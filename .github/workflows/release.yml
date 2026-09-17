@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   publish:
     name: Publish ${{ matrix.target.name }}
@@ -36,7 +39,29 @@ jobs:
       - name: Publish single-file self-contained binary
         run: dotnet publish Cli/Lattice.Cli.csproj -c Release --self-contained true -r ${{ matrix.target.rid }} -p:PublishSingleFile=true -p:AssemblyName=${{ matrix.target.assembly }} -o publish
 
-      - name: Attach binary to GitHub Release
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target.name }}
+          path: publish/${{ matrix.target.name }}
+          if-no-files-found: error
+
+  release:
+    name: Attach binaries to GitHub Release
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all built binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Attach binaries to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: publish/${{ matrix.target.name }}
+          files: artifacts/*

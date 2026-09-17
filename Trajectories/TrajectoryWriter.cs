@@ -8,6 +8,8 @@ namespace Lattice.Trajectories;
 /// sim config), one line per tick (actions + complete StepResult), and a
 /// final metrics line. Each line is independently parseable JSON; simulation
 /// output is byte-stable so re-recording or replaying yields identical lines.
+/// Newlines are emitted as a bare <c>\n</c> on every platform so written
+/// files are byte-identical across Windows, Linux, and macOS.
 /// </summary>
 public static class TrajectoryWriter
 {
@@ -31,7 +33,7 @@ public static class TrajectoryWriter
     {
         var state = Simulation.CreateInitial(map, simulationConfig);
 
-        sink.WriteLine(Serialize(new HeaderLine("header", seed, map, simulationConfig)));
+        sink.Write(Serialize(new HeaderLine("header", seed, map, simulationConfig)) + "\n");
 
         var steps = new List<TrajectoryStep>();
         Info? lastInfo = null;
@@ -42,7 +44,7 @@ public static class TrajectoryWriter
             var outcome = Simulation.Step(state, turn, simulationConfig);
             var step = new TrajectoryStep(outcome.Result.Info.StepNumber, turn, outcome.Result);
             steps.Add(step);
-            sink.WriteLine(Serialize(new StepLine("step", step.StepNumber, turn, outcome.Result)));
+            sink.Write(Serialize(new StepLine("step", step.StepNumber, turn, outcome.Result)) + "\n");
             state = outcome.NextState;
             lastInfo = outcome.Result.Info;
 
@@ -53,7 +55,7 @@ public static class TrajectoryWriter
         }
 
         var final = BuildFinal(state, lastInfo);
-        sink.WriteLine(Serialize(new FinalLine("final", final)));
+        sink.Write(Serialize(new FinalLine("final", final)) + "\n");
 
         return new TrajectoryRecording(
             new TrajectoryHeader(seed, map, simulationConfig),
@@ -69,14 +71,14 @@ public static class TrajectoryWriter
     /// </summary>
     public static void Write(TrajectoryRecording recording, TextWriter sink)
     {
-        sink.WriteLine(Serialize(new HeaderLine("header", recording.Header.Seed, recording.Header.Map, recording.Header.SimulationConfig)));
+        sink.Write(Serialize(new HeaderLine("header", recording.Header.Seed, recording.Header.Map, recording.Header.SimulationConfig)) + "\n");
 
         foreach (var step in recording.Steps)
         {
-            sink.WriteLine(Serialize(new StepLine("step", step.StepNumber, step.Actions, step.Result)));
+            sink.Write(Serialize(new StepLine("step", step.StepNumber, step.Actions, step.Result)) + "\n");
         }
 
-        sink.WriteLine(Serialize(new FinalLine("final", recording.Final)));
+        sink.Write(Serialize(new FinalLine("final", recording.Final)) + "\n");
     }
 
     private static void ValidateTurn(MapGraph map, int stepNumber, AgentAction[] turn)

@@ -260,8 +260,6 @@
 
   function drawEdges(ctx, map, frame, zoneById, layout) {
     const burst = transitEdges(frame);
-    const capStyle = { width: 3.5, dash: [], color: COLORS.edge };
-    let constrained = false;
 
     map.ChokePoints.forEach(function (choke) {
       const from = zoneById[choke.FromZoneId];
@@ -277,8 +275,8 @@
       ctx.lineTo(b.x, b.y);
       ctx.strokeStyle = hot ? COLORS.edgeAtBurst : COLORS.edge;
       ctx.lineWidth = hot ? 5 : (limited ? 3 : 2.5);
-      ctx.setLineDash(hot || !constrained ? [] : []);
-      if (limited && !hot) { ctx.setLineDash([7, 6]); constrained = true; }
+      ctx.setLineDash([]);
+      if (limited && !hot) { ctx.setLineDash([7, 6]); }
       ctx.lineCap = 'round';
       ctx.stroke();
       ctx.setLineDash([]);

@@ -1,0 +1,7 @@
+# Normalize line endings: force LF on checkout/commit for text files so
+# determinism and byte-identical fixture comparisons hold across Windows,
+# Linux, and macOS runners.
+* text=auto eol=lf
+*.jsonl text eol=lf
+*.json text eol=lf
+*.md text eol=lf

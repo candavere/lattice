@@ -76,7 +76,9 @@ public class TrajectoryTests
     {
         var buffer = new StringWriter();
         TrajectoryWriter.Write(recording, buffer);
-        return buffer.ToString();
+        // Normalize line endings so byte-identical comparisons hold on CRLF
+        // (Windows) runners as well as LF (Linux/macOS) runners.
+        return buffer.ToString().Replace("\r\n", "\n");
     }
 
     [Fact]
@@ -109,7 +111,9 @@ public class TrajectoryTests
         var config = new SimulationConfig(2, 10);
         var buffer = new StringWriter();
         TrajectoryWriter.Record(TriangleMap, config, seed, FullCollectorEpisode(), buffer);
-        var original = buffer.ToString();
+        // Normalize line endings so the byte-identical assertion holds on
+        // CRLF (Windows) runners as well as LF (Linux/macOS) runners.
+        var original = buffer.ToString().Replace("\r\n", "\n");
 
         var readBack = TrajectoryReader.Read(new StringReader(original));
         var rewritten = SerializeViaWriter(readBack);

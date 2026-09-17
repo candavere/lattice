@@ -32,7 +32,9 @@ public class TrajectoryPlaybackTests
     {
         var sink = new StringWriter();
         TrajectoryPlayback.Playback(new StringReader(trajectory), sink);
-        return sink.ToString();
+        // Normalize line endings before asserting so frame comparisons hold on
+        // CRLF (Windows) runners as well as LF (Linux/macOS) runners.
+        return sink.ToString().Replace("\r\n", "\n");
     }
 
     [Fact]

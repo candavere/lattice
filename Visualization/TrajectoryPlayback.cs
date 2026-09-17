@@ -15,36 +15,37 @@ namespace Lattice.Visualization;
 /// </summary>
 public static class TrajectoryPlayback
 {
-    /// <summary>
-    /// Reads a trajectory from <paramref name="trajectorySource"/> and writes a
-    /// human-readable sequence of frames to <paramref name="sink"/>. Throws the
-    /// same structural exceptions as <see cref="TrajectoryReader.Read"/> on a
-    /// malformed file. Deterministic: same JSONL, byte-identical output.
-    /// </summary>
-    public static void Playback(TextReader trajectorySource, TextWriter sink)
+/// <summary>
+/// Reads a trajectory from <paramref name="trajectorySource"/> and writes a
+/// human-readable sequence of frames to <paramref name="sink"/>. Throws the
+/// same structural exceptions as <see cref="TrajectoryReader.Read"/> on a
+/// malformed file. Deterministic: same JSONL, byte-identical output, with
+/// newlines emitted as a bare <c>\n</c> on every platform.
+/// </summary>
+public static void Playback(TextReader trajectorySource, TextWriter sink)
+{
+    var recording = TrajectoryReader.Read(trajectorySource);
+    var header = recording.Header;
+    var initial = Simulation.CreateInitial(header.Map, header.SimulationConfig);
+
+    sink.Write("== initial state ==\n");
+    WriteFrame(sink, header.Map, initial.Agents, initial.Claims);
+
+    foreach (var step in recording.Steps)
     {
-        var recording = TrajectoryReader.Read(trajectorySource);
-        var header = recording.Header;
-        var initial = Simulation.CreateInitial(header.Map, header.SimulationConfig);
-
-        sink.WriteLine("== initial state ==");
-        WriteFrame(sink, header.Map, initial.Agents, initial.Claims);
-
-        foreach (var step in recording.Steps)
+        var heading = $"== step {step.StepNumber}";
+        var info = step.Result.Info;
+        if (info.IsTerminal)
         {
-            var heading = $"== step {step.StepNumber}";
-            var info = step.Result.Info;
-            if (info.IsTerminal)
-            {
-                heading += $" - terminal ({info.Reason}), winner: agent {info.WinnerAgentId}";
-            }
-
-            heading += " ==";
-            sink.WriteLine(heading);
-            sink.WriteLine($"actions: {FormatActions(step.Actions)}");
-            WriteFrame(sink, header.Map, step.Result.Observations[0]);
+            heading += $" - terminal ({info.Reason}), winner: agent {info.WinnerAgentId}";
         }
+
+        heading += " ==";
+        sink.Write(heading + "\n");
+        sink.Write($"actions: {FormatActions(step.Actions)}\n");
+        WriteFrame(sink, header.Map, step.Result.Observations[0]);
     }
+}
 
     /// <summary>
     /// One-line summary of a turn, agent-by-agent in slot order, e.g.
@@ -81,13 +82,11 @@ public static class TrajectoryPlayback
 
     private static void WriteFrame(TextWriter sink, MapGraph map, AgentState[] agents, int[] claims)
     {
-        sink.WriteLine(AsciiRenderer.RenderFrame(map, agents, claims));
-        sink.WriteLine();
+        sink.Write(AsciiRenderer.RenderFrame(map, agents, claims) + "\n\n");
     }
 
     private static void WriteFrame(TextWriter sink, MapGraph map, Observation observation)
     {
-        sink.WriteLine(AsciiRenderer.RenderFrame(map, observation));
-        sink.WriteLine();
+        sink.Write(AsciiRenderer.RenderFrame(map, observation) + "\n\n");
     }
 }

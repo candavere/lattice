@@ -1,0 +1,152 @@
+# Contributing to Lattice
+
+Thank you for considering a contribution to Lattice — a deterministic,
+seedable 2D procedural strategy/tactical simulation environment with a clean
+agent harness. This guide documents the engineering contract every change must
+honor so the repository keeps reading as a coherent product rather than an
+accumulation of patches.
+
+Before anything else: read the project's engineering contract; it is the
+source of truth for design principles and non-negotiable constraints. Work is
+only *done* when the tests that pin the requested behavior pass, no principle
+is violated, and no unrequested functionality was added.
+
+## Philosophy & Design Tenets
+
+Four ideas govern every change:
+
+1. **Zero external runtime dependencies.** `Lattice.Environment`,
+   `Lattice.Generator`, and `Lattice.Analytics` are Standard BCL only. No
+   NuGet packages, no game engine references, no Newtonsoft.Json, no
+   serialization frameworks. Visualization and tooling may depend on what they
+   need, but they must consume the core only through the public step-contract
+   types.
+
+2. **Strict platform determinism.** The core guarantee is **same seed + same
+   actions → byte-identical trajectory**, on every supported target: .NET 8 on
+   Linux, macOS, and Windows, on x64 and ARM64. There is no ambient randomness,
+   no hidden mutable state, no `System.Random` without an explicit seeded
+   instance, and no behavior that depends on `GetHashCode`, culture, or
+   iteration order leaks. Determinism is tested, not assumed.
+
+3. **High-throughput, allocation-conscious simulation loops.** The pure
+   `Simulation.Step` loop targets the `>400k steps/second` baseline (sample
+   figures around 430k steps/sec, single-threaded). Keep the hot path free of
+   per-step allocation churn, avoid string concatenation and LINQ in tight
+   loops, and never move work such as logging or serialization into the step.
+
+4. **Clear separation of concerns.** Environment state, topological graph
+   definition, and agent decision logic are three distinct layers. The
+   environment never knows about vision (perception is a pure projection), the
+   map generator never knows agents or fairness exist (an acceptance gate is
+   caller-supplied), and agents are a thin demonstration layer — the
+   environment is the product.
+
+## Development Environment & Prerequisites
+
+- a recent [.NET 8.0 SDK](https://dotnet.microsoft.com/download) (the solution
+  also runs on later majors via `RollForward=LatestMajor`).
+- no other tooling is required; there is no formatter, linter, or
+  code-generator step. Everything compiles and tests with the SDK alone.
+
+Build the solution (expect **0 warnings, 0 errors**):
+
+```sh
+dotnet build Lattice.sln -c Release
+```
+
+Run the full test suite (unit, determinism, replay, benchmark):
+
+```sh
+dotnet test Lattice.sln
+```
+
+A green build with a green suite in Release is the baseline bar for any merge.
+
+## Determinism Testing Checklist (Mandatory for PRs)
+
+Any change to action resolution, tie-breaking, kinematic transit counters,
+capacity triage, or agent heuristics risk silently re-tilting a trajectory.
+Run the determinism verification below **before** submitting and keep the
+results in the PR description.
+
+1. **Replay byte-identical across consecutive runs.** Record an episode to
+   JSONL, then re-record the same seed/actions on a fresh process and diff:
+
+   ```sh
+   dotnet run --project Cli -c Release -- simulate --seed 42 --steps 100 --out a.jsonl
+   dotnet run --project Cli -c Release -- simulate --seed 42 --steps 100 --out b.jsonl
+   cmp a.jsonl b.jsonl && echo "identical"
+   ```
+
+   If you changed resolution logic, do the same with `--agent mcts` (the
+   search must still traverse deterministically).
+
+2. **Cross-platform determinism.** Determinism is a property of the code, not
+   the machine. CI runs the suite on Linux, macOS, and Windows (x64 and
+   ARM64); confirm the platform matrix is green in your PR. If you cannot run
+   all platforms locally, say so explicitly so reviewers know the matrix is
+   the coverage.
+
+3. **Floating-point hygiene.** No simulation rule may depend on IEEE
+   double/float comparisons in tie-break or ordering decisions; tie-breaks
+   must be integer-quantized (union/record order, id, distance). Call this out
+   in the PR if your change touches scoring or search ranking.
+
+4. **Determinism regression tests.** Add or extend a determinism test that pins
+   the changed behavior: same seed + same actions produce identical JSON,
+   asserted rather than eyeballed. See `/Tests` for the existing suite — new
+   deterministic behavior without a pinning test will be sent back.
+
+## Pull Request Guidelines
+
+- **Focused, atomic PRs.** One logical change per PR, branched from `main`
+  with a descriptive, imperative subject. Split cross-cutting work; if the
+  diff touches both environment and generator, it should typically be two PRs
+  with the dependency stated in their descriptions.
+- **100% test pass rate, zero compiler warnings.** The suite must pass as-is
+  on `main` plus your branch; a change that turns a passing test red or adds a
+  warning is not mergeable. If legacy behavior is intentionally changing, the
+  PR must update the affected pins *in the same commit* with a rationale.
+- **No new external packages in core assemblies.** `Lattice.Environment`,
+  `Lattice.Generator`, and `Lattice.Analytics` remain BCL-only. Dependency
+  proposals for the core are a design decision, not a merge decision — raise
+  them in an issue first.
+- **Regression tests for bug fixes and topological edge cases.** Any fix —
+  especially choke contention, capacity limits, transit bookkeeping, or
+  generator constraint edge cases — must ship with a test that fails on the old
+  behavior and passes on the new one. Favor adversarial fixtures (opposing
+  agents on a capacity-1 choke, blocked first hops, exhausted retry budgets).
+- **No hidden state or ambient randomness.** A contribution cannot introduce a
+  static mutable field, a singleton, or an unseeded RNG. If an agent or
+  subsystem needs per-episode state, make it instance state and document that
+  the instance is bound to one episode.
+- **Public types need `///` docs on the *why*.** Public step-contract records
+  and functions must carry XML docs explaining their contract, not just their
+  shape. Keep public documentation free of implementation-chronology hints;
+  the repository reads as an authoritative product.
+
+## Reporting Issues
+
+Bugs reproduce deterministically — file them that way. Open a GitHub issue on
+https://github.com/candavere/lattice/issues with the following, all of which
+are required:
+
+- **Seed number** — the exact `--seed` used (a `ulong`).
+- **CLI command line** — the full invocation (command, flags, and values),
+  e.g. `dotnet run --project Cli -- simulate --seed 42 --agent mcts --steps 100`.
+  If the bug surfaces in the web replay viewer instead, say which file you
+  loaded (`demo.jsonl` or a custom recording).
+- **Step count** — how many ticks were recorded and whether the episode ended
+  by exhaustion or tick limit (`Reason` from the final metrics line).
+- **Target architecture** — OS and CPU (e.g. "macOS 15 / Apple silicon",
+  "Linux / x64", "Windows 11 / ARM64"), and the .NET version you built with.
+- **Expected vs. actual trajectory output** — paste (or attach) the
+  differing `jsonl` lines, or the header/final lines that disagree, plus the
+  exact bytes (or hex) of the divergence if it is not visible as text.
+
+Include **one** focused problem per issue. Related but distinct symptoms should
+be separate issues; the determinism guarantees make bisection trivial once the
+seed and platform are recorded. If the bug is a performance regression, run
+`dotnet run --project Cli -- benchmark --ticks 1000` on your machine and report
+`steps_per_second` alongside your hardware.

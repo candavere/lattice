@@ -2,56 +2,68 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="19920" height="17940" viewBox="0 0 19920 17940">
 <rect width="19920" height="17940" fill="#0F111A"/>
 <style>
-  #frame-0 { animation: frame-0 25s steps(1) infinite; }
-  #frame-1 { animation: frame-1 25s steps(1) infinite; }
-  #frame-2 { animation: frame-2 25s steps(1) infinite; }
-  #frame-3 { animation: frame-3 25s steps(1) infinite; }
-  #frame-4 { animation: frame-4 25s steps(1) infinite; }
-  #frame-5 { animation: frame-5 25s steps(1) infinite; }
-  #frame-6 { animation: frame-6 25s steps(1) infinite; }
-  #frame-7 { animation: frame-7 25s steps(1) infinite; }
-  #frame-8 { animation: frame-8 25s steps(1) infinite; }
-  #frame-9 { animation: frame-9 25s steps(1) infinite; }
-  #frame-10 { animation: frame-10 25s steps(1) infinite; }
-  #frame-11 { animation: frame-11 25s steps(1) infinite; }
-  #frame-12 { animation: frame-12 25s steps(1) infinite; }
-  #frame-13 { animation: frame-13 25s steps(1) infinite; }
-  #frame-14 { animation: frame-14 25s steps(1) infinite; }
-  #frame-15 { animation: frame-15 25s steps(1) infinite; }
-  #frame-16 { animation: frame-16 25s steps(1) infinite; }
-  #frame-17 { animation: frame-17 25s steps(1) infinite; }
-  #frame-18 { animation: frame-18 25s steps(1) infinite; }
-  #frame-19 { animation: frame-19 25s steps(1) infinite; }
-  #frame-20 { animation: frame-20 25s steps(1) infinite; }
-  #frame-21 { animation: frame-21 25s steps(1) infinite; }
-  #frame-22 { animation: frame-22 25s steps(1) infinite; }
-  #frame-23 { animation: frame-23 25s steps(1) infinite; }
-  #frame-24 { animation: frame-24 25s steps(1) infinite; }
-  @keyframes frame-0 { 0%, 0% { opacity: 0; } 0%, 4% { opacity: 1; } 4%, 100% { opacity: 0; } }
-  @keyframes frame-1 { 0%, 4% { opacity: 0; } 4%, 8% { opacity: 1; } 8%, 100% { opacity: 0; } }
-  @keyframes frame-2 { 0%, 8% { opacity: 0; } 8%, 12% { opacity: 1; } 12%, 100% { opacity: 0; } }
-  @keyframes frame-3 { 0%, 12% { opacity: 0; } 12%, 16% { opacity: 1; } 16%, 100% { opacity: 0; } }
-  @keyframes frame-4 { 0%, 16% { opacity: 0; } 16%, 20% { opacity: 1; } 20%, 100% { opacity: 0; } }
-  @keyframes frame-5 { 0%, 20% { opacity: 0; } 20%, 24% { opacity: 1; } 24%, 100% { opacity: 0; } }
-  @keyframes frame-6 { 0%, 24% { opacity: 0; } 24%, 28% { opacity: 1; } 28%, 100% { opacity: 0; } }
-  @keyframes frame-7 { 0%, 28% { opacity: 0; } 28%, 32% { opacity: 1; } 32%, 100% { opacity: 0; } }
-  @keyframes frame-8 { 0%, 32% { opacity: 0; } 32%, 36% { opacity: 1; } 36%, 100% { opacity: 0; } }
-  @keyframes frame-9 { 0%, 36% { opacity: 0; } 36%, 40% { opacity: 1; } 40%, 100% { opacity: 0; } }
-  @keyframes frame-10 { 0%, 40% { opacity: 0; } 40%, 44% { opacity: 1; } 44%, 100% { opacity: 0; } }
-  @keyframes frame-11 { 0%, 44% { opacity: 0; } 44%, 48% { opacity: 1; } 48%, 100% { opacity: 0; } }
-  @keyframes frame-12 { 0%, 48% { opacity: 0; } 48%, 52% { opacity: 1; } 52%, 100% { opacity: 0; } }
-  @keyframes frame-13 { 0%, 52% { opacity: 0; } 52%, 56% { opacity: 1; } 56%, 100% { opacity: 0; } }
-  @keyframes frame-14 { 0%, 56% { opacity: 0; } 56%, 60% { opacity: 1; } 60%, 100% { opacity: 0; } }
-  @keyframes frame-15 { 0%, 60% { opacity: 0; } 60%, 64% { opacity: 1; } 64%, 100% { opacity: 0; } }
-  @keyframes frame-16 { 0%, 64% { opacity: 0; } 64%, 68% { opacity: 1; } 68%, 100% { opacity: 0; } }
-  @keyframes frame-17 { 0%, 68% { opacity: 0; } 68%, 72% { opacity: 1; } 72%, 100% { opacity: 0; } }
-  @keyframes frame-18 { 0%, 72% { opacity: 0; } 72%, 76% { opacity: 1; } 76%, 100% { opacity: 0; } }
-  @keyframes frame-19 { 0%, 76% { opacity: 0; } 76%, 80% { opacity: 1; } 80%, 100% { opacity: 0; } }
-  @keyframes frame-20 { 0%, 80% { opacity: 0; } 80%, 84% { opacity: 1; } 84%, 100% { opacity: 0; } }
-  @keyframes frame-21 { 0%, 84% { opacity: 0; } 84%, 88% { opacity: 1; } 88%, 100% { opacity: 0; } }
-  @keyframes frame-22 { 0%, 88% { opacity: 0; } 88%, 92% { opacity: 1; } 92%, 100% { opacity: 0; } }
-  @keyframes frame-23 { 0%, 92% { opacity: 0; } 92%, 96% { opacity: 1; } 96%, 100% { opacity: 0; } }
-  @keyframes frame-24 { 0%, 96% { opacity: 0; } 96%, 100% { opacity: 1; } 100%, 100% { opacity: 0; } }
+  #frame-0 { animation: frame-0 31s steps(1) infinite; }
+  #frame-1 { animation: frame-1 31s steps(1) infinite; }
+  #frame-2 { animation: frame-2 31s steps(1) infinite; }
+  #frame-3 { animation: frame-3 31s steps(1) infinite; }
+  #frame-4 { animation: frame-4 31s steps(1) infinite; }
+  #frame-5 { animation: frame-5 31s steps(1) infinite; }
+  #frame-6 { animation: frame-6 31s steps(1) infinite; }
+  #frame-7 { animation: frame-7 31s steps(1) infinite; }
+  #frame-8 { animation: frame-8 31s steps(1) infinite; }
+  #frame-9 { animation: frame-9 31s steps(1) infinite; }
+  #frame-10 { animation: frame-10 31s steps(1) infinite; }
+  #frame-11 { animation: frame-11 31s steps(1) infinite; }
+  #frame-12 { animation: frame-12 31s steps(1) infinite; }
+  #frame-13 { animation: frame-13 31s steps(1) infinite; }
+  #frame-14 { animation: frame-14 31s steps(1) infinite; }
+  #frame-15 { animation: frame-15 31s steps(1) infinite; }
+  #frame-16 { animation: frame-16 31s steps(1) infinite; }
+  #frame-17 { animation: frame-17 31s steps(1) infinite; }
+  #frame-18 { animation: frame-18 31s steps(1) infinite; }
+  #frame-19 { animation: frame-19 31s steps(1) infinite; }
+  #frame-20 { animation: frame-20 31s steps(1) infinite; }
+  #frame-21 { animation: frame-21 31s steps(1) infinite; }
+  #frame-22 { animation: frame-22 31s steps(1) infinite; }
+  #frame-23 { animation: frame-23 31s steps(1) infinite; }
+  #frame-24 { animation: frame-24 31s steps(1) infinite; }
+  #frame-25 { animation: frame-25 31s steps(1) infinite; }
+  #frame-26 { animation: frame-26 31s steps(1) infinite; }
+  #frame-27 { animation: frame-27 31s steps(1) infinite; }
+  #frame-28 { animation: frame-28 31s steps(1) infinite; }
+  #frame-29 { animation: frame-29 31s steps(1) infinite; }
+  #frame-30 { animation: frame-30 31s steps(1) infinite; }
+  @keyframes frame-0 { 0%, 0% { opacity: 0; } 0%, 3.23% { opacity: 1; } 3.23%, 100% { opacity: 0; } }
+  @keyframes frame-1 { 0%, 3.23% { opacity: 0; } 3.23%, 6.45% { opacity: 1; } 6.45%, 100% { opacity: 0; } }
+  @keyframes frame-2 { 0%, 6.45% { opacity: 0; } 6.45%, 9.68% { opacity: 1; } 9.68%, 100% { opacity: 0; } }
+  @keyframes frame-3 { 0%, 9.68% { opacity: 0; } 9.68%, 12.9% { opacity: 1; } 12.9%, 100% { opacity: 0; } }
+  @keyframes frame-4 { 0%, 12.9% { opacity: 0; } 12.9%, 16.13% { opacity: 1; } 16.13%, 100% { opacity: 0; } }
+  @keyframes frame-5 { 0%, 16.13% { opacity: 0; } 16.13%, 19.35% { opacity: 1; } 19.35%, 100% { opacity: 0; } }
+  @keyframes frame-6 { 0%, 19.35% { opacity: 0; } 19.35%, 22.58% { opacity: 1; } 22.58%, 100% { opacity: 0; } }
+  @keyframes frame-7 { 0%, 22.58% { opacity: 0; } 22.58%, 25.81% { opacity: 1; } 25.81%, 100% { opacity: 0; } }
+  @keyframes frame-8 { 0%, 25.81% { opacity: 0; } 25.81%, 29.03% { opacity: 1; } 29.03%, 100% { opacity: 0; } }
+  @keyframes frame-9 { 0%, 29.03% { opacity: 0; } 29.03%, 32.26% { opacity: 1; } 32.26%, 100% { opacity: 0; } }
+  @keyframes frame-10 { 0%, 32.26% { opacity: 0; } 32.26%, 35.48% { opacity: 1; } 35.48%, 100% { opacity: 0; } }
+  @keyframes frame-11 { 0%, 35.48% { opacity: 0; } 35.48%, 38.71% { opacity: 1; } 38.71%, 100% { opacity: 0; } }
+  @keyframes frame-12 { 0%, 38.71% { opacity: 0; } 38.71%, 41.94% { opacity: 1; } 41.94%, 100% { opacity: 0; } }
+  @keyframes frame-13 { 0%, 41.94% { opacity: 0; } 41.94%, 45.16% { opacity: 1; } 45.16%, 100% { opacity: 0; } }
+  @keyframes frame-14 { 0%, 45.16% { opacity: 0; } 45.16%, 48.39% { opacity: 1; } 48.39%, 100% { opacity: 0; } }
+  @keyframes frame-15 { 0%, 48.39% { opacity: 0; } 48.39%, 51.61% { opacity: 1; } 51.61%, 100% { opacity: 0; } }
+  @keyframes frame-16 { 0%, 51.61% { opacity: 0; } 51.61%, 54.84% { opacity: 1; } 54.84%, 100% { opacity: 0; } }
+  @keyframes frame-17 { 0%, 54.84% { opacity: 0; } 54.84%, 58.06% { opacity: 1; } 58.06%, 100% { opacity: 0; } }
+  @keyframes frame-18 { 0%, 58.06% { opacity: 0; } 58.06%, 61.29% { opacity: 1; } 61.29%, 100% { opacity: 0; } }
+  @keyframes frame-19 { 0%, 61.29% { opacity: 0; } 61.29%, 64.52% { opacity: 1; } 64.52%, 100% { opacity: 0; } }
+  @keyframes frame-20 { 0%, 64.52% { opacity: 0; } 64.52%, 67.74% { opacity: 1; } 67.74%, 100% { opacity: 0; } }
+  @keyframes frame-21 { 0%, 67.74% { opacity: 0; } 67.74%, 70.97% { opacity: 1; } 70.97%, 100% { opacity: 0; } }
+  @keyframes frame-22 { 0%, 70.97% { opacity: 0; } 70.97%, 74.19% { opacity: 1; } 74.19%, 100% { opacity: 0; } }
+  @keyframes frame-23 { 0%, 74.19% { opacity: 0; } 74.19%, 77.42% { opacity: 1; } 77.42%, 100% { opacity: 0; } }
+  @keyframes frame-24 { 0%, 77.42% { opacity: 0; } 77.42%, 80.65% { opacity: 1; } 80.65%, 100% { opacity: 0; } }
+  @keyframes frame-25 { 0%, 80.65% { opacity: 0; } 80.65%, 83.87% { opacity: 1; } 83.87%, 100% { opacity: 0; } }
+  @keyframes frame-26 { 0%, 83.87% { opacity: 0; } 83.87%, 87.1% { opacity: 1; } 87.1%, 100% { opacity: 0; } }
+  @keyframes frame-27 { 0%, 87.1% { opacity: 0; } 87.1%, 90.32% { opacity: 1; } 90.32%, 100% { opacity: 0; } }
+  @keyframes frame-28 { 0%, 90.32% { opacity: 0; } 90.32%, 93.55% { opacity: 1; } 93.55%, 100% { opacity: 0; } }
+  @keyframes frame-29 { 0%, 93.55% { opacity: 0; } 93.55%, 96.77% { opacity: 1; } 96.77%, 100% { opacity: 0; } }
+  @keyframes frame-30 { 0%, 96.77% { opacity: 0; } 96.77%, 100% { opacity: 1; } 100%, 100% { opacity: 0; } }
 </style>
 <g id="frame-0" class="frame" data-step="initial">
 <g id="edges">
@@ -228,7 +240,7 @@
 <circle cx="18840" cy="16560" r="5" fill="#E0AF68"/>
 <circle cx="5220" cy="11120" r="5" fill="#E0AF68"/>
 <circle cx="600" cy="13040" r="5" fill="#E0AF68"/>
-<circle cx="12320" cy="13420" r="5" fill="#3DA66B"/>
+<circle cx="12320" cy="13420" r="5" fill="#E0AF68"/>
 <circle cx="8560" cy="4620" r="5" fill="#E0AF68"/>
 <circle cx="8200" cy="17620" r="5" fill="#E0AF68"/>
 <circle cx="10080" cy="3360" r="5" fill="#E0AF68"/>
@@ -241,7 +253,7 @@
 <g id="zone-3"><title>zone 3 (788, 96)</title><circle cx="15700" cy="1600" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
 </g>
 <g id="agents">
-<g id="agent-0"><title>agent 0, zone 1, score 1</title><circle cx="40" cy="13020" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-0"><title>agent 0, zone 1, score 0</title><circle cx="40" cy="13020" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
 <g id="agent-1"><title>agent 1, zone 2, score 1</title><circle cx="6780" cy="40" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
 </g>
 </g>
@@ -260,7 +272,7 @@
 <circle cx="18840" cy="16560" r="5" fill="#E0AF68"/>
 <circle cx="5220" cy="11120" r="5" fill="#E0AF68"/>
 <circle cx="600" cy="13040" r="5" fill="#E0AF68"/>
-<circle cx="12320" cy="13420" r="5" fill="#3DA66B"/>
+<circle cx="12320" cy="13420" r="5" fill="#E0AF68"/>
 <circle cx="8560" cy="4620" r="5" fill="#E0AF68"/>
 <circle cx="8200" cy="17620" r="5" fill="#E0AF68"/>
 <circle cx="10080" cy="3360" r="5" fill="#E0AF68"/>
@@ -273,7 +285,7 @@
 <g id="zone-3"><title>zone 3 (788, 96)</title><circle cx="15700" cy="1600" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
 </g>
 <g id="agents">
-<g id="agent-0"><title>agent 0, zone 2, score 1</title><circle cx="6780" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-0"><title>agent 0, zone 2, score 0</title><circle cx="6780" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
 <g id="agent-1"><title>agent 1, zone 3, score 1</title><circle cx="15700" cy="1600" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
 </g>
 </g>
@@ -292,7 +304,7 @@
 <circle cx="18840" cy="16560" r="5" fill="#E0AF68"/>
 <circle cx="5220" cy="11120" r="5" fill="#E0AF68"/>
 <circle cx="600" cy="13040" r="5" fill="#E0AF68"/>
-<circle cx="12320" cy="13420" r="5" fill="#3DA66B"/>
+<circle cx="12320" cy="13420" r="5" fill="#E0AF68"/>
 <circle cx="8560" cy="4620" r="5" fill="#E0AF68"/>
 <circle cx="8200" cy="17620" r="5" fill="#E0AF68"/>
 <circle cx="10080" cy="3360" r="5" fill="#E0AF68"/>
@@ -305,7 +317,7 @@
 <g id="zone-3"><title>zone 3 (788, 96)</title><circle cx="15700" cy="1600" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
 </g>
 <g id="agents">
-<g id="agent-0"><title>agent 0, zone 1, score 1</title><circle cx="40" cy="13020" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-0"><title>agent 0, zone 1, score 0</title><circle cx="40" cy="13020" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
 <g id="agent-1"><title>agent 1, zone 3, score 1</title><circle cx="15700" cy="1600" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
 </g>
 </g>
@@ -324,7 +336,7 @@
 <circle cx="18840" cy="16560" r="5" fill="#E0AF68"/>
 <circle cx="5220" cy="11120" r="5" fill="#E0AF68"/>
 <circle cx="600" cy="13040" r="5" fill="#E0AF68"/>
-<circle cx="12320" cy="13420" r="5" fill="#3DA66B"/>
+<circle cx="12320" cy="13420" r="5" fill="#E0AF68"/>
 <circle cx="8560" cy="4620" r="5" fill="#E0AF68"/>
 <circle cx="8200" cy="17620" r="5" fill="#E0AF68"/>
 <circle cx="10080" cy="3360" r="5" fill="#E0AF68"/>
@@ -337,7 +349,7 @@
 <g id="zone-3"><title>zone 3 (788, 96)</title><circle cx="15700" cy="1600" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
 </g>
 <g id="agents">
-<g id="agent-0"><title>agent 0, zone 1, score 1</title><circle cx="40" cy="13020" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-0"><title>agent 0, zone 1, score 0</title><circle cx="40" cy="13020" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
 <g id="agent-1"><title>agent 1, zone 1, score 1</title><circle cx="40" cy="13020" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
 </g>
 </g>
@@ -356,7 +368,7 @@
 <circle cx="18840" cy="16560" r="5" fill="#E0AF68"/>
 <circle cx="5220" cy="11120" r="5" fill="#E0AF68"/>
 <circle cx="600" cy="13040" r="5" fill="#3DA66B"/>
-<circle cx="12320" cy="13420" r="5" fill="#3DA66B"/>
+<circle cx="12320" cy="13420" r="5" fill="#E0AF68"/>
 <circle cx="8560" cy="4620" r="5" fill="#E0AF68"/>
 <circle cx="8200" cy="17620" r="5" fill="#E0AF68"/>
 <circle cx="10080" cy="3360" r="5" fill="#E0AF68"/>
@@ -369,7 +381,7 @@
 <g id="zone-3"><title>zone 3 (788, 96)</title><circle cx="15700" cy="1600" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
 </g>
 <g id="agents">
-<g id="agent-0"><title>agent 0, zone 1, score 2</title><circle cx="40" cy="13020" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-0"><title>agent 0, zone 1, score 1</title><circle cx="40" cy="13020" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
 <g id="agent-1"><title>agent 1, zone 1, score 1</title><circle cx="40" cy="13020" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
 </g>
 </g>
@@ -401,11 +413,107 @@
 <g id="zone-3"><title>zone 3 (788, 96)</title><circle cx="15700" cy="1600" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
 </g>
 <g id="agents">
+<g id="agent-0"><title>agent 0, zone 1, score 2</title><circle cx="40" cy="13020" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, zone 2, score 1</title><circle cx="6780" cy="40" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+</g>
+</g>
+<g id="frame-11" class="frame" data-step="11">
+<g id="edges">
+<line x1="6220" y1="17900" x2="40" y2="13020" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="40" y1="13020" x2="6780" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="6780" y1="40" x2="15700" y2="1600" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="40" y1="13020" x2="6220" y2="17900" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="6220" y1="17900" x2="40" y2="13020" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="40" y1="13020" x2="15700" y2="1600" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="6780" y1="40" x2="6220" y2="17900" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="resources">
+<circle cx="15120" cy="3260" r="5" fill="#E0AF68"/>
+<circle cx="18840" cy="16560" r="5" fill="#E0AF68"/>
+<circle cx="5220" cy="11120" r="5" fill="#E0AF68"/>
+<circle cx="600" cy="13040" r="5" fill="#3DA66B"/>
+<circle cx="12320" cy="13420" r="5" fill="#3DA66B"/>
+<circle cx="8560" cy="4620" r="5" fill="#E0AF68"/>
+<circle cx="8200" cy="17620" r="5" fill="#E0AF68"/>
+<circle cx="10080" cy="3360" r="5" fill="#E0AF68"/>
+<circle cx="19880" cy="13200" r="5" fill="#3DA66B"/>
+</g>
+<g id="zones">
+<g id="zone-0"><title>zone 0 (314, 911)</title><circle cx="6220" cy="17900" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="6220" y="17900" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 (5, 667)</title><circle cx="40" cy="13020" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 (342, 18)</title><circle cx="6780" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 (788, 96)</title><circle cx="15700" cy="1600" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+</g>
+<g id="agents">
+<g id="agent-0"><title>agent 0, zone 2, score 2</title><circle cx="6780" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, zone 1, score 1</title><circle cx="40" cy="13020" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+</g>
+</g>
+<g id="frame-12" class="frame" data-step="12">
+<g id="edges">
+<line x1="6220" y1="17900" x2="40" y2="13020" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="40" y1="13020" x2="6780" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="6780" y1="40" x2="15700" y2="1600" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="40" y1="13020" x2="6220" y2="17900" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="6220" y1="17900" x2="40" y2="13020" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="40" y1="13020" x2="15700" y2="1600" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="6780" y1="40" x2="6220" y2="17900" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="resources">
+<circle cx="15120" cy="3260" r="5" fill="#E0AF68"/>
+<circle cx="18840" cy="16560" r="5" fill="#E0AF68"/>
+<circle cx="5220" cy="11120" r="5" fill="#E0AF68"/>
+<circle cx="600" cy="13040" r="5" fill="#3DA66B"/>
+<circle cx="12320" cy="13420" r="5" fill="#3DA66B"/>
+<circle cx="8560" cy="4620" r="5" fill="#E0AF68"/>
+<circle cx="8200" cy="17620" r="5" fill="#E0AF68"/>
+<circle cx="10080" cy="3360" r="5" fill="#E0AF68"/>
+<circle cx="19880" cy="13200" r="5" fill="#3DA66B"/>
+</g>
+<g id="zones">
+<g id="zone-0"><title>zone 0 (314, 911)</title><circle cx="6220" cy="17900" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="6220" y="17900" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 (5, 667)</title><circle cx="40" cy="13020" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 (342, 18)</title><circle cx="6780" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 (788, 96)</title><circle cx="15700" cy="1600" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+</g>
+<g id="agents">
+<g id="agent-0"><title>agent 0, zone 0, score 2</title><circle cx="6220" cy="17900" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6220" y="17900" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, zone 1, score 1</title><circle cx="40" cy="13020" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+</g>
+</g>
+<g id="frame-13" class="frame" data-step="13">
+<g id="edges">
+<line x1="6220" y1="17900" x2="40" y2="13020" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="40" y1="13020" x2="6780" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="6780" y1="40" x2="15700" y2="1600" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="40" y1="13020" x2="6220" y2="17900" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="6220" y1="17900" x2="40" y2="13020" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="40" y1="13020" x2="15700" y2="1600" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="6780" y1="40" x2="6220" y2="17900" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="resources">
+<circle cx="15120" cy="3260" r="5" fill="#E0AF68"/>
+<circle cx="18840" cy="16560" r="5" fill="#E0AF68"/>
+<circle cx="5220" cy="11120" r="5" fill="#E0AF68"/>
+<circle cx="600" cy="13040" r="5" fill="#3DA66B"/>
+<circle cx="12320" cy="13420" r="5" fill="#3DA66B"/>
+<circle cx="8560" cy="4620" r="5" fill="#E0AF68"/>
+<circle cx="8200" cy="17620" r="5" fill="#E0AF68"/>
+<circle cx="10080" cy="3360" r="5" fill="#E0AF68"/>
+<circle cx="19880" cy="13200" r="5" fill="#3DA66B"/>
+</g>
+<g id="zones">
+<g id="zone-0"><title>zone 0 (314, 911)</title><circle cx="6220" cy="17900" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="6220" y="17900" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 (5, 667)</title><circle cx="40" cy="13020" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 (342, 18)</title><circle cx="6780" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 (788, 96)</title><circle cx="15700" cy="1600" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+</g>
+<g id="agents">
 <g id="agent-0"><title>agent 0, zone 0, score 2</title><circle cx="6220" cy="17900" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6220" y="17900" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
 <g id="agent-1"><title>agent 1, zone 0, score 1</title><circle cx="6220" cy="17900" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="6220" y="17900" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
 </g>
 </g>
-<g id="frame-11" class="frame" data-step="11">
+<g id="frame-14" class="frame" data-step="14">
 <g id="edges">
 <line x1="6220" y1="17900" x2="40" y2="13020" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
 <line x1="40" y1="13020" x2="6780" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
@@ -437,102 +545,6 @@
 <g id="agent-1"><title>agent 1, zone 1, score 1</title><circle cx="40" cy="13020" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
 </g>
 </g>
-<g id="frame-12" class="frame" data-step="12">
-<g id="edges">
-<line x1="6220" y1="17900" x2="40" y2="13020" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
-<line x1="40" y1="13020" x2="6780" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
-<line x1="6780" y1="40" x2="15700" y2="1600" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
-<line x1="40" y1="13020" x2="6220" y2="17900" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
-<line x1="6220" y1="17900" x2="40" y2="13020" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
-<line x1="40" y1="13020" x2="15700" y2="1600" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
-<line x1="6780" y1="40" x2="6220" y2="17900" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
-</g>
-<g id="resources">
-<circle cx="15120" cy="3260" r="5" fill="#3DA66B"/>
-<circle cx="18840" cy="16560" r="5" fill="#3DA66B"/>
-<circle cx="5220" cy="11120" r="5" fill="#E0AF68"/>
-<circle cx="600" cy="13040" r="5" fill="#3DA66B"/>
-<circle cx="12320" cy="13420" r="5" fill="#3DA66B"/>
-<circle cx="8560" cy="4620" r="5" fill="#E0AF68"/>
-<circle cx="8200" cy="17620" r="5" fill="#E0AF68"/>
-<circle cx="10080" cy="3360" r="5" fill="#E0AF68"/>
-<circle cx="19880" cy="13200" r="5" fill="#3DA66B"/>
-</g>
-<g id="zones">
-<g id="zone-0"><title>zone 0 (314, 911)</title><circle cx="6220" cy="17900" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="6220" y="17900" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
-<g id="zone-1"><title>zone 1 (5, 667)</title><circle cx="40" cy="13020" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
-<g id="zone-2"><title>zone 2 (342, 18)</title><circle cx="6780" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
-<g id="zone-3"><title>zone 3 (788, 96)</title><circle cx="15700" cy="1600" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
-</g>
-<g id="agents">
-<g id="agent-0"><title>agent 0, zone 0, score 4</title><circle cx="6220" cy="17900" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6220" y="17900" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
-<g id="agent-1"><title>agent 1, zone 1, score 1</title><circle cx="40" cy="13020" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
-</g>
-</g>
-<g id="frame-13" class="frame" data-step="13">
-<g id="edges">
-<line x1="6220" y1="17900" x2="40" y2="13020" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
-<line x1="40" y1="13020" x2="6780" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
-<line x1="6780" y1="40" x2="15700" y2="1600" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
-<line x1="40" y1="13020" x2="6220" y2="17900" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
-<line x1="6220" y1="17900" x2="40" y2="13020" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
-<line x1="40" y1="13020" x2="15700" y2="1600" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
-<line x1="6780" y1="40" x2="6220" y2="17900" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
-</g>
-<g id="resources">
-<circle cx="15120" cy="3260" r="5" fill="#3DA66B"/>
-<circle cx="18840" cy="16560" r="5" fill="#3DA66B"/>
-<circle cx="5220" cy="11120" r="5" fill="#E0AF68"/>
-<circle cx="600" cy="13040" r="5" fill="#3DA66B"/>
-<circle cx="12320" cy="13420" r="5" fill="#3DA66B"/>
-<circle cx="8560" cy="4620" r="5" fill="#E0AF68"/>
-<circle cx="8200" cy="17620" r="5" fill="#E0AF68"/>
-<circle cx="10080" cy="3360" r="5" fill="#E0AF68"/>
-<circle cx="19880" cy="13200" r="5" fill="#3DA66B"/>
-</g>
-<g id="zones">
-<g id="zone-0"><title>zone 0 (314, 911)</title><circle cx="6220" cy="17900" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="6220" y="17900" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
-<g id="zone-1"><title>zone 1 (5, 667)</title><circle cx="40" cy="13020" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
-<g id="zone-2"><title>zone 2 (342, 18)</title><circle cx="6780" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
-<g id="zone-3"><title>zone 3 (788, 96)</title><circle cx="15700" cy="1600" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
-</g>
-<g id="agents">
-<g id="agent-0"><title>agent 0, zone 0, score 4</title><circle cx="6220" cy="17900" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6220" y="17900" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
-<g id="agent-1"><title>agent 1, zone 0, score 1</title><circle cx="6220" cy="17900" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="6220" y="17900" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
-</g>
-</g>
-<g id="frame-14" class="frame" data-step="14">
-<g id="edges">
-<line x1="6220" y1="17900" x2="40" y2="13020" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
-<line x1="40" y1="13020" x2="6780" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
-<line x1="6780" y1="40" x2="15700" y2="1600" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
-<line x1="40" y1="13020" x2="6220" y2="17900" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
-<line x1="6220" y1="17900" x2="40" y2="13020" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
-<line x1="40" y1="13020" x2="15700" y2="1600" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
-<line x1="6780" y1="40" x2="6220" y2="17900" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
-</g>
-<g id="resources">
-<circle cx="15120" cy="3260" r="5" fill="#3DA66B"/>
-<circle cx="18840" cy="16560" r="5" fill="#3DA66B"/>
-<circle cx="5220" cy="11120" r="5" fill="#3DA66B"/>
-<circle cx="600" cy="13040" r="5" fill="#3DA66B"/>
-<circle cx="12320" cy="13420" r="5" fill="#3DA66B"/>
-<circle cx="8560" cy="4620" r="5" fill="#E0AF68"/>
-<circle cx="8200" cy="17620" r="5" fill="#E0AF68"/>
-<circle cx="10080" cy="3360" r="5" fill="#E0AF68"/>
-<circle cx="19880" cy="13200" r="5" fill="#3DA66B"/>
-</g>
-<g id="zones">
-<g id="zone-0"><title>zone 0 (314, 911)</title><circle cx="6220" cy="17900" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="6220" y="17900" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
-<g id="zone-1"><title>zone 1 (5, 667)</title><circle cx="40" cy="13020" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
-<g id="zone-2"><title>zone 2 (342, 18)</title><circle cx="6780" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
-<g id="zone-3"><title>zone 3 (788, 96)</title><circle cx="15700" cy="1600" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
-</g>
-<g id="agents">
-<g id="agent-0"><title>agent 0, zone 0, score 5</title><circle cx="6220" cy="17900" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6220" y="17900" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
-<g id="agent-1"><title>agent 1, zone 1, score 1</title><circle cx="40" cy="13020" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
-</g>
-</g>
 <g id="frame-15" class="frame" data-step="15">
 <g id="edges">
 <line x1="6220" y1="17900" x2="40" y2="13020" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
@@ -545,8 +557,8 @@
 </g>
 <g id="resources">
 <circle cx="15120" cy="3260" r="5" fill="#3DA66B"/>
-<circle cx="18840" cy="16560" r="5" fill="#3DA66B"/>
-<circle cx="5220" cy="11120" r="5" fill="#3DA66B"/>
+<circle cx="18840" cy="16560" r="5" fill="#E0AF68"/>
+<circle cx="5220" cy="11120" r="5" fill="#E0AF68"/>
 <circle cx="600" cy="13040" r="5" fill="#3DA66B"/>
 <circle cx="12320" cy="13420" r="5" fill="#3DA66B"/>
 <circle cx="8560" cy="4620" r="5" fill="#E0AF68"/>
@@ -561,7 +573,7 @@
 <g id="zone-3"><title>zone 3 (788, 96)</title><circle cx="15700" cy="1600" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
 </g>
 <g id="agents">
-<g id="agent-0"><title>agent 0, zone 2, score 5</title><circle cx="6780" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-0"><title>agent 0, zone 0, score 3</title><circle cx="6220" cy="17900" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6220" y="17900" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
 <g id="agent-1"><title>agent 1, zone 3, score 1</title><circle cx="15700" cy="1600" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
 </g>
 </g>
@@ -577,8 +589,8 @@
 </g>
 <g id="resources">
 <circle cx="15120" cy="3260" r="5" fill="#3DA66B"/>
-<circle cx="18840" cy="16560" r="5" fill="#3DA66B"/>
-<circle cx="5220" cy="11120" r="5" fill="#3DA66B"/>
+<circle cx="18840" cy="16560" r="5" fill="#E0AF68"/>
+<circle cx="5220" cy="11120" r="5" fill="#E0AF68"/>
 <circle cx="600" cy="13040" r="5" fill="#3DA66B"/>
 <circle cx="12320" cy="13420" r="5" fill="#3DA66B"/>
 <circle cx="8560" cy="4620" r="5" fill="#E0AF68"/>
@@ -593,7 +605,7 @@
 <g id="zone-3"><title>zone 3 (788, 96)</title><circle cx="15700" cy="1600" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
 </g>
 <g id="agents">
-<g id="agent-0"><title>agent 0, zone 2, score 5</title><circle cx="6780" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-0"><title>agent 0, zone 2, score 3</title><circle cx="6780" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
 <g id="agent-1"><title>agent 1, zone 1, score 1</title><circle cx="40" cy="13020" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
 </g>
 </g>
@@ -609,13 +621,13 @@
 </g>
 <g id="resources">
 <circle cx="15120" cy="3260" r="5" fill="#3DA66B"/>
-<circle cx="18840" cy="16560" r="5" fill="#3DA66B"/>
-<circle cx="5220" cy="11120" r="5" fill="#3DA66B"/>
+<circle cx="18840" cy="16560" r="5" fill="#E0AF68"/>
+<circle cx="5220" cy="11120" r="5" fill="#E0AF68"/>
 <circle cx="600" cy="13040" r="5" fill="#3DA66B"/>
 <circle cx="12320" cy="13420" r="5" fill="#3DA66B"/>
 <circle cx="8560" cy="4620" r="5" fill="#E0AF68"/>
 <circle cx="8200" cy="17620" r="5" fill="#E0AF68"/>
-<circle cx="10080" cy="3360" r="5" fill="#3DA66B"/>
+<circle cx="10080" cy="3360" r="5" fill="#E0AF68"/>
 <circle cx="19880" cy="13200" r="5" fill="#3DA66B"/>
 </g>
 <g id="zones">
@@ -625,7 +637,7 @@
 <g id="zone-3"><title>zone 3 (788, 96)</title><circle cx="15700" cy="1600" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
 </g>
 <g id="agents">
-<g id="agent-0"><title>agent 0, zone 2, score 6</title><circle cx="6780" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-0"><title>agent 0, zone 0, score 3</title><circle cx="6220" cy="17900" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6220" y="17900" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
 <g id="agent-1"><title>agent 1, zone 1, score 1</title><circle cx="40" cy="13020" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
 </g>
 </g>
@@ -641,13 +653,13 @@
 </g>
 <g id="resources">
 <circle cx="15120" cy="3260" r="5" fill="#3DA66B"/>
-<circle cx="18840" cy="16560" r="5" fill="#3DA66B"/>
-<circle cx="5220" cy="11120" r="5" fill="#3DA66B"/>
+<circle cx="18840" cy="16560" r="5" fill="#E0AF68"/>
+<circle cx="5220" cy="11120" r="5" fill="#E0AF68"/>
 <circle cx="600" cy="13040" r="5" fill="#3DA66B"/>
 <circle cx="12320" cy="13420" r="5" fill="#3DA66B"/>
 <circle cx="8560" cy="4620" r="5" fill="#E0AF68"/>
 <circle cx="8200" cy="17620" r="5" fill="#E0AF68"/>
-<circle cx="10080" cy="3360" r="5" fill="#3DA66B"/>
+<circle cx="10080" cy="3360" r="5" fill="#E0AF68"/>
 <circle cx="19880" cy="13200" r="5" fill="#3DA66B"/>
 </g>
 <g id="zones">
@@ -657,7 +669,7 @@
 <g id="zone-3"><title>zone 3 (788, 96)</title><circle cx="15700" cy="1600" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
 </g>
 <g id="agents">
-<g id="agent-0"><title>agent 0, zone 2, score 6</title><circle cx="6780" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-0"><title>agent 0, zone 0, score 3</title><circle cx="6220" cy="17900" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6220" y="17900" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
 <g id="agent-1"><title>agent 1, zone 3, score 1</title><circle cx="15700" cy="1600" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
 </g>
 </g>
@@ -673,13 +685,13 @@
 </g>
 <g id="resources">
 <circle cx="15120" cy="3260" r="5" fill="#3DA66B"/>
-<circle cx="18840" cy="16560" r="5" fill="#3DA66B"/>
-<circle cx="5220" cy="11120" r="5" fill="#3DA66B"/>
+<circle cx="18840" cy="16560" r="5" fill="#E0AF68"/>
+<circle cx="5220" cy="11120" r="5" fill="#E0AF68"/>
 <circle cx="600" cy="13040" r="5" fill="#3DA66B"/>
 <circle cx="12320" cy="13420" r="5" fill="#3DA66B"/>
-<circle cx="8560" cy="4620" r="5" fill="#3DA66B"/>
+<circle cx="8560" cy="4620" r="5" fill="#E0AF68"/>
 <circle cx="8200" cy="17620" r="5" fill="#E0AF68"/>
-<circle cx="10080" cy="3360" r="5" fill="#3DA66B"/>
+<circle cx="10080" cy="3360" r="5" fill="#E0AF68"/>
 <circle cx="19880" cy="13200" r="5" fill="#3DA66B"/>
 </g>
 <g id="zones">
@@ -689,7 +701,7 @@
 <g id="zone-3"><title>zone 3 (788, 96)</title><circle cx="15700" cy="1600" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
 </g>
 <g id="agents">
-<g id="agent-0"><title>agent 0, zone 2, score 7</title><circle cx="6780" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-0"><title>agent 0, zone 2, score 3</title><circle cx="6780" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
 <g id="agent-1"><title>agent 1, zone 1, score 1</title><circle cx="40" cy="13020" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
 </g>
 </g>
@@ -705,13 +717,13 @@
 </g>
 <g id="resources">
 <circle cx="15120" cy="3260" r="5" fill="#3DA66B"/>
-<circle cx="18840" cy="16560" r="5" fill="#3DA66B"/>
-<circle cx="5220" cy="11120" r="5" fill="#3DA66B"/>
+<circle cx="18840" cy="16560" r="5" fill="#E0AF68"/>
+<circle cx="5220" cy="11120" r="5" fill="#E0AF68"/>
 <circle cx="600" cy="13040" r="5" fill="#3DA66B"/>
 <circle cx="12320" cy="13420" r="5" fill="#3DA66B"/>
-<circle cx="8560" cy="4620" r="5" fill="#3DA66B"/>
+<circle cx="8560" cy="4620" r="5" fill="#E0AF68"/>
 <circle cx="8200" cy="17620" r="5" fill="#E0AF68"/>
-<circle cx="10080" cy="3360" r="5" fill="#3DA66B"/>
+<circle cx="10080" cy="3360" r="5" fill="#E0AF68"/>
 <circle cx="19880" cy="13200" r="5" fill="#3DA66B"/>
 </g>
 <g id="zones">
@@ -721,7 +733,7 @@
 <g id="zone-3"><title>zone 3 (788, 96)</title><circle cx="15700" cy="1600" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
 </g>
 <g id="agents">
-<g id="agent-0"><title>agent 0, zone 2, score 7</title><circle cx="6780" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-0"><title>agent 0, zone 0, score 3</title><circle cx="6220" cy="17900" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6220" y="17900" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
 <g id="agent-1"><title>agent 1, zone 1, score 1</title><circle cx="40" cy="13020" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
 </g>
 </g>
@@ -737,13 +749,13 @@
 </g>
 <g id="resources">
 <circle cx="15120" cy="3260" r="5" fill="#3DA66B"/>
-<circle cx="18840" cy="16560" r="5" fill="#3DA66B"/>
-<circle cx="5220" cy="11120" r="5" fill="#3DA66B"/>
+<circle cx="18840" cy="16560" r="5" fill="#E0AF68"/>
+<circle cx="5220" cy="11120" r="5" fill="#E0AF68"/>
 <circle cx="600" cy="13040" r="5" fill="#3DA66B"/>
 <circle cx="12320" cy="13420" r="5" fill="#3DA66B"/>
-<circle cx="8560" cy="4620" r="5" fill="#3DA66B"/>
+<circle cx="8560" cy="4620" r="5" fill="#E0AF68"/>
 <circle cx="8200" cy="17620" r="5" fill="#E0AF68"/>
-<circle cx="10080" cy="3360" r="5" fill="#3DA66B"/>
+<circle cx="10080" cy="3360" r="5" fill="#E0AF68"/>
 <circle cx="19880" cy="13200" r="5" fill="#3DA66B"/>
 </g>
 <g id="zones">
@@ -753,7 +765,7 @@
 <g id="zone-3"><title>zone 3 (788, 96)</title><circle cx="15700" cy="1600" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
 </g>
 <g id="agents">
-<g id="agent-0"><title>agent 0, zone 2, score 7</title><circle cx="6780" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-0"><title>agent 0, zone 0, score 3</title><circle cx="6220" cy="17900" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6220" y="17900" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
 <g id="agent-1"><title>agent 1, zone 3, score 1</title><circle cx="15700" cy="1600" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
 </g>
 </g>
@@ -769,13 +781,13 @@
 </g>
 <g id="resources">
 <circle cx="15120" cy="3260" r="5" fill="#3DA66B"/>
-<circle cx="18840" cy="16560" r="5" fill="#3DA66B"/>
-<circle cx="5220" cy="11120" r="5" fill="#3DA66B"/>
+<circle cx="18840" cy="16560" r="5" fill="#E0AF68"/>
+<circle cx="5220" cy="11120" r="5" fill="#E0AF68"/>
 <circle cx="600" cy="13040" r="5" fill="#3DA66B"/>
 <circle cx="12320" cy="13420" r="5" fill="#3DA66B"/>
-<circle cx="8560" cy="4620" r="5" fill="#3DA66B"/>
+<circle cx="8560" cy="4620" r="5" fill="#E0AF68"/>
 <circle cx="8200" cy="17620" r="5" fill="#E0AF68"/>
-<circle cx="10080" cy="3360" r="5" fill="#3DA66B"/>
+<circle cx="10080" cy="3360" r="5" fill="#E0AF68"/>
 <circle cx="19880" cy="13200" r="5" fill="#3DA66B"/>
 </g>
 <g id="zones">
@@ -785,7 +797,7 @@
 <g id="zone-3"><title>zone 3 (788, 96)</title><circle cx="15700" cy="1600" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
 </g>
 <g id="agents">
-<g id="agent-0"><title>agent 0, zone 2, score 7</title><circle cx="6780" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-0"><title>agent 0, zone 2, score 3</title><circle cx="6780" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
 <g id="agent-1"><title>agent 1, zone 1, score 1</title><circle cx="40" cy="13020" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
 </g>
 </g>
@@ -801,13 +813,13 @@
 </g>
 <g id="resources">
 <circle cx="15120" cy="3260" r="5" fill="#3DA66B"/>
-<circle cx="18840" cy="16560" r="5" fill="#3DA66B"/>
-<circle cx="5220" cy="11120" r="5" fill="#3DA66B"/>
+<circle cx="18840" cy="16560" r="5" fill="#E0AF68"/>
+<circle cx="5220" cy="11120" r="5" fill="#E0AF68"/>
 <circle cx="600" cy="13040" r="5" fill="#3DA66B"/>
 <circle cx="12320" cy="13420" r="5" fill="#3DA66B"/>
-<circle cx="8560" cy="4620" r="5" fill="#3DA66B"/>
+<circle cx="8560" cy="4620" r="5" fill="#E0AF68"/>
 <circle cx="8200" cy="17620" r="5" fill="#E0AF68"/>
-<circle cx="10080" cy="3360" r="5" fill="#3DA66B"/>
+<circle cx="10080" cy="3360" r="5" fill="#E0AF68"/>
 <circle cx="19880" cy="13200" r="5" fill="#3DA66B"/>
 </g>
 <g id="zones">
@@ -817,7 +829,7 @@
 <g id="zone-3"><title>zone 3 (788, 96)</title><circle cx="15700" cy="1600" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
 </g>
 <g id="agents">
-<g id="agent-0"><title>agent 0, zone 2, score 7</title><circle cx="6780" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-0"><title>agent 0, zone 0, score 3</title><circle cx="6220" cy="17900" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6220" y="17900" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
 <g id="agent-1"><title>agent 1, zone 0, score 1</title><circle cx="6220" cy="17900" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="6220" y="17900" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
 </g>
 </g>
@@ -834,7 +846,199 @@
 <g id="resources">
 <circle cx="15120" cy="3260" r="5" fill="#3DA66B"/>
 <circle cx="18840" cy="16560" r="5" fill="#3DA66B"/>
-<circle cx="5220" cy="11120" r="5" fill="#3DA66B"/>
+<circle cx="5220" cy="11120" r="5" fill="#E0AF68"/>
+<circle cx="600" cy="13040" r="5" fill="#3DA66B"/>
+<circle cx="12320" cy="13420" r="5" fill="#3DA66B"/>
+<circle cx="8560" cy="4620" r="5" fill="#E0AF68"/>
+<circle cx="8200" cy="17620" r="5" fill="#E0AF68"/>
+<circle cx="10080" cy="3360" r="5" fill="#E0AF68"/>
+<circle cx="19880" cy="13200" r="5" fill="#3DA66B"/>
+</g>
+<g id="zones">
+<g id="zone-0"><title>zone 0 (314, 911)</title><circle cx="6220" cy="17900" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="6220" y="17900" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 (5, 667)</title><circle cx="40" cy="13020" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 (342, 18)</title><circle cx="6780" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 (788, 96)</title><circle cx="15700" cy="1600" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+</g>
+<g id="agents">
+<g id="agent-0"><title>agent 0, zone 0, score 4</title><circle cx="6220" cy="17900" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6220" y="17900" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, zone 2, score 1</title><circle cx="6780" cy="40" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+</g>
+</g>
+<g id="frame-25" class="frame" data-step="25">
+<g id="edges">
+<line x1="6220" y1="17900" x2="40" y2="13020" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="40" y1="13020" x2="6780" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="6780" y1="40" x2="15700" y2="1600" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="40" y1="13020" x2="6220" y2="17900" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="6220" y1="17900" x2="40" y2="13020" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="40" y1="13020" x2="15700" y2="1600" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="6780" y1="40" x2="6220" y2="17900" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="resources">
+<circle cx="15120" cy="3260" r="5" fill="#3DA66B"/>
+<circle cx="18840" cy="16560" r="5" fill="#3DA66B"/>
+<circle cx="5220" cy="11120" r="5" fill="#E0AF68"/>
+<circle cx="600" cy="13040" r="5" fill="#3DA66B"/>
+<circle cx="12320" cy="13420" r="5" fill="#3DA66B"/>
+<circle cx="8560" cy="4620" r="5" fill="#E0AF68"/>
+<circle cx="8200" cy="17620" r="5" fill="#E0AF68"/>
+<circle cx="10080" cy="3360" r="5" fill="#E0AF68"/>
+<circle cx="19880" cy="13200" r="5" fill="#3DA66B"/>
+</g>
+<g id="zones">
+<g id="zone-0"><title>zone 0 (314, 911)</title><circle cx="6220" cy="17900" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="6220" y="17900" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 (5, 667)</title><circle cx="40" cy="13020" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 (342, 18)</title><circle cx="6780" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 (788, 96)</title><circle cx="15700" cy="1600" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+</g>
+<g id="agents">
+<g id="agent-0"><title>agent 0, zone 2, score 4</title><circle cx="6780" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, zone 3, score 1</title><circle cx="15700" cy="1600" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+</g>
+</g>
+<g id="frame-26" class="frame" data-step="26">
+<g id="edges">
+<line x1="6220" y1="17900" x2="40" y2="13020" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="40" y1="13020" x2="6780" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="6780" y1="40" x2="15700" y2="1600" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="40" y1="13020" x2="6220" y2="17900" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="6220" y1="17900" x2="40" y2="13020" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="40" y1="13020" x2="15700" y2="1600" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="6780" y1="40" x2="6220" y2="17900" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="resources">
+<circle cx="15120" cy="3260" r="5" fill="#3DA66B"/>
+<circle cx="18840" cy="16560" r="5" fill="#3DA66B"/>
+<circle cx="5220" cy="11120" r="5" fill="#E0AF68"/>
+<circle cx="600" cy="13040" r="5" fill="#3DA66B"/>
+<circle cx="12320" cy="13420" r="5" fill="#3DA66B"/>
+<circle cx="8560" cy="4620" r="5" fill="#E0AF68"/>
+<circle cx="8200" cy="17620" r="5" fill="#E0AF68"/>
+<circle cx="10080" cy="3360" r="5" fill="#E0AF68"/>
+<circle cx="19880" cy="13200" r="5" fill="#3DA66B"/>
+</g>
+<g id="zones">
+<g id="zone-0"><title>zone 0 (314, 911)</title><circle cx="6220" cy="17900" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="6220" y="17900" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 (5, 667)</title><circle cx="40" cy="13020" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 (342, 18)</title><circle cx="6780" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 (788, 96)</title><circle cx="15700" cy="1600" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+</g>
+<g id="agents">
+<g id="agent-0"><title>agent 0, zone 2, score 4</title><circle cx="6780" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, zone 3, score 1</title><circle cx="15700" cy="1600" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+</g>
+</g>
+<g id="frame-27" class="frame" data-step="27">
+<g id="edges">
+<line x1="6220" y1="17900" x2="40" y2="13020" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="40" y1="13020" x2="6780" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="6780" y1="40" x2="15700" y2="1600" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="40" y1="13020" x2="6220" y2="17900" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="6220" y1="17900" x2="40" y2="13020" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="40" y1="13020" x2="15700" y2="1600" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="6780" y1="40" x2="6220" y2="17900" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="resources">
+<circle cx="15120" cy="3260" r="5" fill="#3DA66B"/>
+<circle cx="18840" cy="16560" r="5" fill="#3DA66B"/>
+<circle cx="5220" cy="11120" r="5" fill="#E0AF68"/>
+<circle cx="600" cy="13040" r="5" fill="#3DA66B"/>
+<circle cx="12320" cy="13420" r="5" fill="#3DA66B"/>
+<circle cx="8560" cy="4620" r="5" fill="#E0AF68"/>
+<circle cx="8200" cy="17620" r="5" fill="#E0AF68"/>
+<circle cx="10080" cy="3360" r="5" fill="#E0AF68"/>
+<circle cx="19880" cy="13200" r="5" fill="#3DA66B"/>
+</g>
+<g id="zones">
+<g id="zone-0"><title>zone 0 (314, 911)</title><circle cx="6220" cy="17900" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="6220" y="17900" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 (5, 667)</title><circle cx="40" cy="13020" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 (342, 18)</title><circle cx="6780" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 (788, 96)</title><circle cx="15700" cy="1600" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+</g>
+<g id="agents">
+<g id="agent-0"><title>agent 0, zone 2, score 4</title><circle cx="6780" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, zone 2, score 1</title><circle cx="6780" cy="40" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+</g>
+</g>
+<g id="frame-28" class="frame" data-step="28">
+<g id="edges">
+<line x1="6220" y1="17900" x2="40" y2="13020" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="40" y1="13020" x2="6780" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="6780" y1="40" x2="15700" y2="1600" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="40" y1="13020" x2="6220" y2="17900" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="6220" y1="17900" x2="40" y2="13020" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="40" y1="13020" x2="15700" y2="1600" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="6780" y1="40" x2="6220" y2="17900" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="resources">
+<circle cx="15120" cy="3260" r="5" fill="#3DA66B"/>
+<circle cx="18840" cy="16560" r="5" fill="#3DA66B"/>
+<circle cx="5220" cy="11120" r="5" fill="#E0AF68"/>
+<circle cx="600" cy="13040" r="5" fill="#3DA66B"/>
+<circle cx="12320" cy="13420" r="5" fill="#3DA66B"/>
+<circle cx="8560" cy="4620" r="5" fill="#3DA66B"/>
+<circle cx="8200" cy="17620" r="5" fill="#E0AF68"/>
+<circle cx="10080" cy="3360" r="5" fill="#E0AF68"/>
+<circle cx="19880" cy="13200" r="5" fill="#3DA66B"/>
+</g>
+<g id="zones">
+<g id="zone-0"><title>zone 0 (314, 911)</title><circle cx="6220" cy="17900" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="6220" y="17900" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 (5, 667)</title><circle cx="40" cy="13020" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 (342, 18)</title><circle cx="6780" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 (788, 96)</title><circle cx="15700" cy="1600" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+</g>
+<g id="agents">
+<g id="agent-0"><title>agent 0, zone 2, score 5</title><circle cx="6780" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, zone 2, score 1</title><circle cx="6780" cy="40" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+</g>
+</g>
+<g id="frame-29" class="frame" data-step="29">
+<g id="edges">
+<line x1="6220" y1="17900" x2="40" y2="13020" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="40" y1="13020" x2="6780" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="6780" y1="40" x2="15700" y2="1600" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="40" y1="13020" x2="6220" y2="17900" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="6220" y1="17900" x2="40" y2="13020" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="40" y1="13020" x2="15700" y2="1600" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="6780" y1="40" x2="6220" y2="17900" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="resources">
+<circle cx="15120" cy="3260" r="5" fill="#3DA66B"/>
+<circle cx="18840" cy="16560" r="5" fill="#3DA66B"/>
+<circle cx="5220" cy="11120" r="5" fill="#E0AF68"/>
+<circle cx="600" cy="13040" r="5" fill="#3DA66B"/>
+<circle cx="12320" cy="13420" r="5" fill="#3DA66B"/>
+<circle cx="8560" cy="4620" r="5" fill="#3DA66B"/>
+<circle cx="8200" cy="17620" r="5" fill="#3DA66B"/>
+<circle cx="10080" cy="3360" r="5" fill="#E0AF68"/>
+<circle cx="19880" cy="13200" r="5" fill="#3DA66B"/>
+</g>
+<g id="zones">
+<g id="zone-0"><title>zone 0 (314, 911)</title><circle cx="6220" cy="17900" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="6220" y="17900" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 (5, 667)</title><circle cx="40" cy="13020" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 (342, 18)</title><circle cx="6780" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 (788, 96)</title><circle cx="15700" cy="1600" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+</g>
+<g id="agents">
+<g id="agent-0"><title>agent 0, zone 2, score 6</title><circle cx="6780" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, zone 2, score 1</title><circle cx="6780" cy="40" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+</g>
+</g>
+<g id="frame-30" class="frame" data-step="30">
+<g id="edges">
+<line x1="6220" y1="17900" x2="40" y2="13020" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="40" y1="13020" x2="6780" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="6780" y1="40" x2="15700" y2="1600" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="40" y1="13020" x2="6220" y2="17900" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="6220" y1="17900" x2="40" y2="13020" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="40" y1="13020" x2="15700" y2="1600" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+<line x1="6780" y1="40" x2="6220" y2="17900" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="resources">
+<circle cx="15120" cy="3260" r="5" fill="#3DA66B"/>
+<circle cx="18840" cy="16560" r="5" fill="#3DA66B"/>
+<circle cx="5220" cy="11120" r="5" fill="#E0AF68"/>
 <circle cx="600" cy="13040" r="5" fill="#3DA66B"/>
 <circle cx="12320" cy="13420" r="5" fill="#3DA66B"/>
 <circle cx="8560" cy="4620" r="5" fill="#3DA66B"/>
@@ -849,8 +1053,8 @@
 <g id="zone-3"><title>zone 3 (788, 96)</title><circle cx="15700" cy="1600" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="15700" y="1600" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
 </g>
 <g id="agents">
-<g id="agent-0"><title>agent 0, zone 2, score 8</title><circle cx="6780" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
-<g id="agent-1"><title>agent 1, zone 1, score 1</title><circle cx="40" cy="13020" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="13020" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+<g id="agent-0"><title>agent 0, zone 2, score 7</title><circle cx="6780" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, zone 2, score 1</title><circle cx="6780" cy="40" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="6780" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
 </g>
 </g>
 </svg>

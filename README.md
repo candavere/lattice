@@ -5,6 +5,13 @@
 > architectures (MCTS, Fog-of-War perception, and procedural map fairness) at
 > >400k steps/second before game engine integration.
 
+Think of Lattice as a digital board game engine running in memory without
+graphics: units traverse a network of connected topological outposts over
+multiple turns, competing for resources under Fog-of-War. Because every
+transition is calculated using pure math rather than approximate continuous
+physics, simulations run at 400,000+ turns per second with byte-for-byte
+identical replay across any platform.
+
 <!--
 Proposed GitHub topics for the maintainer (set these in the repo settings):
 game-ai, tactical-ai, game-development, determinism, mcts, headless-simulation,
@@ -18,6 +25,46 @@ and ships a pure step-contract simulation core, a seeded procedural map
 generator, a procedural map balance and spawn fairness tester, and a
 recording/reporting toolchain. Agents are a thin demonstration layer — the
 environment is the product.
+
+## Who Is This For?
+
+- **Game Designers & Systems Engineers:** Pre-balance procedural map seeds,
+  detect choke-point congestion, and evaluate layout fairness before building
+  3D environments.
+- **AI & Systems Researchers:** Benchmark lookahead planners (MCTS, custom
+  heuristics) under verifiable partial observability without state leakage.
+- **.NET & Systems Programmers:** Study high-throughput, low-allocation C#
+  systems programming operating on standard BCL primitives with zero
+  third-party dependencies.
+
+#### Reinforcement Learning & Simulation Interface Mapping
+
+Coming from OpenAI Gym or PettingZoo? The step-contract surface maps almost
+one-to-one onto the classic RL loop:
+
+| Lattice (.NET 8 C#) | Gymnasium / PettingZoo Concept | Architectural Role |
+| :--- | :--- | :--- |
+| `Simulation.Step(actions)` | `env.step(actions)` | Advances active simulation state by exactly one tick |
+| `Observation` | `observation` | Agent's egocentric, hop-bounded partial sensor horizon |
+| `SimulationFork` | `copy.deepcopy(env)` | Allocation-conscious, immutable counterfactual rollout sandbox |
+| `AgentAction` | `action` | Strongly-typed discrete action (`Move`, `Collect`, `Wait`) |
+| `MapFairnessEvaluator` | N/A (Procedural Benchmark) | Automated symmetric seat-inversion balance profiler |
+
+<details>
+<summary><b>Glossary: Key Concepts & Terminology</b></summary>
+
+- **BCL-only:** Base Class Library only; runs strictly on core standard .NET
+  with zero external NuGet packages.
+- **Headless:** Operates without a window, GPU context, or graphics thread,
+  optimized for automated CI and high-speed batch evaluation.
+- **Determinism:** Given the same seed and action sequence, simulations produce
+  bit-for-bit identical state transitions across Windows, Linux, and macOS
+  runtimes.
+- **Topological Graph:** An environment modeled as discrete interconnected
+  nodes (zones) and capacity-limited edges (chokes) rather than a continuous
+  floating-point coordinate space.
+
+</details>
 
 Turn-based tactical play is a zero-dependency C# game state machine: every tick
 is a pure function of the previous state and the recorded actions. The core
@@ -61,23 +108,17 @@ any machine. The full command set is `generate`, `simulate`, `render`,
 
 ## Architecture & Modules
 
-```
-/Environment    Step contracts + pure reset/step core (Observation, AgentAction,
-                Reward, Info, StepResult, MapGraph, Simulation); spatial capacity,
-                kinematic transit (InTransit), PerceptionFilter with
-                Observed/Stale/Unknown projections for partial observability
-/Generator      Seeded procedural map generator with hard-constraint checkers
-                (retry, don't patch); optional caller-supplied acceptance gate
-/Agents         Rule-based and tactical agents (Random, GreedyCollector,
-                ScoutCollector, MctsAgent) + AgentBeliefMap + scenario runner
-/Trajectories   JSONL trajectory read/write/replay/step utilities
-/Analytics      Trajectory analysis (contention, pathing efficiency, heatmaps,
-                Markdown reports) + MapFairnessEvaluator spawn-bias profiling
-/Visualization  ASCII renderer + zero-dependency CSS-animated SVG exporter
-/Cli            Driver: generate / simulate / render / analyze / benchmark
-/Tests          Unit, determinism, replay, and benchmark tests (one per module)
-/docs           ADR-style design-decision records (adr-001, adr-002, adr-003)
-```
+| Directory | Responsibilities | Key Architectural Types |
+| :--- | :--- | :--- |
+| `/Environment` | Pure step-contract core — reset/step, spatial capacity, kinematic transit, perception projection | `MapGraph`, `Observation`, `AgentAction`, `StepResult`, `PerceptionFilter`, `InTransit`, `Simulation` |
+| `/Generator` | Seeded procedural map generation with hard-constraint checkers (retry, don't patch); optional caller-supplied acceptance gate | `MapGenerator`, `ConstraintCheckers`, `MapGenerationException` |
+| `/Agents` | Rule-based and tactical agent policies, belief maps, scenario runner | `IAgent`, `RandomAgent`, `GreedyCollectorAgent`, `ScoutCollectorAgent`, `MctsAgent`, `AgentBeliefMap`, `ScenarioRunner` |
+| `/Trajectories` | JSONL trajectory read/write/replay/step utilities | `TrajectoryModel`, `TrajectoryWriter`, `TrajectoryReader`, `TrajectoryReplay` |
+| `/Analytics` | Trajectory analysis — contention, pathing efficiency, heatmaps, Markdown reports; spawn-bias fairness profiling | `TrajectoryAnalyzer`, `IncidentDetector`, `CounterfactualEvaluator`, `MapFairnessEvaluator`, `ReportGenerator`, `MapTraversal` |
+| `/Visualization` | ASCII terminal renderer + dependency-free CSS-animated SVG exporter | `AsciiRenderer`, `SvgRenderer`, `SvgViewport`, `SvgTrajectoryExporter`, `TrajectoryPlayback` |
+| `/Cli` | Driver: `generate` / `simulate` / `render` / `analyze` / `benchmark` | `CliApp`, `Benchmark`, `Program` |
+| `/Tests` | Unit, determinism, replay, and benchmark tests (one per module) | — |
+| `/docs` | ADR-style design-decision records (`adr-001`, `adr-002`, `adr-003`) | — |
 
 The behavioral contracts of each subsystem are documented as architecture
 decision records in `/docs`; see [Design Decisions](#design-decisions).

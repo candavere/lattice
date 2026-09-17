@@ -3,104 +3,144 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Lattice — Deterministic Simulation Demo</title>
-  <style>
-    :root {
-      --bg: #0d1117;
-      --panel: #161b22;
-      --border: #30363d;
-      --text: #c9d1d9;
-      --muted: #8b949e;
-      --accent: #58a6ff;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      background: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-      line-height: 1.6;
-    }
-    header {
-      border-bottom: 1px solid var(--border);
-      background: var(--panel);
-      padding: 24px 16px;
-      text-align: center;
-    }
-    header h1 { margin: 0 0 4px; font-size: 1.5rem; }
-    header p { margin: 0 auto; max-width: 720px; color: var(--muted); font-size: 0.95rem; }
-    main { max-width: 960px; margin: 0 auto; padding: 24px 16px; }
-    .card {
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 16px;
-      margin-bottom: 24px;
-    }
-    .card h2 { margin: 0 0 12px; font-size: 1.05rem; color: var(--accent); }
-    object.demo {
-      display: block;
-      width: 100%;
-      min-height: 420px;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      background: #010409;
-    }
-    .fallback { display: none; color: var(--muted); }
-    code {
-      background: rgba(110, 118, 129, 0.2);
-      border-radius: 4px;
-      padding: 2px 6px;
-      font-size: 0.88em;
-    }
-    ul { padding-left: 20px; }
-    li { margin-bottom: 4px; }
-    footer {
-      text-align: center;
-      color: var(--muted);
-      font-size: 0.85rem;
-      padding: 24px 16px;
-      border-top: 1px solid var(--border);
-    }
-    a { color: var(--accent); }
-  </style>
+  <meta name="description" content="Lattice — a deterministic, seedable 2D procedural strategy simulation environment. Replay recorded trajectories in the browser.">
+  <title>Lattice — Deterministic Tactical Simulation Replay</title>
+  <link rel="stylesheet" href="./style.css">
+  <script src="./app.js" defer></script>
 </head>
 <body>
-  <header>
-    <h1>Lattice</h1>
-    <p>A deterministic, seedable 2D procedural strategy/tactical simulation
-      environment. Same seed, same actions, same bytes — every time.</p>
+  <header class="app-header">
+    <h1>Lattice — Deterministic Tactical Simulation Replay</h1>
+    <p class="subtitle">
+      A deterministic, seedable 2D procedural strategy/tactical simulation
+      environment. Same seed, same actions, same bytes — every time. Every
+      frame below is replayed from a recorded JSON Lines trajectory; nothing is
+      recomputed in the browser.
+    </p>
+    <div class="badges" aria-label="Repository information">
+      <span class="badge"><a href="https://github.com/candavere/lattice">github.com/candavere/lattice</a></span>
+      <span class="badge"><a href="https://candavere.github.io/lattice/">live demo</a></span>
+      <span class="badge">net8.0 · BCL only</span>
+      <span class="badge">deterministic replay</span>
+    </div>
   </header>
 
   <main>
     <section class="card">
-      <h2>Demo trajectory</h2>
-      <!-- 60fps-equal CSS-animated SVG; <img> renders only the first frame in some browsers, hence <object>. -->
-      <object class="demo" type="image/svg+xml" data="demo.svg" aria-label="Animated Lattice demo trajectory">
+      <h2>Interactive replay viewer</h2>
+      <p class="card-note">
+        <code>demo.jsonl</code> loads automatically. Drop any recorded
+        trajectory file onto the canvas (or pick one below) to replay it.
+        Zones are rimmed circles with occupancy counters; amber dots are
+        unclaimed resources, green dots are claimed; agent tokens carry their
+        id and live score. Dashed edges are bounded choke points with their
+        capacity shown.
+      </p>
+
+      <div class="viewer" id="viewer">
+        <canvas id="viewer-canvas" aria-label="Trajectory replay canvas">
+          Your browser does not support the HTML5 canvas element.
+        </canvas>
+        <div id="viewer-hint">
+          <div>
+            Replay view is empty.<br>
+            <code>demo.jsonl</code> failed to load here — <strong>drag a
+            .jsonl trajectory onto this page</strong> to play it.
+          </div>
+        </div>
+      </div>
+
+      <div class="transport">
+        <button class="btn primary" id="play-btn" type="button">Play</button>
+        <button class="btn" id="step-back-btn" type="button">−1 Tick</button>
+        <button class="btn" id="step-fwd-btn" type="button">+1 Tick</button>
+        <div class="scrub">
+          <label for="scrub-slider" class="visually-hidden">Scrub through ticks</label>
+          <input type="range" id="scrub-slider" min="0" max="0" value="0" step="1" aria-label="Scrub through ticks">
+          <span class="tick-readout" id="tick-readout">0 / 0</span>
+        </div>
+        <div class="spacer"></div>
+        <label class="btn" for="speed-select">Speed</label>
+        <select id="speed-select" aria-label="Playback speed">
+          <option value="800">0.5×</option>
+          <option value="420" selected>1×</option>
+          <option value="200">2×</option>
+          <option value="90">4×</option>
+        </select>
+        <label class="btn" for="file-input">Load recording…</label>
+        <input type="file" id="file-input" accept=".jsonl,application/json,text/plain" hidden>
+      </div>
+
+      <div class="statusbar">
+        <span class="source" id="source-label">no trajectory loaded</span>
+        <span class="terminal" id="terminal-label"></span>
+      </div>
+
+      <div id="message" role="status"></div>
+
+      <div class="metrics">
+        <div class="metric">
+          <h3>Trajectory</h3>
+          <p class="stat-line">claim <span id="stat-claimed">—</span> · steps <span id="stat-steps">—</span></p>
+          <p class="stat-line">seed <span id="stat-seed">—</span> · agents <span id="stat-agents">—</span></p>
+        </div>
+        <div class="metric">
+          <h3>Agents</h3>
+          <table><tbody id="agents-body"></tbody></table>
+        </div>
+        <div class="metric">
+          <h3>Zone occupancy (ρ agents · ◆ unclaimed)</h3>
+          <table><tbody id="zones-body"></tbody></table>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Static render of the demo trajectory</h2>
+      <p class="card-note">
+        The same run as a single dependency-free animated SVG, painted by the
+        CLI renderer — scroll-stable and printable, for when you want a
+        static snapshot rather than an interactive replay.
+      </p>
+      <object class="demo" type="image/svg+xml" data="./demo.svg" aria-label="Animated Lattice demo trajectory">
         <p class="fallback">
           Your browser could not render the animated SVG.
-          <a href="demo.svg">Open demo.svg directly</a>.
+          <a href="./demo.svg">Open demo.svg directly</a>.
         </p>
       </object>
-      <p style="color: var(--muted); font-size: 0.9rem;">
+      <p class="card-note">
         Seed <code>42</code>, MCTS agent, 30 ticks. Recorded with
-        <code>lattice simulate</code> and rendered as a single dependency-free
-        CSS-animated SVG by <code>lattice render --format svg</code>.
+        <code>lattice simulate</code> and rendered as a dependency-free
+        CSS-animated SVG with <code>lattice render --format svg</code>.
       </p>
     </section>
 
     <section class="card">
       <h2>Reproduce it yourself</h2>
-      <ul>
-        <li><code>dotnet run --project Cli -- simulate --seed 42 --agent mcts --steps 30</code></li>
-        <li><code>dotnet run --project Cli -- render --trajectory demo.jsonl --format svg --out demo.svg</code></li>
+      <ul class="plain">
+        <li>
+          Record a trajectory
+          <pre class="cli"><code>dotnet run --project Cli -- simulate --seed 42 --agent mcts --steps 30 --out demo.jsonl</code></pre>
+        </li>
+        <li>
+          Render it as an animated SVG
+          <pre class="cli"><code>dotnet run --project Cli -- render --trajectory demo.jsonl --format svg --out demo.svg</code></pre>
+        </li>
+        <li>
+          Replay it in a browser: drop the <code>demo.jsonl</code> file onto
+          the replay viewer above.
+        </li>
       </ul>
     </section>
   </main>
 
-  <footer>
+  <footer class="app-footer">
     Lattice — environment over agents. Compiled against the .NET base class
-    library only; no external dependencies.
+    library only; no external runtime dependencies.
+    <div class="fine">
+      © 2026 <a href="https://github.com/candavere/lattice">candavere/lattice</a>
+      · MIT License · deterministic, seedable, replayable.
+    </div>
   </footer>
 </body>
 </html>

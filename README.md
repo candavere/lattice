@@ -29,7 +29,7 @@ candidate actions with deterministic BFS rollouts against the same pure `Step`
 used by every other policy.
 
 <p align="center">
-  <a href="https://github.com/candavere/lattice/actions/workflows/ci.yml"><img src="https://github.com/candavere/lattice/actions/workflows/ci.yml/badge.svg" alt="CI build status" /></a>
+  <a href="https://github.com/candavere/lattice/actions/workflows/ci.yml">
   <img src="https://img.shields.io/badge/tests-275%20passing-brightgreen" alt="275 unit tests passing" />
   <img src="https://img.shields.io/badge/determinism-byte--identical-blue" alt="byte-identical determinism" />
   <img src="https://img.shields.io/badge/dependencies-BCL%20only-blueviolet" alt="zero dependencies — BCL only" />

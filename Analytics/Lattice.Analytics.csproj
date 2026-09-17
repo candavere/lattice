@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RollForward>LatestMajor</RollForward>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Environment\Lattice.Environment.csproj" />
+    <ProjectReference Include="..\Trajectories\Lattice.Trajectories.csproj" />
+    <ProjectReference Include="..\Agents\Lattice.Agents.csproj" />
+  </ItemGroup>
+
+</Project>

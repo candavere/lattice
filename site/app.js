@@ -223,11 +223,40 @@
   }
 
   function ensureLayout(traj) {
-    if (state.layout) return state.layout;
     const map = traj.header.Map;
+    const zones = map.Zones;
+    const resources = map.Resources;
+
+    const hasPosition = function (p) {
+      return p && typeof p.X === 'number' && typeof p.Y === 'number';
+    };
+    const isZero = function (p) {
+      return !hasPosition(p) || (p.X === 0 && p.Y === 0);
+    };
+    const allZero = zones.length > 0 && zones.every(function (z) { return isZero(z.Position); });
+
+    if (allZero) {
+      const cx = dom.canvas.clientWidth / 2;
+      const cy = dom.canvas.clientHeight / 2;
+      const radius = Math.min(cx, cy) * 0.7;
+      zones.forEach(function (zone, idx) {
+        const angle = (2 * Math.PI * idx) / zones.length - Math.PI / 2;
+        zone.Position = {
+          X: Math.round(cx + radius * Math.cos(angle)),
+          Y: Math.round(cy + radius * Math.sin(angle)),
+        };
+      });
+      resources.forEach(function (res, idx) {
+        res.Position = {
+          X: zones[res.ZoneId % zones.length].Position.X,
+          Y: zones[res.ZoneId % zones.length].Position.Y,
+        };
+      });
+    }
+
     const points = [];
-    map.Zones.forEach(function (z) { points.push(z.Position); });
-    map.Resources.forEach(function (r) { points.push(r.Position); });
+    zones.forEach(function (z) { points.push(z.Position); });
+    resources.forEach(function (r) { points.push(r.Position); });
     if (!points.length) return null;
 
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -238,18 +267,27 @@
       if (p.Y > maxY) maxY = p.Y;
     });
 
-    const pad = 46;
     const w = dom.canvas.clientWidth, h = dom.canvas.clientHeight;
+    const cached = state.layout;
+    if (cached && cached.w === w && cached.h === h && cached.minX === minX && cached.maxX === maxX &&
+        cached.minY === minY && cached.maxY === maxY) {
+      return cached;
+    }
+
+    const pad = 46;
     const spanX = Math.max(1, maxX - minX);
     const spanY = Math.max(1, maxY - minY);
-    const sx = (w - 2 * pad) / spanX;
-    const sy = (h - 2 * pad) / spanY;
+    const regionW = Math.max(1, w - 2 * pad);
+    const regionH = Math.max(1, h - 2 * pad);
+    const sx = regionW / spanX;
+    const sy = regionH / spanY;
     const s = Math.min(sx, sy);
     const offX = (w - s * spanX) / 2;
     const offY = (h - s * spanY) / 2;
 
     state.layout = {
       minX: minX, minY: minY, spanX: spanX, spanY: spanY, s: s, offX: offX, offY: offY,
+      w: w, h: h,
       rZone: Math.max(9, 12 * s / 20),
       rAgent: Math.max(6, 7 * s / 20),
       rRes: Math.max(3, 5 * s / 20),

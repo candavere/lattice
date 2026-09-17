@@ -77,12 +77,12 @@
 </g>
 </g>
 <g id="zones">
-<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
-<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
-<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
-<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
-<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
-<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+<g id="zone-0"><title>zone 0 - SentryPost (1, 1)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (4, 1)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (7, 1)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (7, 5)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (4, 5)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (1, 5)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
 </g>
 <g id="agents">
 <g id="agent-0"><title>agent 0, Sentry, zone 0, score 0</title><circle cx="40" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
@@ -115,12 +115,12 @@
 </g>
 </g>
 <g id="zones">
-<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
-<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
-<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
-<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
-<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
-<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+<g id="zone-0"><title>zone 0 - SentryPost (1, 1)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (4, 1)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (7, 1)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (7, 5)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (4, 5)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (1, 5)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
 </g>
 <g id="agents">
 <g id="agent-0"><title>agent 0, Sentry, zone 1, score 0</title><circle cx="100" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
@@ -153,12 +153,12 @@
 </g>
 </g>
 <g id="zones">
-<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
-<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
-<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
-<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
-<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
-<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+<g id="zone-0"><title>zone 0 - SentryPost (1, 1)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (4, 1)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (7, 1)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (7, 5)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (4, 5)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (1, 5)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
 </g>
 <g id="agents">
 <g id="agent-0"><title>agent 0, Sentry, zone 2, score 0</title><circle cx="160" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
@@ -191,12 +191,12 @@
 </g>
 </g>
 <g id="zones">
-<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
-<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
-<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
-<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
-<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
-<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+<g id="zone-0"><title>zone 0 - SentryPost (1, 1)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (4, 1)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (7, 1)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (7, 5)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (4, 5)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (1, 5)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
 </g>
 <g id="agents">
 <g id="agent-0"><title>agent 0, Sentry, zone 2, score 0</title><circle cx="160" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
@@ -229,12 +229,12 @@
 </g>
 </g>
 <g id="zones">
-<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
-<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
-<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
-<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
-<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
-<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+<g id="zone-0"><title>zone 0 - SentryPost (1, 1)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (4, 1)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (7, 1)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (7, 5)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (4, 5)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (1, 5)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
 </g>
 <g id="agents">
 <g id="agent-0"><title>agent 0, Sentry, zone 2, score 0</title><circle cx="160" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
@@ -267,12 +267,12 @@
 </g>
 </g>
 <g id="zones">
-<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
-<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
-<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
-<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
-<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
-<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+<g id="zone-0"><title>zone 0 - SentryPost (1, 1)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (4, 1)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (7, 1)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (7, 5)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (4, 5)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (1, 5)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
 </g>
 <g id="agents">
 <g id="agent-0"><title>agent 0, Sentry, zone 4, score 0</title><circle cx="100" cy="120" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
@@ -305,12 +305,12 @@
 </g>
 </g>
 <g id="zones">
-<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
-<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
-<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
-<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
-<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
-<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+<g id="zone-0"><title>zone 0 - SentryPost (1, 1)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (4, 1)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (7, 1)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (7, 5)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (4, 5)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (1, 5)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
 </g>
 <g id="agents">
 <g id="agent-0"><title>agent 0, Sentry, zone 5, score 0</title><circle cx="40" cy="120" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
@@ -343,12 +343,12 @@
 </g>
 </g>
 <g id="zones">
-<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
-<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
-<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
-<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
-<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
-<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+<g id="zone-0"><title>zone 0 - SentryPost (1, 1)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (4, 1)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (7, 1)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (7, 5)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (4, 5)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (1, 5)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
 </g>
 <g id="agents">
 <g id="agent-0"><title>agent 0, Sentry, zone 4, score 0</title><circle cx="100" cy="120" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
@@ -381,12 +381,12 @@
 </g>
 </g>
 <g id="zones">
-<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
-<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
-<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
-<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
-<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
-<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+<g id="zone-0"><title>zone 0 - SentryPost (1, 1)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (4, 1)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (7, 1)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (7, 5)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (4, 5)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (1, 5)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
 </g>
 <g id="agents">
 <g id="agent-0"><title>agent 0, Sentry, zone 3, score 0</title><circle cx="160" cy="120" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
@@ -419,12 +419,12 @@
 </g>
 </g>
 <g id="zones">
-<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
-<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
-<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
-<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
-<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
-<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+<g id="zone-0"><title>zone 0 - SentryPost (1, 1)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (4, 1)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (7, 1)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (7, 5)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (4, 5)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (1, 5)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
 </g>
 <g id="agents">
 <g id="agent-0"><title>agent 0, Sentry, zone 2, score 0</title><circle cx="160" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
@@ -457,12 +457,12 @@
 </g>
 </g>
 <g id="zones">
-<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
-<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
-<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
-<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
-<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
-<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+<g id="zone-0"><title>zone 0 - SentryPost (1, 1)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (4, 1)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (7, 1)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (7, 5)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (4, 5)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (1, 5)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
 </g>
 <g id="agents">
 <g id="agent-0"><title>agent 0, Sentry, zone 1, score 0</title><circle cx="100" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
@@ -495,12 +495,12 @@
 </g>
 </g>
 <g id="zones">
-<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
-<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
-<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
-<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
-<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
-<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+<g id="zone-0"><title>zone 0 - SentryPost (1, 1)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (4, 1)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (7, 1)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (7, 5)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (4, 5)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (1, 5)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
 </g>
 <g id="agents">
 <g id="agent-0"><title>agent 0, Sentry, zone 0, score 0</title><circle cx="40" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
@@ -533,12 +533,12 @@
 </g>
 </g>
 <g id="zones">
-<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
-<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
-<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
-<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
-<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
-<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+<g id="zone-0"><title>zone 0 - SentryPost (1, 1)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (4, 1)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (7, 1)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (7, 5)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (4, 5)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (1, 5)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
 </g>
 <g id="agents">
 <g id="agent-0"><title>agent 0, Sentry, zone 0, score 0</title><circle cx="40" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
@@ -571,12 +571,12 @@
 </g>
 </g>
 <g id="zones">
-<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
-<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
-<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
-<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
-<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
-<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+<g id="zone-0"><title>zone 0 - SentryPost (1, 1)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (4, 1)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (7, 1)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (7, 5)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (4, 5)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (1, 5)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
 </g>
 <g id="agents">
 <g id="agent-0"><title>agent 0, Sentry, zone 0, score 0</title><circle cx="40" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
@@ -609,12 +609,12 @@
 </g>
 </g>
 <g id="zones">
-<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
-<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
-<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
-<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
-<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
-<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+<g id="zone-0"><title>zone 0 - SentryPost (1, 1)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (4, 1)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (7, 1)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (7, 5)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (4, 5)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (1, 5)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
 </g>
 <g id="agents">
 <g id="agent-0"><title>agent 0, Sentry, zone 1, score 0</title><circle cx="100" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
@@ -647,12 +647,12 @@
 </g>
 </g>
 <g id="zones">
-<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
-<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
-<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
-<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
-<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
-<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+<g id="zone-0"><title>zone 0 - SentryPost (1, 1)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (4, 1)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (7, 1)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (7, 5)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (4, 5)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (1, 5)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
 </g>
 <g id="agents">
 <g id="agent-0"><title>agent 0, Sentry, zone 2, score 0</title><circle cx="160" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
@@ -685,12 +685,12 @@
 </g>
 </g>
 <g id="zones">
-<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
-<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
-<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
-<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
-<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
-<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+<g id="zone-0"><title>zone 0 - SentryPost (1, 1)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (4, 1)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (7, 1)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (7, 5)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (4, 5)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (1, 5)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
 </g>
 <g id="agents">
 <g id="agent-0"><title>agent 0, Sentry, zone 2, score 0</title><circle cx="160" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
@@ -723,12 +723,12 @@
 </g>
 </g>
 <g id="zones">
-<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
-<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
-<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
-<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
-<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
-<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+<g id="zone-0"><title>zone 0 - SentryPost (1, 1)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (4, 1)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (7, 1)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (7, 5)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (4, 5)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (1, 5)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
 </g>
 <g id="agents">
 <g id="agent-0"><title>agent 0, Sentry, zone 2, score 0</title><circle cx="160" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
@@ -761,12 +761,12 @@
 </g>
 </g>
 <g id="zones">
-<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
-<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
-<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
-<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
-<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
-<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+<g id="zone-0"><title>zone 0 - SentryPost (1, 1)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (4, 1)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (7, 1)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (7, 5)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (4, 5)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (1, 5)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
 </g>
 <g id="agents">
 <g id="agent-0"><title>agent 0, Sentry, zone 4, score 0</title><circle cx="100" cy="120" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
@@ -799,12 +799,12 @@
 </g>
 </g>
 <g id="zones">
-<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
-<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
-<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
-<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
-<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
-<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+<g id="zone-0"><title>zone 0 - SentryPost (1, 1)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (4, 1)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (7, 1)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (7, 5)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (4, 5)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (1, 5)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
 </g>
 <g id="agents">
 <g id="agent-0"><title>agent 0, Sentry, zone 5, score 0</title><circle cx="40" cy="120" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
@@ -837,12 +837,12 @@
 </g>
 </g>
 <g id="zones">
-<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
-<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
-<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
-<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
-<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
-<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+<g id="zone-0"><title>zone 0 - SentryPost (1, 1)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (4, 1)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (7, 1)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (7, 5)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (4, 5)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (1, 5)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
 </g>
 <g id="agents">
 <g id="agent-0"><title>agent 0, Sentry, zone 4, score 0</title><circle cx="100" cy="120" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
@@ -875,12 +875,12 @@
 </g>
 </g>
 <g id="zones">
-<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
-<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
-<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
-<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
-<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
-<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+<g id="zone-0"><title>zone 0 - SentryPost (1, 1)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (4, 1)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (7, 1)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (7, 5)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (4, 5)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (1, 5)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
 </g>
 <g id="agents">
 <g id="agent-0"><title>agent 0, Sentry, zone 3, score 0</title><circle cx="160" cy="120" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
@@ -913,12 +913,12 @@
 </g>
 </g>
 <g id="zones">
-<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
-<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
-<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
-<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
-<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
-<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+<g id="zone-0"><title>zone 0 - SentryPost (1, 1)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (4, 1)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (7, 1)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (7, 5)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (4, 5)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (1, 5)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
 </g>
 <g id="agents">
 <g id="agent-0"><title>agent 0, Sentry, zone 2, score 0</title><circle cx="160" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
@@ -951,12 +951,12 @@
 </g>
 </g>
 <g id="zones">
-<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
-<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
-<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
-<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
-<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
-<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+<g id="zone-0"><title>zone 0 - SentryPost (1, 1)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (4, 1)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (7, 1)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (7, 5)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (4, 5)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (1, 5)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
 </g>
 <g id="agents">
 <g id="agent-0"><title>agent 0, Sentry, zone 1, score 0</title><circle cx="100" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>

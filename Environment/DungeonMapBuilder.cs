@@ -62,12 +62,12 @@ public static class DungeonMapBuilder
     {
         var zones = new[]
         {
-            new Zone(SentryPostZone, new GridPoint(0, 0), Role: DungeonRoles.SentryPost),
-            new Zone(EntryHallZone, new GridPoint(3, 0), Role: DungeonRoles.EntryHall),
-            new Zone(CorridorZone, new GridPoint(6, 0), Role: DungeonRoles.Corridor),
-            new Zone(ArmoryZone, new GridPoint(6, 4), Role: DungeonRoles.Armory),
-            new Zone(ChokeDoorwayZone, new GridPoint(3, 4), Role: DungeonRoles.ChokeDoorway),
-            new Zone(TreasureVaultZone, new GridPoint(0, 4), Role: DungeonRoles.TreasureVault),
+            new Zone(SentryPostZone, new GridPoint(1, 1), Role: DungeonRoles.SentryPost),
+            new Zone(EntryHallZone, new GridPoint(4, 1), Role: DungeonRoles.EntryHall),
+            new Zone(CorridorZone, new GridPoint(7, 1), Role: DungeonRoles.Corridor),
+            new Zone(ArmoryZone, new GridPoint(7, 5), Role: DungeonRoles.Armory),
+            new Zone(ChokeDoorwayZone, new GridPoint(4, 5), Role: DungeonRoles.ChokeDoorway),
+            new Zone(TreasureVaultZone, new GridPoint(1, 5), Role: DungeonRoles.TreasureVault),
         };
 
         var chokes = new[]
@@ -94,13 +94,13 @@ public static class DungeonMapBuilder
     public static ResourceNode ExtractionResource() => new(
         Id: 0,
         ZoneId: EntryHallZone,
-        Position: new GridPoint(4, 0),
+        Position: new GridPoint(5, 1),
         Role: DungeonRoles.ObjectiveExtraction);
 
     /// <summary>A treasure chest in the vault, fanned out near the room so it renders distinctly.</summary>
     public static ResourceNode ChestResource(int id) => new(
         Id: id,
         ZoneId: TreasureVaultZone,
-        Position: new GridPoint(1 + id % 2, 3 + id / 2),
+        Position: new GridPoint(2 + id % 2, 4 + id / 2),
         Role: DungeonRoles.TreasureChest);
 }

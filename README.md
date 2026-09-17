@@ -1,9 +1,19 @@
 # Lattice
 
+<p align="center">
+  <a href="https://github.com/candavere/lattice/actions/workflows/ci.yml"><img src="https://github.com/candavere/lattice/actions/workflows/ci.yml/badge.svg" alt="CI build status" /></a>
+  <img src="https://img.shields.io/badge/tests-294%20passing-brightgreen" alt="294 unit tests passing" />
+  <img src="https://img.shields.io/badge/determinism-byte--identical-blue" alt="byte-identical determinism" />
+  <img src="https://img.shields.io/badge/dependencies-BCL%20only-blueviolet" alt="zero dependencies — BCL only" />
+  <img src="https://img.shields.io/badge/.NET-8.0-512BD4" alt=".NET 8" />
+  <a href="https://candavere.github.io/lattice/"><img src="https://img.shields.io/badge/live%20demo-GitHub%20Pages-2ea44f" alt="live demo" /></a>
+</p>
+
 > A deterministic, headless 2D tactical AI simulation substrate in pure C#
 > (.NET 8). Built to validate, balance, and stress-test high-level game AI
-> architectures (MCTS, Fog-of-War perception, and procedural map fairness) at
-> >400k steps/second before game engine integration.
+> architectures (MCTS, Fog-of-War perception, procedural map fairness, and a
+> tactical Dungeon Infiltration & Sentry Patrol scenario) at >400k steps/second
+> before game engine integration.
 
 Think of Lattice as a digital board game engine running in memory without
 graphics: units traverse a network of connected topological outposts over
@@ -75,31 +85,21 @@ Carlo Tree Search (MCTS) agent demonstrates exactly this contract, pricing
 candidate actions with deterministic BFS rollouts against the same pure `Step`
 used by every other policy.
 
-<p align="center">
-  <a href="https://github.com/candavere/lattice/actions/workflows/ci.yml"><img src="https://github.com/candavere/lattice/actions/workflows/ci.yml/badge.svg" alt="CI build status" /></a>
-  <img src="https://img.shields.io/badge/tests-275%20passing-brightgreen" alt="275 unit tests passing" />
-  <img src="https://img.shields.io/badge/determinism-byte--identical-blue" alt="byte-identical determinism" />
-  <img src="https://img.shields.io/badge/dependencies-BCL%20only-blueviolet" alt="zero dependencies — BCL only" />
-  <img src="https://img.shields.io/badge/.NET-8.0-512BD4" alt=".NET 8" />
-  <a href="https://candavere.github.io/lattice/"><img src="https://img.shields.io/badge/live%20demo-GitHub%20Pages-2ea44f" alt="live demo" /></a>
-</p>
-
-
 ## Quickstart
 
-Run a seeded MCTS episode and replay it immediately — nothing beyond the
-[.NET 8 SDK](https://dotnet.microsoft.com/download) is required:
+Run the Dungeon Infiltration & Sentry Patrol scenario — a patrolling guard
+chases a heister through a capacity-gated dungeon under partial observation:
 
 ```sh
-dotnet run --project Cli -- simulate --seed 42 --agent mcts --steps 30 --out trajectory.jsonl
-dotnet run --project Cli -- render --trajectory trajectory.jsonl
+dotnet run --project Cli -- simulate --seed 42 --scenario infiltration --steps 100 --out infiltration.jsonl
+dotnet run --project Cli -- render --trajectory infiltration.jsonl --format svg --out infiltration.svg
 ```
 
-The second command streams the recorded episode as ASCII frames to your
-terminal (Ctrl+C to quit). For the animated, single-file SVG embedded above:
+Or the classic two-agent sampling run (MCTS vs Random):
 
 ```sh
-dotnet run --project Cli -- render --trajectory trajectory.jsonl --format svg --out demo.svg
+dotnet run --project Cli -- simulate --seed 42 --agent mcts --steps 30 --out demo.jsonl
+dotnet run --project Cli -- render --trajectory demo.jsonl
 ```
 
 Every command is seeded, so identical arguments reproduce identical bytes on
@@ -110,9 +110,9 @@ any machine. The full command set is `generate`, `simulate`, `render`,
 
 | Directory | Responsibilities | Key Architectural Types |
 | :--- | :--- | :--- |
-| `/Environment` | Pure step-contract core — reset/step, spatial capacity, kinematic transit, perception projection | `MapGraph`, `Observation`, `AgentAction`, `StepResult`, `PerceptionFilter`, `InTransit`, `Simulation` |
+| `/Environment` | Pure step-contract core — reset/step, spatial capacity, kinematic transit, perception projection, dungeon topology | `MapGraph`, `Observation`, `AgentAction`, `StepResult`, `PerceptionFilter`, `InTransit`, `Simulation`, `DungeonMapBuilder`, `DungeonRoles` |
 | `/Generator` | Seeded procedural map generation with hard-constraint checkers (retry, don't patch); optional caller-supplied acceptance gate | `MapGenerator`, `ConstraintCheckers`, `MapGenerationException` |
-| `/Agents` | Rule-based and tactical agent policies, belief maps, scenario runner | `IAgent`, `RandomAgent`, `GreedyCollectorAgent`, `ScoutCollectorAgent`, `MctsAgent`, `AgentBeliefMap`, `ScenarioRunner` |
+| `/Agents` | Rule-based and tactical agent policies, belief maps, scenario runner | `IAgent`, `RandomAgent`, `GreedyCollectorAgent`, `ScoutCollectorAgent`, `MctsAgent`, `SentryPatrolAgent`, `InfiltratorAgent`, `AgentBeliefMap`, `ScenarioRunner`, `InfiltrationScenario` |
 | `/Trajectories` | JSONL trajectory read/write/replay/step utilities | `TrajectoryModel`, `TrajectoryWriter`, `TrajectoryReader`, `TrajectoryReplay` |
 | `/Analytics` | Trajectory analysis — contention, pathing efficiency, heatmaps, Markdown reports; spawn-bias fairness profiling | `TrajectoryAnalyzer`, `IncidentDetector`, `CounterfactualEvaluator`, `MapFairnessEvaluator`, `ReportGenerator`, `MapTraversal` |
 | `/Visualization` | ASCII terminal renderer + dependency-free CSS-animated SVG exporter | `AsciiRenderer`, `SvgRenderer`, `SvgViewport`, `SvgTrajectoryExporter`, `TrajectoryPlayback` |
@@ -186,6 +186,28 @@ source state, the recording, or a sibling fork. The `MctsAgent` builds on this
 by pricing candidate actions with deterministic BFS rollouts against a greedy
 opponent model, evaluated by `CounterfactualEvaluator`.
 
+### Dungeon Infiltration & Sentry Patrol scenario
+
+`InfiltrationScenario` uses the fixed hand-authored `DungeonMapBuilder`:
+six rooms connected by capacity-1 choke points, seeded chest count in the
+Treasure Vault (2–3), and an extraction objective in the Entry Hall. The
+sentry (`SentryPatrolAgent`) walks a fixed patrol loop and pivots to pursuit
+on a Chebyshev-bounded hop cone; the infiltrator (`InfiltratorAgent`) builds
+a fog-of-war belief map, steers through a least-risk goal-priority heuristic,
+and collects the vault before racing back to extract.
+
+The deterministic outcome taxonomy (all `XOR`-exclusive verdicts):
+
+| Status | Meaning |
+| :--- | :--- |
+| `exfiltrated` | Every resource claimed, no co-location capture at any tick |
+| `intercepted` | Sentry and Infiltrator share a zone with no active transit — the guard physically corners the rogue |
+| `intercepted-after-exfil` | Infiltrator completes the haul, but is caught at the exit the same tick the episode closes |
+| `timeout` | Budget exhausted before the vault is raided or captured |
+
+Identical parameters always reproduce identical trajectories — same room
+sequence, same choke contention, same final verdict.
+
 ### Map fairness and spawn bias
 
 `MapFairnessEvaluator` measures whether a map structurally favors one spawn
@@ -212,7 +234,9 @@ The index can be wired into generation as a retry-loop acceptance gate (see
 4. **Hard constraints over probabilistic generation.** The generator rejects
    and retries; constraint checkers are explicit and unit-tested.
 5. **Environment over agents.** Agents stay intentionally simple; the budget
-   belongs to the environment and tooling.
+   belongs to the environment and tooling. The infiltration scenario's
+   deterministic outcome is an emergent property of the graph topology and
+   the capacity-gated choke points, not the agents' internal logic.
 6. **No heavy dependencies in the core.** `/Environment` and `/Generator` are
    BCL-only; everything else consumes them through public step contracts.
 
@@ -273,17 +297,21 @@ stderr; a seed whose retry budget yields no fair map exits non-zero.
 | `--seed <ulong>` | Required RNG seed for map generation and agents |
 | `--steps <n>`   | Tick budget; default 100. Episode ends on budget or when all resources are claimed |
 | `--agent <greedy\|random\|mcts>` | Policy for player 0 (default `greedy`); `mcts` is the rollout-based tactical agent |
+| `--scenario <infiltration>` | Run the fixed Dungeon Infiltration & Sentry Patrol scenario; `--agent` is forbidden (roster is fixed) |
 | `--out <file>`  | Write trajectory to a file instead of stdout |
 
 ```sh
 dotnet run --project Cli -- simulate --seed 42
 dotnet run --project Cli -- simulate --seed 42 --steps 40
 dotnet run --project Cli -- simulate --seed 42 --steps 40 --agent mcts
+dotnet run --project Cli -- simulate --seed 42 --scenario infiltration --steps 100 --out infiltration.jsonl
 ```
 
-Runs `GreedyCollectorAgent` vs `RandomAgent` and writes the trajectory (header,
-one line per step, final metrics line) to stdout or file. A summary line —
-steps recorded, termination reason, winner — goes to stderr.
+Without `--scenario`, runs `GreedyCollectorAgent` vs `RandomAgent` on a
+procedurally generated map. With `--scenario infiltration`, the fixed
+dungeon is used and the roster is hard-wired to Sentry vs Infiltrator. A
+summary line — steps recorded, termination reason, outcome — goes to
+stderr.
 
 ### render — replay a recorded trajectory
 

@@ -6,6 +6,10 @@
   'use strict';
 
   const DEFAULT_TRAJECTORY = './demo.jsonl';
+  const PRESETS = {
+    demo: { url: './demo.jsonl', name: 'demo.jsonl', staticSvg: './demo.svg', caption: 'Seed 42, MCTS vs Random, 30 ticks. Recorded with lattice simulate and rendered as a dependency-free CSS-animated SVG with lattice render --format svg.' },
+    infiltration: { url: './infiltration.jsonl', name: 'infiltration.jsonl', staticSvg: './infiltration.svg', caption: 'Seed 42, Dungeon Infiltration & Sentry Patrol: the Infiltrator raids the Treasure Vault under a patrolling Sentry. Recorded with lattice simulate --scenario infiltration and rendered as an animated SVG with lattice render --format svg.' },
+  };
   const UNLIMITED = 2147483647; // MapLimits.Unlimited, as serialized by the writer
   const TRANSIT_FRACTION = 0.5;  // where a transiting token is drawn between its endpoints
 
@@ -17,6 +21,7 @@
     zoneFill: '#10131F',
     zoneStroke: '#7AA2F7',
     zoneText: '#C0CAF5',
+    mutedText: '#94A3B8',
     unclaimed: '#E0AF68',
     claimed: '#3DA66B',
     agentRim: '#FFFFFF',
@@ -35,6 +40,7 @@
     dom.slider = document.getElementById('scrub-slider');
     dom.tickReadout = document.getElementById('tick-readout');
     dom.source = document.getElementById('source-label');
+    dom.roster = document.getElementById('roster-label');
     dom.terminal = document.getElementById('terminal-label');
     dom.agentsBody = document.getElementById('agents-body');
     dom.zonesBody = document.getElementById('zones-body');
@@ -48,6 +54,9 @@
     dom.stepFwdBtn = document.getElementById('step-fwd-btn');
     dom.speedSelect = document.getElementById('speed-select');
     dom.fileInput = document.getElementById('file-input');
+    dom.presetSelect = document.getElementById('preset-select');
+    dom.staticSvg = document.getElementById('static-svg');
+    dom.staticCaption = document.getElementById('static-caption');
 
     dom.playBtn.addEventListener('click', togglePlay);
     dom.stepBackBtn.addEventListener('click', function () { pause(); stepBy(-1); });
@@ -55,6 +64,7 @@
     dom.slider.addEventListener('input', function () { pause(); setIndex(Number(dom.slider.value)); });
     dom.speedSelect.addEventListener('change', function () { applyCadence(); });
     dom.fileInput.addEventListener('change', handleFileChoice);
+    dom.presetSelect.addEventListener('change', handlePresetChoice);
     document.addEventListener('dragover', preventDefaultFileDrop);
     document.addEventListener('drop', handleDrop);
     window.addEventListener('resize', scheduleDraw);
@@ -111,12 +121,36 @@
     event.target.value = '';
   }
 
+  function handlePresetChoice(event) {
+    const key = event.target.value;
+    if (key === 'custom') return;
+    loadPreset(key);
+  }
+
+  function loadPreset(key) {
+    const preset = PRESETS[key];
+    if (!preset) return;
+    fetch(preset.url)
+      .then(function (res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status + ' while fetching ' + preset.url);
+        return res.text();
+      })
+      .then(function (text) {
+        const traj = parseTrajectory(text);
+        adoptTrajectory(traj, preset.name, key);
+        showMessage('loaded preset recording ' + preset.name + ' (seed ' + traj.header.Seed + ')', false);
+      })
+      .catch(function (err) {
+        showMessage('could not load preset ' + preset.name + ' (' + err.message + ')', true);
+      });
+  }
+
   function readTrajectoryFile(file) {
     const reader = new FileReader();
     reader.onload = function () {
       try {
         const traj = parseTrajectory(String(reader.result));
-        adoptTrajectory(traj, file.name);
+        adoptTrajectory(traj, file.name, 'custom');
         showMessage('loaded ' + file.name + ' (seed ' + traj.header.Seed + ')', false);
       } catch (err) {
         showMessage('could not parse ' + file.name + ': ' + err.message, true);
@@ -128,7 +162,7 @@
     reader.readAsText(file, 'utf-8');
   }
 
-  function adoptTrajectory(traj, fileName) {
+  function adoptTrajectory(traj, fileName, presetKey) {
     state.trajectory = traj;
     state.index = 0;
     state.playing = false;
@@ -138,6 +172,17 @@
     dom.slider.value = '0';
     dom.source.textContent = fileName;
     dom.fileInput.title = fileName;
+    if (presetKey && PRESETS[presetKey]) {
+      dom.presetSelect.value = presetKey;
+      dom.staticSvg.data = PRESETS[presetKey].staticSvg;
+      dom.staticCaption.innerHTML = PRESETS[presetKey].caption;
+    } else {
+      dom.presetSelect.value = 'custom';
+    }
+    const roster = traj.header.AgentRoles;
+    dom.roster.textContent = traj.header.Scenario
+      ? traj.header.Scenario + ' · ' + (roster && roster.length ? roster.join(' vs ') : '')
+      : '';
     hideDom(dom.hint);
     scheduleDraw();
   }
@@ -295,6 +340,12 @@
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(String(choke.MaxOccupancy), mid.x, mid.y);
+
+        if (choke.Role) {
+          ctx.font = '7px ' + 'monospace';
+          ctx.fillStyle = COLORS.mutedText;
+          ctx.fillText(choke.Role, mid.x, mid.y + layout.rRes + 11);
+        }
       }
     });
   }
@@ -341,6 +392,12 @@
       ctx.font = '9px ' + 'monospace';
       ctx.fillStyle = COLORS.unclaimed;
       ctx.fillText('◆' + (r > 0 ? '' + r : ''), p.x, top + 12);
+
+      if (zone.Role) {
+        ctx.font = '8px ' + 'monospace';
+        ctx.fillStyle = COLORS.zoneText;
+        ctx.fillText(zone.Role, p.x, p.y + layout.rZone + 12);
+      }
     });
   }
 
@@ -363,6 +420,7 @@
   }
 
   function drawAgents(ctx, map, frame, zoneById, layout) {
+    const roles = state.trajectory ? state.trajectory.header.AgentRoles : null;
     const pool = frame.agents.slice().sort(function (a, b) { return a.AgentId - b.AgentId; });
     pool.forEach(function (agent, i) {
       const zonePos = zoneById[agent.ZoneId];
@@ -409,6 +467,13 @@
       ctx.font = '9px ' + 'monospace';
       ctx.fillText(String(agent.Score), x, y - layout.rAgent - 4);
 
+      const role = roles && roles[agent.AgentId];
+      if (role) {
+        ctx.font = '8px ' + 'monospace';
+        ctx.fillStyle = AGENT_PALETTE[agent.AgentId % AGENT_PALETTE.length];
+        ctx.fillText(role, x, y + layout.rAgent + 12);
+      }
+
       if (agent.Transit) {
         const to = agent.Transit.ToZoneId;
         ctx.fillStyle = COLORS.edgeAtBurst;
@@ -453,18 +518,21 @@
     dom.statSteps.textContent = fin ? fin.TotalSteps + ' (limit ' + traj.header.SimulationConfig.MaxTicks + ')' : String(state.index);
 
     const crowd = zoneCounts(map, frame);
+    const roles = traj.header.AgentRoles;
     let rows = '';
     frame.agents.slice().sort(function (a, b) { return a.AgentId - b.AgentId; }).forEach(function (agent) {
       const transit = agent.Transit
         ? '→' + agent.Transit.ToZoneId + ' (' + agent.Transit.RemainingTicks + 't)'
         : 'idle';
-      rows += '<tr><td class="k">A' + agent.AgentId + ' · zone ' + agent.ZoneId + '</td><td class="v">' + transit + '</td></tr>';
+      const role = roles && roles[agent.AgentId] ? ' · ' + roles[agent.AgentId] : '';
+      rows += '<tr><td class="k">A' + agent.AgentId + role + ' · zone ' + agent.ZoneId + '</td><td class="v">' + transit + '</td></tr>';
     });
     dom.agentsBody.innerHTML = rows;
 
     let zrows = '';
     map.Zones.slice().sort(function (a, b) { return a.Id - b.Id; }).forEach(function (zone) {
-      zrows += '<tr><td class="k">Z' + zone.Id + '</td><td class="v">ρ' + (crowd[zone.Id] || 0) +
+      const room = zone.Role ? ' · ' + zone.Role : '';
+      zrows += '<tr><td class="k">Z' + zone.Id + room + '</td><td class="v">ρ' + (crowd[zone.Id] || 0) +
         ' · ◆' + (zoneUnclaimed(map, frame)[zone.Id] || 0) + '</td></tr>';
     });
     dom.zonesBody.innerHTML = zrows;
@@ -564,7 +632,13 @@
     if (decoded[0].Kind !== 'header') throw new Error('first line must be a header');
     if (!decoded[0].Map || !decoded[0].Map.Zones) throw new Error('header carries no Map');
 
-    const header = { Seed: decoded[0].Seed, Map: decodeMap(decoded[0].Map), SimulationConfig: decoded[0].SimulationConfig || {} };
+    const header = {
+      Seed: decoded[0].Seed,
+      Map: decodeMap(decoded[0].Map),
+      SimulationConfig: decoded[0].SimulationConfig || {},
+      Scenario: decoded[0].Scenario || null,
+      AgentRoles: decoded[0].AgentRoles || null,
+    };
     const steps = [];
     let final = null;
 
@@ -597,9 +671,9 @@
 
   function decodeMap(m) {
     const map = { Zones: [], Resources: [], ChokePoints: [] };
-    m.Zones.forEach(function (z) { map.Zones.push({ Id: z.Id, Position: z.Position, MaxOccupancy: z.MaxOccupancy }); });
-    if (m.Resources) m.Resources.forEach(function (r) { map.Resources.push({ Id: r.Id, ZoneId: r.ZoneId, Position: r.Position }); });
-    if (m.ChokePoints) m.ChokePoints.forEach(function (c) { map.ChokePoints.push({ Id: c.Id, FromZoneId: c.FromZoneId, ToZoneId: c.ToZoneId, MaxOccupancy: c.MaxOccupancy }); });
+    m.Zones.forEach(function (z) { map.Zones.push({ Id: z.Id, Position: z.Position, MaxOccupancy: z.MaxOccupancy, Role: z.Role || null }); });
+    if (m.Resources) m.Resources.forEach(function (r) { map.Resources.push({ Id: r.Id, ZoneId: r.ZoneId, Position: r.Position, Role: r.Role || null }); });
+    if (m.ChokePoints) m.ChokePoints.forEach(function (c) { map.ChokePoints.push({ Id: c.Id, FromZoneId: c.FromZoneId, ToZoneId: c.ToZoneId, MaxOccupancy: c.MaxOccupancy, Role: c.Role || null }); });
     return map;
   }
 })();

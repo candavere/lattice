@@ -110,12 +110,27 @@ public static class CliApp
     {
         try
         {
-            var (flags, positionals) = ParseFlags(args, "--seed", "--steps", "--agent", "--out");
+            var (flags, positionals) = ParseFlags(args, "--seed", "--steps", "--agent", "--scenario", "--out");
             GuardNoPositionals(positionals);
             var seed = ParseULong(Require(flags, "--seed"), "--seed");
             var steps = flags.TryGetValue("--steps", out var stepsText)
                 ? ParsePositiveInt(stepsText, "--steps")
                 : DefaultSimulationSteps;
+            var scenario = flags.TryGetValue("--scenario", out var scenarioText)
+                ? scenarioText.ToLowerInvariant()
+                : "";
+
+            if (scenario == InfiltrationScenario.ScenarioName)
+            {
+                return SimulateInfiltration(flags, seed, steps, stdout, stderr);
+            }
+
+            if (scenario.Length > 0)
+            {
+                throw new ArgumentException(
+                    $"invalid --scenario '{scenarioText}' (expected 'infiltration').");
+            }
+
             var agent = flags.TryGetValue("--agent", out var agentText)
                 ? agentText.ToLowerInvariant()
                 : "greedy";
@@ -130,7 +145,7 @@ public static class CliApp
                 _ => throw new ArgumentException(
                     $"invalid --agent '{agentText}' (expected 'greedy', 'random', or 'mcts')."),
             };
-            var scenario = ScenarioRunner.Run(
+            var scenarioResult = ScenarioRunner.Run(
                 map,
                 config,
                 new IAgent[] { agent0, new RandomAgent(1, new Rng(seed)) },
@@ -139,12 +154,12 @@ public static class CliApp
             var jsonl = new StringBuilder();
             using (var sink = new StringWriter(jsonl))
             {
-                TrajectoryWriter.Record(map, config, seed, scenario.Turns, sink);
+                TrajectoryWriter.Record(map, config, seed, scenarioResult.Turns, sink);
             }
 
-            var lastInfo = scenario.Results[^1].Info;
+            var lastInfo = scenarioResult.Results[^1].Info;
             stderr.WriteLine(
-                $"recorded {scenario.Metrics.TotalSteps} steps" +
+                $"recorded {scenarioResult.Metrics.TotalSteps} steps" +
                 $" ({(lastInfo.IsTerminal ? lastInfo.Reason : "budget-reached")}," +
                 $" winner: {(lastInfo.WinnerAgentId.HasValue ? $"agent {lastInfo.WinnerAgentId}" : "none")})");
             return WriteOutput(flags, "--out", jsonl.ToString().TrimEnd(), stdout, stderr);
@@ -153,6 +168,48 @@ public static class CliApp
         {
             return Report(ex, stderr);
         }
+    }
+
+    /// <summary>
+    /// Runs the "Dungeon Infiltration &amp; Sentry Patrol" demonstration
+    /// scenario (<see cref="Lattice.Agents.InfiltrationScenario"/>) and records
+    /// it as trajectory JSONL whose header carries the scenario name and the
+    /// tactical roster, so the renderers and web viewer can label the guard and
+    /// the rogue. Same seed, same bytes.
+    /// </summary>
+    private static int SimulateInfiltration(
+        Dictionary<string, string> flags,
+        ulong seed,
+        int steps,
+        TextWriter stdout,
+        TextWriter stderr)
+    {
+        if (flags.ContainsKey("--agent"))
+        {
+            throw new ArgumentException("--agent cannot be used with --scenario infiltration (the roster is fixed: Sentry vs Infiltrator).");
+        }
+
+        var run = InfiltrationScenario.Run(seed, steps);
+
+        var jsonl = new StringBuilder();
+        using (var sink = new StringWriter(jsonl))
+        {
+            TrajectoryWriter.Record(
+                run.Map,
+                run.Config,
+                seed,
+                run.Base.Turns,
+                sink,
+                scenario: InfiltrationScenario.ScenarioName,
+                agentRoles: new[] { InfiltrationScenario.SentryRole, InfiltrationScenario.InfiltratorRole });
+        }
+
+        var lastInfo = run.Base.Results[^1].Info;
+        stderr.WriteLine(
+            $"recorded {run.Base.Metrics.TotalSteps} steps" +
+            $" ({(lastInfo.IsTerminal ? lastInfo.Reason : "budget-reached")}," +
+            $" outcome: {run.Outcome.Status})");
+        return WriteOutput(flags, "--out", jsonl.ToString().TrimEnd(), stdout, stderr);
     }
 
     private static int Render(string[] args, TextWriter stdout, TextWriter stderr)
@@ -396,6 +453,10 @@ public static class CliApp
         sink.WriteLine("  simulate  --seed <ulong> [--steps <n>] [--agent greedy|random|mcts] [--out <file>]");
         sink.WriteLine("            Record a greedy (default)-vs-random episode as trajectory JSONL;");
         sink.WriteLine("            '--agent mcts' substitutes a rollout-based tactical agent for agent 0");
+        sink.WriteLine("  simulate  --seed <ulong> --scenario infiltration [--steps <n>] [--out <file>]");
+        sink.WriteLine("            Record a Dungeon Infiltration & Sentry Patrol episode: fix the roster to");
+        sink.WriteLine("            a SentryPatrolAgent (guard) vs an InfiltratorAgent (rogue) on the gated");
+        sink.WriteLine("            dungeon, with the trajectory header carrying the scenario + roster");
         sink.WriteLine("  render    --trajectory <file> [--format ascii|svg] [--out <file>]");
         sink.WriteLine("            Replay a recorded trajectory to the terminal or a standalone SVG");
         sink.WriteLine("  analyze   --trajectory <file> [--out <file>]");

@@ -29,11 +29,13 @@ public static class TrajectoryWriter
         SimulationConfig simulationConfig,
         ulong seed,
         AgentAction[][] actions,
-        TextWriter sink)
+        TextWriter sink,
+        string? scenario = null,
+        string[]? agentRoles = null)
     {
         var state = Simulation.CreateInitial(map, simulationConfig);
 
-        sink.Write(Serialize(new HeaderLine("header", seed, map, simulationConfig)) + "\n");
+        sink.Write(Serialize(new HeaderLine("header", seed, map, simulationConfig, scenario, agentRoles)) + "\n");
 
         var steps = new List<TrajectoryStep>();
         Info? lastInfo = null;
@@ -69,9 +71,19 @@ public static class TrajectoryWriter
     /// <see cref="Record"/>. Byte-identical to the original recording's own
     /// output, which is how a read-back is verified.
     /// </summary>
-    public static void Write(TrajectoryRecording recording, TextWriter sink)
+    public static void Write(
+        TrajectoryRecording recording,
+        TextWriter sink,
+        string? scenario = null,
+        string[]? agentRoles = null)
     {
-        sink.Write(Serialize(new HeaderLine("header", recording.Header.Seed, recording.Header.Map, recording.Header.SimulationConfig)) + "\n");
+        sink.Write(Serialize(new HeaderLine(
+            "header",
+            recording.Header.Seed,
+            recording.Header.Map,
+            recording.Header.SimulationConfig,
+            scenario ?? recording.Header.Scenario,
+            agentRoles ?? recording.Header.AgentRoles)) + "\n");
 
         foreach (var step in recording.Steps)
         {
@@ -108,9 +120,15 @@ public static class TrajectoryWriter
 
     private static string Serialize<T>(T value) => JsonSerializer.Serialize(value, Options);
 
-    internal sealed record HeaderLine(string Kind, ulong Seed, MapGraph Map, SimulationConfig SimulationConfig)
+    internal sealed record HeaderLine(
+        string Kind,
+        ulong Seed,
+        MapGraph Map,
+        SimulationConfig SimulationConfig,
+        string? Scenario = null,
+        string[]? AgentRoles = null)
     {
-        public TrajectoryHeader ToModel() => new(Seed, Map, SimulationConfig);
+        public TrajectoryHeader ToModel() => new(Seed, Map, SimulationConfig, Scenario, AgentRoles);
     }
 
     internal sealed record StepLine(string Kind, int StepNumber, AgentAction[] Actions, StepResult Result)

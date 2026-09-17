@@ -307,4 +307,81 @@ public class CliIntegrationTests
         Assert.Equal(0, exit);
         Assert.Contains("usage: lattice <command> [options]", stdout);
     }
+
+    [Fact]
+    public void Simulate_InfiltrationScenario_RecordsTrajectoryJsonl()
+    {
+        var path = TempPath(".jsonl");
+        try
+        {
+            var (exit, stdout, stderr) = Run("simulate", "--scenario", "infiltration", "--seed", "42", "--steps", "20", "--out", path);
+
+            Assert.Equal(0, exit);
+            Assert.Equal("", stdout);
+            Assert.Contains("recorded", stderr);
+            Assert.Contains("outcome:", stderr);
+            var file = File.ReadAllText(path);
+            Assert.Contains("\"Kind\":\"header\"", file);
+            Assert.Contains("\"Kind\":\"step\"", file);
+            Assert.Contains("\"Kind\":\"final\"", file);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Simulate_InfiltrationScenario_IsDeterministicAcrossRuns()
+    {
+        var first = Run("simulate", "--scenario", "infiltration", "--seed", "42", "--steps", "15").Stdout;
+        var second = Run("simulate", "--scenario", "infiltration", "--seed", "42", "--steps", "15").Stdout;
+
+        Assert.Equal(first, second);
+    }
+
+    [Fact]
+    public void Simulate_InfiltrationScenario_RejectsAgentFlag()
+    {
+        var (exit, _, stderr) = Run("simulate", "--scenario", "infiltration", "--seed", "42", "--agent", "greedy");
+
+        Assert.NotEqual(0, exit);
+        Assert.Contains("--agent cannot be used with --scenario infiltration", stderr);
+    }
+
+    [Fact]
+    public void Simulate_InfiltrationScenario_HeaderCarriesScenarioAndRoles()
+    {
+        var (exit, stdout, _) = Run("simulate", "--scenario", "infiltration", "--seed", "42", "--steps", "10");
+
+        Assert.Equal(0, exit);
+        var headerLine = stdout.Split('\n').First(line => line.Contains("\"Kind\":\"header\""));
+        using var document = JsonDocument.Parse(headerLine);
+        var header = document.RootElement;
+        Assert.Equal("infiltration", header.GetProperty("Scenario").GetString());
+        var roles = header.GetProperty("AgentRoles");
+        Assert.Equal("Sentry", roles[0].GetString());
+        Assert.Equal("Infiltrator", roles[1].GetString());
+    }
+
+    [Fact]
+    public void Render_InfiltrationAscii_ReplaysScenarioRoster()
+    {
+        var trajectory = TempPath(".jsonl");
+        try
+        {
+            Assert.Equal(0, Run("simulate", "--scenario", "infiltration", "--seed", "42", "--steps", "10", "--out", trajectory).ExitCode);
+
+            var (exit, stdout, _) = Run("render", "--trajectory", trajectory);
+
+            Assert.Equal(0, exit);
+            Assert.Contains("Scenario: infiltration", stdout);
+            Assert.Contains("Sentry@Z", stdout);
+            Assert.Contains("Infiltrator@Z", stdout);
+        }
+        finally
+        {
+            File.Delete(trajectory);
+        }
+    }
 }

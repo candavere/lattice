@@ -29,7 +29,7 @@ public static void Playback(TextReader trajectorySource, TextWriter sink)
     var initial = Simulation.CreateInitial(header.Map, header.SimulationConfig);
 
     sink.Write("== initial state ==\n");
-    WriteFrame(sink, header.Map, initial.Agents, initial.Claims);
+    WriteFrame(sink, header.Map, initial.Agents, initial.Claims, header.Scenario, header.AgentRoles);
 
     foreach (var step in recording.Steps)
     {
@@ -43,7 +43,7 @@ public static void Playback(TextReader trajectorySource, TextWriter sink)
         heading += " ==";
         sink.Write(heading + "\n");
         sink.Write($"actions: {FormatActions(step.Actions)}\n");
-        WriteFrame(sink, header.Map, step.Result.Observations[0]);
+        WriteFrame(sink, header.Map, step.Result.Observations[0], header.Scenario, header.AgentRoles);
     }
 }
 
@@ -85,8 +85,18 @@ public static void Playback(TextReader trajectorySource, TextWriter sink)
         sink.Write(AsciiRenderer.RenderFrame(map, agents, claims) + "\n\n");
     }
 
+    private static void WriteFrame(TextWriter sink, MapGraph map, AgentState[] agents, int[] claims, string? scenario, string[]? agentRoles)
+    {
+        sink.Write(AsciiRenderer.RenderFrame(map, agents, claims, scenario, agentRoles) + "\n\n");
+    }
+
     private static void WriteFrame(TextWriter sink, MapGraph map, Observation observation)
     {
         sink.Write(AsciiRenderer.RenderFrame(map, observation) + "\n\n");
+    }
+
+    private static void WriteFrame(TextWriter sink, MapGraph map, Observation observation, string? scenario, string[]? agentRoles)
+    {
+        sink.Write(AsciiRenderer.RenderFrame(map, observation, scenario, agentRoles) + "\n\n");
     }
 }

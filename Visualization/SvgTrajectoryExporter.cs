@@ -47,7 +47,7 @@ public static class SvgTrajectoryExporter
         {
             sb.Append("<g id=\"frame-").Append(i).Append("\" class=\"frame\" data-step=\"")
                 .Append(frames[i].Label).Append("\">\n");
-            sb.Append(SvgRenderer.RenderScene(map, frames[i].Agents, frames[i].Claims));
+            sb.Append(SvgRenderer.RenderScene(map, frames[i].Agents, frames[i].Claims, recording.Header.AgentRoles));
             sb.Append("</g>\n");
         }
 

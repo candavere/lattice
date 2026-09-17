@@ -228,6 +228,9 @@ main {
 
 .statusbar .source::before { content: "◆ "; color: var(--accent); }
 
+.statusbar .roster::before { content: "▲ "; color: var(--warn); }
+.statusbar .roster:empty::before { content: none; }
+
 .statusbar .terminal.ok { color: var(--ok); }
 .statusbar .terminal.limit { color: var(--warn); }
 

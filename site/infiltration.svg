@@ -1,0 +1,966 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="160" viewBox="0 0 200 160">
+<rect width="200" height="160" fill="#0F111A"/>
+<style>
+  #frame-0 { animation: frame-0 24s steps(1) infinite; }
+  #frame-1 { animation: frame-1 24s steps(1) infinite; }
+  #frame-2 { animation: frame-2 24s steps(1) infinite; }
+  #frame-3 { animation: frame-3 24s steps(1) infinite; }
+  #frame-4 { animation: frame-4 24s steps(1) infinite; }
+  #frame-5 { animation: frame-5 24s steps(1) infinite; }
+  #frame-6 { animation: frame-6 24s steps(1) infinite; }
+  #frame-7 { animation: frame-7 24s steps(1) infinite; }
+  #frame-8 { animation: frame-8 24s steps(1) infinite; }
+  #frame-9 { animation: frame-9 24s steps(1) infinite; }
+  #frame-10 { animation: frame-10 24s steps(1) infinite; }
+  #frame-11 { animation: frame-11 24s steps(1) infinite; }
+  #frame-12 { animation: frame-12 24s steps(1) infinite; }
+  #frame-13 { animation: frame-13 24s steps(1) infinite; }
+  #frame-14 { animation: frame-14 24s steps(1) infinite; }
+  #frame-15 { animation: frame-15 24s steps(1) infinite; }
+  #frame-16 { animation: frame-16 24s steps(1) infinite; }
+  #frame-17 { animation: frame-17 24s steps(1) infinite; }
+  #frame-18 { animation: frame-18 24s steps(1) infinite; }
+  #frame-19 { animation: frame-19 24s steps(1) infinite; }
+  #frame-20 { animation: frame-20 24s steps(1) infinite; }
+  #frame-21 { animation: frame-21 24s steps(1) infinite; }
+  #frame-22 { animation: frame-22 24s steps(1) infinite; }
+  #frame-23 { animation: frame-23 24s steps(1) infinite; }
+  @keyframes frame-0 { 0%, 0% { opacity: 0; } 0%, 4.17% { opacity: 1; } 4.17%, 100% { opacity: 0; } }
+  @keyframes frame-1 { 0%, 4.17% { opacity: 0; } 4.17%, 8.33% { opacity: 1; } 8.33%, 100% { opacity: 0; } }
+  @keyframes frame-2 { 0%, 8.33% { opacity: 0; } 8.33%, 12.5% { opacity: 1; } 12.5%, 100% { opacity: 0; } }
+  @keyframes frame-3 { 0%, 12.5% { opacity: 0; } 12.5%, 16.67% { opacity: 1; } 16.67%, 100% { opacity: 0; } }
+  @keyframes frame-4 { 0%, 16.67% { opacity: 0; } 16.67%, 20.83% { opacity: 1; } 20.83%, 100% { opacity: 0; } }
+  @keyframes frame-5 { 0%, 20.83% { opacity: 0; } 20.83%, 25% { opacity: 1; } 25%, 100% { opacity: 0; } }
+  @keyframes frame-6 { 0%, 25% { opacity: 0; } 25%, 29.17% { opacity: 1; } 29.17%, 100% { opacity: 0; } }
+  @keyframes frame-7 { 0%, 29.17% { opacity: 0; } 29.17%, 33.33% { opacity: 1; } 33.33%, 100% { opacity: 0; } }
+  @keyframes frame-8 { 0%, 33.33% { opacity: 0; } 33.33%, 37.5% { opacity: 1; } 37.5%, 100% { opacity: 0; } }
+  @keyframes frame-9 { 0%, 37.5% { opacity: 0; } 37.5%, 41.67% { opacity: 1; } 41.67%, 100% { opacity: 0; } }
+  @keyframes frame-10 { 0%, 41.67% { opacity: 0; } 41.67%, 45.83% { opacity: 1; } 45.83%, 100% { opacity: 0; } }
+  @keyframes frame-11 { 0%, 45.83% { opacity: 0; } 45.83%, 50% { opacity: 1; } 50%, 100% { opacity: 0; } }
+  @keyframes frame-12 { 0%, 50% { opacity: 0; } 50%, 54.17% { opacity: 1; } 54.17%, 100% { opacity: 0; } }
+  @keyframes frame-13 { 0%, 54.17% { opacity: 0; } 54.17%, 58.33% { opacity: 1; } 58.33%, 100% { opacity: 0; } }
+  @keyframes frame-14 { 0%, 58.33% { opacity: 0; } 58.33%, 62.5% { opacity: 1; } 62.5%, 100% { opacity: 0; } }
+  @keyframes frame-15 { 0%, 62.5% { opacity: 0; } 62.5%, 66.67% { opacity: 1; } 66.67%, 100% { opacity: 0; } }
+  @keyframes frame-16 { 0%, 66.67% { opacity: 0; } 66.67%, 70.83% { opacity: 1; } 70.83%, 100% { opacity: 0; } }
+  @keyframes frame-17 { 0%, 70.83% { opacity: 0; } 70.83%, 75% { opacity: 1; } 75%, 100% { opacity: 0; } }
+  @keyframes frame-18 { 0%, 75% { opacity: 0; } 75%, 79.17% { opacity: 1; } 79.17%, 100% { opacity: 0; } }
+  @keyframes frame-19 { 0%, 79.17% { opacity: 0; } 79.17%, 83.33% { opacity: 1; } 83.33%, 100% { opacity: 0; } }
+  @keyframes frame-20 { 0%, 83.33% { opacity: 0; } 83.33%, 87.5% { opacity: 1; } 87.5%, 100% { opacity: 0; } }
+  @keyframes frame-21 { 0%, 87.5% { opacity: 0; } 87.5%, 91.67% { opacity: 1; } 91.67%, 100% { opacity: 0; } }
+  @keyframes frame-22 { 0%, 91.67% { opacity: 0; } 91.67%, 95.83% { opacity: 1; } 95.83%, 100% { opacity: 0; } }
+  @keyframes frame-23 { 0%, 95.83% { opacity: 0; } 95.83%, 100% { opacity: 1; } 100%, 100% { opacity: 0; } }
+</style>
+<g id="frame-0" class="frame" data-step="initial">
+<g id="edges">
+<g id="choke-0"><title>choke 0 - Portcullis (0->1)</title><line x1="40" y1="40" x2="100" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-1"><title>choke 1 - Portcullis (1->2)</title><line x1="100" y1="40" x2="160" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-2"><title>choke 2 - AirLockDoorway (2->3)</title><line x1="160" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-3"><title>choke 3 - AirLockDoorway (3->4)</title><line x1="160" y1="120" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-4"><title>choke 4 - Portcullis (4->5)</title><line x1="100" y1="120" x2="40" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-5"><title>choke 5 - AirLockDoorway (2->4)</title><line x1="160" y1="40" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-6"><title>choke 6 - Portcullis (0->3)</title><line x1="40" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+</g>
+<g id="resources">
+<g id="resource-0"><title>resource 0 - ObjectiveExtraction in zone 1</title><circle cx="120" cy="40" r="5" fill="#E0AF68"/>
+</g>
+<g id="resource-1"><title>resource 1 - TreasureChest in zone 5</title><circle cx="80" cy="100" r="5" fill="#E0AF68"/>
+</g>
+<g id="resource-2"><title>resource 2 - TreasureChest in zone 5</title><circle cx="60" cy="120" r="5" fill="#E0AF68"/>
+</g>
+</g>
+<g id="zones">
+<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+</g>
+<g id="agents">
+<g id="agent-0"><title>agent 0, Sentry, zone 0, score 0</title><circle cx="40" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, Infiltrator, zone 1, score 0</title><circle cx="100" cy="40" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+</g>
+</g>
+<g id="frame-1" class="frame" data-step="1">
+<g id="edges">
+<g id="choke-0"><title>choke 0 - Portcullis (0->1)</title><line x1="40" y1="40" x2="100" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-1"><title>choke 1 - Portcullis (1->2)</title><line x1="100" y1="40" x2="160" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-2"><title>choke 2 - AirLockDoorway (2->3)</title><line x1="160" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-3"><title>choke 3 - AirLockDoorway (3->4)</title><line x1="160" y1="120" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-4"><title>choke 4 - Portcullis (4->5)</title><line x1="100" y1="120" x2="40" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-5"><title>choke 5 - AirLockDoorway (2->4)</title><line x1="160" y1="40" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-6"><title>choke 6 - Portcullis (0->3)</title><line x1="40" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+</g>
+<g id="resources">
+<g id="resource-0"><title>resource 0 - ObjectiveExtraction in zone 1</title><circle cx="120" cy="40" r="5" fill="#E0AF68"/>
+</g>
+<g id="resource-1"><title>resource 1 - TreasureChest in zone 5</title><circle cx="80" cy="100" r="5" fill="#E0AF68"/>
+</g>
+<g id="resource-2"><title>resource 2 - TreasureChest in zone 5</title><circle cx="60" cy="120" r="5" fill="#E0AF68"/>
+</g>
+</g>
+<g id="zones">
+<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+</g>
+<g id="agents">
+<g id="agent-0"><title>agent 0, Sentry, zone 1, score 0</title><circle cx="100" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, Infiltrator, zone 2, score 0</title><circle cx="160" cy="40" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+</g>
+</g>
+<g id="frame-2" class="frame" data-step="2">
+<g id="edges">
+<g id="choke-0"><title>choke 0 - Portcullis (0->1)</title><line x1="40" y1="40" x2="100" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-1"><title>choke 1 - Portcullis (1->2)</title><line x1="100" y1="40" x2="160" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-2"><title>choke 2 - AirLockDoorway (2->3)</title><line x1="160" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-3"><title>choke 3 - AirLockDoorway (3->4)</title><line x1="160" y1="120" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-4"><title>choke 4 - Portcullis (4->5)</title><line x1="100" y1="120" x2="40" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-5"><title>choke 5 - AirLockDoorway (2->4)</title><line x1="160" y1="40" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-6"><title>choke 6 - Portcullis (0->3)</title><line x1="40" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+</g>
+<g id="resources">
+<g id="resource-0"><title>resource 0 - ObjectiveExtraction in zone 1</title><circle cx="120" cy="40" r="5" fill="#E0AF68"/>
+</g>
+<g id="resource-1"><title>resource 1 - TreasureChest in zone 5</title><circle cx="80" cy="100" r="5" fill="#E0AF68"/>
+</g>
+<g id="resource-2"><title>resource 2 - TreasureChest in zone 5</title><circle cx="60" cy="120" r="5" fill="#E0AF68"/>
+</g>
+</g>
+<g id="zones">
+<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+</g>
+<g id="agents">
+<g id="agent-0"><title>agent 0, Sentry, zone 2, score 0</title><circle cx="160" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, Infiltrator, zone 2, score 0</title><circle cx="160" cy="40" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+</g>
+</g>
+<g id="frame-3" class="frame" data-step="3">
+<g id="edges">
+<g id="choke-0"><title>choke 0 - Portcullis (0->1)</title><line x1="40" y1="40" x2="100" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-1"><title>choke 1 - Portcullis (1->2)</title><line x1="100" y1="40" x2="160" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-2"><title>choke 2 - AirLockDoorway (2->3)</title><line x1="160" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-3"><title>choke 3 - AirLockDoorway (3->4)</title><line x1="160" y1="120" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-4"><title>choke 4 - Portcullis (4->5)</title><line x1="100" y1="120" x2="40" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-5"><title>choke 5 - AirLockDoorway (2->4)</title><line x1="160" y1="40" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-6"><title>choke 6 - Portcullis (0->3)</title><line x1="40" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+</g>
+<g id="resources">
+<g id="resource-0"><title>resource 0 - ObjectiveExtraction in zone 1</title><circle cx="120" cy="40" r="5" fill="#E0AF68"/>
+</g>
+<g id="resource-1"><title>resource 1 - TreasureChest in zone 5</title><circle cx="80" cy="100" r="5" fill="#E0AF68"/>
+</g>
+<g id="resource-2"><title>resource 2 - TreasureChest in zone 5</title><circle cx="60" cy="120" r="5" fill="#E0AF68"/>
+</g>
+</g>
+<g id="zones">
+<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+</g>
+<g id="agents">
+<g id="agent-0"><title>agent 0, Sentry, zone 2, score 0</title><circle cx="160" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, Infiltrator, zone 4, score 0</title><circle cx="100" cy="120" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+</g>
+</g>
+<g id="frame-4" class="frame" data-step="4">
+<g id="edges">
+<g id="choke-0"><title>choke 0 - Portcullis (0->1)</title><line x1="40" y1="40" x2="100" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-1"><title>choke 1 - Portcullis (1->2)</title><line x1="100" y1="40" x2="160" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-2"><title>choke 2 - AirLockDoorway (2->3)</title><line x1="160" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-3"><title>choke 3 - AirLockDoorway (3->4)</title><line x1="160" y1="120" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-4"><title>choke 4 - Portcullis (4->5)</title><line x1="100" y1="120" x2="40" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-5"><title>choke 5 - AirLockDoorway (2->4)</title><line x1="160" y1="40" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-6"><title>choke 6 - Portcullis (0->3)</title><line x1="40" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+</g>
+<g id="resources">
+<g id="resource-0"><title>resource 0 - ObjectiveExtraction in zone 1</title><circle cx="120" cy="40" r="5" fill="#E0AF68"/>
+</g>
+<g id="resource-1"><title>resource 1 - TreasureChest in zone 5</title><circle cx="80" cy="100" r="5" fill="#E0AF68"/>
+</g>
+<g id="resource-2"><title>resource 2 - TreasureChest in zone 5</title><circle cx="60" cy="120" r="5" fill="#E0AF68"/>
+</g>
+</g>
+<g id="zones">
+<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+</g>
+<g id="agents">
+<g id="agent-0"><title>agent 0, Sentry, zone 2, score 0</title><circle cx="160" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, Infiltrator, zone 5, score 0</title><circle cx="40" cy="120" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+</g>
+</g>
+<g id="frame-5" class="frame" data-step="5">
+<g id="edges">
+<g id="choke-0"><title>choke 0 - Portcullis (0->1)</title><line x1="40" y1="40" x2="100" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-1"><title>choke 1 - Portcullis (1->2)</title><line x1="100" y1="40" x2="160" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-2"><title>choke 2 - AirLockDoorway (2->3)</title><line x1="160" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-3"><title>choke 3 - AirLockDoorway (3->4)</title><line x1="160" y1="120" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-4"><title>choke 4 - Portcullis (4->5)</title><line x1="100" y1="120" x2="40" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-5"><title>choke 5 - AirLockDoorway (2->4)</title><line x1="160" y1="40" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-6"><title>choke 6 - Portcullis (0->3)</title><line x1="40" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+</g>
+<g id="resources">
+<g id="resource-0"><title>resource 0 - ObjectiveExtraction in zone 1</title><circle cx="120" cy="40" r="5" fill="#E0AF68"/>
+</g>
+<g id="resource-1"><title>resource 1 - TreasureChest in zone 5</title><circle cx="80" cy="100" r="5" fill="#3DA66B"/>
+</g>
+<g id="resource-2"><title>resource 2 - TreasureChest in zone 5</title><circle cx="60" cy="120" r="5" fill="#E0AF68"/>
+</g>
+</g>
+<g id="zones">
+<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+</g>
+<g id="agents">
+<g id="agent-0"><title>agent 0, Sentry, zone 4, score 0</title><circle cx="100" cy="120" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, Infiltrator, zone 5, score 1</title><circle cx="40" cy="120" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+</g>
+</g>
+<g id="frame-6" class="frame" data-step="6">
+<g id="edges">
+<g id="choke-0"><title>choke 0 - Portcullis (0->1)</title><line x1="40" y1="40" x2="100" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-1"><title>choke 1 - Portcullis (1->2)</title><line x1="100" y1="40" x2="160" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-2"><title>choke 2 - AirLockDoorway (2->3)</title><line x1="160" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-3"><title>choke 3 - AirLockDoorway (3->4)</title><line x1="160" y1="120" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-4"><title>choke 4 - Portcullis (4->5)</title><line x1="100" y1="120" x2="40" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-5"><title>choke 5 - AirLockDoorway (2->4)</title><line x1="160" y1="40" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-6"><title>choke 6 - Portcullis (0->3)</title><line x1="40" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+</g>
+<g id="resources">
+<g id="resource-0"><title>resource 0 - ObjectiveExtraction in zone 1</title><circle cx="120" cy="40" r="5" fill="#E0AF68"/>
+</g>
+<g id="resource-1"><title>resource 1 - TreasureChest in zone 5</title><circle cx="80" cy="100" r="5" fill="#3DA66B"/>
+</g>
+<g id="resource-2"><title>resource 2 - TreasureChest in zone 5</title><circle cx="60" cy="120" r="5" fill="#E0AF68"/>
+</g>
+</g>
+<g id="zones">
+<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+</g>
+<g id="agents">
+<g id="agent-0"><title>agent 0, Sentry, zone 5, score 0</title><circle cx="40" cy="120" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, Infiltrator, zone 4, score 1</title><circle cx="100" cy="120" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+</g>
+</g>
+<g id="frame-7" class="frame" data-step="7">
+<g id="edges">
+<g id="choke-0"><title>choke 0 - Portcullis (0->1)</title><line x1="40" y1="40" x2="100" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-1"><title>choke 1 - Portcullis (1->2)</title><line x1="100" y1="40" x2="160" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-2"><title>choke 2 - AirLockDoorway (2->3)</title><line x1="160" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-3"><title>choke 3 - AirLockDoorway (3->4)</title><line x1="160" y1="120" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-4"><title>choke 4 - Portcullis (4->5)</title><line x1="100" y1="120" x2="40" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-5"><title>choke 5 - AirLockDoorway (2->4)</title><line x1="160" y1="40" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-6"><title>choke 6 - Portcullis (0->3)</title><line x1="40" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+</g>
+<g id="resources">
+<g id="resource-0"><title>resource 0 - ObjectiveExtraction in zone 1</title><circle cx="120" cy="40" r="5" fill="#E0AF68"/>
+</g>
+<g id="resource-1"><title>resource 1 - TreasureChest in zone 5</title><circle cx="80" cy="100" r="5" fill="#3DA66B"/>
+</g>
+<g id="resource-2"><title>resource 2 - TreasureChest in zone 5</title><circle cx="60" cy="120" r="5" fill="#E0AF68"/>
+</g>
+</g>
+<g id="zones">
+<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+</g>
+<g id="agents">
+<g id="agent-0"><title>agent 0, Sentry, zone 4, score 0</title><circle cx="100" cy="120" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, Infiltrator, zone 3, score 1</title><circle cx="160" cy="120" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+</g>
+</g>
+<g id="frame-8" class="frame" data-step="8">
+<g id="edges">
+<g id="choke-0"><title>choke 0 - Portcullis (0->1)</title><line x1="40" y1="40" x2="100" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-1"><title>choke 1 - Portcullis (1->2)</title><line x1="100" y1="40" x2="160" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-2"><title>choke 2 - AirLockDoorway (2->3)</title><line x1="160" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-3"><title>choke 3 - AirLockDoorway (3->4)</title><line x1="160" y1="120" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-4"><title>choke 4 - Portcullis (4->5)</title><line x1="100" y1="120" x2="40" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-5"><title>choke 5 - AirLockDoorway (2->4)</title><line x1="160" y1="40" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-6"><title>choke 6 - Portcullis (0->3)</title><line x1="40" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+</g>
+<g id="resources">
+<g id="resource-0"><title>resource 0 - ObjectiveExtraction in zone 1</title><circle cx="120" cy="40" r="5" fill="#E0AF68"/>
+</g>
+<g id="resource-1"><title>resource 1 - TreasureChest in zone 5</title><circle cx="80" cy="100" r="5" fill="#3DA66B"/>
+</g>
+<g id="resource-2"><title>resource 2 - TreasureChest in zone 5</title><circle cx="60" cy="120" r="5" fill="#E0AF68"/>
+</g>
+</g>
+<g id="zones">
+<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+</g>
+<g id="agents">
+<g id="agent-0"><title>agent 0, Sentry, zone 3, score 0</title><circle cx="160" cy="120" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, Infiltrator, zone 2, score 1</title><circle cx="160" cy="40" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+</g>
+</g>
+<g id="frame-9" class="frame" data-step="9">
+<g id="edges">
+<g id="choke-0"><title>choke 0 - Portcullis (0->1)</title><line x1="40" y1="40" x2="100" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-1"><title>choke 1 - Portcullis (1->2)</title><line x1="100" y1="40" x2="160" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-2"><title>choke 2 - AirLockDoorway (2->3)</title><line x1="160" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-3"><title>choke 3 - AirLockDoorway (3->4)</title><line x1="160" y1="120" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-4"><title>choke 4 - Portcullis (4->5)</title><line x1="100" y1="120" x2="40" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-5"><title>choke 5 - AirLockDoorway (2->4)</title><line x1="160" y1="40" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-6"><title>choke 6 - Portcullis (0->3)</title><line x1="40" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+</g>
+<g id="resources">
+<g id="resource-0"><title>resource 0 - ObjectiveExtraction in zone 1</title><circle cx="120" cy="40" r="5" fill="#E0AF68"/>
+</g>
+<g id="resource-1"><title>resource 1 - TreasureChest in zone 5</title><circle cx="80" cy="100" r="5" fill="#3DA66B"/>
+</g>
+<g id="resource-2"><title>resource 2 - TreasureChest in zone 5</title><circle cx="60" cy="120" r="5" fill="#E0AF68"/>
+</g>
+</g>
+<g id="zones">
+<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+</g>
+<g id="agents">
+<g id="agent-0"><title>agent 0, Sentry, zone 2, score 0</title><circle cx="160" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, Infiltrator, zone 1, score 1</title><circle cx="100" cy="40" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+</g>
+</g>
+<g id="frame-10" class="frame" data-step="10">
+<g id="edges">
+<g id="choke-0"><title>choke 0 - Portcullis (0->1)</title><line x1="40" y1="40" x2="100" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-1"><title>choke 1 - Portcullis (1->2)</title><line x1="100" y1="40" x2="160" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-2"><title>choke 2 - AirLockDoorway (2->3)</title><line x1="160" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-3"><title>choke 3 - AirLockDoorway (3->4)</title><line x1="160" y1="120" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-4"><title>choke 4 - Portcullis (4->5)</title><line x1="100" y1="120" x2="40" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-5"><title>choke 5 - AirLockDoorway (2->4)</title><line x1="160" y1="40" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-6"><title>choke 6 - Portcullis (0->3)</title><line x1="40" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+</g>
+<g id="resources">
+<g id="resource-0"><title>resource 0 - ObjectiveExtraction in zone 1</title><circle cx="120" cy="40" r="5" fill="#E0AF68"/>
+</g>
+<g id="resource-1"><title>resource 1 - TreasureChest in zone 5</title><circle cx="80" cy="100" r="5" fill="#3DA66B"/>
+</g>
+<g id="resource-2"><title>resource 2 - TreasureChest in zone 5</title><circle cx="60" cy="120" r="5" fill="#E0AF68"/>
+</g>
+</g>
+<g id="zones">
+<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+</g>
+<g id="agents">
+<g id="agent-0"><title>agent 0, Sentry, zone 1, score 0</title><circle cx="100" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, Infiltrator, zone 0, score 1</title><circle cx="40" cy="40" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+</g>
+</g>
+<g id="frame-11" class="frame" data-step="11">
+<g id="edges">
+<g id="choke-0"><title>choke 0 - Portcullis (0->1)</title><line x1="40" y1="40" x2="100" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-1"><title>choke 1 - Portcullis (1->2)</title><line x1="100" y1="40" x2="160" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-2"><title>choke 2 - AirLockDoorway (2->3)</title><line x1="160" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-3"><title>choke 3 - AirLockDoorway (3->4)</title><line x1="160" y1="120" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-4"><title>choke 4 - Portcullis (4->5)</title><line x1="100" y1="120" x2="40" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-5"><title>choke 5 - AirLockDoorway (2->4)</title><line x1="160" y1="40" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-6"><title>choke 6 - Portcullis (0->3)</title><line x1="40" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+</g>
+<g id="resources">
+<g id="resource-0"><title>resource 0 - ObjectiveExtraction in zone 1</title><circle cx="120" cy="40" r="5" fill="#E0AF68"/>
+</g>
+<g id="resource-1"><title>resource 1 - TreasureChest in zone 5</title><circle cx="80" cy="100" r="5" fill="#3DA66B"/>
+</g>
+<g id="resource-2"><title>resource 2 - TreasureChest in zone 5</title><circle cx="60" cy="120" r="5" fill="#E0AF68"/>
+</g>
+</g>
+<g id="zones">
+<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+</g>
+<g id="agents">
+<g id="agent-0"><title>agent 0, Sentry, zone 0, score 0</title><circle cx="40" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, Infiltrator, zone 0, score 1</title><circle cx="40" cy="40" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+</g>
+</g>
+<g id="frame-12" class="frame" data-step="12">
+<g id="edges">
+<g id="choke-0"><title>choke 0 - Portcullis (0->1)</title><line x1="40" y1="40" x2="100" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-1"><title>choke 1 - Portcullis (1->2)</title><line x1="100" y1="40" x2="160" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-2"><title>choke 2 - AirLockDoorway (2->3)</title><line x1="160" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-3"><title>choke 3 - AirLockDoorway (3->4)</title><line x1="160" y1="120" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-4"><title>choke 4 - Portcullis (4->5)</title><line x1="100" y1="120" x2="40" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-5"><title>choke 5 - AirLockDoorway (2->4)</title><line x1="160" y1="40" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-6"><title>choke 6 - Portcullis (0->3)</title><line x1="40" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+</g>
+<g id="resources">
+<g id="resource-0"><title>resource 0 - ObjectiveExtraction in zone 1</title><circle cx="120" cy="40" r="5" fill="#E0AF68"/>
+</g>
+<g id="resource-1"><title>resource 1 - TreasureChest in zone 5</title><circle cx="80" cy="100" r="5" fill="#3DA66B"/>
+</g>
+<g id="resource-2"><title>resource 2 - TreasureChest in zone 5</title><circle cx="60" cy="120" r="5" fill="#E0AF68"/>
+</g>
+</g>
+<g id="zones">
+<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+</g>
+<g id="agents">
+<g id="agent-0"><title>agent 0, Sentry, zone 0, score 0</title><circle cx="40" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, Infiltrator, zone 0, score 1</title><circle cx="40" cy="40" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+</g>
+</g>
+<g id="frame-13" class="frame" data-step="13">
+<g id="edges">
+<g id="choke-0"><title>choke 0 - Portcullis (0->1)</title><line x1="40" y1="40" x2="100" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-1"><title>choke 1 - Portcullis (1->2)</title><line x1="100" y1="40" x2="160" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-2"><title>choke 2 - AirLockDoorway (2->3)</title><line x1="160" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-3"><title>choke 3 - AirLockDoorway (3->4)</title><line x1="160" y1="120" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-4"><title>choke 4 - Portcullis (4->5)</title><line x1="100" y1="120" x2="40" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-5"><title>choke 5 - AirLockDoorway (2->4)</title><line x1="160" y1="40" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-6"><title>choke 6 - Portcullis (0->3)</title><line x1="40" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+</g>
+<g id="resources">
+<g id="resource-0"><title>resource 0 - ObjectiveExtraction in zone 1</title><circle cx="120" cy="40" r="5" fill="#E0AF68"/>
+</g>
+<g id="resource-1"><title>resource 1 - TreasureChest in zone 5</title><circle cx="80" cy="100" r="5" fill="#3DA66B"/>
+</g>
+<g id="resource-2"><title>resource 2 - TreasureChest in zone 5</title><circle cx="60" cy="120" r="5" fill="#E0AF68"/>
+</g>
+</g>
+<g id="zones">
+<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+</g>
+<g id="agents">
+<g id="agent-0"><title>agent 0, Sentry, zone 0, score 0</title><circle cx="40" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, Infiltrator, zone 3, score 1</title><circle cx="160" cy="120" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+</g>
+</g>
+<g id="frame-14" class="frame" data-step="14">
+<g id="edges">
+<g id="choke-0"><title>choke 0 - Portcullis (0->1)</title><line x1="40" y1="40" x2="100" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-1"><title>choke 1 - Portcullis (1->2)</title><line x1="100" y1="40" x2="160" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-2"><title>choke 2 - AirLockDoorway (2->3)</title><line x1="160" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-3"><title>choke 3 - AirLockDoorway (3->4)</title><line x1="160" y1="120" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-4"><title>choke 4 - Portcullis (4->5)</title><line x1="100" y1="120" x2="40" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-5"><title>choke 5 - AirLockDoorway (2->4)</title><line x1="160" y1="40" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-6"><title>choke 6 - Portcullis (0->3)</title><line x1="40" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+</g>
+<g id="resources">
+<g id="resource-0"><title>resource 0 - ObjectiveExtraction in zone 1</title><circle cx="120" cy="40" r="5" fill="#E0AF68"/>
+</g>
+<g id="resource-1"><title>resource 1 - TreasureChest in zone 5</title><circle cx="80" cy="100" r="5" fill="#3DA66B"/>
+</g>
+<g id="resource-2"><title>resource 2 - TreasureChest in zone 5</title><circle cx="60" cy="120" r="5" fill="#E0AF68"/>
+</g>
+</g>
+<g id="zones">
+<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+</g>
+<g id="agents">
+<g id="agent-0"><title>agent 0, Sentry, zone 1, score 0</title><circle cx="100" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, Infiltrator, zone 2, score 1</title><circle cx="160" cy="40" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+</g>
+</g>
+<g id="frame-15" class="frame" data-step="15">
+<g id="edges">
+<g id="choke-0"><title>choke 0 - Portcullis (0->1)</title><line x1="40" y1="40" x2="100" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-1"><title>choke 1 - Portcullis (1->2)</title><line x1="100" y1="40" x2="160" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-2"><title>choke 2 - AirLockDoorway (2->3)</title><line x1="160" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-3"><title>choke 3 - AirLockDoorway (3->4)</title><line x1="160" y1="120" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-4"><title>choke 4 - Portcullis (4->5)</title><line x1="100" y1="120" x2="40" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-5"><title>choke 5 - AirLockDoorway (2->4)</title><line x1="160" y1="40" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-6"><title>choke 6 - Portcullis (0->3)</title><line x1="40" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+</g>
+<g id="resources">
+<g id="resource-0"><title>resource 0 - ObjectiveExtraction in zone 1</title><circle cx="120" cy="40" r="5" fill="#E0AF68"/>
+</g>
+<g id="resource-1"><title>resource 1 - TreasureChest in zone 5</title><circle cx="80" cy="100" r="5" fill="#3DA66B"/>
+</g>
+<g id="resource-2"><title>resource 2 - TreasureChest in zone 5</title><circle cx="60" cy="120" r="5" fill="#E0AF68"/>
+</g>
+</g>
+<g id="zones">
+<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+</g>
+<g id="agents">
+<g id="agent-0"><title>agent 0, Sentry, zone 2, score 0</title><circle cx="160" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, Infiltrator, zone 2, score 1</title><circle cx="160" cy="40" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+</g>
+</g>
+<g id="frame-16" class="frame" data-step="16">
+<g id="edges">
+<g id="choke-0"><title>choke 0 - Portcullis (0->1)</title><line x1="40" y1="40" x2="100" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-1"><title>choke 1 - Portcullis (1->2)</title><line x1="100" y1="40" x2="160" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-2"><title>choke 2 - AirLockDoorway (2->3)</title><line x1="160" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-3"><title>choke 3 - AirLockDoorway (3->4)</title><line x1="160" y1="120" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-4"><title>choke 4 - Portcullis (4->5)</title><line x1="100" y1="120" x2="40" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-5"><title>choke 5 - AirLockDoorway (2->4)</title><line x1="160" y1="40" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-6"><title>choke 6 - Portcullis (0->3)</title><line x1="40" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+</g>
+<g id="resources">
+<g id="resource-0"><title>resource 0 - ObjectiveExtraction in zone 1</title><circle cx="120" cy="40" r="5" fill="#E0AF68"/>
+</g>
+<g id="resource-1"><title>resource 1 - TreasureChest in zone 5</title><circle cx="80" cy="100" r="5" fill="#3DA66B"/>
+</g>
+<g id="resource-2"><title>resource 2 - TreasureChest in zone 5</title><circle cx="60" cy="120" r="5" fill="#E0AF68"/>
+</g>
+</g>
+<g id="zones">
+<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+</g>
+<g id="agents">
+<g id="agent-0"><title>agent 0, Sentry, zone 2, score 0</title><circle cx="160" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, Infiltrator, zone 4, score 1</title><circle cx="100" cy="120" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+</g>
+</g>
+<g id="frame-17" class="frame" data-step="17">
+<g id="edges">
+<g id="choke-0"><title>choke 0 - Portcullis (0->1)</title><line x1="40" y1="40" x2="100" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-1"><title>choke 1 - Portcullis (1->2)</title><line x1="100" y1="40" x2="160" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-2"><title>choke 2 - AirLockDoorway (2->3)</title><line x1="160" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-3"><title>choke 3 - AirLockDoorway (3->4)</title><line x1="160" y1="120" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-4"><title>choke 4 - Portcullis (4->5)</title><line x1="100" y1="120" x2="40" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-5"><title>choke 5 - AirLockDoorway (2->4)</title><line x1="160" y1="40" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-6"><title>choke 6 - Portcullis (0->3)</title><line x1="40" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+</g>
+<g id="resources">
+<g id="resource-0"><title>resource 0 - ObjectiveExtraction in zone 1</title><circle cx="120" cy="40" r="5" fill="#E0AF68"/>
+</g>
+<g id="resource-1"><title>resource 1 - TreasureChest in zone 5</title><circle cx="80" cy="100" r="5" fill="#3DA66B"/>
+</g>
+<g id="resource-2"><title>resource 2 - TreasureChest in zone 5</title><circle cx="60" cy="120" r="5" fill="#E0AF68"/>
+</g>
+</g>
+<g id="zones">
+<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+</g>
+<g id="agents">
+<g id="agent-0"><title>agent 0, Sentry, zone 2, score 0</title><circle cx="160" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, Infiltrator, zone 5, score 1</title><circle cx="40" cy="120" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+</g>
+</g>
+<g id="frame-18" class="frame" data-step="18">
+<g id="edges">
+<g id="choke-0"><title>choke 0 - Portcullis (0->1)</title><line x1="40" y1="40" x2="100" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-1"><title>choke 1 - Portcullis (1->2)</title><line x1="100" y1="40" x2="160" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-2"><title>choke 2 - AirLockDoorway (2->3)</title><line x1="160" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-3"><title>choke 3 - AirLockDoorway (3->4)</title><line x1="160" y1="120" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-4"><title>choke 4 - Portcullis (4->5)</title><line x1="100" y1="120" x2="40" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-5"><title>choke 5 - AirLockDoorway (2->4)</title><line x1="160" y1="40" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-6"><title>choke 6 - Portcullis (0->3)</title><line x1="40" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+</g>
+<g id="resources">
+<g id="resource-0"><title>resource 0 - ObjectiveExtraction in zone 1</title><circle cx="120" cy="40" r="5" fill="#E0AF68"/>
+</g>
+<g id="resource-1"><title>resource 1 - TreasureChest in zone 5</title><circle cx="80" cy="100" r="5" fill="#3DA66B"/>
+</g>
+<g id="resource-2"><title>resource 2 - TreasureChest in zone 5</title><circle cx="60" cy="120" r="5" fill="#3DA66B"/>
+</g>
+</g>
+<g id="zones">
+<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+</g>
+<g id="agents">
+<g id="agent-0"><title>agent 0, Sentry, zone 4, score 0</title><circle cx="100" cy="120" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, Infiltrator, zone 5, score 2</title><circle cx="40" cy="120" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+</g>
+</g>
+<g id="frame-19" class="frame" data-step="19">
+<g id="edges">
+<g id="choke-0"><title>choke 0 - Portcullis (0->1)</title><line x1="40" y1="40" x2="100" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-1"><title>choke 1 - Portcullis (1->2)</title><line x1="100" y1="40" x2="160" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-2"><title>choke 2 - AirLockDoorway (2->3)</title><line x1="160" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-3"><title>choke 3 - AirLockDoorway (3->4)</title><line x1="160" y1="120" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-4"><title>choke 4 - Portcullis (4->5)</title><line x1="100" y1="120" x2="40" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-5"><title>choke 5 - AirLockDoorway (2->4)</title><line x1="160" y1="40" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-6"><title>choke 6 - Portcullis (0->3)</title><line x1="40" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+</g>
+<g id="resources">
+<g id="resource-0"><title>resource 0 - ObjectiveExtraction in zone 1</title><circle cx="120" cy="40" r="5" fill="#E0AF68"/>
+</g>
+<g id="resource-1"><title>resource 1 - TreasureChest in zone 5</title><circle cx="80" cy="100" r="5" fill="#3DA66B"/>
+</g>
+<g id="resource-2"><title>resource 2 - TreasureChest in zone 5</title><circle cx="60" cy="120" r="5" fill="#3DA66B"/>
+</g>
+</g>
+<g id="zones">
+<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+</g>
+<g id="agents">
+<g id="agent-0"><title>agent 0, Sentry, zone 5, score 0</title><circle cx="40" cy="120" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, Infiltrator, zone 4, score 2</title><circle cx="100" cy="120" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+</g>
+</g>
+<g id="frame-20" class="frame" data-step="20">
+<g id="edges">
+<g id="choke-0"><title>choke 0 - Portcullis (0->1)</title><line x1="40" y1="40" x2="100" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-1"><title>choke 1 - Portcullis (1->2)</title><line x1="100" y1="40" x2="160" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-2"><title>choke 2 - AirLockDoorway (2->3)</title><line x1="160" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-3"><title>choke 3 - AirLockDoorway (3->4)</title><line x1="160" y1="120" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-4"><title>choke 4 - Portcullis (4->5)</title><line x1="100" y1="120" x2="40" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-5"><title>choke 5 - AirLockDoorway (2->4)</title><line x1="160" y1="40" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-6"><title>choke 6 - Portcullis (0->3)</title><line x1="40" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+</g>
+<g id="resources">
+<g id="resource-0"><title>resource 0 - ObjectiveExtraction in zone 1</title><circle cx="120" cy="40" r="5" fill="#E0AF68"/>
+</g>
+<g id="resource-1"><title>resource 1 - TreasureChest in zone 5</title><circle cx="80" cy="100" r="5" fill="#3DA66B"/>
+</g>
+<g id="resource-2"><title>resource 2 - TreasureChest in zone 5</title><circle cx="60" cy="120" r="5" fill="#3DA66B"/>
+</g>
+</g>
+<g id="zones">
+<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+</g>
+<g id="agents">
+<g id="agent-0"><title>agent 0, Sentry, zone 4, score 0</title><circle cx="100" cy="120" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, Infiltrator, zone 3, score 2</title><circle cx="160" cy="120" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+</g>
+</g>
+<g id="frame-21" class="frame" data-step="21">
+<g id="edges">
+<g id="choke-0"><title>choke 0 - Portcullis (0->1)</title><line x1="40" y1="40" x2="100" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-1"><title>choke 1 - Portcullis (1->2)</title><line x1="100" y1="40" x2="160" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-2"><title>choke 2 - AirLockDoorway (2->3)</title><line x1="160" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-3"><title>choke 3 - AirLockDoorway (3->4)</title><line x1="160" y1="120" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-4"><title>choke 4 - Portcullis (4->5)</title><line x1="100" y1="120" x2="40" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-5"><title>choke 5 - AirLockDoorway (2->4)</title><line x1="160" y1="40" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-6"><title>choke 6 - Portcullis (0->3)</title><line x1="40" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+</g>
+<g id="resources">
+<g id="resource-0"><title>resource 0 - ObjectiveExtraction in zone 1</title><circle cx="120" cy="40" r="5" fill="#E0AF68"/>
+</g>
+<g id="resource-1"><title>resource 1 - TreasureChest in zone 5</title><circle cx="80" cy="100" r="5" fill="#3DA66B"/>
+</g>
+<g id="resource-2"><title>resource 2 - TreasureChest in zone 5</title><circle cx="60" cy="120" r="5" fill="#3DA66B"/>
+</g>
+</g>
+<g id="zones">
+<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+</g>
+<g id="agents">
+<g id="agent-0"><title>agent 0, Sentry, zone 3, score 0</title><circle cx="160" cy="120" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, Infiltrator, zone 2, score 2</title><circle cx="160" cy="40" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+</g>
+</g>
+<g id="frame-22" class="frame" data-step="22">
+<g id="edges">
+<g id="choke-0"><title>choke 0 - Portcullis (0->1)</title><line x1="40" y1="40" x2="100" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-1"><title>choke 1 - Portcullis (1->2)</title><line x1="100" y1="40" x2="160" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-2"><title>choke 2 - AirLockDoorway (2->3)</title><line x1="160" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-3"><title>choke 3 - AirLockDoorway (3->4)</title><line x1="160" y1="120" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-4"><title>choke 4 - Portcullis (4->5)</title><line x1="100" y1="120" x2="40" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-5"><title>choke 5 - AirLockDoorway (2->4)</title><line x1="160" y1="40" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-6"><title>choke 6 - Portcullis (0->3)</title><line x1="40" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+</g>
+<g id="resources">
+<g id="resource-0"><title>resource 0 - ObjectiveExtraction in zone 1</title><circle cx="120" cy="40" r="5" fill="#E0AF68"/>
+</g>
+<g id="resource-1"><title>resource 1 - TreasureChest in zone 5</title><circle cx="80" cy="100" r="5" fill="#3DA66B"/>
+</g>
+<g id="resource-2"><title>resource 2 - TreasureChest in zone 5</title><circle cx="60" cy="120" r="5" fill="#3DA66B"/>
+</g>
+</g>
+<g id="zones">
+<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+</g>
+<g id="agents">
+<g id="agent-0"><title>agent 0, Sentry, zone 2, score 0</title><circle cx="160" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, Infiltrator, zone 1, score 2</title><circle cx="100" cy="40" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+</g>
+</g>
+<g id="frame-23" class="frame" data-step="23">
+<g id="edges">
+<g id="choke-0"><title>choke 0 - Portcullis (0->1)</title><line x1="40" y1="40" x2="100" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-1"><title>choke 1 - Portcullis (1->2)</title><line x1="100" y1="40" x2="160" y2="40" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-2"><title>choke 2 - AirLockDoorway (2->3)</title><line x1="160" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-3"><title>choke 3 - AirLockDoorway (3->4)</title><line x1="160" y1="120" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-4"><title>choke 4 - Portcullis (4->5)</title><line x1="100" y1="120" x2="40" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-5"><title>choke 5 - AirLockDoorway (2->4)</title><line x1="160" y1="40" x2="100" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g id="choke-6"><title>choke 6 - Portcullis (0->3)</title><line x1="40" y1="40" x2="160" y2="120" stroke="#8A8678" stroke-width="5" stroke-linecap="round"/>
+</g>
+</g>
+<g id="resources">
+<g id="resource-0"><title>resource 0 - ObjectiveExtraction in zone 1</title><circle cx="120" cy="40" r="5" fill="#3DA66B"/>
+</g>
+<g id="resource-1"><title>resource 1 - TreasureChest in zone 5</title><circle cx="80" cy="100" r="5" fill="#3DA66B"/>
+</g>
+<g id="resource-2"><title>resource 2 - TreasureChest in zone 5</title><circle cx="60" cy="120" r="5" fill="#3DA66B"/>
+</g>
+</g>
+<g id="zones">
+<g id="zone-0"><title>zone 0 - SentryPost (0, 0)</title><circle cx="40" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">0</text></g>
+<g id="zone-1"><title>zone 1 - EntryHall (3, 0)</title><circle cx="100" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">1</text></g>
+<g id="zone-2"><title>zone 2 - Corridor (6, 0)</title><circle cx="160" cy="40" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">2</text></g>
+<g id="zone-3"><title>zone 3 - Armory (6, 4)</title><circle cx="160" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="160" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">3</text></g>
+<g id="zone-4"><title>zone 4 - ChokeDoorway (3, 4)</title><circle cx="100" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="100" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">4</text></g>
+<g id="zone-5"><title>zone 5 - TreasureVault (0, 4)</title><circle cx="40" cy="120" r="12" fill="#10131F" stroke="#7AA2F7" stroke-width="2"/><text x="40" y="120" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="13" fill="#C0CAF5">5</text></g>
+</g>
+<g id="agents">
+<g id="agent-0"><title>agent 0, Sentry, zone 1, score 0</title><circle cx="100" cy="40" r="7" fill="#F7768E" stroke="#FFFFFF" stroke-width="1.5"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">0</text></g>
+<g id="agent-1"><title>agent 1, Infiltrator, zone 1, score 3</title><circle cx="100" cy="40" r="7" fill="#BB9AF7" stroke="#FFFFFF" stroke-width="1.5"/><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#FFFFFF">1</text></g>
+</g>
+</g>
+</svg>

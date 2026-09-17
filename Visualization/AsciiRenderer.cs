@@ -28,7 +28,23 @@ public static class AsciiRenderer
     /// case for a freshly stepped or recorded state. Claims is the set of
     /// resource ids already collected (as in <see cref="Observation.Claims"/>).
     /// </summary>
-    public static string RenderFrame(MapGraph map, AgentState[] agents, int[] claims)
+    public static string RenderFrame(MapGraph map, AgentState[] agents, int[] claims) =>
+        RenderFrame(map, agents, claims, null, null);
+
+    /// <summary>
+    /// Tactical overload: <paramref name="scenario"/> and
+    /// <paramref name="agentRoles"/> are the demonstration-layer header fields
+    /// (see <see cref="TrajectoryModel.TrajectoryHeader"/>) that name the
+    /// scenario and each agent's role for the footer roster. Both are optional
+    /// and never alter the projected canvas — a frame with no roles is
+    /// byte-identical to the plain overload, preserving legacy output exactly.
+    /// </summary>
+    public static string RenderFrame(
+        MapGraph map,
+        AgentState[] agents,
+        int[] claims,
+        string? scenario,
+        string[]? agentRoles)
     {
         if (agents is null)
         {
@@ -42,7 +58,7 @@ public static class AsciiRenderer
 
         var cells = DrawMap(map, claims);
         var canvas = BuildCanvas(cells, map);
-        return string.Join("\n", new[] { canvas }.Concat(Footer(map, agents, claims)));
+        return string.Join("\n", new[] { canvas }.Concat(Footer(map, agents, claims, scenario, agentRoles)));
     }
 
     /// <summary>
@@ -52,6 +68,17 @@ public static class AsciiRenderer
     /// </summary>
     public static string RenderFrame(MapGraph map, Observation observation) =>
         RenderFrame(map, observation.AgentStates, observation.Claims);
+
+    /// <summary>
+    /// Convenience overload that threads a trajectory's header scenario and
+    /// roster onto the frame the agent observed this tick.
+    /// </summary>
+    public static string RenderFrame(
+        MapGraph map,
+        Observation observation,
+        string? scenario,
+        string[]? agentRoles) =>
+        RenderFrame(map, observation.AgentStates, observation.Claims, scenario, agentRoles);
 
     /// <summary>
     /// All grid cells are dedicated to a single character with a fixed,
@@ -133,23 +160,56 @@ public static class AsciiRenderer
         return builder.ToString();
     }
 
-    private static IEnumerable<string> Footer(MapGraph map, AgentState[] agents, int[] claims)
+    private static IEnumerable<string> Footer(
+        MapGraph map,
+        AgentState[] agents,
+        int[] claims,
+        string? scenario,
+        string[]? agentRoles)
     {
+        if (scenario is not null)
+        {
+            yield return $"Scenario: {scenario}";
+        }
+
         var agentLine = "Agents: " + string.Join(" ",
-            agents.OrderBy(a => a.AgentId).Select(a => $"A{a.AgentId}@Z{a.ZoneId}({a.Score})"));
+            agents.OrderBy(a => a.AgentId).Select(a =>
+                $"{AgentLabel(a.AgentId, agentRoles)}@Z{a.ZoneId}({a.Score})"));
         yield return agentLine;
 
         var claimedResources = map.Resources.Where(r => claims.Contains(r.Id)).ToList();
         yield return $"Resources: claimed {claimedResources.Count} of {map.Resources.Length}";
+
+        var labeledChokes = map.ChokePoints
+            .Where(c => c.Role is not null)
+            .OrderBy(c => c.Id)
+            .Select(c => $"{c.Role}({c.FromZoneId}->{c.ToZoneId})")
+            .ToList();
+        if (labeledChokes.Count > 0)
+        {
+            yield return "Chokes: " + string.Join(", ", labeledChokes);
+        }
 
         foreach (var zone in map.Zones.OrderBy(z => z.Id))
         {
             var inZone = map.Resources.Where(r => r.ZoneId == zone.Id).ToList();
             var claimed = inZone.Where(r => claims.Contains(r.Id)).Select(r => r.Id).OrderBy(id => id);
             var unclaimed = inZone.Where(r => !claims.Contains(r.Id)).Select(r => r.Id).OrderBy(id => id);
-            yield return $"Z{zone.Id}: claimed [{string.Join(" ", claimed)}] unclaimed [{string.Join(" ", unclaimed)}]";
+            var room = zone.Role is null ? "" : $" ({zone.Role})";
+            yield return $"Z{zone.Id}{room}: claimed [{string.Join(" ", claimed)}] unclaimed [{string.Join(" ", unclaimed)}]";
         }
     }
+
+    /// <summary>
+    /// Names an agent for the footer roster: its role from the trajectory
+    /// header when one is recorded for its slot, otherwise the bare agent id
+    /// (e.g. "Sentry" vs "A0"). Falls back to the id token for any slot the
+    /// roster does not cover so partial rosters never skew the layout.
+    /// </summary>
+    private static string AgentLabel(int agentId, string[]? agentRoles) =>
+        agentRoles is not null && agentId < agentRoles.Length && !string.IsNullOrEmpty(agentRoles[agentId])
+            ? agentRoles[agentId]
+            : $"A{agentId}";
 
     /// <summary>
     /// Maps a zone id onto a single ASCII glyph: 0-9, then A-Z, then a-z.

@@ -29,12 +29,13 @@
     <section class="card">
       <h2>Interactive replay viewer</h2>
       <p class="card-note">
-        <code>demo.jsonl</code> loads automatically. Drop any recorded
-        trajectory file onto the canvas (or pick one below) to replay it.
-        Zones are rimmed circles with occupancy counters; amber dots are
-        unclaimed resources, green dots are claimed; agent tokens carry their
-        id and live score. Dashed edges are bounded choke points with their
-        capacity shown.
+        <code>demo.jsonl</code> loads automatically. Switch presets below or drop
+        any recorded trajectory file onto the canvas to replay it. Zones are
+        rimmed circles labeled with their tactical room (Sentry Post, Treasure
+        Vault, …); amber dots are unclaimed resources, green dots are claimed;
+        agent tokens carry their role (Sentry / Infiltrator), id and live score.
+        Dashed edges are bounded choke points with their capacity and gate role
+        (Portcullis / AirLock Doorway) shown.
       </p>
 
       <div class="viewer" id="viewer">
@@ -60,6 +61,12 @@
           <span class="tick-readout" id="tick-readout">0 / 0</span>
         </div>
         <div class="spacer"></div>
+        <label class="btn" for="preset-select">Preset</label>
+        <select id="preset-select" aria-label="Recoding preset">
+          <option value="demo">Demo sampling (Greedy vs Random)</option>
+          <option value="infiltration">Infiltration (Sentry vs Infiltrator)</option>
+          <option value="custom">Custom…</option>
+        </select>
         <label class="btn" for="speed-select">Speed</label>
         <select id="speed-select" aria-label="Playback speed">
           <option value="800">0.5×</option>
@@ -73,6 +80,7 @@
 
       <div class="statusbar">
         <span class="source" id="source-label">no trajectory loaded</span>
+        <span class="roster" id="roster-label"></span>
         <span class="terminal" id="terminal-label"></span>
       </div>
 
@@ -96,19 +104,20 @@
     </section>
 
     <section class="card">
-      <h2>Static render of the demo trajectory</h2>
-      <p class="card-note">
+      <h2>Static render of the selected preset</h2>
+      <p class="card-note" id="static-note">
         The same run as a single dependency-free animated SVG, painted by the
-        CLI renderer — scroll-stable and printable, for when you want a
-        static snapshot rather than an interactive replay.
+        CLI renderer with tactical roles in every tooltip — scroll-stable and
+        printable, for when you want a snapshot rather than an interactive
+        replay.
       </p>
-      <object class="demo" type="image/svg+xml" data="./demo.svg" aria-label="Animated Lattice demo trajectory">
+      <object class="demo" id="static-svg" type="image/svg+xml" data="./demo.svg" aria-label="Animated Lattice demo trajectory">
         <p class="fallback">
           Your browser could not render the animated SVG.
-          <a href="./demo.svg">Open demo.svg directly</a>.
+          <a href="./demo.svg">Open it directly</a>.
         </p>
       </object>
-      <p class="card-note">
+      <p class="card-note" id="static-caption">
         Seed <code>42</code>, MCTS agent, 30 ticks. Recorded with
         <code>lattice simulate</code> and rendered as a dependency-free
         CSS-animated SVG with <code>lattice render --format svg</code>.
@@ -119,16 +128,20 @@
       <h2>Reproduce it yourself</h2>
       <ul class="plain">
         <li>
-          Record a trajectory
+          Record the infiltration scenario (Sentry vs Infiltrator)
+          <pre class="cli"><code>dotnet run --project Cli -- simulate --seed 42 --scenario infiltration --steps 100 --out infiltration.jsonl</code></pre>
+        </li>
+        <li>
+          Or the classic sampling scenario
           <pre class="cli"><code>dotnet run --project Cli -- simulate --seed 42 --agent mcts --steps 30 --out demo.jsonl</code></pre>
         </li>
         <li>
           Render it as an animated SVG
-          <pre class="cli"><code>dotnet run --project Cli -- render --trajectory demo.jsonl --format svg --out demo.svg</code></pre>
+          <pre class="cli"><code>dotnet run --project Cli -- render --trajectory infiltration.jsonl --format svg --out infiltration.svg</code></pre>
         </li>
         <li>
-          Replay it in a browser: drop the <code>demo.jsonl</code> file onto
-          the replay viewer above.
+          Replay it in a browser: drop the <code>.jsonl</code> file onto the
+          replay viewer above.
         </li>
       </ul>
     </section>

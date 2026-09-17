@@ -4,11 +4,11 @@ using Lattice.Trajectories;
 namespace Lattice.Tests.Analytics;
 
 /// <summary>
-/// Deterministic fixtures for the T6.x analytics, incident, and report tests.
-/// Every fixture is a real simulation replay over a hand-built ring map
-/// (zones 0-3, chokes C0(0-1) C1(1-2) C2(2-3) C3(3-0), agents placed at
-/// zone = agentId % zoneCount), so the recordings encode the ground truth the
-/// analyses must reproduce — no mock recorded state.
+/// Deterministic fixtures for the analytics, incident detection, and report
+/// generation tests. Every fixture is a real simulation replay over a
+/// hand-built ring map (zones 0-3, chokes C0(0-1) C1(1-2) C2(2-3) C3(3-0),
+/// agents placed at zone = agentId % zoneCount), so the recordings encode the
+/// ground truth the analyses must reproduce — no mock recorded state.
 /// </summary>
 internal static class AnalyticsFixtures
 {

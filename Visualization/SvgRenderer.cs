@@ -73,7 +73,17 @@ public static class SvgRenderer
     /// (agents, claims) state on <paramref name="map"/>. Chartable in any
     /// browser or image viewer with no external files, stylesheets, or fonts.
     /// </summary>
-    public static string RenderFrame(MapGraph map, AgentState[] agents, int[] claims)
+    public static string RenderFrame(MapGraph map, AgentState[] agents, int[] claims) =>
+        RenderFrame(map, agents, claims, null);
+
+    /// <summary>
+    /// Tactical overload: <paramref name="agentRoles"/> is the trajectory
+    /// header roster (see <see cref="TrajectoryModel.TrajectoryHeader"/>),
+    /// indexed by agent id, appended to each token's tooltip so the guard and
+    /// the rogue are identifiable by role. Purely header metadata — with null
+    /// roles the document is byte-identical to the plain overload.
+    /// </summary>
+    public static string RenderFrame(MapGraph map, AgentState[] agents, int[] claims, string[]? agentRoles)
     {
         if (agents is null)
         {
@@ -97,7 +107,7 @@ public static class SvgRenderer
             .Append("\">\n");
         builder.Append("<rect width=\"").Append(Num(viewport.Width)).Append("\" height=\"")
             .Append(Num(viewport.Height)).Append("\" fill=\"").Append(BackgroundFill).Append("\"/>\n");
-        builder.Append(RenderScene(map, agents, claims));
+        builder.Append(RenderScene(map, agents, claims, agentRoles));
         builder.Append("</svg>");
         return builder.ToString();
     }
@@ -111,15 +121,35 @@ public static class SvgRenderer
         RenderFrame(map, observation.AgentStates, observation.Claims);
 
     /// <summary>
+    /// Convenience overload that threads a trajectory's header roster onto the
+    /// frame the agent observed this tick.
+    /// </summary>
+    public static string RenderFrame(MapGraph map, Observation observation, string[]? agentRoles) =>
+        RenderFrame(map, observation.AgentStates, observation.Claims, agentRoles);
+
+    /// <summary>
     /// The layer markup shared by single-frame and trajectory exports: an
     /// &lt;edges&gt; group of choke lines, an &lt;resources&gt; group of
     /// claim-colored circles, a &lt;zones&gt; group of rimmed circles with
     /// id labels and coordinate/id tooltips, and an &lt;agents&gt; group of
     /// color-coded tokens on top. Every element is emitted in ascending id
-    /// order so the document text never depends on map array order. The
-    /// resulting markup is valid inside any &lt;svg&gt; element.
+    /// order so the document text never depends on map array order. Zone,
+    /// choke, and resource roles (see <see cref="Environment.Zone.Role"/>,
+    /// <see cref="Environment.ChokePoint.Role"/>, <see cref="Environment.ResourceNode.Role"/>)
+    /// are demonstration-layer metadata: rooms and gates name themselves in
+    /// their tooltips, and the agent roster threads through
+    /// <paramref name="agentRoles"/>. The resulting markup is valid inside any
+    /// &lt;svg&gt; element.
     /// </summary>
-    public static string RenderScene(MapGraph map, AgentState[] agents, int[] claims)
+    public static string RenderScene(MapGraph map, AgentState[] agents, int[] claims) =>
+        RenderScene(map, agents, claims, null);
+
+    /// <summary>
+    /// Tactical overlay of <see cref="RenderScene(MapGraph, AgentState[], int[])"/>:
+    /// identical output when <paramref name="agentRoles"/> is null, role-tagged
+    /// agent tooltips otherwise.
+    /// </summary>
+    public static string RenderScene(MapGraph map, AgentState[] agents, int[] claims, string[]? agentRoles)
     {
         var (minX, _maxX, minY, _maxY) = Bounds(map);
         double Px(int x) => (x - minX) * UnitPixels + PaddingPixels;
@@ -133,12 +163,16 @@ public static class SvgRenderer
         {
             var from = zoneById[choke.FromZoneId];
             var to = zoneById[choke.ToZoneId];
+            var gateRole = choke.Role is null ? "" : $" - {choke.Role} ({choke.FromZoneId}->{choke.ToZoneId})";
+            builder.Append("<g id=\"choke-").Append(choke.Id).Append("\">")
+                .Append("<title>choke ").Append(choke.Id).Append(gateRole).Append("</title>");
             builder.Append("<line x1=\"").Append(Num(Px(from.X)))
                 .Append("\" y1=\"").Append(Num(Py(from.Y)))
                 .Append("\" x2=\"").Append(Num(Px(to.X)))
                 .Append("\" y2=\"").Append(Num(Py(to.Y)))
                 .Append("\" stroke=\"").Append(EdgeStroke)
                 .Append("\" stroke-width=\"5\" stroke-linecap=\"round\"/>\n");
+            builder.Append("</g>\n");
         }
 
         builder.Append("</g>\n");
@@ -147,9 +181,22 @@ public static class SvgRenderer
         foreach (var resource in map.Resources.OrderBy(r => r.Id))
         {
             var fill = claims.Contains(resource.Id) ? ClaimedResourceFill : UnclaimedResourceFill;
+            if (resource.Role is null)
+            {
+                builder.Append("<circle cx=\"").Append(Num(Px(resource.Position.X)))
+                    .Append("\" cy=\"").Append(Num(Py(resource.Position.Y)))
+                    .Append("\" r=\"5\" fill=\"").Append(fill).Append("\"/>\n");
+                continue;
+            }
+
+            builder.Append("<g id=\"resource-").Append(resource.Id).Append("\">")
+                .Append("<title>resource ").Append(resource.Id)
+                .Append(" - ").Append(resource.Role)
+                .Append(" in zone ").Append(resource.ZoneId).Append("</title>");
             builder.Append("<circle cx=\"").Append(Num(Px(resource.Position.X)))
                 .Append("\" cy=\"").Append(Num(Py(resource.Position.Y)))
                 .Append("\" r=\"5\" fill=\"").Append(fill).Append("\"/>\n");
+            builder.Append("</g>\n");
         }
 
         builder.Append("</g>\n");
@@ -161,6 +208,7 @@ public static class SvgRenderer
             var cy = Num(Py(zone.Position.Y));
             builder.Append("<g id=\"zone-").Append(zone.Id).Append("\">")
                 .Append("<title>zone ").Append(zone.Id)
+                .Append(zone.Role is null ? "" : " - " + zone.Role)
                 .Append(" (").Append(zone.Position.X).Append(", ").Append(zone.Position.Y).Append(")</title>")
                 .Append("<circle cx=\"").Append(cx).Append("\" cy=\"").Append(cy)
                 .Append("\" r=\"12\" fill=\"").Append(ZoneFill).Append("\" stroke=\"").Append(ZoneStroke)
@@ -180,8 +228,12 @@ public static class SvgRenderer
             var cx = Num(Px(zone.X));
             var cy = Num(Py(zone.Y));
             var fill = AgentPalette[agent.AgentId % AgentPalette.Length];
+            var role = agentRoles is not null && agent.AgentId < agentRoles.Length && !string.IsNullOrEmpty(agentRoles[agent.AgentId])
+                ? agentRoles[agent.AgentId]
+                : null;
             builder.Append("<g id=\"agent-").Append(agent.AgentId).Append("\">")
                 .Append("<title>agent ").Append(agent.AgentId)
+                .Append(role is null ? "" : $", {role}")
                 .Append(", zone ").Append(agent.ZoneId)
                 .Append(", score ").Append(agent.Score).Append("</title>")
                 .Append("<circle cx=\"").Append(cx).Append("\" cy=\"").Append(cy)

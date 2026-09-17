@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Lattice.Environment;
 
 namespace Lattice.Trajectories;
@@ -6,12 +7,17 @@ namespace Lattice.Trajectories;
 /// The header line of a trajectory: everything needed to reconstruct the
 /// episode. The seed and map are captured together so replay never needs the
 /// generator again; the simulation config is required to rebuild the
-/// environment exactly.
+/// environment exactly. <see cref="Scenario"/> and <see cref="AgentRoles"/>
+/// are optional demonstration-layer metadata (e.g. the "infiltration" scenario
+/// and its "Sentry"/"Infiltrator" roster) that viewer tooling reads to render
+/// tactical roles; the replay core ignores them.
 /// </summary>
 public sealed record TrajectoryHeader(
     ulong Seed,
     MapGraph Map,
-    SimulationConfig SimulationConfig);
+    SimulationConfig SimulationConfig,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Scenario = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string[]? AgentRoles = null);
 
 /// <summary>
 /// One recorded tick: the exact <see cref="AgentAction"/>s submitted, the

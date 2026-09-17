@@ -7,7 +7,7 @@ using Xunit;
 namespace Lattice.Tests.Agents;
 
 /// <summary>
-/// Validates <see cref="ScoutCollectorAgent"/> (T7.2): decisions derive only
+/// Validates <see cref="ScoutCollectorAgent"/>: decisions derive only
 /// from what the scout has actually seen (its projected partial view plus
 /// retained memory) — never from hidden simulation state; it collects lazily
 /// under partial knowledge, routes around remembered enemy positions, explores
@@ -60,7 +60,7 @@ public class ScoutCollectorAgentTests
     private static Observation Obs(MapGraph map, params AgentState[] states) =>
         new(0, map, states, Array.Empty<int>());
 
-    // ---- Partial-knowledge decisions (the T7.2 guardrails) ----
+    // ---- Partial-knowledge decisions (the guardrails on beliefs) ----
 
     [Fact]
     public void DoesNotCollectResourcesItCannotCurrentlySee()

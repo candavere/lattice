@@ -6,8 +6,8 @@ using Xunit;
 namespace Lattice.Tests.Environment;
 
 /// <summary>
-/// Phase 8 (T8.2) spatial capacity: zones and choke edges carry a
-/// MaxOccupancy that binds the Phase-1 move gateway. Resolution is a total
+/// Spatial capacity: zones and choke edges carry a
+/// MaxOccupancy that binds the move gateway. Resolution is a total
 /// deterministic function — agents are triaged in ascending id, so when
 /// capacity is contested the lowest id wins and the loser stays put. Node
 /// capacity is a same-tick entry gate (bookings and same-tick arrivals count

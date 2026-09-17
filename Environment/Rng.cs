@@ -6,7 +6,7 @@ namespace Lattice.Environment;
 /// consumer is forced to state its seed: there is no ambient, unsourced
 /// randomness anywhere in Lattice. Two instances built from the same seed
 /// produce identical sequences, which underlies the byte-identical-trajectory
-/// determinism guarantee in AGENTS.md principle 2.
+/// determinism guarantee.
 /// </summary>
 public sealed class Rng
 {

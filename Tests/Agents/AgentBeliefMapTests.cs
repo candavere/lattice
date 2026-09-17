@@ -5,7 +5,7 @@ using Xunit;
 namespace Lattice.Tests.Agents;
 
 /// <summary>
-/// Unit tests for <see cref="AgentBeliefMap"/>, the T7.2 data structure that
+/// Unit tests for <see cref="AgentBeliefMap"/>, the data structure that
 /// folds <see cref="PartialObservation"/> projections into known / stale /
 /// unexplored territory, suspected resources, and enemy sightings.
 /// </summary>

@@ -16,7 +16,7 @@ internal sealed record TickBenchmark(int Ticks, double ElapsedMs, double StepsPe
 /// <summary>
 /// Pumps the pure <see cref="Simulation.Step"/> function without agent,
 /// episode, or serialization overhead so `benchmark --ticks N` measures the
-/// core the same way the T5.1 regression gate does: one warmup batch, then a
+/// core the same way the performance regression gate does: one warmup batch, then a
 /// stopped clock around exactly N ticks of a Wait-only turn, with heap growth
 /// read from the current thread only.
 /// </summary>

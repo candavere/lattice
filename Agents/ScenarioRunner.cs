@@ -4,7 +4,7 @@ namespace Lattice.Agents;
 
 /// <summary>
 /// Drives a fixed set of agents through one episode on a given map and
-/// reports competitive metrics (T3.2). Pure and deterministic: the runner owns
+/// reports competitive metrics. Pure and deterministic: the runner owns
 /// no mutable state, agents decide from post-tick Observations exactly as the
 /// logged trajectory exposes them, and the Environment step contract resolves
 /// every race — so the same (map, config, ordered agents, budget) always

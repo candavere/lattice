@@ -37,30 +37,35 @@ public sealed record MctsSearchConfig
 }
 
 /// <summary>
-/// A rollout-based tactical agent (T9.2): it prices the future instead of
+/// A rollout-based tactical agent: it prices the future instead of
 /// greedily grabbing the nearest resource. For each legal action it runs
 /// fast, in-memory rollouts of the whole episode from the exact position the
 /// observation describes — the decisive move, then the rival agents and its
 /// own continuation played by the deterministic nearest-resource policy — and
-/// reports the average final score that action yields. It picks the highest
-/// average, breaking score ties deterministically from its seeded
-/// <see cref="Rng"/>. All search runs on detached <see cref="SimulationFork"/>s
-/// built solely from the public <see cref="Observation"/> data, so the live
-/// simulation and any recorded trajectory stay untouched.
+/// reports the total score that action yields across its rollouts. Candidates
+/// are ranked by that integer (<see cref="long"/>) total, never by a
+/// floating-point average, so the win/lose verdict between two actions can
+/// never flip across platforms or via FP rounding. When totals tie, the
+/// tie-break is the canonical candidate order — Wait, then Moves in ascending
+/// zone id, then Collects in ascending resource id — so the decision is a
+/// total function of the observation alone. All search runs on detached
+/// <see cref="SimulationFork"/>s built solely from the public
+/// <see cref="Observation"/> data, so the live simulation and any recorded
+/// trajectory stay untouched.
 /// </summary>
 public sealed class MctsAgent : IAgent
 {
     private readonly SimulationConfig _config;
     private readonly MctsSearchConfig _search;
-    private readonly Rng _rng;
     private readonly GreedyCollectorAgent[] _rolloutPolicy;
 
     /// <summary>
     /// Creates the agent pinned to the given slot. <paramref name="config"/> is
     /// the episode's own simulation parameters (transit and capacity included),
     /// so rollouts reproduce exactly the physics the live episode obeys.
-    /// <paramref name="seed"/> seeds the tie-break draws; same seed, same
-    /// decision stream.
+    /// <paramref name="seed"/> is accepted for construction parity with the
+    /// other agent families; decisions are fully determined by the observation
+    /// and never vary with the seed.
     /// </summary>
     public MctsAgent(int agentId, SimulationConfig config, ulong seed, MctsSearchConfig search)
     {
@@ -73,11 +78,14 @@ public sealed class MctsAgent : IAgent
         AgentId = agentId;
         _config = config;
         _search = search;
-        _rng = new Rng(seed);
         _rolloutPolicy = new GreedyCollectorAgent[config.AgentCount];
         for (var i = 0; i < config.AgentCount; i++)
         {
-            _rolloutPolicy[i] = new GreedyCollectorAgent(i);
+            // Rollout policies stay strictly stateless: every rollout is an
+            // independent continuation from the same position, so a policy
+            // that carried blocked-tick history across rollouts would bias the
+            // value estimates toward action enumeration order.
+            _rolloutPolicy[i] = new GreedyCollectorAgent(i, stallRecovery: false);
         }
     }
 
@@ -94,40 +102,43 @@ public sealed class MctsAgent : IAgent
             StepCount: 0); // tick-limit is irrelevant: rollouts clamp at MaxDepth
 
         var candidates = CandidateActions(observation);
+        var turn = new AgentAction[_config.AgentCount];
+        var observations = new Dictionary<int, Observation>(_config.AgentCount);
 
-        double bestAverage = double.NegativeInfinity;
+        var bestTotal = long.MinValue;
         var bestIndexes = new List<int>();
         for (var i = 0; i < candidates.Count; i++)
         {
-            var average = 0.0;
+            var total = 0L;
             for (var rollout = 0; rollout < _search.RolloutsPerAction; rollout++)
             {
-                average += Rollout(state, candidates[i]);
+                total += Rollout(state, candidates[i], turn, observations);
             }
 
-            average /= _search.RolloutsPerAction;
-            if (average > bestAverage)
+            if (total > bestTotal)
             {
-                bestAverage = average;
+                bestTotal = total;
                 bestIndexes.Clear();
                 bestIndexes.Add(i);
             }
-            else if (average == bestAverage)
+            else if (total == bestTotal)
             {
                 bestIndexes.Add(i);
             }
         }
 
-        return bestIndexes.Count == 1
-            ? candidates[bestIndexes[0]]
-            : candidates[bestIndexes[_rng.Next(0, bestIndexes.Count)]];
+        // Ties resolve to the first index: candidates are emitted in the
+        // canonical order (Wait, Moves ascending, Collects ascending), so an
+        // equal total breaks by that explicit ordering, deterministically.
+        return candidates[bestIndexes[0]];
     }
 
     /// <summary>
     /// Every legal action in a fixed order: Wait, then Moves to adjacent zones
     /// (ascending zone id), then Collects of unclaimed resources in the agent's
     /// own zone (ascending resource id). Built from the observation only, so
-    /// every candidate is in the action space by construction.
+    /// every candidate is in the action space by construction. This order is
+    /// the documented tie-break for equal rollout totals.
     /// </summary>
     private List<AgentAction> CandidateActions(Observation observation)
     {
@@ -169,14 +180,21 @@ public sealed class MctsAgent : IAgent
     /// second tick on, every agent (including this one) follows the seeded
     /// nearest-resource policy until the episode ends or the depth budget runs
     /// out. Falls back to a Wait turn when a policy agent is asked to act on a
-    /// state it is no longer valid for. Returns the agent's final score.
+    /// state it is no longer valid for. Returns the agent's final score as an
+    /// integer, so the caller's rollup is exact integer arithmetic.
+    /// <paramref name="turn"/> and <paramref name="observations"/> are caller
+    /// owned scratch buffers, reused across ticks and rollouts so the search
+    /// allocates a fixed amount per decision rather than per tick.
     /// </summary>
-    private double Rollout(SimulationState state, AgentAction firstMove)
+    private int Rollout(
+        SimulationState state,
+        AgentAction firstMove,
+        AgentAction[] turn,
+        Dictionary<int, Observation> observations)
     {
         var fork = SimulationFork.Create(state, _config);
-        var observations = BuildObservations(fork.Snapshot);
+        PopulateObservations(observations, fork.Snapshot);
 
-        var turn = new AgentAction[_config.AgentCount];
         turn[AgentId] = firstMove;
         for (var i = 0; i < _config.AgentCount; i++)
         {
@@ -193,8 +211,7 @@ public sealed class MctsAgent : IAgent
         var ticks = 1;
         while (!fork.IsTerminal && ticks < _search.MaxDepth)
         {
-            observations = BuildObservations(fork.Snapshot);
-            turn = new AgentAction[_config.AgentCount];
+            PopulateObservations(observations, fork.Snapshot);
             for (var i = 0; i < _config.AgentCount; i++)
             {
                 turn[i] = _rolloutPolicy[i].Decide(observations[i]);
@@ -207,14 +224,22 @@ public sealed class MctsAgent : IAgent
         return fork.Snapshot.Agents[AgentId].Score;
     }
 
-    private static Dictionary<int, Observation> BuildObservations(SimulationState state) =>
-        state.Agents.ToDictionary(
-            a => a.AgentId,
-            a => new Observation(a.AgentId, state.Map, state.Agents, state.Claims));
+    private static void PopulateObservations(
+        Dictionary<int, Observation> observations,
+        SimulationState state)
+    {
+        observations.Clear();
+        foreach (var agent in state.Agents)
+        {
+            observations.Add(
+                agent.AgentId,
+                new Observation(agent.AgentId, state.Map, state.Agents, state.Claims));
+        }
+    }
 }
 
 /// <summary>
-/// The MCTS family label for the batch harness (T9.2). Each agent slot is
+/// The MCTS family label for the batch harness. Each agent slot is
 /// seeded deterministically from (familySeed, runSeed, slot) like the other
 /// families, and the episode's own simulation config is carried through so
 /// rollouts reproduce the live physics.

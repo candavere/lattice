@@ -2,8 +2,8 @@ namespace Lattice.Environment;
 
 /// <summary>
 /// Defines which <see cref="AgentAction"/> values are well-formed for a map.
-/// This is the contract agents must satisfy (and T3.2's random-legal agent
-/// relies on constructing in-space actions by hand). It checks shape only —
+/// This is the contract agents must satisfy, and random-legal agents
+/// rely on constructing in-space actions by hand. It checks shape only —
 /// kind is a defined enum value and ids are in the map's range — not rules
 /// the step function tolerates as no-ops (e.g. moving to a non-adjacent
 /// zone). Kept pure and total so any action value yields an answer.

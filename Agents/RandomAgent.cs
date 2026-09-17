@@ -10,10 +10,24 @@ namespace Lattice.Agents;
 /// per decision, so the whole decision stream is deterministic for a given
 /// (seed, observation sequence) — and every emitted action is in the action
 /// space by construction.
+///
+/// Stall recovery: a Move the agent issued that is denied three ticks in a
+/// row (the environment keeps the agent at its zone) is a blocked tick. On
+/// the third consecutive blocked tick the agent pauses for exactly one Wait —
+/// clearing its target and giving the contested choke a tick to drain —
+/// instead of spinning against it forever. The pause is fully determined by
+/// the observation stream, so determinism still holds.
 /// </summary>
 public sealed class RandomAgent : IAgent
 {
+    /// <summary>How many consecutive denied Move attempts trigger a pause.</summary>
+    public const int StallRecoveryThreshold = 3;
+
     private readonly Rng _rng;
+    private bool _hasHistory;
+    private int _lastZone;
+    private int? _lastMoveTarget;
+    private int _blockedStreak;
 
     /// <summary>
     /// Creates the agent. <paramref name="rng"/> must be a seeded instance;
@@ -32,6 +46,29 @@ public sealed class RandomAgent : IAgent
     public AgentAction Decide(Observation observation)
     {
         var myZone = ObservationView.MyZone(observation);
+
+        if (_hasHistory && _lastMoveTarget is { } target)
+        {
+            if (myZone == target || myZone != _lastZone)
+            {
+                _blockedStreak = 0;
+            }
+            else
+            {
+                _blockedStreak++;
+            }
+        }
+
+        if (_blockedStreak >= StallRecoveryThreshold)
+        {
+            // Re-evaluation pause: three consecutive Moves were denied, so
+            // wait one tick instead of hammering the contested edge. The
+            // choke drains and the draw stream resumes fresh next tick.
+            _blockedStreak = 0;
+            RecordDecision(myZone, null);
+            return new AgentAction(ActionKind.Wait);
+        }
+
         var options = new List<AgentAction> { new(ActionKind.Wait) };
 
         foreach (var choke in observation.Map.ChokePoints)
@@ -55,6 +92,15 @@ public sealed class RandomAgent : IAgent
         }
 
         var distinct = options.Distinct().ToArray();
-        return distinct[_rng.Next(0, distinct.Length)];
+        var action = distinct[_rng.Next(0, distinct.Length)];
+        RecordDecision(myZone, action.Kind == ActionKind.Move ? action.ZoneId : null);
+        return action;
+    }
+
+    private void RecordDecision(int myZone, int? moveTarget)
+    {
+        _lastZone = myZone;
+        _lastMoveTarget = moveTarget;
+        _hasHistory = true;
     }
 }

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lattice — Deterministic Simulation Demo</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+    }
+    header {
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+      padding: 24px 16px;
+      text-align: center;
+    }
+    header h1 { margin: 0 0 4px; font-size: 1.5rem; }
+    header p { margin: 0 auto; max-width: 720px; color: var(--muted); font-size: 0.95rem; }
+    main { max-width: 960px; margin: 0 auto; padding: 24px 16px; }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 24px;
+    }
+    .card h2 { margin: 0 0 12px; font-size: 1.05rem; color: var(--accent); }
+    object.demo {
+      display: block;
+      width: 100%;
+      min-height: 420px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #010409;
+    }
+    .fallback { display: none; color: var(--muted); }
+    code {
+      background: rgba(110, 118, 129, 0.2);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 0.88em;
+    }
+    ul { padding-left: 20px; }
+    li { margin-bottom: 4px; }
+    footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+      padding: 24px 16px;
+      border-top: 1px solid var(--border);
+    }
+    a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Lattice</h1>
+    <p>A deterministic, seedable 2D procedural strategy/tactical simulation
+      environment. Same seed, same actions, same bytes — every time.</p>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>Demo trajectory</h2>
+      <!-- 60fps-equal CSS-animated SVG; <img> renders only the first frame in some browsers, hence <object>. -->
+      <object class="demo" type="image/svg+xml" data="demo.svg" aria-label="Animated Lattice demo trajectory">
+        <p class="fallback">
+          Your browser could not render the animated SVG.
+          <a href="demo.svg">Open demo.svg directly</a>.
+        </p>
+      </object>
+      <p style="color: var(--muted); font-size: 0.9rem;">
+        Seed <code>42</code>, MCTS agent, 30 ticks. Recorded with
+        <code>lattice simulate</code> and rendered as a single dependency-free
+        CSS-animated SVG by <code>lattice render --format svg</code>.
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>Reproduce it yourself</h2>
+      <ul>
+        <li><code>dotnet run --project Cli -- simulate --seed 42 --agent mcts --steps 30</code></li>
+        <li><code>dotnet run --project Cli -- render --trajectory demo.jsonl --format svg --out demo.svg</code></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    Lattice — environment over agents. Compiled against the .NET base class
+    library only; no external dependencies.
+  </footer>
+</body>
+</html>

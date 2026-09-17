@@ -6,7 +6,7 @@ namespace Lattice.Generator;
 /// Checks that every zone is reachable from every other zone through
 /// choke-point edges — the map is one connected component. Connectivity is the
 /// primary "playable map" guarantee: a disconnected map would strand agents
-/// with no way to reach resources, and AGENTS.md's lineage demands hard
+/// with no way to reach resources, and the Lattice lineage demands hard
 /// constraints over "probably fine" placement.
 /// </summary>
 public static class ConnectivityChecker

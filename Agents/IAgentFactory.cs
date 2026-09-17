@@ -5,7 +5,7 @@ namespace Lattice.Agents;
 /// <summary>
 /// A factory keyed by a <c>ulong runSeed</c> and an agent slot id, producing a
 /// fresh <see cref="IAgent"/> whose internal RNG state (if any) is derived
-/// deterministically from both inputs. The batch harness (T3.3) creates new
+/// deterministically from both inputs. The batch harness creates new
 /// agent instances per run-seed × pairing combination so the draw-stream of
 /// one match can never leak into another.
 /// </summary>

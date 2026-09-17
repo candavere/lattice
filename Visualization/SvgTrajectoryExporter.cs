@@ -6,8 +6,8 @@ using Lattice.Trajectories;
 namespace Lattice.Visualization;
 
 /// <summary>
-/// Exports a full trajectory (T2.3 JSONL recording) as one self-contained,
-/// CSS-animated multi-frame SVG (T4.2). Each recorded tick becomes a hidden
+/// Exports a full trajectory (JSONL recording) as one self-contained,
+/// CSS-animated multi-frame SVG. Each recorded tick becomes a hidden
 /// &lt;g&gt; layer; an embedded @keyframes stylesheet cycles the layers in
 /// sequence so the file animates a step-by-step replay in any browser, in the
 /// spirit of Settle's scrubbable CSS-driven visualization — with no script,

@@ -5,7 +5,7 @@ using Xunit;
 namespace Lattice.Tests.Cli;
 
 /// <summary>
-/// Integration coverage for the `analyze` subcommand added in T6.3: it drives
+/// Integration coverage for the `analyze` subcommand: it drives
 /// the real <see cref="CliApp.Run"/> entry point — the same code
 /// <c>Program.Main</c> forwards to — against a written trajectory JSONL file,
 /// asserting exit codes, stdout/stderr side effects, and byte-identical output

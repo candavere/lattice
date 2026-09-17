@@ -5,7 +5,7 @@ using Xunit;
 namespace Lattice.Tests.Cli;
 
 /// <summary>
-/// Integration coverage for the <see cref="Lattice.Cli"/> driver (T5.2): it
+/// Integration coverage for the <see cref="Lattice.Cli"/> driver: it
 /// drives the real <see cref="CliApp.Run"/> entry point (which is what
 /// <c>Program.Main</c> forwards to) through String writers, asserting exit
 /// codes — 0 on success, non-zero on any bad-argument or runtime error — and

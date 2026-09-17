@@ -5,7 +5,7 @@ namespace Lattice.Analytics;
 
 /// <summary>
 /// The divergence between a recorded trajectory's outcome and the outcome of a
-/// counterfactual branch (T9.1). Reported against the same axis the recording
+/// counterfactual branch. Reported against the same axis the recording
 /// uses: per-agent final scores, the winner, and the ticks-to-completion — so
 /// a delta is directly interpretable ("agent 0 would have scored +2 and won").
 /// </summary>
@@ -22,7 +22,7 @@ public sealed record CounterfactualResult(
 
 /// <summary>
 /// Re-rolls a completed trajectory from branch tick K under an alternative
-/// action sequence (T9.1). The recorded prefix (turns strictly before K) is
+/// action sequence. The recorded prefix (turns strictly before K) is
 /// replayed exactly; the alternative turns replace the recorded turn at K and
 /// drive the episode to completion; the recorded suffix is discarded. Any
 /// remaining ticks after the alternative sequence is exhausted are played as

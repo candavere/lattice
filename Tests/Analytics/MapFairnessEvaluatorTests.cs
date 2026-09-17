@@ -8,7 +8,7 @@ using Xunit;
 namespace Lattice.Tests.Analytics;
 
 /// <summary>
-/// Deterministic fixtures for the T10.1 map fairness tests. Both maps are
+/// Deterministic fixtures for the map fairness tests. Both maps are
 /// hand-built 3-zone boards so their mirrored outcomes are hand-computable:
 /// the symmetric board must collapse the spawn-bias index to zero and the
 /// asymmetric board must report a pinned nonzero divergence.
@@ -147,7 +147,7 @@ public class MapFairnessEvaluatorTests
 
         Assert.Equal(FairnessPolicy.Mcts, first.Policy);
         Assert.Equal(Json(first), Json(second));
-        Assert.Equal(0.5, first.SpawnBiasIndex);
+        Assert.Equal(0.25, first.SpawnBiasIndex);
     }
 
     [Fact]
@@ -172,7 +172,7 @@ public class MapFairnessEvaluatorTests
     [Fact]
     public void GeneratorGate_StrictFairnessThreshold_RejectsBiasedCandidates()
     {
-        var exception = Assert.Throws<InvalidOperationException>(() =>
+        var exception = Assert.Throws<MapGenerationException>(() =>
             MapGenerator.Generate(
                 FairnessFixtures.ProbeSeed,
                 FairnessFixtures.GeneratorConfig(),

@@ -19,7 +19,7 @@ internal sealed record TickBenchmark(
 
 /// <summary>
 /// A lightweight, allocation- and time-measuring driver for the simulation
-/// core (T5.1). It pumps the pure <see cref="Simulation.Step"/> exactly
+/// core. It pumps the pure <see cref="Simulation.Step"/> exactly
 /// <paramref name="ticks"/> times with a fixed turn — the same operation a
 /// full episode performs, minus trajectory bookkeeping — after a short warmup
 /// so JIT/startup effects don't pollute the first measured batch. This is a

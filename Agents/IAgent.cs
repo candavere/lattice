@@ -7,8 +7,9 @@ namespace Lattice.Agents;
 /// <see cref="AgentAction"/> from an <see cref="Observation"/>, purely.
 /// Agents are read-only consumers of the observation — they must never
 /// mutate it — and the returned action is a plain data value the environment
-/// interprets. No planning or search is permitted here (AGENTS.md
-/// principle 5); <see cref="GreedyCollectorAgent"/> is the complexity ceiling.
+/// interprets. No planning or search is permitted here (the "environment
+/// over agents" principle);
+/// <see cref="GreedyCollectorAgent"/> is the complexity ceiling.
 /// </summary>
 public interface IAgent
 {

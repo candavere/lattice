@@ -5,7 +5,7 @@ using Xunit;
 namespace Lattice.Tests.Environment;
 
 /// <summary>
-/// Coverage for T7.1 — the vision-bounded <see cref="PerceptionFilter"/> and
+/// Coverage for the vision-bounded <see cref="PerceptionFilter"/> and
 /// <see cref="PartialObservation"/> contract. Fixtures replay the real
 /// simulation over a ring map (zones 0-3, chokes C0(0-1) C1(1-2) C2(2-3)
 /// C3(3-0)) so masking and stale-memory behavior are asserted against ground

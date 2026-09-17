@@ -28,6 +28,14 @@ public sealed class GeneratorConfig
     public int RetryCap { get; }
 
     /// <summary>
+    /// The default rejection budget, used when a caller does not pick its own.
+    /// Generation is a bounded retry loop: after this many rejected candidates
+    /// the generator raises <see cref="MapGenerationException"/> instead of
+    /// silently degrading the constraints.
+    /// </summary>
+    public const int DefaultRetryCap = 50;
+
+    /// <summary>
     /// Validates the ranges and throws <see cref="ArgumentOutOfRangeException"/>
     /// on nonsense so callers find out immediately instead of getting an
     /// impossible-to-satisfy generate loop.
@@ -91,11 +99,13 @@ public sealed class GeneratorConfig
 public delegate bool MapAcceptanceGate(MapGraph candidate);
 
 /// <summary>
-/// The seeded map generator. Produces a candidate map, runs every Phase-1
+/// The seeded map generator. Produces a candidate map, runs every constraint
 /// checker on it, and — when a candidate fails — retries using the same
 /// advancing random stream rather than re-seeding, so a fresh attempt cannot
-/// accidentally replay the same bad layout. Exhausting the retry cap throws
-/// with a diagnostic instead of silently returning an invalid map.
+/// accidentally replay the same bad layout. Exhausting the bounded rejection
+/// budget (<see cref="GeneratorConfig.RetryCap"/>) raises a
+/// <see cref="MapGenerationException"/> with a diagnostic instead of silently
+/// returning an invalid map.
 /// </summary>
 public static class MapGenerator
 {
@@ -108,7 +118,7 @@ public static class MapGenerator
     /// advances one seeded stream (the canonical <see cref="Rng"/>) and never
     /// resets it. When <paramref name="acceptanceGate"/> is supplied, a
     /// structurally valid candidate must also pass the gate or it is retried
-    /// like any other failure. Throws <see cref="InvalidOperationException"/>
+    /// like any other failure. Throws <see cref="MapGenerationException"/>
     /// with the failing checks when <see cref="GeneratorConfig.RetryCap"/>
     /// attempts are exhausted.
     /// </summary>
@@ -148,9 +158,7 @@ public static class MapGenerator
 
             if (attempt == config.RetryCap)
             {
-                throw new InvalidOperationException(
-                    $"MapGenerator exhausted {config.RetryCap} attempt(s) for seed {seed} " +
-                    $"(zone count {map.Zones.Length}); final attempt failed checks: {string.Join(", ", failures)}.");
+                throw new MapGenerationException(seed, config.RetryCap, map.Zones.Length, failures);
             }
         }
 

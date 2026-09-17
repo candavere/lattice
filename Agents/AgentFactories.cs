@@ -28,8 +28,9 @@ public sealed class RandomAgentFactory : IAgentFactory
 }
 
 /// <summary>
-/// The family label for <see cref="GreedyCollectorAgent"/>. Greedy is fully
-/// deterministic and stateless, so the run seed is accepted and ignored —
+/// The family label for <see cref="GreedyCollectorAgent"/> with stall recovery
+/// enabled. Greedy is fully
+/// deterministic, so the run seed is accepted and ignored —
 /// keeping the factory contract uniform across families.
 /// </summary>
 public sealed class GreedyCollectorAgentFactory : IAgentFactory

@@ -66,7 +66,7 @@ public sealed record PairingSummary(
 public sealed record BatchEvaluation(MatchResult[] Matches, PairingSummary[] Pairings);
 
 /// <summary>
-/// Configuration for a batch evaluation (T3.3). Validates in the constructor
+/// Configuration for a batch evaluation. Validates in the constructor
 /// so a defective batch fails loudly: at least one seed, at least one team,
 /// at least one pairing, pairings within team bounds, a positive step budget,
 /// and a 2-agent simulation config (pairings are head-to-head by design).
@@ -149,7 +149,7 @@ public sealed class EvaluationSpec
 }
 
 /// <summary>
-/// Runs a batch of head-to-head matches (T3.3): for every (pairing, seed), it
+/// Runs a batch of head-to-head matches: for every (pairing, seed), it
 /// generates the map, builds one fresh agent per side, plays the episode via
 /// <see cref="ScenarioRunner"/>, and accumulates per-pairing statistics. The
 /// harness itself is pure — same spec, byte-identical aggregated numbers —

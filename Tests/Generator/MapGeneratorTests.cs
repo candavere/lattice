@@ -48,10 +48,13 @@ public class MapGeneratorTests
             MaxResourcesPerZone: 0,
             RetryCap: 5);
 
-        var exception = Assert.Throws<InvalidOperationException>(() => MapGenerator.Generate(1UL, impossible));
+        var exception = Assert.Throws<MapGenerationException>(() => MapGenerator.Generate(1UL, impossible));
 
+        Assert.Equal(5, exception.Attempts);
+        Assert.Equal((ulong)1, exception.Seed);
         Assert.Contains("5 attempt(s)", exception.Message);
         Assert.Contains("1", exception.Message);
+        Assert.NotEmpty(exception.FailedChecks);
     }
 
     [Fact]
@@ -77,10 +80,11 @@ public class MapGeneratorTests
             MaxResourcesPerZone: 1,
             RetryCap: 3);
 
-        var exception = Assert.Throws<InvalidOperationException>(() =>
+        var exception = Assert.Throws<MapGenerationException>(() =>
             MapGenerator.Generate(1UL, smallCap, acceptanceGate: _ => false));
 
         Assert.Contains("acceptance-gate", exception.Message);
+        Assert.Contains("acceptance-gate", exception.FailedChecks);
         Assert.Contains("3 attempt(s)", exception.Message);
     }
 

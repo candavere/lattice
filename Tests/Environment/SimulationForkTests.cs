@@ -5,7 +5,7 @@ using Xunit;
 namespace Lattice.Tests.Environment;
 
 /// <summary>
-/// Phase 9 (T9.1) <see cref="SimulationFork"/>: a fork is a detached sandbox
+/// <see cref="SimulationFork"/>: a fork is a detached sandbox
 /// snapshot of an immutable <see cref="SimulationState"/> that can be advanced
 /// turn-by-turn without disturbing the source state, its owners, or other
 /// forks. These tests pin isolation (byte-identical source), independent

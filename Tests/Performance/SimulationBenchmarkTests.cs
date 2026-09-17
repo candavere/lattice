@@ -5,7 +5,7 @@ using Xunit;
 namespace Lattice.Tests.Performance;
 
 /// <summary>
-/// T5.1 regression gates on simulation throughput and allocation behavior.
+/// Regression gates on simulation throughput and allocation behavior.
 /// These are deliberately coarse, generous bounds (a 1000-tick batch in under
 /// one second, allocations growing linearly with tick count) so they measure
 /// real regressions — a step loop that explodes in cost or leaks across

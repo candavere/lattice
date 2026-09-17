@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    name: Publish ${{ matrix.target.name }}
+    runs-on: ${{ matrix.target.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - os: ubuntu-latest
+            rid: linux-x64
+            assembly: lattice-linux-x64
+            name: lattice-linux-x64
+          - os: windows-latest
+            rid: win-x64
+            assembly: lattice-win-x64
+            name: lattice-win-x64.exe
+          - os: macos-latest
+            rid: osx-arm64
+            assembly: lattice-osx-arm64
+            name: lattice-osx-arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish single-file self-contained binary
+        run: dotnet publish Cli/Lattice.Cli.csproj -c Release --self-contained true -r ${{ matrix.target.rid }} -p:PublishSingleFile=true -p:AssemblyName=${{ matrix.target.assembly }} -o publish
+
+      - name: Attach binary to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: publish/${{ matrix.target.name }}

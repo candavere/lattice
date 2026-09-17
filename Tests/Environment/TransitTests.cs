@@ -6,7 +6,7 @@ using Xunit;
 namespace Lattice.Tests.Environment;
 
 /// <summary>
-/// Phase 8 (T8.1) multi-tick edge traversal: a Move between adjacent zones
+/// Multi-tick edge traversal: a Move between adjacent zones
 /// takes an integer number of ticks (Manhattan length / cruise speed, minimum
 /// 1) and the agent is represented by an <see cref="InTransit"/> state until
 /// it arrives. Transit must be exact, deterministic, wired into the JSONL

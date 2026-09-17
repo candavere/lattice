@@ -6,7 +6,7 @@ using Xunit;
 namespace Lattice.Tests.Agents;
 
 /// <summary>
-/// Coverage for <see cref="MctsAgent"/> (T9.2): constructor validation, search
+/// Coverage for <see cref="MctsAgent"/>: constructor validation, search
 /// determinism, action-space legality of everything the search emits, the
 /// strict bottlenecked-map superiority claim over
 /// <see cref="GreedyCollectorAgent"/>, and the factory/harness wiring.

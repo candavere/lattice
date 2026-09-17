@@ -15,9 +15,9 @@ public sealed class SimulationConfig
     public const int UnboundedVision = -1;
 
     /// <summary>
-    /// Sentinel meaning edge traversal is instantaneous (the default, matching
-    /// pre-Phase-8 behavior): a Move arrives in the same tick and no
-    /// <see cref="InTransit"/> state is ever produced.
+    /// Sentinel meaning edge traversal is instantaneous (the default): a Move
+    /// arrives in the same tick and no <see cref="InTransit"/> state is ever
+    /// produced.
     /// </summary>
     public const int InstantTransit = 0;
 
@@ -28,7 +28,7 @@ public sealed class SimulationConfig
     public int MaxTicks { get; }
 
     /// <summary>
-    /// Perception horizon in graph-hop distance (T7.1). A positive integer
+    /// Perception horizon in graph-hop distance. A positive integer
     /// bounds every observer to zones within this many choke edges; the
     /// default <see cref="UnboundedVision"/> keeps the classic full
     /// observation model. The simulation core itself is vision-agnostic —
@@ -38,7 +38,7 @@ public sealed class SimulationConfig
     public int Vision { get; }
 
     /// <summary>
-    /// Movement speed in integer distance-units per tick (T8.1). Edges take
+    /// Movement speed in integer distance-units per tick. Edges take
     /// <c>max(1, ceil(ManhattanLength / TransitSpeed))</c> ticks to cross; the
     /// default <see cref="InstantTransit"/> preserves instantaneous moves for
     /// callers that never opt into kinematic traversal.
@@ -48,7 +48,7 @@ public sealed class SimulationConfig
     /// <summary>
     /// Validates and stores the parameters; throws
     /// <see cref="ArgumentOutOfRangeException"/> for out-of-range values.
-    /// AgentCount is bounded to 2–4 per the environment ticket; MaxTicks must
+    /// AgentCount is bounded to 2–4; MaxTicks must
     /// be positive so a tick limit always exists; Vision must be unbounded or
     /// at least 1 (a zero-hop cone would blind an agent to its own zone);
     /// TransitSpeed must be <see cref="InstantTransit"/> or at least 1.
@@ -134,11 +134,11 @@ public static class Simulation
     /// Advances <paramref name="state"/> by one tick under the agents'
     /// actions. Pure and total: the input state is never mutated and any
     /// action array yields the next state (invalid/missing actions degrade to
-    /// Wait). Resolution is still two-phase (docs/adr-002.md): phase 1 moves
-    /// (now respecting edge transit and zone/choke capacity, Phase 8 — see
-    /// ticket T8.1/T8.2), then phase 2 collects in ascending agent id against
-    /// post-move zones, one claim per resource per tick (lowest id wins).
-    /// Returns the next state plus the tick's <see cref="StepResult"/>.
+    /// Wait). Resolution is still two-phase (docs/adr-002.md): movement and
+    /// transit resolve first in ascending agent id, respecting edge transit
+    /// and zone/choke capacity, then collects resolve in ascending agent id
+    /// against post-move zones, one claim per resource per tick (lowest id
+    /// wins). Returns the next state plus the tick's <see cref="StepResult"/>.
     /// </summary>
     public static StepOutcome Step(SimulationState state, AgentAction[] actions, SimulationConfig config)
     {
@@ -165,11 +165,16 @@ public static class Simulation
             }
         }
 
-        // Phase 1 — movement & transit (T8.1) with capacity gating (T8.2).
-        // Agents resolve in ascending id so the outcome is a total function of
-        // the state. Transiting agents never act: their countdown advances one
-        // tick this tick and they arrive when it reaches zero (the transit
-        // consumes exactly one tick per unit of RemainingTicks).
+        // Movement & transit with capacity gating. Agents resolve in
+        // ascending id so the outcome is a total function of the state.
+        // Priority-yield rule: when a capacity-1 choke is contested between
+        // two agents crossing from opposite sides, the lower id is granted
+        // passage (it resolves first and reserves the edge); the yielding
+        // agent stays stationary in its origin zone and re-attempts on a
+        // later tick, so two opposing crossings can never livelock. Transiting
+        // agents never act: their countdown advances one tick this tick and
+        // they arrive when it reaches zero (the transit consumes exactly one
+        // tick per unit of RemainingTicks).
         var nextZones = new int[agentCount];
         var nextTransit = new InTransit?[agentCount];
         for (var i = 0; i < agentCount; i++)
@@ -250,9 +255,9 @@ public static class Simulation
             }
         }
 
-        // Phase 2 — collects (unchanged semantics: ascending id, post-move
-        // zones, one claim per resource per tick). Transiting agents are on an
-        // edge and cannot collect, even from their departure node.
+        // Collects (ascending id, post-move zones, one claim per resource per
+        // tick). Transiting agents are on an edge and cannot collect, even
+        // from their departure node.
         var nextScores = state.Agents.Select(agent => agent.Score).ToArray();
         var rewards = new double[agentCount];
         var nextClaims = new List<int>(state.Claims);
@@ -330,7 +335,7 @@ public static class Simulation
     }
 
     /// <summary>
-    /// Phase 8 (T8.1) edge cost: how many ticks a traversal of the choke
+    /// Kinematic edge cost: how many ticks a traversal of the choke
     /// between <paramref name="fromZoneId"/> and <paramref name="toZoneId"/>
     /// takes at the given <paramref name="transitSpeed"/>. Length is the
     /// Manhattan distance between the zones' positions, and the division is
@@ -352,7 +357,7 @@ public static class Simulation
     }
 
     /// <summary>
-    /// Phase 8 (T8.2): the index of the choke backing the undirected edge
+    /// The index of the choke backing the undirected edge
     /// between two zones, or -1 if no choke connects them. Choke capacity is
     /// attributed to the edge (in either direction), so a single-lane choke
     /// gates both crossings.
@@ -500,7 +505,7 @@ public sealed class LatticeEnvironment
 }
 
 /// <summary>
-/// A detached, sandboxed copy of the simulation (T9.1): it snapshots an
+/// A detached, sandboxed copy of the simulation: it snapshots an
 /// immutable <see cref="SimulationState"/> as of any tick and lets the caller
 /// advance that private copy turn-by-turn without any effect on the original
 /// state, its owning trajectory, or any other fork. This is the primitive the

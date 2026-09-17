@@ -1,9 +1,9 @@
 namespace Lattice.Environment;
 
 /// <summary>
-/// Global occupancy sentinels for the Phase 8 capacity model. Every zone and
+/// Global occupancy sentinels for the spatial capacity model. Every zone and
 /// choke point carries a <c>MaxOccupancy</c>; <see cref="Unlimited"/> means no
-/// bound at all (the pre-Phase-8 behavior), and 0 models an impassable
+/// bound at all (the default), and 0 models an impassable
 /// entry. Kept as plain integer configuration so capacity math is exact.
 /// </summary>
 public static class MapLimits
@@ -17,7 +17,7 @@ public static class MapLimits
 /// so graph nodes can hold one without imposing grid structure: the map is a
 /// graph (see docs/adr-001.md), and positions are an embedding for the spatial
 /// reasoning agents need (e.g. "nearest resource"), not a storage lattice.
-/// This is also the Phase 8 measure of edge length: Manhattan distance here
+/// This is also the kinematic measure of edge length: Manhattan distance here
 /// feeds <see cref="Simulation.TransitTicks"/> with pure integer arithmetic.
 /// </summary>
 public sealed record GridPoint(int X, int Y);
@@ -35,7 +35,7 @@ public sealed record Zone(int Id, GridPoint Position, int MaxOccupancy = MapLimi
 /// <summary>
 /// A collectable that belongs to exactly one zone (<see cref="ZoneId"/>) and
 /// sits at an absolute position on the map plane. It deliberately carries no
-/// type/tier fields yet — nothing in the Phase 1 constraints needs them, and
+/// type/tier fields yet — nothing in the current constraints needs them, and
 /// adding speculative state now would be burned attention for the generator.
 /// </summary>
 public sealed record ResourceNode(int Id, int ZoneId, GridPoint Position);

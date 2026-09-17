@@ -2,7 +2,7 @@ namespace Lattice.Environment;
 
 /// <summary>
 /// How much real-time fidelity a sighted element carries in a
-/// <see cref="PartialObservation"/> (T7.1). <see cref="Observed"/> elements
+/// <see cref="PartialObservation"/>. <see cref="Observed"/> elements
 /// were inside the observer's vision cone this tick and are real-time;
 /// <see cref="Stale"/> elements are beyond the cone now but were seen before,
 /// so their last-known data and the tick of that sighting survive;
@@ -58,7 +58,7 @@ public sealed record AgentSight(
     int LastSeenTick);
 
 /// <summary>
-/// The vision-bounded observation contract (T7.1): everything an agent is
+/// The vision-bounded observation contract: everything an agent is
 /// entitled to know this tick. It is produced by <see cref="PerceptionFilter"/>
 /// as a pure projection of a full <see cref="Observation"/> and carries three
 /// data tiers — real-time detail for elements within <see cref="Vision"/> hops,
@@ -75,7 +75,7 @@ public sealed record PartialObservation(
     int[] VisibleClaims);
 
 /// <summary>
-/// The deterministic, vision-bounded observation filter (T7.1). Given the
+/// The deterministic, vision-bounded observation filter. Given the
 /// omniscient <see cref="Observation"/> the simulation core produces, it
 /// projects what one observer can actually see: zones within
 /// <see cref="SimulationConfig.Vision"/> graph hops (and everything in them),

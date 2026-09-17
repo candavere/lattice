@@ -27,7 +27,7 @@ public sealed record ContentionEvent(
 public sealed record TurningPoint(int Tick, int LeaderAgentId, int Lead, int RemainingResources);
 
 /// <summary>
-/// Per-agent inefficiency counters (T6.2): <see cref="IdleSteps"/> Wait
+/// Per-agent inefficiency counters: <see cref="IdleSteps"/> Wait
 /// actions, <see cref="RejectedMoves"/> Move actions that did not change the
 /// agent's zone (illegal or self-targeting — the environment's no-op rule),
 /// and <see cref="SuboptimalMoves"/> legal moves that increased the BFS
@@ -47,7 +47,7 @@ public sealed record TrajectoryIncidents(
 
 /// <summary>
 /// Detects contention events, insurmountable-lead turning points, and
-/// per-agent inefficiency across a recorded trajectory (T6.2). Read-only over
+/// per-agent inefficiency across a recorded trajectory. Read-only over
 /// <see cref="TrajectoryRecording"/>; never mutates the simulation core or
 /// any input.
 /// </summary>

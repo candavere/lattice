@@ -4,7 +4,7 @@ namespace Lattice.Environment;
 /// The closed set of things an agent may ask to do in one tick. Kept as an
 /// enum plus one positional record (rather than a class hierarchy) so the
 /// contract stays pure data — serializable, comparable, and with no behavior
-/// hooks, per AGENTS.md principle 3.
+/// hooks, per the "step contracts are data" principle.
 /// </summary>
 public enum ActionKind
 {
@@ -31,7 +31,7 @@ public enum ActionKind
 public sealed record AgentAction(ActionKind Kind, int ZoneId = -1, int ResourceId = -1);
 
 /// <summary>
-/// Phase 8 transit state: the agent is mid-edge between two zones and not
+/// Kinematic transit state: the agent is mid-edge between two zones and not
 /// occupying any node. <see cref="RemainingTicks"/> is the number of further
 /// ticks until arrival, counting the tick in which the agent will arrive —
 /// so a value of 1 means "arrives at the end of this tick" and a value of 0
@@ -44,7 +44,7 @@ public sealed record InTransit(int FromZoneId, int ToZoneId, int RemainingTicks)
 /// The observable state of one agent: where it is and how many resources it
 /// has collected. Score is used for winner determination at termination.
 /// While the agent is mid-edge, <see cref="ZoneId"/> stays at the departure
-/// node and <see cref="Transit"/> describes the crossing (Phase 8); an agent
+/// node and <see cref="Transit"/> describes the crossing; an agent
 /// with <c>Transit == null</c> is at a node and may act.
 /// </summary>
 public sealed record AgentState(int AgentId, int ZoneId, int Score, InTransit? Transit = null);
@@ -52,8 +52,9 @@ public sealed record AgentState(int AgentId, int ZoneId, int Score, InTransit? T
 /// <summary>
 /// Everything an agent can see this tick. Full observability (the whole map,
 /// every agent, and every claimed resource id) keeps rule-based agents simple
-/// and makes their decisions deterministic given the state, per AGENTS.md
-/// principle 5. Unclaimed resources are Map.Resources minus Claims.
+/// and makes their decisions deterministic given the state, per the
+/// "environment over agents" principle. Unclaimed resources are Map.Resources
+/// minus Claims.
 /// </summary>
 public sealed record Observation(int AgentId, MapGraph Map, AgentState[] AgentStates, int[] Claims);
 
@@ -73,6 +74,6 @@ public sealed record Info(int StepNumber, bool IsTerminal, string? Reason, int? 
 /// <summary>
 /// The full outcome of one tick: one <see cref="Observation"/> and one
 /// <see cref="Reward"/> per agent, plus step <see cref="Info"/>. This is the
-/// unit that trajectory logging writes one-per-line in T2.3.
+/// unit that trajectory logging writes one per line.
 /// </summary>
 public sealed record StepResult(Observation[] Observations, Reward[] Rewards, Info Info);

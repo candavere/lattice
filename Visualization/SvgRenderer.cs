@@ -5,7 +5,7 @@ using Lattice.Environment;
 namespace Lattice.Visualization;
 
 /// <summary>
-/// Renders a lattice state as a standalone, self-contained SVG (T4.2). Like
+/// Renders a lattice state as a standalone, self-contained SVG. Like
 /// the ASCII renderer, it is strictly a reader: every element it emits (zone
 /// circles, choke edges, claim-colored resource nodes, color-coded agent
 /// tokens) is already present in the state it is handed, and it never

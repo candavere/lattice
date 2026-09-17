@@ -6,7 +6,7 @@ using Lattice.Trajectories;
 namespace Lattice.Analytics;
 
 /// <summary>
-/// Renders a recorded trajectory into a human report (T6.3). Two surfaces,
+/// Renders a recorded trajectory into a human report. Two surfaces,
 /// same aggregates: <see cref="Report"/> produces a full Markdown document
 /// (invariant culture, deterministic bytes) suitable for writing to a file,
 /// and <see cref="TerminalReport"/> produces a compact ASCII rendering for

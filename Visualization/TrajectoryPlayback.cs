@@ -5,7 +5,7 @@ using Lattice.Trajectories;
 namespace Lattice.Visualization;
 
 /// <summary>
-/// Streams a recorded trajectory to a terminal as printable frames (T4.1):
+/// Streams a recorded trajectory to a terminal as printable frames.
 /// an initial-state frame, then one frame per recorded tick. It consumes the
 /// JSONL produced by <see cref="TrajectoryWriter"/> through
 /// <see cref="TrajectoryReader"/> and renders ONLY what the recorded

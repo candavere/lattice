@@ -7,7 +7,7 @@ using Xunit;
 namespace Lattice.Tests.Analytics;
 
 /// <summary>
-/// Phase 9 (T9.1) <see cref="CounterfactualEvaluator"/>: re-roll a completed
+/// <see cref="CounterfactualEvaluator"/>: re-roll a completed
 /// trajectory from branch tick K under an alternative action sequence and read
 /// off the outcome divergence (per-agent score delta, winner change, steps to
 /// complete) against the recorded outcome — with the recording provably left

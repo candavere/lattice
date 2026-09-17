@@ -1,15 +1,66 @@
 # Lattice
 
-A deterministic, seedable simulation substrate for tactical/strategic game AI
-design and systems engineering. Lattice runs headless and graphics-free: it
-provides a pure simulation core, a seeded procedural map generator, and a
+> A deterministic, headless 2D tactical AI simulation substrate in pure C#
+> (.NET 8). Built to validate, balance, and stress-test high-level game AI
+> architectures (MCTS, Fog-of-War perception, and procedural map fairness) at
+> >400k steps/second before game engine integration.
+
+<!--
+Proposed GitHub topics for the maintainer (set these in the repo settings):
+game-ai, tactical-ai, game-development, determinism, mcts, headless-simulation,
+dotnet8, procedural-generation, fog-of-war, simulation-engine
+-->
+
+A deterministic game AI simulation in pure C#, built for tactical/strategic
+systems design and engineering. Lattice is a headless tactical combat engine
+for .NET: it runs graphics-free, has zero engine or ML dependencies (BCL only),
+and ships a pure step-contract simulation core, a seeded procedural map
+generator, a procedural map balance and spawn fairness tester, and a
 recording/reporting toolchain. Agents are a thin demonstration layer — the
 environment is the product.
 
-The core guarantee is repeatability: **same seed, same actions, same bytes.**
-Every run on every machine reproduces an identical trajectory, because the
-simulation has no hidden state, no singletons, and no ambient randomness. The
-core libraries depend only on the .NET base class library.
+Turn-based tactical play is a zero-dependency C# game state machine: every tick
+is a pure function of the previous state and the recorded actions. The core
+guarantee is repeatability — **same seed, same actions, same bytes.** Every run
+on every machine reproduces an identical trajectory, because the simulation has
+no hidden state, no singletons, and no ambient randomness. The built-in Monte
+Carlo Tree Search (MCTS) agent demonstrates exactly this contract, pricing
+candidate actions with deterministic BFS rollouts against the same pure `Step`
+used by every other policy.
+
+<p align="center">
+  <a href="https://github.com/candavere/lattice/actions/workflows/ci.yml"><img src="https://github.com/candavere/lattice/actions/workflows/ci.yml/badge.svg" alt="CI build status" /></a>
+  <img src="https://img.shields.io/badge/tests-275%20passing-brightgreen" alt="275 unit tests passing" />
+  <img src="https://img.shields.io/badge/determinism-byte--identical-blue" alt="byte-identical determinism" />
+  <img src="https://img.shields.io/badge/dependencies-BCL%20only-blueviolet" alt="zero dependencies — BCL only" />
+  <img src="https://img.shields.io/badge/.NET-8.0-512BD4" alt=".NET 8" />
+  <a href="https://candavere.github.io/lattice/"><img src="https://img.shields.io/badge/live%20demo-GitHub%20Pages-2ea44f" alt="live demo" /></a>
+</p>
+
+<p align="center">
+  <img src="assets/demo.svg" alt="Lattice demo trajectory — seed 42, MCTS agent, 30 ticks">
+</p>
+
+## Quickstart
+
+Run a seeded MCTS episode and replay it immediately — nothing beyond the
+[.NET 8 SDK](https://dotnet.microsoft.com/download) is required:
+
+```sh
+dotnet run --project Cli -- simulate --seed 42 --agent mcts --steps 30 --out trajectory.jsonl
+dotnet run --project Cli -- render --trajectory trajectory.jsonl
+```
+
+The second command streams the recorded episode as ASCII frames to your
+terminal (Ctrl+C to quit). For the animated, single-file SVG embedded above:
+
+```sh
+dotnet run --project Cli -- render --trajectory trajectory.jsonl --format svg --out demo.svg
+```
+
+Every command is seeded, so identical arguments reproduce identical bytes on
+any machine. The full command set is `generate`, `simulate`, `render`,
+`analyze`, and `benchmark` — see the [CLI Reference](#cli-reference) below.
 
 ## Architecture & Modules
 
@@ -250,6 +301,14 @@ steps_per_second=433621.9
 allocated_bytes=704192
 bytes_per_tick=704.2
 ```
+
+The printed figure is a sample from a typical developer workstation; the
+`>400k steps/second` tagline reflects this workload class (roughly
+half a million pure steps per second, single-threaded, on the .NET 8
+runtime). Absolute numbers vary with hardware and build profile — the
+guarantee the benchmark pins is not a headroom claim but that the loop
+is low-allocation (no per-step logging or serialization in the hot path)
+and never touches the disk or a network until the caller asks it to.
 
 ## Design Decisions
 

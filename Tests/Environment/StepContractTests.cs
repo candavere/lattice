@@ -6,7 +6,7 @@ namespace Lattice.Tests.Environment;
 
 /// <summary>
 /// Verifies every step-contract type is plain data: JSON serializable to
-/// JSONL and back with no custom logic, per AGENTS.md principle 3. Records
+/// JSONL and back with no custom logic. Records
 /// without arrays compare by value; records carrying arrays (which C# compares
 /// by reference) are asserted via byte-identical serialization.
 /// </summary>

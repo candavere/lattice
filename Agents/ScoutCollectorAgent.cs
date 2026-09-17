@@ -3,7 +3,7 @@ using Lattice.Environment;
 namespace Lattice.Agents;
 
 /// <summary>
-/// A deterministic exploration-first agent (T7.2). It holds its own
+/// A deterministic exploration-first agent. It holds its own
 /// <see cref="PerceptionFilter"/> (a bounded-vision sensor) and an
 /// <see cref="AgentBeliefMap"/>, and decides strictly from what it sees:
 /// each tick it projects the incoming <see cref="Observation"/> to its
@@ -11,10 +11,15 @@ namespace Lattice.Agents;
 /// it believes unclaimed in its own zone, and otherwise moves toward the
 /// most promising unaware territory — unexplored or stale zones, preferring
 /// zones that may hold an unclaimed resource, while refusing to route
-/// through the last zones where it saw an enemy agent. All reasoning runs
-/// over believed edges only (choke exits it has actually observed), so it
-/// never reasons about geometry it has not seen. No ambient randomness; the
-/// same observation stream always yields the same decision stream.
+/// through the last zones where it saw an enemy agent. When the sensor
+/// refutes a held belief — a resource it believed unclaimed observed as
+/// claimed, or a choke it believed traversable observed occupied by a rival
+/// mid-crossing — the scout re-plans within the same tick: the refuted
+/// target drops out of contention and routing avoids the occupied choke for
+/// that tick instead of honoring the stale plan. All reasoning runs over
+/// believed edges only (choke exits it has actually observed), so it never
+/// reasons about geometry it has not seen. No ambient randomness; the same
+/// observation stream always yields the same decision stream.
 /// </summary>
 public sealed class ScoutCollectorAgent : IAgent
 {
@@ -75,7 +80,7 @@ public sealed class ScoutCollectorAgent : IAgent
             return new AgentAction(ActionKind.Collect, ResourceId: localResource.ResourceId);
         }
 
-        var hop = BestExplorationHop(myZone, out var found);
+        var hop = BestExplorationHop(myZone, partial.Tick, out var found);
         return found
             ? new AgentAction(ActionKind.Move, hop!.Value)
             : new AgentAction(ActionKind.Wait);
@@ -87,8 +92,14 @@ public sealed class ScoutCollectorAgent : IAgent
     /// preferred; among equals, unexplored before stale; ties break by hop
     /// distance then zone id. Zones the agent last saw an enemy in are never
     /// traversed, so the scout won't charge into a remembered enemy position.
+    /// Beliefs refuted by this tick's sensor — a suspected resource observed
+    /// claimed, an intended choke observed occupied — have already been folded
+    /// in by <see cref="AgentBeliefMap.Update"/>, so the plan is rebuilt from
+    /// the corrected belief state rather than the stale one. <paramref name="tick"/>
+    /// is the projection tick, so occupancy sightings carry their real-time tick
+    /// into routing decisions.
     /// </summary>
-    private int? BestExplorationHop(int myZone, out bool found)
+    private int? BestExplorationHop(int myZone, int tick, out bool found)
     {
         found = false;
         var enemyZones = _belief.Enemies.Values
@@ -116,7 +127,7 @@ public sealed class ScoutCollectorAgent : IAgent
             }
 
             var priority = (suspected ? 2 : 0) + (unexplored ? 1 : 0);
-            if (!TryPlan(myZone, zoneId, enemyZones, out var hop, out var distance))
+            if (!TryPlan(myZone, zoneId, enemyZones, tick, out var hop, out var distance))
             {
                 continue;
             }
@@ -145,11 +156,14 @@ public sealed class ScoutCollectorAgent : IAgent
 
     /// <summary>
     /// BFS over believed edges from <paramref name="from"/> to
-    /// <paramref name="to"/>, expanding neighbors in ascending id and refusing
-    /// to enter <paramref name="enemyZones"/>. Returns the first hop and the
-    /// hop count, or false when no believed path exists.
+    /// <paramref name="to"/>, expanding neighbors in ascending id, refusing to
+    /// enter <paramref name="enemyZones"/>, and refusing choke edges observed
+    /// occupied at <paramref name="tick"/> (a saturated choke re-routes the
+    /// plan this tick instead of sending the scout into the blockage).
+    /// Returns the first hop and the hop count, or false when no believed
+    /// path exists.
     /// </summary>
-    private bool TryPlan(int from, int to, HashSet<int> enemyZones, out int hop, out int distance)
+    private bool TryPlan(int from, int to, HashSet<int> enemyZones, int tick, out int hop, out int distance)
     {
         hop = -1;
         distance = -1;
@@ -180,7 +194,7 @@ public sealed class ScoutCollectorAgent : IAgent
 
             foreach (var neighbor in _belief.KnownEdges(current).OrderBy(edge => edge))
             {
-                if (enemyZones.Contains(neighbor) || !visited.Add(neighbor))
+                if (enemyZones.Contains(neighbor) || _belief.IsEdgeBusy(current, neighbor, tick) || !visited.Add(neighbor))
                 {
                     continue;
                 }

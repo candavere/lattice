@@ -38,8 +38,8 @@ public sealed record EdgeTraversal(int ChokePointId, int FromZoneId, int ToZoneI
 public sealed record PathingEfficiency(int AgentId, int TotalMoves, int OptimalMoves, double Ratio);
 
 /// <summary>
-/// The full spatial/pathing/acquisition analysis of one recorded trajectory
-/// (T6.1). Purely downstream: every number is a pure function of the
+/// The full spatial/pathing/acquisition analysis of one recorded trajectory.
+    /// Purely downstream: every number is a pure function of the
 /// <see cref="TrajectoryRecording"/> (header, steps, final) and nothing else.
 /// </summary>
 public sealed record TrajectoryAnalytics(
@@ -50,7 +50,7 @@ public sealed record TrajectoryAnalytics(
 
 /// <summary>
 /// Computes spatial heatmaps, pathing efficiency, and resource acquisition
-/// timelines from a recorded trajectory (T6.1). The analyzer is strictly
+/// timelines from a recorded trajectory. The analyzer is strictly
 /// read-only over <see cref="TrajectoryRecording"/> — it never re-runs the
 /// simulation and never mutates any input.
 /// </summary>

@@ -483,8 +483,6 @@ $RECYCLE.BIN/
 
 ## Internal project tracking (never published to version control)
 AGENTS.md
-PHASE_TASKS.md
-PROGRESS_LOG.md
 *.todo
 *.notes
 *.scratchpad

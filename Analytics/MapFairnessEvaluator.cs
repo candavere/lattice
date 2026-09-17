@@ -49,7 +49,7 @@ public sealed record MapFairnessReport(
     double SpawnBiasIndex);
 
 /// <summary>
-/// Measures structural spawn bias of a map (T10.1) by playing the same
+/// Measures structural spawn bias of a map by playing the same
 /// identical policy twice in mirrored seating and comparing how much each
 /// spawn territory could collect, averaged over both seats.
 ///
@@ -121,10 +121,22 @@ public sealed class MapFairnessEvaluator
             TerminationReason: mirroredRun.TerminationReason);
 
         var totalResources = map.Resources.Length;
-        var spawnAMean = (assignmentAB.ScoreFromSpawnA + assignmentBA.ScoreFromSpawnA) / 2.0;
-        var spawnBMean = (assignmentAB.ScoreFromSpawnB + assignmentBA.ScoreFromSpawnB) / 2.0;
-        var divergence = Math.Abs(spawnAMean - spawnBMean);
-        var bias = totalResources == 0 ? 0.0 : Math.Min(1.0, divergence / totalResources);
+
+        // Integer-quantized fairness math: the per-territory aggregates are
+        // exact long sums of the four integer run scores, and the divergence is
+        // |sumA - sumB| over the exact denominator 2 * totalResources. Only the
+        // final normalization to the reported scalar is a (single, IEEE-exact)
+        // division, so the underlying rank/verdict between territories can
+        // never flip through FP rounding or platform variation.
+        var sumA = (long)assignmentAB.ScoreFromSpawnA + assignmentBA.ScoreFromSpawnA;
+        var sumB = (long)assignmentAB.ScoreFromSpawnB + assignmentBA.ScoreFromSpawnB;
+        var divergence = Math.Abs(sumA - sumB);
+        var spawnAMean = sumA / 2.0;
+        var spawnBMean = sumB / 2.0;
+        var biasDenominator = 2L * totalResources;
+        var bias = biasDenominator == 0
+            ? 0.0
+            : Math.Min(1.0, (double)divergence / biasDenominator);
 
         return new MapFairnessReport(
             Map: map,

@@ -139,13 +139,20 @@ public class GreedyCollectorAgentTests
     }
 
     [Fact]
-    public void SameObservation_AnyCall_SameAction()
+    public void SameObservation_BelowStallThreshold_RepeatsSameAction()
     {
+        // The agent is a deterministic function of the observation STREAM (the
+        // stall-recovery counter is derived from it). Two consecutive identical
+        // observations are below the stall threshold, so the repeated call —
+        // and a fresh instance with the same observation — must still agree.
         var agent = new GreedyCollectorAgent(0);
         var observation = Obs(TriangleMap, 0, 0);
         var expected = agent.Decide(observation);
         var second = agent.Decide(observation);
         Assert.Equal(Json(expected), Json(second));
+
+        var fresh = new GreedyCollectorAgent(0).Decide(observation);
+        Assert.Equal(Json(expected), Json(fresh));
     }
 
     [Theory]
@@ -176,10 +183,11 @@ public class GreedyCollectorAgentTests
         const ulong seed = 0xC0FFEEUL;
         var generatorConfig = new GeneratorConfig(3, 5, 1, 1, 3, 50);
         var map = MapGenerator.Generate(seed, generatorConfig);
-        var agents = MakeAgents();
 
-        var first = AgentEpisode.Run(map, Config, agents, 40);
-        var second = AgentEpisode.Run(map, Config, agents, 40);
+        // An agent instance is bound to one episode (its stall-recovery counter
+        // is per-instance), so each run must be driven by fresh instances.
+        var first = AgentEpisode.Run(map, Config, MakeAgents(), 40);
+        var second = AgentEpisode.Run(map, Config, MakeAgents(), 40);
 
         Assert.Equal(Json(first.Turns), Json(second.Turns));
         Assert.Equal(Json(first.Results), Json(second.Results));

@@ -10,7 +10,8 @@ using Lattice.Visualization;
 namespace Lattice.Cli;
 
 /// <summary>
-/// The Lattice command-line driver (T5.2, extended in T6.3 with `analyze`).
+/// The Lattice command-line driver: simulate, analyze, compare, render, and
+    /// benchmark subcommands over the seedable environment.
 /// Turns plain `args` into one of five subcommands — `generate`, `simulate`,
 /// `render`, `analyze`, `benchmark` — and routes all
 /// I/O through caller-supplied writers so it stays a pure function of its
@@ -25,7 +26,7 @@ public static class CliApp
     private const int Success = 0;
     private const int Failure = 1;
 
-    private static readonly GeneratorConfig DefaultGeneratorConfig = new(3, 5, 1, 1, 3, 50);
+    private static readonly GeneratorConfig DefaultGeneratorConfig = new(3, 5, 1, 1, 3, GeneratorConfig.DefaultRetryCap);
     private const int DefaultSimulationSteps = 100;
     private const int DefaultBenchmarkTicks = 1000;
     private const ulong BenchmarkSeed = 42;
@@ -385,7 +386,7 @@ public static class CliApp
 
     private static void WriteUsage(TextWriter sink)
     {
-        sink.WriteLine("lattice — seeded deterministic procedural strategy/tactical simulation (Phase 5 driver)");
+        sink.WriteLine("lattice — seeded deterministic procedural strategy/tactical simulation");
         sink.WriteLine();
         sink.WriteLine("usage: lattice <command> [options]");
         sink.WriteLine();

@@ -4,13 +4,12 @@ using Lattice.Environment;
 namespace Lattice.Visualization;
 
 /// <summary>
-/// Renders a lattice map as a plain-ASCII grid (T4.1). Replaces the later
+/// Renders a lattice map as a plain-ASCII grid. It replaces the
 /// "thin web viewer" idea with something catchier: a zero-dependency terminal
 /// projection that works anywhere. It is strictly a reader — every glyph it
 /// emits (zone tokens, choke edges, resource markers, agent positions, claim
 /// state) is already present in the <see cref="Observation"/>/<see cref="StepResult"/>
-/// it is handed, and it never re-derives game logic (AGENTS.md thought the
-/// intended T4.1 guardrail). Output is a deterministic pure function of its
+/// it is handed, and it never re-derives game logic. Output is a deterministic pure function of its
 /// inputs: identical inputs, byte-identical frames, which the tests pin down.
 /// </summary>
 public static class AsciiRenderer

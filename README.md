@@ -134,9 +134,9 @@ any machine. The full command set is `generate`, `simulate`, `render`,
 | `/Generator` | Seeded procedural map generation with hard-constraint checkers (retry, don't patch); optional caller-supplied acceptance gate | `MapGenerator`, `ConstraintCheckers`, `MapGenerationException` |
 | `/Agents` | Rule-based and tactical agent policies, belief maps, scenario runner | `IAgent`, `RandomAgent`, `GreedyCollectorAgent`, `ScoutCollectorAgent`, `MctsAgent`, `SentryPatrolAgent`, `InfiltratorAgent`, `AgentBeliefMap`, `ScenarioRunner`, `InfiltrationScenario` |
 | `/Trajectories` | JSONL trajectory read/write/replay/step utilities | `TrajectoryModel`, `TrajectoryWriter`, `TrajectoryReader`, `TrajectoryReplay` |
-| `/Analytics` | Trajectory analysis — contention, pathing efficiency, heatmaps, Markdown reports; spawn-bias fairness profiling | `TrajectoryAnalyzer`, `IncidentDetector`, `CounterfactualEvaluator`, `MapFairnessEvaluator`, `ReportGenerator`, `MapTraversal` |
+| `/Analytics` | Trajectory analysis — contention, pathing efficiency, heatmaps, Markdown reports; spawn-bias fairness profiling; the five-case reproducibility benchmark harness | `TrajectoryAnalyzer`, `IncidentDetector`, `CounterfactualEvaluator`, `MapFairnessEvaluator`, `ReportGenerator`, `MapTraversal`, `WorkloadCatalog`, `BenchmarkHarness` |
 | `/Visualization` | ASCII terminal renderer + dependency-free CSS-animated SVG exporter | `AsciiRenderer`, `SvgRenderer`, `SvgViewport`, `SvgTrajectoryExporter`, `TrajectoryPlayback` |
-| `/Cli` | Driver: `generate` / `simulate` / `render` / `analyze` / `benchmark` | `CliApp`, `Benchmark`, `Program` |
+| `/Cli` | Driver: `generate` / `simulate` / `render` / `analyze` / `benchmark` / `evaluate` | `CliApp`, `Program` |
 | `/Tests` | Unit, determinism, replay, and benchmark tests (one per module) | — |
 | `/docs` | ADR-style design-decision records (`adr-001`, `adr-002`, `adr-003`) | — |
 
@@ -399,57 +399,81 @@ zone/edge heatmaps, and a per-agent steps timeline. Analysis is a pure
 function of the trajectory: the same file always produces the same report
 (invariant culture, byte-identical).
 
-### benchmark — measure core throughput
+### benchmark — measure the five-case workload matrix
 
 | Flag | Description |
 | --- | --- |
-| `--ticks <n>` | Simulation ticks per measurement batch; default 200000 |
+| `--runs <n>` | Measured iterations per workload; default 10 |
+| `--warmup <n>` | Warm-up budget in ticks (realized as 1–2 full iterations); default 50000 |
+| `--steps <n>` | Per-iteration ticks for the raw cases (for smoke passes); raw cases default 100000, the MCTS case keeps its own 100-tick catalog budget |
 | `--commit <sha>` | Source revision to record in the JSON artifact (provenance) |
 | `--cpu <model>` | CPU model string to record in the JSON artifact (provenance) |
 | `--out <file>` | Write the JSON artifact to a file instead of stdout |
 
 ```sh
-dotnet run --project Cli -- benchmark --ticks 200000 --out benchmarks/throughput_benchmark.json
+dotnet run --project Cli -- benchmark --runs 10 --warmup 50000 --out benchmarks/throughput_benchmark.json
 ```
 
-Measures a pure `Simulation.Step` loop with two waiting agents — no agent
-logic, episode, or serialization overhead. The methodology is a proper
-measurement, not a single sample: a 50,000-tick warm-up (JIT + caches), then
-5 measurement batches of `--ticks` each. The report gives mean, min, max,
-and standard deviation of steps/second across the batches, total managed
-allocation, `bytes_per_tick`, and GC collection counts (`GC.CollectionCount`
-for Gen0/1/2 across the measured window):
+The benchmark runs a reproducible five-case workload matrix through one
+harness protocol (see `Analytics/Benchmarking`), not a single hand-picked
+sample:
 
-```
-ticks=200000
-runs=5
-total_ticks=1000000
-warmup_ticks=50000
-elapsed_ms=462.543
-mean_steps_per_second=2961498.2
-min_steps_per_second=857862.8
-max_steps_per_second=3521920.4
-stddev_steps_per_second=1176173.8
-allocated_bytes=1000001304
-bytes_per_tick=1000.0
-gc_gen0=160
-gc_gen1=0
-gc_gen2=0
-```
+| Case | Map | Roster | What it measures |
+| --- | --- | --- | --- |
+| `micro_raw_2agent` | 3 zones / 2–5 chokes | 2 seeded `RandomAgent`s | Raw engine stepping |
+| `facility_static_4agent` | 10 zones / ≥9 chokes | 2 `GreedyCollectorAgent` + 2 seeded `RandomAgent` | Mixed static facility |
+| `dynamic_contention_4agent` | 10 zones | 4 seeded `RandomAgent`s under a `TimedPortcullisRule` + `EventLockedChokeRule` | Dynamic topology |
+| `stress_topology_4agent` | 30 zones / ≥29 chokes | 2 `GreedyCollectorAgent` + 2 `ScoutCollectorAgent` | Large-map contention |
+| `policy_lookahead_mcts_32` | 3 zones | 2 `MctsAgent`s, 32 rollouts / depth 12 | Rollout-search decisions |
 
-`--out` writes a JSON artifact plus host/provenance facts — runtime, OS, core
-count, architecture, CPU model, source revision, timestamp — so the numbers
-are scoped to the exact machine that produced them. The record committed at
-`benchmarks/throughput_benchmark.json` is the reference: **Apple M1 / 8
-cores / .NET 8-shaped runtime / macOS**, measured mean **≈ 3.0M steps/s**
-(batch range 0.86–3.52M, std ≈ 1.18M). The guarantee the benchmark pins is
-not a headroom claim but allocation behavior: the hot loop is
-allocation-light — roughly 1 KB managed allocation per tick, linear in tick
-count with no growth under a fixed episode (recorded run: Gen1 and Gen2
-collections both **0**, only ephemeral Gen0 reclamation) — and never touches
-the disk or a network until the caller asks it to. Numbers vary with
-hardware and build profile; treat them as host-scoped evidence, not a
-cross-machine promise.
+Maps are generated from fixed seeds, so every host benchmarks the exact same
+topologies. The protocol is the same for every case: a JIT-settling warm-up
+that anchors an FNV-1a step digest, then `--runs` measured iterations with a
+forced GC sweep before each, per-step latency sampled into one histogram
+(`Stopwatch.GetTimestamp` per tick), throughput per iteration, managed
+allocation via `GC.GetAllocatedBytesForCurrentThread`, and process-wide
+`GC.CollectionCount` deltas for Gen0/1/2 across the measured window. Every
+measured iteration must reproduce the warm-up anchor's step digest exactly —
+if the episode ever went off-script the run fails loudly instead of reporting
+timings.
+
+Raw cases report **steps/sec**; the MCTS case reports **decisions/sec** (each
+decision runs rolloutsPerAction × depth fork steps). The reference record
+committed at `benchmarks/throughput_benchmark.json` was produced on
+**Apple M1 / 8 cores / macOS 27.0.0 / .NET 10.0.10 / Release / Workstation
+GC** at commit `0ce60b8`:
+
+| Case | Median throughput | p50 step lat. | p95 step lat. | Alloc / step |
+| --- | --- | --- | --- | --- |
+| `micro_raw_2agent` | 769k steps/s | 1.17 µs | 1.46 µs | 3.2 KB |
+| `facility_static_4agent` | 405k steps/s | 2.21 µs | 3.92 µs | 4.6 KB |
+| `dynamic_contention_4agent` | 243k steps/s | 3.79 µs | 6.42 µs | 7.1 KB |
+| `stress_topology_4agent` | 9.0k steps/s | 100 µs | 146 µs | 104 KB |
+| `policy_lookahead_mcts_32` | 463 decisions/s | 4.2 ms | 7.0 ms | 11.5 MB |
+
+Two honest notes on what the numbers do and do not say:
+
+- **The stepping core is allocation-light, but not zero-allocation.** Each tick
+  the pure step contract returns an immutable `StepResult` (observations,
+  rewards, info) and the harness rebuilds per-agent `Observation`s — that is
+  measured reality, reported as measured (roughly KB/tick for raw cases, far
+  more under stress/MCTS search). The committed record shows only ephemeral
+  Gen0-dominated reclamation (Gen2 = 20 over the whole run in raw cases), and
+  the regression suite still enforces that allocation grows **linearly**, never
+  per-episode. Claiming "0 bytes" would be fabrication; the README reports the
+  verified numbers instead.
+- **The stress case runs 4 agents, not a nominal 16.** `SimulationConfig`
+  validates agent count inclusive 2..4, so Workload D exercises the contract
+  ceiling on the 30-zone map rather than an impossible 16 — an honest
+  adaptation, not a silent change.
+
+Numbers vary with hardware and build profile; treat the committed record as
+host-scoped evidence (its `metadata` block carries the commit, timestamp,
+runtime, OS, CPU, cores, RAM, and GC mode) and the CI regression gate
+(`.github/workflows/benchmarks.yml`) as the reproducibility check — it
+re-benchmarks the matrix and fails on a >20% regression against the committed
+baseline when the host fingerprint matches, and shows a cross-host comparison
+table otherwise.
 
 ### evaluate — mirrored-seat MCTS evidence
 

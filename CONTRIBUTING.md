@@ -31,14 +31,18 @@ Four ideas govern every change:
    instance, and no behavior that depends on `GetHashCode`, culture, or
    iteration order leaks. Determinism is tested, not assumed.
 
-3. **High-throughput, allocation-conscious simulation loops.** The pure
-   `Simulation.Step` loop measures ≈ 3.0M steps/sec mean (0.86–3.52M across
-   batches; see `benchmarks/throughput_benchmark.json` for the host-scoped
-   reference run) on a 2020 Apple M1. Methodology: 50k-tick warm-up, 5
-   batches, per-batch stopwatch + min/max/std, `GC.CollectionCount` for
-   Gen0/1/2. Keep the hot path free of per-step allocation churn, avoid
-   string concatenation and LINQ in tight loops, and never move work such as
-   logging or serialization into the step.
+3. **High-throughput, allocation-conscious simulation loops.** The five-case
+   workload matrix (raw stepping, facility, dynamic topology, stress, MCTS
+   policy — see `Analytics/Benchmarking` and `benchmarks/throughput_benchmark.json`
+   for the host-scoped reference run) measures the pure
+   `Simulation.Step` core per case, e.g. ≈ 769k steps/s median for the 2-agent
+   micro case on a 2020 Apple M1. Methodology: warm-up that anchors a step
+   digest, ≥10 measured iterations, per-step stopwatch + median/mean/std/p95,
+   `GC.GetAllocatedBytesForCurrentThread`, and `GC.CollectionCount` for
+   Gen0/1/2. Every measured iteration must reproduce the warm-up anchor's step
+   digest. Keep the hot path free of per-step allocation churn, avoid string
+   concatenation and LINQ in tight loops, and never move work such as logging
+   or serialization into the step.
 
 4. **Clear separation of concerns.** Environment state, topological graph
    definition, and agent decision logic are three distinct layers. The
@@ -156,5 +160,5 @@ are required:
 Include **one** focused problem per issue. Related but distinct symptoms should
 be separate issues; the determinism guarantees make bisection trivial once the
 seed and platform are recorded. If the bug is a performance regression, run
-`dotnet run --project Cli -- benchmark --ticks 1000` on your machine and report
-`steps_per_second` alongside your hardware.
+`dotnet run --project Cli -- benchmark --runs 3 --steps 20000` on your machine and report
+the per-case `MedianThroughputPerSecond` (or the JSON artifact) alongside your hardware.

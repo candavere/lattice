@@ -7,9 +7,8 @@ namespace Lattice.Analytics;
 /// One high-friction contention event: at <see cref="Tick"/>, at least two
 /// agents tried to collect <see cref="ResourceId"/> in the same turn.
 /// <see cref="WinnerAgentId"/> is the agent who actually secured the claim —
-/// read from the recorded claim transition (ascending-id tie-breaker by
-/// construction) — and <see cref="Losers"/> are the participating agents who
-/// did not get it.
+/// read from the tick's recorded per-agent rewards — and <see cref="Losers"/>
+/// are the participating agents who did not get it.
 /// </summary>
 public sealed record ContentionEvent(
     int Tick,
@@ -87,7 +86,7 @@ public static class IncidentDetector
             var scores = observation.AgentStates.ToDictionary(agent => agent.AgentId, agent => agent.Score);
             var claimsNow = new HashSet<int>(observation.Claims);
 
-            DetectContentions(step, map, claimsNow, claimsBefore, zones, contentions);
+            DetectContentions(step, contentions);
 
             for (var agentId = 0; agentId < agentCount; agentId++)
             {
@@ -134,10 +133,6 @@ public static class IncidentDetector
 
     private static void DetectContentions(
         TrajectoryStep step,
-        MapGraph map,
-        HashSet<int> claimsNow,
-        HashSet<int> claimsBefore,
-        Dictionary<int, int> zones,
         List<ContentionEvent> contentions)
     {
         var collectorsByResource = new Dictionary<int, List<int>>();
@@ -166,7 +161,7 @@ public static class IncidentDetector
                 continue;
             }
 
-            var winner = Claimant(map, pair.Key, claimsNow, claimsBefore, zones) ?? participants.Min();
+            var winner = Claimant(participants, step) ?? participants.Min();
             contentions.Add(new ContentionEvent(
                 step.StepNumber,
                 pair.Key,
@@ -177,26 +172,25 @@ public static class IncidentDetector
     }
 
     /// <summary>
-    /// Who actually secured <paramref name="resource"/> this tick: non-null
-    /// only when the resource first appears in this tick's claims, mapped to
-    /// the agent occupying its zone after the tick. Null when the claim did
-    /// not land.
+    /// Who actually secured the contested resource this tick: the participant
+    /// the step rewarded (+1 collection reward), or null when the claim did not
+    /// land. Rewards are the authoritative, resolution-order-independent signal
+    /// of the winner, so contention reports stay correct under any priority
+    /// scheme. Ties resolve to the lowest participant id defensively.
     /// </summary>
-    private static int? Claimant(
-        MapGraph map,
-        int resource,
-        HashSet<int> claimsNow,
-        HashSet<int> claimsBefore,
-        Dictionary<int, int> zones)
+    private static int? Claimant(IReadOnlyList<int> participants, TrajectoryStep step)
     {
-        if (claimsBefore.Contains(resource) || !claimsNow.Contains(resource))
+        int? winner = null;
+        foreach (var agentId in participants)
         {
-            return null;
+            if (step.Result.Rewards[agentId].Value > 0
+                && (winner is null || agentId < winner))
+            {
+                winner = agentId;
+            }
         }
 
-        var zone = map.Resources[resource].ZoneId;
-        var candidates = zones.Where(pair => pair.Value == zone).Select(pair => pair.Key).OrderBy(id => id);
-        return candidates.FirstOrDefault() is { } agentId ? agentId : (int?)null;
+        return winner;
     }
 
     private static int NearestUnclaimedDistance(MapGraph map, HashSet<int> claimedResources, int fromZone)

@@ -128,17 +128,17 @@ public class ReportGeneratorTests
     public void Fixture5_ReportShowsContentionAndComeback()
     {
         var report = ReportGenerator.Report(AnalyticsFixtures.Fixture5());
-        Assert.Contains("| 2 | 0 | [0,1] | 0 | [1] |", report);
-        Assert.Contains("- tick 5: agent 1 unassailable (lead 1 > 0 resources left)", report);
-        Assert.Contains("| 0 | 1 | 2 | 1/2 (0.50) | C | Harvester | 2 | 1-0 |", report);
-        Assert.Contains("| 1 | 2 | 1 | 1/1 (1.00) | A | Harvester | 1 | 0-1 |", report);
+        Assert.Contains("| 3 | 0 | [0,1] | 0 | [1] |", report);
+        Assert.Contains("- tick 6: agent 1 unassailable (lead 1 > 0 resources left)", report);
+        Assert.Contains("| 0 | 1 | 2 | 1/2 (0.50) | C | Harvester | 3 | 1-0 |", report);
+        Assert.Contains("| 1 | 2 | 1 | 1/1 (1.00) | A | Harvester | 2 | 0-1 |", report);
     }
 
     [Fact]
     public void Fixture6_ThreeWayScramble_ReportsOneWinnerTwoLosers()
     {
         var report = ReportGenerator.Report(AnalyticsFixtures.Fixture6());
-        Assert.Contains("| 2 | 0 | [0,1,2] | 0 | [1,2] |", report);
+        Assert.Contains("| 2 | 0 | [0,1,2] | 2 | [0,1] |", report);
     }
 
     [Fact]

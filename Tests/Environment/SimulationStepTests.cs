@@ -95,7 +95,7 @@ public class SimulationStepTests
     }
 
     [Fact]
-    public void ContendedCollect_LowestAgentIdWins()
+    public void ContendedCollect_LowestPriorityRankWins()
     {
         var state = Simulation.CreateInitial(Map, Config);
         var afterMove = Simulation.Step(state, new[] { new AgentAction(ActionKind.Move, ZoneId: 1), new AgentAction(ActionKind.Wait) }, Config);

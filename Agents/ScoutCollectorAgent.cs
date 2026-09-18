@@ -157,9 +157,12 @@ public sealed class ScoutCollectorAgent : IAgent
     /// <summary>
     /// BFS over believed edges from <paramref name="from"/> to
     /// <paramref name="to"/>, expanding neighbors in ascending id, refusing to
-    /// enter <paramref name="enemyZones"/>, and refusing choke edges observed
-    /// occupied at <paramref name="tick"/> (a saturated choke re-routes the
-    /// plan this tick instead of sending the scout into the blockage).
+    /// enter <paramref name="enemyZones"/>, and refusing choke edges that are
+    /// blocked at <paramref name="tick"/> — observed occupied this tick, or
+    /// inside their congestion cooldown after repeated saturation — so a
+    /// saturated choke re-routes the plan this tick instead of sending the
+    /// scout into the blockage, and a chronically saturated choke stays
+    /// deprioritized rather than re-attempted every tick.
     /// Returns the first hop and the hop count, or false when no believed
     /// path exists.
     /// </summary>
@@ -194,7 +197,7 @@ public sealed class ScoutCollectorAgent : IAgent
 
             foreach (var neighbor in _belief.KnownEdges(current).OrderBy(edge => edge))
             {
-                if (enemyZones.Contains(neighbor) || _belief.IsEdgeBusy(current, neighbor, tick) || !visited.Add(neighbor))
+                if (enemyZones.Contains(neighbor) || _belief.IsEdgeBlocked(current, neighbor, tick) || !visited.Add(neighbor))
                 {
                     continue;
                 }

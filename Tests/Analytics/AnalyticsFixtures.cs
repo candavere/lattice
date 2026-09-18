@@ -126,14 +126,15 @@ internal static class AnalyticsFixtures
 
     /// <summary>
     /// Fixture-5: 2 agents, 3 resources; one tick of head-to-head contention on
-    /// resource 0 (two collectors, winner agent 0 by ascending-id tie-break),
-    /// then A1 comes from behind to win at tick 5 — the only turning point.
+    /// resource 0 at tick 3 (two collectors, winner agent 0), then A1 comes from
+    /// behind to win 2-1 at tick 6 — the only turning point.
     /// </summary>
     public static TrajectoryRecording Fixture5() =>
         Record(
             RingMap([1, 2, 2]),
             agentCount: 2,
             new AgentAction[] { new(ActionKind.Move, ZoneId: 1), new(ActionKind.Wait) },
+            new AgentAction[] { new(ActionKind.Wait), new(ActionKind.Wait) },
             new AgentAction[] { new(ActionKind.Collect, ResourceId: 0), new(ActionKind.Collect, ResourceId: 0) },
             new AgentAction[] { new(ActionKind.Wait), new(ActionKind.Move, ZoneId: 2) },
             new AgentAction[] { new(ActionKind.Wait), new(ActionKind.Collect, ResourceId: 1) },
@@ -141,7 +142,9 @@ internal static class AnalyticsFixtures
 
     /// <summary>
     /// Fixture-6: 3 agents fighting over a single resource R0@Z1. All three
-    /// collect in the same tick; exactly one can win. Terminal at tick 2.
+    /// collect in the same tick; exactly one can win — at tick 2 the
+    /// tick-interleaved priority seats agent 2 first, so agent 2 takes it.
+    /// Terminal at tick 2.
     /// </summary>
     public static TrajectoryRecording Fixture6() =>
         Record(

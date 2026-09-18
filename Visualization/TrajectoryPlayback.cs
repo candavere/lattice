@@ -24,14 +24,13 @@ public static class TrajectoryPlayback
 /// </summary>
 public static void Playback(TextReader trajectorySource, TextWriter sink)
 {
-    var recording = TrajectoryReader.Read(trajectorySource);
-    var header = recording.Header;
+    var header = TrajectoryReader.ReadHeader(trajectorySource);
     var initial = Simulation.CreateInitial(header.Map, header.SimulationConfig);
 
     sink.Write("== initial state ==\n");
     WriteFrame(sink, header.Map, initial.Agents, initial.Claims, header.Scenario, header.AgentRoles);
 
-    foreach (var step in recording.Steps)
+    foreach (var step in TrajectoryReader.StreamSteps(trajectorySource))
     {
         var heading = $"== step {step.StepNumber}";
         var info = step.Result.Info;

@@ -151,25 +151,27 @@ public static class TrajectoryAnalyzer
 
     /// <summary>
     /// Who claimed <paramref name="resourceId"/> on <paramref name="step"/>:
-    /// the lowest agent id that both asked to collect that resource and ended
-    /// the tick in its zone — mirroring the environment's ascending-id claim
-    /// resolution so shared-zone contention never misattributes the claim.
-    /// Falls back to the lowest zone occupant for recordings where no
-    /// qualifying collect action was recorded.
+    /// the collect participant the step actually rewarded (+1 collection
+    /// reward), falling back to the lowest participant id and then the lowest
+    /// zone occupant for recordings where no reward was recorded. Rewards are
+    /// the authoritative, resolution-order-independent signal of the claim, so
+    /// shared-zone contention never misattributes the claim under any priority
+    /// scheme.
     /// </summary>
     private static int NewClaimant(TrajectoryStep step, Dictionary<int, int> zones, MapGraph map, int resourceId)
     {
         var resourceZone = map.Resources[resourceId].ZoneId;
-        var participant = Enumerable.Range(0, step.Actions.Length)
+        var participants = Enumerable.Range(0, step.Actions.Length)
             .Where(agentId =>
                 step.Actions[agentId].Kind == ActionKind.Collect
                 && step.Actions[agentId].ResourceId == resourceId
                 && zones[agentId] == resourceZone)
-            .DefaultIfEmpty(-1)
-            .Min();
-        if (participant >= 0)
+            .OrderBy(agentId => agentId)
+            .ToArray();
+        if (participants.Length > 0)
         {
-            return participant;
+            var rewarded = participants.FirstOrDefault(agentId => step.Result.Rewards[agentId].Value > 0, -1);
+            return rewarded >= 0 ? rewarded : participants[0];
         }
 
         return zones.First(pair => pair.Value == resourceZone).Key;

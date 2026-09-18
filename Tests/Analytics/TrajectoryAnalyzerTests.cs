@@ -114,11 +114,11 @@ public class TrajectoryAnalyzerTests
     {
         var analytics = TrajectoryAnalyzer.Analyze(AnalyticsFixtures.Fixture5());
         Assert.Equal(
-            new[] { (2, 0) },
+            new[] { (3, 0) },
             analytics.ResourceTimelines.Single(timeline => timeline.AgentId == 0)
                 .Claims.Select(claim => (claim.Tick, claim.ResourceId)));
         Assert.Equal(
-            new[] { (4, 1), (5, 2) },
+            new[] { (5, 1), (6, 2) },
             analytics.ResourceTimelines.Single(timeline => timeline.AgentId == 1)
                 .Claims.Select(claim => (claim.Tick, claim.ResourceId)));
     }

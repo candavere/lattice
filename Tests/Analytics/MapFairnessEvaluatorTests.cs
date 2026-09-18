@@ -29,9 +29,10 @@ internal static class FairnessFixtures
     /// Y-mirror-symmetric board across x=8: two identical spawn territories at
     /// (0,0) and (16,0) plus a shared center stash at (8,8). Both spawns are
     /// equidistant from the stash, so whichever seat holds either territory
-    /// collects the same amount; the ascending-id tie-break happens to favor
-    /// player 0 in both seats, which the territory-averaged metric must cancel
-    /// out. Expect the SpawnBiasIndex to be exactly 0.
+    /// collects the same amount; the tick-interleaved resolution priority
+    /// yields the same outcome in both mirrored seats, which the
+    /// territory-averaged metric must cancel out. Expect the SpawnBiasIndex to
+    /// be exactly 0.
     /// </summary>
     public static MapGraph SymmetricBoard() => new(
         new[]
@@ -147,7 +148,7 @@ public class MapFairnessEvaluatorTests
 
         Assert.Equal(FairnessPolicy.Mcts, first.Policy);
         Assert.Equal(Json(first), Json(second));
-        Assert.Equal(0.25, first.SpawnBiasIndex);
+        Assert.Equal(0.5, first.SpawnBiasIndex);
     }
 
     [Fact]

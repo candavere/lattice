@@ -99,7 +99,7 @@ public sealed class MctsAgent : IAgent
             observation.Map,
             observation.AgentStates,
             observation.Claims,
-            StepCount: 0); // tick-limit is irrelevant: rollouts clamp at MaxDepth
+            StepCount: observation.StepNumber); // fork starts at the live tick so its rotation matches the episode's
 
         var candidates = CandidateActions(observation);
         var turn = new AgentAction[_config.AgentCount];
@@ -233,7 +233,7 @@ public sealed class MctsAgent : IAgent
         {
             observations.Add(
                 agent.AgentId,
-                new Observation(agent.AgentId, state.Map, state.Agents, state.Claims));
+                new Observation(agent.AgentId, state.Map, state.Agents, state.Claims, state.StepCount));
         }
     }
 }

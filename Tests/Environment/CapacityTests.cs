@@ -8,8 +8,8 @@ namespace Lattice.Tests.Environment;
 /// <summary>
 /// Spatial capacity: zones and choke edges carry a
 /// MaxOccupancy that binds the move gateway. Resolution is a total
-/// deterministic function — agents are triaged in ascending id, so when
-/// capacity is contested the lowest id wins and the loser stays put. Node
+/// deterministic function — agents resolve in ascending rank
+/// (agentId + state.StepCount) % agentCount; denied agents stay put. Node
 /// capacity is a same-tick entry gate (bookings and same-tick arrivals count
 /// against it, departures do not free their slot mid-tick); choke capacity
 /// persists across ticks while a transit is on the edge and is only consulted

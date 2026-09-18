@@ -54,9 +54,17 @@ public sealed record AgentState(int AgentId, int ZoneId, int Score, InTransit? T
 /// every agent, and every claimed resource id) keeps rule-based agents simple
 /// and makes their decisions deterministic given the state, per the
 /// "environment over agents" principle. Unclaimed resources are Map.Resources
-/// minus Claims.
+/// minus Claims. <see cref="StepNumber"/> is the tick being decided (the same
+/// value <see cref="StepResult.Info"/> carries): time-varying resolution and
+/// dynamic topology both depend on it, so an agent that plans ahead must be
+/// able to read it to stay aligned with the live simulation.
 /// </summary>
-public sealed record Observation(int AgentId, MapGraph Map, AgentState[] AgentStates, int[] Claims);
+public sealed record Observation(
+    int AgentId,
+    MapGraph Map,
+    AgentState[] AgentStates,
+    int[] Claims,
+    int StepNumber = 0);
 
 /// <summary>
 /// Per-agent reward for one tick. +1 for each resource collected this tick,

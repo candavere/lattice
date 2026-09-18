@@ -20,15 +20,15 @@ public class CounterfactualEvaluatorTests
     [Fact]
     public void AlternativeBranch_FlipsTheWinner_Deterministically()
     {
-        // Fixture-5: A1 wins 2-1 at tick 5 after A0 takes the contested R0.
-        // Branching at tick 3 to send BOTH agents to zone 2 early lets A0
-        // (lower id) win both contested zone-2 resources instead.
+        // Fixture-5: A1 wins 2-1 at tick 6 after A0 takes the contested R0 at
+        // tick 3. Branching at tick 4 to send BOTH agents to zone 2 early lets
+        // A0 win both contested zone-2 resources instead.
         var recording = AnalyticsFixtures.Fixture5();
         var recordingJson = Json(recording);
 
         var first = CounterfactualEvaluator.Evaluate(
             recording,
-            branchTick: 3,
+            branchTick: 4,
             alternativeTurns: new[]
             {
                 new[] { new AgentAction(ActionKind.Move, ZoneId: 2), new AgentAction(ActionKind.Move, ZoneId: 2) },
@@ -38,7 +38,7 @@ public class CounterfactualEvaluatorTests
 
         var second = CounterfactualEvaluator.Evaluate(
             recording,
-            3,
+            4,
             new[]
             {
                 new[] { new AgentAction(ActionKind.Move, ZoneId: 2), new AgentAction(ActionKind.Move, ZoneId: 2) },
@@ -47,8 +47,8 @@ public class CounterfactualEvaluatorTests
             });
 
         Assert.Equal([1, 2], first.RecordedScores);
-        Assert.Equal([3, 0], first.ForkedScores);
-        Assert.Equal([2, -2], first.ScoreDeltas);
+        Assert.Equal([2, 1], first.ForkedScores);
+        Assert.Equal([1, -1], first.ScoreDeltas);
         Assert.Equal(1, first.RecordedWinner);
         Assert.Equal(0, first.ForkedWinner);
         Assert.True(first.WinnerChanged);
@@ -77,7 +77,7 @@ public class CounterfactualEvaluatorTests
         Assert.Equal(2, result.RecordedSteps);
         Assert.Equal(100, result.ForkedSteps);
         Assert.Equal([0, 0, 0], result.ForkedScores);
-        Assert.Equal([-1, 0, 0], result.ScoreDeltas);
+        Assert.Equal([0, 0, -1], result.ScoreDeltas);
         Assert.Equal(0, result.ForkedWinner);
     }
 

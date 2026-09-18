@@ -153,5 +153,5 @@ public static class ScenarioRunner
     private static Dictionary<int, Observation> BuildObservations(SimulationState state) =>
         state.Agents.ToDictionary(
             a => a.AgentId,
-            a => new Observation(a.AgentId, state.Map, state.Agents, state.Claims));
+            a => new Observation(a.AgentId, state.Map, state.Agents, state.Claims, state.StepCount));
 }

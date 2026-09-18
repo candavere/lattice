@@ -10,7 +10,7 @@ public class IncidentDetectorTests
     {
         var incidents = IncidentDetector.Detect(AnalyticsFixtures.Fixture5());
         var contention = Assert.Single(incidents.Contentions);
-        Assert.Equal(2, contention.Tick);
+        Assert.Equal(3, contention.Tick);
         Assert.Equal(0, contention.ResourceId);
         Assert.Equal(new[] { 0, 1 }, contention.Participants);
         Assert.Equal(0, contention.WinnerAgentId);
@@ -23,8 +23,8 @@ public class IncidentDetectorTests
         var incidents = IncidentDetector.Detect(AnalyticsFixtures.Fixture6());
         var contention = Assert.Single(incidents.Contentions);
         Assert.Equal(new[] { 0, 1, 2 }, contention.Participants);
-        Assert.Equal(0, contention.WinnerAgentId);
-        Assert.Equal(new[] { 1, 2 }, contention.Losers);
+        Assert.Equal(2, contention.WinnerAgentId);
+        Assert.Equal(new[] { 0, 1 }, contention.Losers);
     }
 
     [Fact]
@@ -59,7 +59,7 @@ public class IncidentDetectorTests
     {
         var incidents = IncidentDetector.Detect(AnalyticsFixtures.Fixture5());
         var point = Assert.Single(incidents.TurningPoints);
-        Assert.Equal(5, point.Tick);
+        Assert.Equal(6, point.Tick);
         Assert.Equal(1, point.LeaderAgentId);
         Assert.Equal(1, point.Lead);
         Assert.Equal(0, point.RemainingResources);

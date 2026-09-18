@@ -21,10 +21,38 @@ public static class TrajectoryReader
     /// </summary>
     public static TrajectoryRecording Read(TextReader source)
     {
-        TrajectoryHeader? header = null;
-        var steps = new List<TrajectoryStep>();
+        var header = ReadHeader(source);
         TrajectoryFinal? final = null;
-        var lineNumber = 0;
+        var steps = ReadSteps(source, value => final = value).ToArray();
+        return new TrajectoryRecording(header, steps, final!);
+    }
+
+    public static TrajectoryHeader ReadHeader(TextReader source)
+    {
+        var line = source.ReadLine();
+        if (line is null)
+        {
+            throw new InvalidDataException("Trajectory has no header line.");
+        }
+
+        if (string.IsNullOrWhiteSpace(line) || ReadKind(line, 1) != "header")
+        {
+            throw new InvalidDataException("The header line must be the first line of the trajectory.");
+        }
+
+        return DeserializeOrThrow<TrajectoryWriter.HeaderLine>(line, 1).ToModel();
+    }
+
+    public static IEnumerable<TrajectoryStep> StreamSteps(TextReader source)
+    {
+        return ReadSteps(source, null);
+    }
+
+    private static IEnumerable<TrajectoryStep> ReadSteps(TextReader source, Action<TrajectoryFinal>? onFinal)
+    {
+        var stepCount = 0;
+        TrajectoryFinal? final = null;
+        var lineNumber = 1;
 
         string? line;
         while ((line = source.ReadLine()) is not null)
@@ -35,63 +63,37 @@ public static class TrajectoryReader
                 continue;
             }
 
-            using var document = JsonDocument.Parse(line);
-            if (!document.RootElement.TryGetProperty("Kind", out var kindNode) || kindNode.GetString() is not { } kind)
-            {
-                throw new InvalidDataException($"Line {lineNumber} has no 'Kind' property.");
-            }
-
+            var kind = ReadKind(line, lineNumber);
             switch (kind)
             {
                 case "header":
-                    if (lineNumber != 1 || header is not null)
-                    {
-                        throw new InvalidDataException("The header line must be the first line of the trajectory.");
-                    }
-
-                    header = DeserializeOrThrow<TrajectoryWriter.HeaderLine>(line, lineNumber).ToModel();
-                    break;
+                    throw new InvalidDataException("The header line must be the first line of the trajectory.");
 
                 case "step":
-                    if (header is null)
-                    {
-                        throw new InvalidDataException("A step line appeared before the header.");
-                    }
-
                     if (final is not null)
                     {
                         throw new InvalidDataException("A step line appeared after the final line.");
                     }
 
                     var step = DeserializeOrThrow<TrajectoryWriter.StepLine>(line, lineNumber).ToModel();
-                    if (step.StepNumber != steps.Count + 1)
+                    if (step.StepNumber != stepCount + 1)
                     {
                         throw new InvalidDataException(
-                            $"Step numbers must be contiguous from 1; encountered {step.StepNumber} after {steps.Count} step(s).");
+                            $"Step numbers must be contiguous from 1; encountered {step.StepNumber} after {stepCount} step(s).");
                     }
 
-                    steps.Add(step);
+                    stepCount++;
+                    yield return step;
                     break;
 
                 case "final":
-                    if (header is null)
-                    {
-                        throw new InvalidDataException("The final line appeared before the header.");
-                    }
-
                     if (final is not null)
                     {
                         throw new InvalidDataException("Multiple final lines found.");
                     }
 
-                    var metrics = DeserializeOrThrow<TrajectoryWriter.FinalLine>(line, lineNumber).Metrics;
-                    final = new TrajectoryFinal(
-                        metrics.Reason,
-                        metrics.WinnerAgentId,
-                        metrics.TotalSteps,
-                        metrics.FinalScores,
-                        metrics.ResourcesClaimed,
-                        metrics.TotalResources);
+                    final = DeserializeOrThrow<TrajectoryWriter.FinalLine>(line, lineNumber).Metrics
+                        ?? throw new InvalidDataException($"Line {lineNumber} has no final metrics.");
                     break;
 
                 default:
@@ -99,23 +101,31 @@ public static class TrajectoryReader
             }
         }
 
-        if (header is null)
-        {
-            throw new InvalidDataException("Trajectory has no header line.");
-        }
-
         if (final is null)
         {
             throw new InvalidDataException("Trajectory has no final line.");
         }
 
-        if (final.TotalSteps != steps.Count)
+        if (final.TotalSteps != stepCount)
         {
             throw new InvalidDataException(
-                $"Final TotalSteps ({final.TotalSteps}) disagrees with the {steps.Count} recorded step line(s).");
+                $"Final TotalSteps ({final.TotalSteps}) disagrees with the {stepCount} recorded step line(s).");
         }
 
-        return new TrajectoryRecording(header, steps.ToArray(), final);
+        onFinal?.Invoke(final);
+    }
+
+    private static string ReadKind(string line, int lineNumber)
+    {
+        using var document = JsonDocument.Parse(line);
+        if (document.RootElement.ValueKind != JsonValueKind.Object ||
+            !document.RootElement.TryGetProperty("Kind", out var kindNode) ||
+            kindNode.ValueKind != JsonValueKind.String)
+        {
+            throw new InvalidDataException($"Line {lineNumber} has no valid 'Kind' property.");
+        }
+
+        return kindNode.GetString()!;
     }
 
     private static T DeserializeOrThrow<T>(string line, int lineNumber) where T : class

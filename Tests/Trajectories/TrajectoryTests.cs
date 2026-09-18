@@ -208,4 +208,158 @@ public class TrajectoryTests
 
         Assert.Throws<InvalidDataException>(() => TrajectoryReader.Read(new StringReader(broken)));
     }
+
+    [Fact]
+    public void ReadHeader_ReturnsHeaderWithoutConsumingSteps()
+    {
+        var config = new SimulationConfig(2, 3);
+        var recording = TrajectoryWriter.Record(TriangleMap, config, 0xAAAAUL, FullCollectorEpisode(), new StringWriter());
+        var text = SerializeViaWriter(recording);
+        using var reader = new CountingReader(text);
+
+        var header = TrajectoryReader.ReadHeader(reader);
+
+        Assert.Equal(Serialize(recording.Header), Serialize(header));
+        Assert.Equal(1, reader.ReadCount);
+        Assert.Equal(text.Split('\n')[1], reader.ReadLine());
+    }
+
+    [Fact]
+    public void StreamSteps_YieldsAllStepsInOrder()
+    {
+        var config = new SimulationConfig(2, 3);
+        var recording = TrajectoryWriter.Record(TriangleMap, config, 0xBBBBUL, FullCollectorEpisode(), new StringWriter());
+
+        using var source = new StringReader(SerializeViaWriter(recording));
+        var header = TrajectoryReader.ReadHeader(source);
+        var steps = TrajectoryReader.StreamSteps(source).ToArray();
+
+        Assert.Equal(recording.Header.Seed, header.Seed);
+        Assert.Equal(recording.Steps.Length, steps.Length);
+        for (var i = 0; i < steps.Length; i++)
+        {
+            Assert.Equal(recording.Steps[i].StepNumber, steps[i].StepNumber);
+            Assert.Equal(Serialize(recording.Steps[i]), Serialize(steps[i]));
+        }
+    }
+
+    [Fact]
+    public void StreamSteps_IsLazy_OnlyConsumesLinesUpToRequestedStep()
+    {
+        var config = new SimulationConfig(2, 3);
+        var recording = TrajectoryWriter.Record(TriangleMap, config, 0xCCCCUL, FullCollectorEpisode(), new StringWriter());
+        var text = SerializeViaWriter(recording);
+        using var source = new CountingReader(text);
+        TrajectoryReader.ReadHeader(source);
+
+        var steps = TrajectoryReader.StreamSteps(source);
+        Assert.Equal(1, source.ReadCount);
+        using (var enumerator = steps.GetEnumerator())
+        {
+            Assert.Equal(1, source.ReadCount);
+            Assert.True(enumerator.MoveNext());
+            Assert.Equal(1, enumerator.Current.StepNumber);
+            Assert.Equal(2, source.ReadCount);
+        }
+
+        Assert.Equal(2, source.ReadCount);
+        Assert.Equal(text.Split('\n')[2], source.ReadLine());
+    }
+
+    [Fact]
+    public void StreamSteps_TerminalStep_StillRequiresFinalOnFullEnumeration()
+    {
+        var config = new SimulationConfig(2, 3);
+        var recording = TrajectoryWriter.Record(TriangleMap, config, 0xDDDDUL, FullCollectorEpisode(), new StringWriter());
+        var lines = SerializeViaWriter(recording).Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        var stepsOnly = string.Join('\n', lines.Take(lines.Length - 1));
+
+        using var source = new StringReader(stepsOnly);
+        TrajectoryReader.ReadHeader(source);
+        using var steps = TrajectoryReader.StreamSteps(source).GetEnumerator();
+        foreach (var expected in recording.Steps)
+        {
+            Assert.True(steps.MoveNext());
+            Assert.Equal(expected.StepNumber, steps.Current.StepNumber);
+        }
+
+        Assert.True(steps.Current.Result.Info.IsTerminal);
+        Assert.Throws<InvalidDataException>(() => steps.MoveNext());
+    }
+
+    [Fact]
+    public void StreamSteps_RejectsMalformedLines()
+    {
+        var config = new SimulationConfig(2, 3);
+        var recording = TrajectoryWriter.Record(TriangleMap, config, 0xEEEEUL, FullCollectorEpisode(), new StringWriter());
+        var lines = SerializeViaWriter(recording).Split('\n', StringSplitOptions.RemoveEmptyEntries);
+
+        using var source = new StringReader(lines[0] + "\n" + lines[1] + "\n{not json}\n");
+        TrajectoryReader.ReadHeader(source);
+        using var steps = TrajectoryReader.StreamSteps(source).GetEnumerator();
+        Assert.True(steps.MoveNext());
+        Assert.Equal(1, steps.Current.StepNumber);
+        Assert.ThrowsAny<JsonException>(() => steps.MoveNext());
+    }
+
+    [Fact]
+    public void StreamSteps_RejectsTrailingStepAfterFinal()
+    {
+        var config = new SimulationConfig(2, 3);
+        var recording = TrajectoryWriter.Record(TriangleMap, config, 0xFFFFUL, FullCollectorEpisode(), new StringWriter());
+        var lines = SerializeViaWriter(recording).Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        var withTrailingStep = string.Join('\n', lines) + "\n" + lines[1];
+
+        using var source = new StringReader(withTrailingStep);
+        TrajectoryReader.ReadHeader(source);
+        Assert.Throws<InvalidDataException>(() => TrajectoryReader.StreamSteps(source).ToArray());
+    }
+
+    [Fact]
+    public void StreamSteps_RejectsNonContiguousStepNumbers()
+    {
+        var config = new SimulationConfig(2, 3);
+        var recording = TrajectoryWriter.Record(TriangleMap, config, 0x1111UL, FullCollectorEpisode(), new StringWriter());
+        var broken = SerializeViaWriter(recording).Replace("\"StepNumber\":3", "\"StepNumber\":9", StringComparison.Ordinal);
+
+        Assert.Throws<InvalidDataException>(() =>
+            TrajectoryReader.StreamSteps(new StringReader(broken)).ToArray());
+    }
+
+    [Fact]
+    public void Read_MatchesWriterRoundtrip_AfterStreamingHelpersAdded()
+    {
+        var config = new SimulationConfig(2, 3);
+        var recording = TrajectoryWriter.Record(TriangleMap, config, 0x2222UL, FullCollectorEpisode(), new StringWriter());
+
+        var readBack = TrajectoryReader.Read(new StringReader(SerializeViaWriter(recording)));
+
+        Assert.Equal(Serialize(recording), Serialize(readBack));
+    }
+
+    private sealed class CountingReader : TextReader
+    {
+        private readonly StringReader inner;
+
+        public CountingReader(string text) => inner = new StringReader(text);
+
+        public int ReadCount { get; private set; }
+
+        public override int Peek()
+        {
+            return inner.Peek();
+        }
+
+        public override int Read()
+        {
+            ReadCount++;
+            return inner.Read();
+        }
+
+        public override string? ReadLine()
+        {
+            ReadCount++;
+            return inner.ReadLine();
+        }
+    }
 }

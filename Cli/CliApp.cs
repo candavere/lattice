@@ -1,7 +1,9 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Lattice.Agents;
+using Lattice.Cli.Presentation;
 using Lattice.Environment;
 using Lattice.Generator;
 using Lattice.Trajectories;
@@ -110,6 +112,14 @@ public static class CliApp
     {
         try
         {
+            // --quiet is a boolean switch: strip it before the key/value flag
+            // parser so it never demands a trailing value.
+            var quiet = args.Contains("--quiet", StringComparer.Ordinal);
+            if (quiet)
+            {
+                args = args.Where(arg => arg != "--quiet").ToArray();
+            }
+
             var (flags, positionals) = ParseFlags(args, "--seed", "--steps", "--agent", "--scenario", "--out");
             GuardNoPositionals(positionals);
             var seed = ParseULong(Require(flags, "--seed"), "--seed");
@@ -122,7 +132,7 @@ public static class CliApp
 
             if (scenario == InfiltrationScenario.ScenarioName)
             {
-                return SimulateInfiltration(flags, seed, steps, stdout, stderr);
+                return SimulateInfiltration(flags, seed, steps, quiet, stdout, stderr);
             }
 
             if (scenario.Length > 0)
@@ -145,11 +155,10 @@ public static class CliApp
                 _ => throw new ArgumentException(
                     $"invalid --agent '{agentText}' (expected 'greedy', 'random', or 'mcts')."),
             };
-            var scenarioResult = ScenarioRunner.Run(
-                map,
-                config,
-                new IAgent[] { agent0, new RandomAgent(1, new Rng(seed)) },
-                maxSteps: steps);
+            var contenders = new IAgent[] { agent0, new RandomAgent(1, new Rng(seed)) };
+            var stopwatch = Stopwatch.StartNew();
+            var scenarioResult = ScenarioRunner.Run(map, config, contenders, maxSteps: steps);
+            stopwatch.Stop();
 
             var jsonl = new StringBuilder();
             using (var sink = new StringWriter(jsonl))
@@ -162,7 +171,34 @@ public static class CliApp
                 $"recorded {scenarioResult.Metrics.TotalSteps} steps" +
                 $" ({(lastInfo.IsTerminal ? lastInfo.Reason : "budget-reached")}," +
                 $" winner: {(lastInfo.WinnerAgentId.HasValue ? $"agent {lastInfo.WinnerAgentId}" : "none")})");
-            return WriteOutput(flags, "--out", jsonl.ToString().TrimEnd(), stdout, stderr);
+
+            var trajectory = jsonl.ToString().TrimEnd();
+            var exit = WriteOutput(flags, "--out", trajectory, stdout, stderr);
+            if (!quiet)
+            {
+                var rows = scenarioResult.Metrics.Agents
+                    .Select(metrics => new AgentScoreboardRow(
+                        metrics.AgentId,
+                        "Collector",
+                        contenders[metrics.AgentId].GetType().Name,
+                        metrics.Score,
+                        GenericStatus(lastInfo, metrics.AgentId),
+                        metrics.Moves))
+                    .ToArray();
+                RenderDashboard(
+                    stderr,
+                    map,
+                    config,
+                    "collection skirmish",
+                    seed,
+                    scenarioResult,
+                    stopwatch.Elapsed.TotalMilliseconds,
+                    rows,
+                    flags.TryGetValue("--out", out var path) ? path : null,
+                    trajectory);
+            }
+
+            return exit;
         }
         catch (Exception ex)
         {
@@ -181,6 +217,7 @@ public static class CliApp
         Dictionary<string, string> flags,
         ulong seed,
         int steps,
+        bool quiet,
         TextWriter stdout,
         TextWriter stderr)
     {
@@ -189,7 +226,9 @@ public static class CliApp
             throw new ArgumentException("--agent cannot be used with --scenario infiltration (the roster is fixed: Sentry vs Infiltrator).");
         }
 
+        var stopwatch = Stopwatch.StartNew();
         var run = InfiltrationScenario.Run(seed, steps);
+        stopwatch.Stop();
 
         var jsonl = new StringBuilder();
         using (var sink = new StringWriter(jsonl))
@@ -209,7 +248,176 @@ public static class CliApp
             $"recorded {run.Base.Metrics.TotalSteps} steps" +
             $" ({(lastInfo.IsTerminal ? lastInfo.Reason : "budget-reached")}," +
             $" outcome: {run.Outcome.Status})");
-        return WriteOutput(flags, "--out", jsonl.ToString().TrimEnd(), stdout, stderr);
+
+        var trajectory = jsonl.ToString().TrimEnd();
+        var exit = WriteOutput(flags, "--out", trajectory, stdout, stderr);
+        if (!quiet)
+        {
+            var rows = new[]
+            {
+                new AgentScoreboardRow(
+                    InfiltrationScenario.SentryAgentId,
+                    InfiltrationScenario.SentryRole,
+                    nameof(SentryPatrolAgent),
+                    run.Sentry.Score,
+                    run.Outcome.Intercepted
+                        ? "Interception"
+                        : run.Outcome.Exfiltrated ? "Evaded" : "On Patrol",
+                    run.Sentry.Moves),
+                new AgentScoreboardRow(
+                    InfiltrationScenario.InfiltratorAgentId,
+                    InfiltrationScenario.InfiltratorRole,
+                    nameof(InfiltratorAgent),
+                    run.Infiltrator.Score,
+                    run.Outcome.Intercepted
+                        ? "Intercepted"
+                        : run.Outcome.Exfiltrated ? "Extracted" : "Active",
+                    run.Infiltrator.Moves),
+            };
+            RenderDashboard(
+                stderr,
+                run.Map,
+                run.Config,
+                "dungeon infiltration & sentry patrol",
+                seed,
+                run.Base,
+                stopwatch.Elapsed.TotalMilliseconds,
+                rows,
+                flags.TryGetValue("--out", out var path) ? path : null,
+                trajectory);
+        }
+
+        return exit;
+    }
+
+    /// <summary>
+    /// Builds the scoreboard status label for a generic (non-scenario) run:
+    /// Winner/Defeated on a decided terminal tick, Active otherwise.
+    /// </summary>
+    private static string GenericStatus(Info lastInfo, int agentId) =>
+        lastInfo.IsTerminal
+            ? !lastInfo.WinnerAgentId.HasValue
+                ? "Draw"
+                : lastInfo.WinnerAgentId.Value == agentId ? "Winner" : "Defeated"
+            : "Active";
+
+    /// <summary>
+    /// Emits the end-of-run ANSI dashboard to <paramref name="sink"/>: run
+    /// header, scoreboard, choke contention, and the output footer with file
+    /// size and replay-verified determinism status.
+    /// </summary>
+    private static void RenderDashboard(
+        TextWriter sink,
+        MapGraph map,
+        SimulationConfig config,
+        string scenarioLabel,
+        ulong seed,
+        ScenarioResult result,
+        double elapsedMilliseconds,
+        IReadOnlyList<AgentScoreboardRow> rows,
+        string? trajectoryPath,
+        string trajectory)
+    {
+        SimulationConsoleRenderer.RenderDashboard(
+            sink,
+            new RunHeaderInfo(
+                scenarioLabel,
+                seed,
+                map.Zones.Length,
+                result.Metrics.TotalSteps,
+                elapsedMilliseconds),
+            rows,
+            ComputeContention(map, config, result),
+            new OutputFooterInfo(
+                trajectoryPath,
+                trajectoryPath is null ? null : SimulationConsoleRenderer.ByteCount(trajectory) + 1,
+                VerifyDeterministicReplay(map, config, result)));
+    }
+
+    /// <summary>
+    /// Replays the recorded turns through the pure step function and checks
+    /// the final tick's info and agent states against the recorded results —
+    /// the engine-level guarantee that same inputs give byte-identical output.
+    /// </summary>
+    private static bool VerifyDeterministicReplay(MapGraph map, SimulationConfig config, ScenarioResult result)
+    {
+        var replay = SimulationDriver.Play(map, config, result.Turns);
+        if (replay.Count != result.Results.Length)
+        {
+            return false;
+        }
+
+        var replayed = replay[^1];
+        var recorded = result.Results[^1];
+        return replayed.Info.Equals(recorded.Info)
+            && replayed.Observations[0].AgentStates.SequenceEqual(recorded.Observations[0].AgentStates);
+    }
+
+    /// <summary>
+    /// Reconstructs per-choke contention from the recorded turns and results:
+    /// an attempt is a Move action across a choke edge by an agent free to
+    /// act; the attempt is denied when capacity gating left the agent in its
+    /// origin zone with no transit started.
+    /// </summary>
+    private static IReadOnlyList<ChokeContentionRow> ComputeContention(MapGraph map, SimulationConfig config, ScenarioResult result)
+    {
+        var stats = new Dictionary<(int Lo, int Hi), (int Capacity, int Attempts, int Denials)>();
+        var previous = Simulation.CreateInitial(map, config).Agents;
+
+        for (var tick = 0; tick < result.Results.Length; tick++)
+        {
+            var turn = result.Turns[tick];
+            var next = result.Results[tick].Observations[0].AgentStates;
+            for (var agentId = 0; agentId < turn.Length; agentId++)
+            {
+                var action = turn[agentId];
+                var before = previous[agentId];
+                if (action.Kind != ActionKind.Move || before.Transit is not null)
+                {
+                    continue;
+                }
+
+                var chokeIndex = FindChoke(map, before.ZoneId, action.ZoneId);
+                if (chokeIndex < 0)
+                {
+                    continue;
+                }
+
+                var key = (Math.Min(before.ZoneId, action.ZoneId), Math.Max(before.ZoneId, action.ZoneId));
+                stats.TryGetValue(key, out var entry);
+                var after = next[agentId];
+                var denied = after.ZoneId == before.ZoneId && after.Transit is null;
+                stats[key] = (map.ChokePoints[chokeIndex].MaxOccupancy, entry.Attempts + 1, entry.Denials + (denied ? 1 : 0));
+            }
+
+            previous = next;
+        }
+
+        return stats
+            .OrderBy(pair => pair.Key)
+            .Select(pair => new ChokeContentionRow(
+                pair.Key.Item1,
+                pair.Key.Item2,
+                pair.Value.Capacity,
+                pair.Value.Attempts,
+                pair.Value.Denials))
+            .ToArray();
+    }
+
+    /// <summary>The index of the choke connecting the two zones, or -1 when they are not adjacent.</summary>
+    private static int FindChoke(MapGraph map, int fromZone, int toZone)
+    {
+        for (var index = 0; index < map.ChokePoints.Length; index++)
+        {
+            var choke = map.ChokePoints[index];
+            if ((choke.FromZoneId == fromZone && choke.ToZoneId == toZone)
+                || (choke.ToZoneId == fromZone && choke.FromZoneId == toZone))
+            {
+                return index;
+            }
+        }
+
+        return -1;
     }
 
     private static int Render(string[] args, TextWriter stdout, TextWriter stderr)
@@ -450,10 +658,11 @@ public static class CliApp
         sink.WriteLine("  generate  --seed <ulong> [--min-fairness <0..1>] [--out <file>]");
         sink.WriteLine("            Generate a valid map (JSON) to stdout or file; with --min-fairness,");
         sink.WriteLine("            retry generation until the mirrored spawn-bias index meets the threshold");
-        sink.WriteLine("  simulate  --seed <ulong> [--steps <n>] [--agent greedy|random|mcts] [--out <file>]");
+        sink.WriteLine("  simulate  --seed <ulong> [--steps <n>] [--agent greedy|random|mcts] [--out <file>] [--quiet]");
         sink.WriteLine("            Record a greedy (default)-vs-random episode as trajectory JSONL;");
-        sink.WriteLine("            '--agent mcts' substitutes a rollout-based tactical agent for agent 0");
-        sink.WriteLine("  simulate  --seed <ulong> --scenario infiltration [--steps <n>] [--out <file>]");
+        sink.WriteLine("            '--agent mcts' substitutes a rollout-based tactical agent for agent 0;");
+        sink.WriteLine("            an ANSI run dashboard renders on stderr unless '--quiet' suppresses it");
+        sink.WriteLine("  simulate  --seed <ulong> --scenario infiltration [--steps <n>] [--out <file>] [--quiet]");
         sink.WriteLine("            Record a Dungeon Infiltration & Sentry Patrol episode: fix the roster to");
         sink.WriteLine("            a SentryPatrolAgent (guard) vs an InfiltratorAgent (rogue) on the gated");
         sink.WriteLine("            dungeon, with the trajectory header carrying the scenario + roster");

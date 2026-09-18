@@ -199,6 +199,49 @@ public class CliIntegrationTests
     }
 
     [Fact]
+    public void Simulate_RendersAnsiDashboardOnStderr()
+    {
+        var path = TempPath(".jsonl");
+        try
+        {
+            var (exit, stdout, stderr) = Run("simulate", "--seed", "9", "--steps", "20", "--out", path);
+
+            Assert.Equal(0, exit);
+            Assert.Equal("", stdout);
+            Assert.Contains("LATTICE SIMULATION RUN", stderr);
+            Assert.Contains("AGENT SCOREBOARD", stderr);
+            Assert.Contains("CHOKE CONTENTION", stderr);
+            Assert.Contains("byte-identical replay verified", stderr);
+            Assert.Contains("\u001b[", stderr); // ANSI decoration present when not quiet
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Simulate_Quiet_SuppressesDashboard()
+    {
+        var path = TempPath(".jsonl");
+        try
+        {
+            var (exit, stdout, stderr) = Run("simulate", "--seed", "9", "--steps", "20", "--out", path, "--quiet");
+
+            Assert.Equal(0, exit);
+            Assert.Equal("", stdout);
+            Assert.Contains("recorded", stderr);
+            Assert.DoesNotContain("LATTICE SIMULATION RUN", stderr);
+            Assert.DoesNotContain("\u001b[", stderr);
+            Assert.Contains("\"Kind\":\"header\"", File.ReadAllText(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void Simulate_InvalidSteps_NonZeroExit()
     {
         var (exit, _, stderr) = Run("simulate", "--seed", "1", "--steps", "zero");

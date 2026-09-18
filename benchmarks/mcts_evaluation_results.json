@@ -1,0 +1,1070 @@
+{
+  "CommitSha": "5783ca1",
+  "CreatedAtUtc": "2026-09-18T19:08:39.033225Z",
+  "Runtime": ".NET 10.0.10",
+  "Os": "macOS 27.0.0",
+  "Cores": 8,
+  "Architecture": "Arm64",
+  "Studies": [
+    {
+      "Suite": "dev",
+      "TargetPolicy": "MCTS",
+      "BaselinePolicy": "Scout",
+      "RolloutsPerAction": 32,
+      "MaxStepsPerMatch": 200,
+      "PerSeed": [
+        {
+          "Seed": 1001,
+          "PolicyScoreAtSeat0": 2,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 6,
+          "BaselineScoreAtSeat1": 2,
+          "MeanDelta": -1.5,
+          "Match0Outcome": 1,
+          "Match1Outcome": 1
+        },
+        {
+          "Seed": 1002,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 2,
+          "BaselineScoreAtSeat0": 3,
+          "BaselineScoreAtSeat1": 3,
+          "MeanDelta": -0.5,
+          "Match0Outcome": 2,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 1003,
+          "PolicyScoreAtSeat0": 1,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 6,
+          "BaselineScoreAtSeat1": 4,
+          "MeanDelta": -3,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 1004,
+          "PolicyScoreAtSeat0": 2,
+          "PolicyScoreAtSeat1": 2,
+          "BaselineScoreAtSeat0": 2,
+          "BaselineScoreAtSeat1": 2,
+          "MeanDelta": 0,
+          "Match0Outcome": 2,
+          "Match1Outcome": 2
+        },
+        {
+          "Seed": 1005,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 4,
+          "BaselineScoreAtSeat1": 3,
+          "MeanDelta": -0.5,
+          "Match0Outcome": 1,
+          "Match1Outcome": 2
+        },
+        {
+          "Seed": 1006,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 4,
+          "BaselineScoreAtSeat1": 6,
+          "MeanDelta": -3,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 1007,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 3,
+          "BaselineScoreAtSeat1": 3,
+          "MeanDelta": 0,
+          "Match0Outcome": 2,
+          "Match1Outcome": 2
+        },
+        {
+          "Seed": 1008,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 3,
+          "BaselineScoreAtSeat1": 5,
+          "MeanDelta": -2,
+          "Match0Outcome": 2,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 1009,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 2,
+          "BaselineScoreAtSeat1": 3,
+          "MeanDelta": -0.5,
+          "Match0Outcome": 0,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 1010,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 1,
+          "BaselineScoreAtSeat1": 4,
+          "MeanDelta": -0.5,
+          "Match0Outcome": 0,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 1011,
+          "PolicyScoreAtSeat0": 2,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 6,
+          "BaselineScoreAtSeat1": 2,
+          "MeanDelta": -1.5,
+          "Match0Outcome": 1,
+          "Match1Outcome": 1
+        },
+        {
+          "Seed": 1012,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 7,
+          "BaselineScoreAtSeat1": 3,
+          "MeanDelta": -2,
+          "Match0Outcome": 1,
+          "Match1Outcome": 2
+        },
+        {
+          "Seed": 1013,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 4,
+          "BaselineScoreAtSeat1": 4,
+          "MeanDelta": -1,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 1014,
+          "PolicyScoreAtSeat0": 2,
+          "PolicyScoreAtSeat1": 2,
+          "BaselineScoreAtSeat0": 2,
+          "BaselineScoreAtSeat1": 2,
+          "MeanDelta": 0,
+          "Match0Outcome": 2,
+          "Match1Outcome": 2
+        },
+        {
+          "Seed": 1015,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 1,
+          "BaselineScoreAtSeat1": 3,
+          "MeanDelta": 0,
+          "Match0Outcome": 0,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 1016,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 5,
+          "BaselineScoreAtSeat1": 5,
+          "MeanDelta": -2,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 1017,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 4,
+          "BaselineScoreAtSeat1": 3,
+          "MeanDelta": -1.5,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 1018,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 3,
+          "BaselineScoreAtSeat1": 3,
+          "MeanDelta": 0,
+          "Match0Outcome": 2,
+          "Match1Outcome": 2
+        },
+        {
+          "Seed": 1019,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 3,
+          "BaselineScoreAtSeat1": 5,
+          "MeanDelta": -1,
+          "Match0Outcome": 2,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 1020,
+          "PolicyScoreAtSeat0": 2,
+          "PolicyScoreAtSeat1": 2,
+          "BaselineScoreAtSeat0": 2,
+          "BaselineScoreAtSeat1": 3,
+          "MeanDelta": -0.5,
+          "Match0Outcome": 2,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 1021,
+          "PolicyScoreAtSeat0": 2,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 5,
+          "BaselineScoreAtSeat1": 4,
+          "MeanDelta": -2,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 1022,
+          "PolicyScoreAtSeat0": 1,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 3,
+          "BaselineScoreAtSeat1": 1,
+          "MeanDelta": -1,
+          "Match0Outcome": 1,
+          "Match1Outcome": 2
+        },
+        {
+          "Seed": 1023,
+          "PolicyScoreAtSeat0": 2,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 4,
+          "BaselineScoreAtSeat1": 3,
+          "MeanDelta": -1,
+          "Match0Outcome": 1,
+          "Match1Outcome": 2
+        },
+        {
+          "Seed": 1024,
+          "PolicyScoreAtSeat0": 2,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 1,
+          "BaselineScoreAtSeat1": 2,
+          "MeanDelta": 0,
+          "Match0Outcome": 0,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 1025,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 4,
+          "BaselineScoreAtSeat1": 4,
+          "MeanDelta": -1,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 1026,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 2,
+          "BaselineScoreAtSeat0": 2,
+          "BaselineScoreAtSeat1": 5,
+          "MeanDelta": -1,
+          "Match0Outcome": 0,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 1027,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 1,
+          "BaselineScoreAtSeat1": 5,
+          "MeanDelta": -1,
+          "Match0Outcome": 0,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 1028,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 5,
+          "BaselineScoreAtSeat1": 3,
+          "MeanDelta": -1,
+          "Match0Outcome": 1,
+          "Match1Outcome": 2
+        },
+        {
+          "Seed": 1029,
+          "PolicyScoreAtSeat0": 2,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 4,
+          "BaselineScoreAtSeat1": 3,
+          "MeanDelta": -1,
+          "Match0Outcome": 1,
+          "Match1Outcome": 2
+        },
+        {
+          "Seed": 1030,
+          "PolicyScoreAtSeat0": 2,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 4,
+          "BaselineScoreAtSeat1": 2,
+          "MeanDelta": -0.5,
+          "Match0Outcome": 1,
+          "Match1Outcome": 1
+        },
+        {
+          "Seed": 1031,
+          "PolicyScoreAtSeat0": 1,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 7,
+          "BaselineScoreAtSeat1": 4,
+          "MeanDelta": -3.5,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 1032,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 2,
+          "BaselineScoreAtSeat0": 4,
+          "BaselineScoreAtSeat1": 3,
+          "MeanDelta": -1,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 1033,
+          "PolicyScoreAtSeat0": 2,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 4,
+          "BaselineScoreAtSeat1": 2,
+          "MeanDelta": -0.5,
+          "Match0Outcome": 1,
+          "Match1Outcome": 1
+        },
+        {
+          "Seed": 1034,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 2,
+          "BaselineScoreAtSeat1": 4,
+          "MeanDelta": -1,
+          "Match0Outcome": 0,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 1035,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 2,
+          "BaselineScoreAtSeat0": 4,
+          "BaselineScoreAtSeat1": 5,
+          "MeanDelta": -2,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 1036,
+          "PolicyScoreAtSeat0": 2,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 5,
+          "BaselineScoreAtSeat1": 4,
+          "MeanDelta": -2,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 1037,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 2,
+          "BaselineScoreAtSeat0": 5,
+          "BaselineScoreAtSeat1": 3,
+          "MeanDelta": -1.5,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 1038,
+          "PolicyScoreAtSeat0": 2,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 4,
+          "BaselineScoreAtSeat1": 3,
+          "MeanDelta": -1,
+          "Match0Outcome": 1,
+          "Match1Outcome": 2
+        },
+        {
+          "Seed": 1039,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 5,
+          "BaselineScoreAtSeat1": 3,
+          "MeanDelta": -1,
+          "Match0Outcome": 1,
+          "Match1Outcome": 2
+        },
+        {
+          "Seed": 1040,
+          "PolicyScoreAtSeat0": 2,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 1,
+          "BaselineScoreAtSeat1": 2,
+          "MeanDelta": 0,
+          "Match0Outcome": 0,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 1041,
+          "PolicyScoreAtSeat0": 2,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 2,
+          "BaselineScoreAtSeat1": 2,
+          "MeanDelta": -0.5,
+          "Match0Outcome": 2,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 1042,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 4,
+          "BaselineScoreAtSeat1": 3,
+          "MeanDelta": -0.5,
+          "Match0Outcome": 1,
+          "Match1Outcome": 2
+        },
+        {
+          "Seed": 1043,
+          "PolicyScoreAtSeat0": 2,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 2,
+          "BaselineScoreAtSeat1": 3,
+          "MeanDelta": -1,
+          "Match0Outcome": 2,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 1044,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 2,
+          "BaselineScoreAtSeat1": 3,
+          "MeanDelta": -0.5,
+          "Match0Outcome": 0,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 1045,
+          "PolicyScoreAtSeat0": 2,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 1,
+          "BaselineScoreAtSeat1": 6,
+          "MeanDelta": -2,
+          "Match0Outcome": 0,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 1046,
+          "PolicyScoreAtSeat0": 2,
+          "PolicyScoreAtSeat1": 2,
+          "BaselineScoreAtSeat0": 2,
+          "BaselineScoreAtSeat1": 2,
+          "MeanDelta": 0,
+          "Match0Outcome": 2,
+          "Match1Outcome": 2
+        },
+        {
+          "Seed": 1047,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 2,
+          "BaselineScoreAtSeat0": 5,
+          "BaselineScoreAtSeat1": 6,
+          "MeanDelta": -3,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 1048,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 1,
+          "BaselineScoreAtSeat1": 6,
+          "MeanDelta": -1.5,
+          "Match0Outcome": 0,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 1049,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 6,
+          "BaselineScoreAtSeat1": 3,
+          "MeanDelta": -1.5,
+          "Match0Outcome": 1,
+          "Match1Outcome": 2
+        },
+        {
+          "Seed": 1050,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 3,
+          "BaselineScoreAtSeat1": 6,
+          "MeanDelta": -1.5,
+          "Match0Outcome": 2,
+          "Match1Outcome": 0
+        }
+      ],
+      "Statistics": {
+        "Seeds": 50,
+        "Matches": 100,
+        "MeanDelta": -1.12,
+        "MedianDelta": -1,
+        "StdDevDelta": 0.8663788114317885,
+        "IqrDelta": 1,
+        "CiLower95": -1.366219438210143,
+        "CiUpper95": -0.8737805617898573,
+        "Wins": 15,
+        "Draws": 27,
+        "Losses": 58,
+        "Timeouts": 0,
+        "WinRate": 0.15,
+        "DrawRate": 0.27,
+        "LossRate": 0.58,
+        "TimeoutRate": 0,
+        "MeanContentionSaturation": 0
+      },
+      "Passed": false,
+      "Decision": "Fail: mean paired delta -1.12 and/or the 95% CI lower bound -1.366 did not clear 0 on 50 seeds."
+    },
+    {
+      "Suite": "heldout",
+      "TargetPolicy": "MCTS",
+      "BaselinePolicy": "Scout",
+      "RolloutsPerAction": 32,
+      "MaxStepsPerMatch": 200,
+      "PerSeed": [
+        {
+          "Seed": 2001,
+          "PolicyScoreAtSeat0": 1,
+          "PolicyScoreAtSeat1": 2,
+          "BaselineScoreAtSeat0": 3,
+          "BaselineScoreAtSeat1": 2,
+          "MeanDelta": -1,
+          "Match0Outcome": 1,
+          "Match1Outcome": 2
+        },
+        {
+          "Seed": 2002,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 1,
+          "BaselineScoreAtSeat1": 3,
+          "MeanDelta": 0,
+          "Match0Outcome": 0,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 2003,
+          "PolicyScoreAtSeat0": 2,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 4,
+          "BaselineScoreAtSeat1": 5,
+          "MeanDelta": -3,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 2004,
+          "PolicyScoreAtSeat0": 1,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 3,
+          "BaselineScoreAtSeat1": 1,
+          "MeanDelta": -1,
+          "Match0Outcome": 1,
+          "Match1Outcome": 2
+        },
+        {
+          "Seed": 2005,
+          "PolicyScoreAtSeat0": 2,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 5,
+          "BaselineScoreAtSeat1": 2,
+          "MeanDelta": -1,
+          "Match0Outcome": 1,
+          "Match1Outcome": 1
+        },
+        {
+          "Seed": 2006,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 2,
+          "BaselineScoreAtSeat1": 4,
+          "MeanDelta": -1,
+          "Match0Outcome": 0,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 2007,
+          "PolicyScoreAtSeat0": 2,
+          "PolicyScoreAtSeat1": 2,
+          "BaselineScoreAtSeat0": 2,
+          "BaselineScoreAtSeat1": 2,
+          "MeanDelta": 0,
+          "Match0Outcome": 2,
+          "Match1Outcome": 2
+        },
+        {
+          "Seed": 2008,
+          "PolicyScoreAtSeat0": 2,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 3,
+          "BaselineScoreAtSeat1": 2,
+          "MeanDelta": 0,
+          "Match0Outcome": 1,
+          "Match1Outcome": 1
+        },
+        {
+          "Seed": 2009,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 2,
+          "BaselineScoreAtSeat1": 3,
+          "MeanDelta": -0.5,
+          "Match0Outcome": 0,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 2010,
+          "PolicyScoreAtSeat0": 2,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 3,
+          "BaselineScoreAtSeat1": 2,
+          "MeanDelta": -1,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 2011,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 3,
+          "BaselineScoreAtSeat1": 6,
+          "MeanDelta": -1.5,
+          "Match0Outcome": 2,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 2012,
+          "PolicyScoreAtSeat0": 2,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 3,
+          "BaselineScoreAtSeat1": 2,
+          "MeanDelta": 0,
+          "Match0Outcome": 1,
+          "Match1Outcome": 1
+        },
+        {
+          "Seed": 2013,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 3,
+          "BaselineScoreAtSeat1": 3,
+          "MeanDelta": 0,
+          "Match0Outcome": 2,
+          "Match1Outcome": 2
+        },
+        {
+          "Seed": 2014,
+          "PolicyScoreAtSeat0": 1,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 4,
+          "BaselineScoreAtSeat1": 1,
+          "MeanDelta": -1.5,
+          "Match0Outcome": 1,
+          "Match1Outcome": 2
+        },
+        {
+          "Seed": 2015,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 4,
+          "BaselineScoreAtSeat1": 6,
+          "MeanDelta": -3,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 2016,
+          "PolicyScoreAtSeat0": 1,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 6,
+          "BaselineScoreAtSeat1": 1,
+          "MeanDelta": -1.5,
+          "Match0Outcome": 1,
+          "Match1Outcome": 1
+        },
+        {
+          "Seed": 2017,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 4,
+          "BaselineScoreAtSeat1": 3,
+          "MeanDelta": -0.5,
+          "Match0Outcome": 1,
+          "Match1Outcome": 2
+        },
+        {
+          "Seed": 2018,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 2,
+          "BaselineScoreAtSeat0": 5,
+          "BaselineScoreAtSeat1": 6,
+          "MeanDelta": -3,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 2019,
+          "PolicyScoreAtSeat0": 2,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 1,
+          "BaselineScoreAtSeat1": 2,
+          "MeanDelta": 0,
+          "Match0Outcome": 0,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 2020,
+          "PolicyScoreAtSeat0": 2,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 4,
+          "BaselineScoreAtSeat1": 2,
+          "MeanDelta": -0.5,
+          "Match0Outcome": 1,
+          "Match1Outcome": 1
+        },
+        {
+          "Seed": 2021,
+          "PolicyScoreAtSeat0": 1,
+          "PolicyScoreAtSeat1": 2,
+          "BaselineScoreAtSeat0": 2,
+          "BaselineScoreAtSeat1": 1,
+          "MeanDelta": 0,
+          "Match0Outcome": 1,
+          "Match1Outcome": 1
+        },
+        {
+          "Seed": 2022,
+          "PolicyScoreAtSeat0": 2,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 3,
+          "BaselineScoreAtSeat1": 4,
+          "MeanDelta": -2,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 2023,
+          "PolicyScoreAtSeat0": 2,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 6,
+          "BaselineScoreAtSeat1": 5,
+          "MeanDelta": -3,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 2024,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 6,
+          "BaselineScoreAtSeat1": 4,
+          "MeanDelta": -2,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 2025,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 6,
+          "BaselineScoreAtSeat1": 6,
+          "MeanDelta": -3,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 2026,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 2,
+          "BaselineScoreAtSeat1": 3,
+          "MeanDelta": -0.5,
+          "Match0Outcome": 0,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 2027,
+          "PolicyScoreAtSeat0": 1,
+          "PolicyScoreAtSeat1": 2,
+          "BaselineScoreAtSeat0": 2,
+          "BaselineScoreAtSeat1": 1,
+          "MeanDelta": 0,
+          "Match0Outcome": 1,
+          "Match1Outcome": 1
+        },
+        {
+          "Seed": 2028,
+          "PolicyScoreAtSeat0": 1,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 3,
+          "BaselineScoreAtSeat1": 4,
+          "MeanDelta": -1.5,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 2029,
+          "PolicyScoreAtSeat0": 1,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 6,
+          "BaselineScoreAtSeat1": 4,
+          "MeanDelta": -3,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 2030,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 4,
+          "BaselineScoreAtSeat1": 6,
+          "MeanDelta": -3,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 2031,
+          "PolicyScoreAtSeat0": 1,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 2,
+          "BaselineScoreAtSeat1": 2,
+          "MeanDelta": -1,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 2032,
+          "PolicyScoreAtSeat0": 1,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 1,
+          "BaselineScoreAtSeat1": 2,
+          "MeanDelta": -0.5,
+          "Match0Outcome": 2,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 2033,
+          "PolicyScoreAtSeat0": 1,
+          "PolicyScoreAtSeat1": 2,
+          "BaselineScoreAtSeat0": 2,
+          "BaselineScoreAtSeat1": 3,
+          "MeanDelta": -1,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 2034,
+          "PolicyScoreAtSeat0": 1,
+          "PolicyScoreAtSeat1": 2,
+          "BaselineScoreAtSeat0": 2,
+          "BaselineScoreAtSeat1": 1,
+          "MeanDelta": 0,
+          "Match0Outcome": 1,
+          "Match1Outcome": 1
+        },
+        {
+          "Seed": 2035,
+          "PolicyScoreAtSeat0": 2,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 6,
+          "BaselineScoreAtSeat1": 2,
+          "MeanDelta": -1.5,
+          "Match0Outcome": 1,
+          "Match1Outcome": 1
+        },
+        {
+          "Seed": 2036,
+          "PolicyScoreAtSeat0": 2,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 3,
+          "BaselineScoreAtSeat1": 2,
+          "MeanDelta": 0,
+          "Match0Outcome": 1,
+          "Match1Outcome": 1
+        },
+        {
+          "Seed": 2037,
+          "PolicyScoreAtSeat0": 1,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 3,
+          "BaselineScoreAtSeat1": 3,
+          "MeanDelta": -2,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 2038,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 2,
+          "BaselineScoreAtSeat0": 4,
+          "BaselineScoreAtSeat1": 5,
+          "MeanDelta": -2,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 2039,
+          "PolicyScoreAtSeat0": 2,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 5,
+          "BaselineScoreAtSeat1": 4,
+          "MeanDelta": -2,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 2040,
+          "PolicyScoreAtSeat0": 1,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 4,
+          "BaselineScoreAtSeat1": 4,
+          "MeanDelta": -3,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 2041,
+          "PolicyScoreAtSeat0": 1,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 4,
+          "BaselineScoreAtSeat1": 1,
+          "MeanDelta": -1.5,
+          "Match0Outcome": 1,
+          "Match1Outcome": 2
+        },
+        {
+          "Seed": 2042,
+          "PolicyScoreAtSeat0": 1,
+          "PolicyScoreAtSeat1": 2,
+          "BaselineScoreAtSeat0": 2,
+          "BaselineScoreAtSeat1": 3,
+          "MeanDelta": -1,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 2043,
+          "PolicyScoreAtSeat0": 2,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 4,
+          "BaselineScoreAtSeat1": 3,
+          "MeanDelta": -1,
+          "Match0Outcome": 1,
+          "Match1Outcome": 2
+        },
+        {
+          "Seed": 2044,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 2,
+          "BaselineScoreAtSeat0": 2,
+          "BaselineScoreAtSeat1": 3,
+          "MeanDelta": 0,
+          "Match0Outcome": 0,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 2045,
+          "PolicyScoreAtSeat0": 1,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 3,
+          "BaselineScoreAtSeat1": 2,
+          "MeanDelta": -0.5,
+          "Match0Outcome": 1,
+          "Match1Outcome": 1
+        },
+        {
+          "Seed": 2046,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 1,
+          "BaselineScoreAtSeat0": 5,
+          "BaselineScoreAtSeat1": 3,
+          "MeanDelta": -2,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 2047,
+          "PolicyScoreAtSeat0": 1,
+          "PolicyScoreAtSeat1": 2,
+          "BaselineScoreAtSeat0": 4,
+          "BaselineScoreAtSeat1": 1,
+          "MeanDelta": -1,
+          "Match0Outcome": 1,
+          "Match1Outcome": 1
+        },
+        {
+          "Seed": 2048,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 3,
+          "BaselineScoreAtSeat0": 5,
+          "BaselineScoreAtSeat1": 3,
+          "MeanDelta": -1,
+          "Match0Outcome": 1,
+          "Match1Outcome": 2
+        },
+        {
+          "Seed": 2049,
+          "PolicyScoreAtSeat0": 3,
+          "PolicyScoreAtSeat1": 2,
+          "BaselineScoreAtSeat0": 3,
+          "BaselineScoreAtSeat1": 4,
+          "MeanDelta": -1,
+          "Match0Outcome": 2,
+          "Match1Outcome": 0
+        },
+        {
+          "Seed": 2050,
+          "PolicyScoreAtSeat0": 1,
+          "PolicyScoreAtSeat1": 2,
+          "BaselineScoreAtSeat0": 4,
+          "BaselineScoreAtSeat1": 4,
+          "MeanDelta": -2.5,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        }
+      ],
+      "Statistics": {
+        "Seeds": 50,
+        "Matches": 100,
+        "MeanDelta": -1.25,
+        "MedianDelta": -1,
+        "StdDevDelta": 1.0214535461482208,
+        "IqrDelta": 1.5,
+        "CiLower95": -1.540290707681018,
+        "CiUpper95": -0.959709292318982,
+        "Wins": 18,
+        "Draws": 14,
+        "Losses": 68,
+        "Timeouts": 0,
+        "WinRate": 0.18,
+        "DrawRate": 0.14,
+        "LossRate": 0.68,
+        "TimeoutRate": 0,
+        "MeanContentionSaturation": 0
+      },
+      "Passed": false,
+      "Decision": "Fail: mean paired delta -1.25 and/or the 95% CI lower bound -1.54 did not clear 0 on 50 seeds."
+    }
+  ]
+}

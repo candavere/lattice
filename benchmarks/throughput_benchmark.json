@@ -1,0 +1,25 @@
+{
+  "CommitSha": "5783ca1",
+  "CpuModel": "Apple M1",
+  "CreatedAtUtc": "2026-09-18T19:08:52.253128Z",
+  "Runtime": ".NET 10.0.10",
+  "Os": "macOS 27.0.0",
+  "Cores": 8,
+  "Architecture": "Arm64",
+  "Report": {
+    "Runs": 5,
+    "Ticks": 200000,
+    "TotalTicks": 1000000,
+    "WarmupTicks": 50000,
+    "MeanStepsPerSecond": 2961498.2162282346,
+    "MinStepsPerSecond": 857862.8491769879,
+    "MaxStepsPerSecond": 3521920.432773583,
+    "StdDevStepsPerSecond": 1176173.8112205653,
+    "TotalElapsedMs": 462.54339999999996,
+    "AllocatedBytes": 1000001304,
+    "BytesPerTick": 1000.001304,
+    "GcGen0": 160,
+    "GcGen1": 0,
+    "GcGen2": 0
+  }
+}

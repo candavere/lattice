@@ -11,24 +11,28 @@
     infiltration: { url: './infiltration.jsonl', name: 'infiltration.jsonl', staticSvg: './infiltration.svg', caption: 'Seed 42, Dungeon Infiltration & Sentry Patrol: the Infiltrator raids the Treasure Vault under a patrolling Sentry. Recorded with lattice simulate --scenario infiltration and rendered as an animated SVG with lattice render --format svg.' },
   };
   const UNLIMITED = 2147483647; // MapLimits.Unlimited, as serialized by the writer
-  const TRANSIT_FRACTION = 0.5;  // where a transiting token is drawn between its endpoints
 
   const AGENT_PALETTE = ['#F7768E', '#BB9AF7', '#73DACA', '#FF9E64'];
+  const SENTRY_COLOR = '#ff5252';
+  const INFILTRATOR_COLOR = '#7c4dff';
 
   const COLORS = {
-    edge: '#8A8678',
-    edgeAtBurst: '#F6C177',
-    zoneFill: '#10131F',
-    zoneStroke: '#7AA2F7',
-    zoneText: '#C0CAF5',
+    corridor: '#4A5878',
+    corridorHot: '#F6C177',
+    roomFill: '#1a1f2c',
+    roomStroke: '#7AA2F7',
+    roomText: '#C0CAF5',
     mutedText: '#94A3B8',
     unclaimed: '#E0AF68',
     claimed: '#3DA66B',
     agentRim: '#FFFFFF',
     transitRing: '#F6C177',
-    badgeBg: '#16233F',
-    badgeText: '#E2E8F0',
-    telltale: 'rgba(15, 23, 42, 0.55)',
+    gateBg: '#16233F',
+    gateText: '#E2E8F0',
+    sentry: SENTRY_COLOR,
+    infiltrator: INFILTRATOR_COLOR,
+    perception: 'rgba(255, 82, 82, 0.55)',
+    extraction: '#40C4FF',
   };
 
   /* ---------------------------------------------------------------- DOM  */
@@ -235,22 +239,26 @@
     };
     const allZero = zones.length > 0 && zones.every(function (z) { return isZero(z.Position); });
 
-    if (allZero) {
-      const cx = dom.canvas.clientWidth / 2;
-      const cy = dom.canvas.clientHeight / 2;
-      const radius = Math.min(cx, cy) * 0.7;
+    // Missing or clustered coordinates collapse the map onto a point; fall
+    // back to a structured multi-row tactical grid so corridors connect
+    // cleanly without diagonal crisscrossing.
+    let clustered = allZero;
+    const seen = {};
+    zones.forEach(function (z) {
+      if (!hasPosition(z.Position)) { clustered = true; return; }
+      const key = z.Position.X + ':' + z.Position.Y;
+      if (seen[key]) clustered = true;
+      seen[key] = true;
+    });
+
+    if (clustered) {
+      const cols = Math.max(1, Math.ceil(Math.sqrt(zones.length)));
       zones.forEach(function (zone, idx) {
-        const angle = (2 * Math.PI * idx) / zones.length - Math.PI / 2;
-        zone.Position = {
-          X: Math.round(cx + radius * Math.cos(angle)),
-          Y: Math.round(cy + radius * Math.sin(angle)),
-        };
+        zone.Position = { X: (idx % cols) * 4, Y: Math.floor(idx / cols) * 4 };
       });
-      resources.forEach(function (res, idx) {
-        res.Position = {
-          X: zones[res.ZoneId % zones.length].Position.X,
-          Y: zones[res.ZoneId % zones.length].Position.Y,
-        };
+      resources.forEach(function (res) {
+        const home = zones[res.ZoneId % zones.length].Position;
+        res.Position = { X: home.X, Y: home.Y };
       });
     }
 
@@ -288,9 +296,7 @@
     state.layout = {
       minX: minX, minY: minY, spanX: spanX, spanY: spanY, s: s, offX: offX, offY: offY,
       w: w, h: h,
-      rZone: Math.max(9, 12 * s / 20),
-      rAgent: Math.max(6, 7 * s / 20),
-      rRes: Math.max(3, 5 * s / 20),
+      rAgent: Math.max(7, Math.min(11, 9 * s / 60)),
     };
     return state.layout;
   }
@@ -341,101 +347,181 @@
     return edges;
   }
 
+  /* A room is a rounded rectangle centered on its zone anchor; corridors are
+     trimmed to the room borders so lines never pierce the cards. */
+
+  const ROOM_HEIGHT = 52;
+  const ROOM_MIN_WIDTH = 78;
+
+  function roomLabel(zone) {
+    return zone.Role ? spaceCamel(zone.Role) : 'Room ' + zone.Id;
+  }
+
+  function spaceCamel(text) {
+    return String(text).replace(/([a-z])([A-Z])/g, '$1 $2');
+  }
+
+  function roomRect(zone, layout) {
+    const center = px(zone.Position, layout);
+    const width = Math.max(ROOM_MIN_WIDTH, roomLabel(zone).length * 7.4 + 26);
+    return { x: center.x, y: center.y, hw: width / 2, hh: ROOM_HEIGHT / 2 };
+  }
+
+  // Where the segment between two room centers enters/leaves each room rect.
+  function corridorEndpoints(aRect, bRect) {
+    const dx = bRect.x - aRect.x;
+    const dy = bRect.y - aRect.y;
+    if (dx === 0 && dy === 0) return null;
+    const trimA = Math.min(aRect.hw / Math.max(1e-6, Math.abs(dx)), aRect.hh / Math.max(1e-6, Math.abs(dy)), 1);
+    const trimB = Math.min(bRect.hw / Math.max(1e-6, Math.abs(dx)), bRect.hh / Math.max(1e-6, Math.abs(dy)), 1);
+    return {
+      ax: aRect.x + dx * trimA, ay: aRect.y + dy * trimA,
+      bx: bRect.x - dx * trimB, by: bRect.y - dy * trimB,
+    };
+  }
+
+  function roundedRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.arcTo(x + w, y, x + w, y + r, r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+    ctx.lineTo(x + r, y + h);
+    ctx.arcTo(x, y + h, x, y + h - r, r);
+    ctx.lineTo(x, y + r);
+    ctx.arcTo(x, y, x + r, y, r);
+    ctx.closePath();
+  }
+
+  // The engine's transit cost, mirrored: ceil(manhattan distance / speed).
+  function transitTotalTicks(map, cfg, fromZoneId, toZoneId) {
+    const speed = cfg && typeof cfg.TransitSpeed === 'number' ? cfg.TransitSpeed : 8;
+    if (speed <= 0) return 1;
+    const a = map.Zones[fromZoneId].Position;
+    const b = map.Zones[toZoneId].Position;
+    const distance = Math.abs(a.X - b.X) + Math.abs(a.Y - b.Y);
+    return Math.max(1, Math.ceil(distance / speed));
+  }
+
   function drawEdges(ctx, map, frame, zoneById, layout) {
     const burst = transitEdges(frame);
 
     map.ChokePoints.forEach(function (choke) {
-      const from = zoneById[choke.FromZoneId];
-      const to = zoneById[choke.ToZoneId];
-      if (!from || !to) return;
-      const a = px(from, layout);
-      const b = px(to, layout);
+      const zoneA = map.Zones[choke.FromZoneId];
+      const zoneB = map.Zones[choke.ToZoneId];
+      if (!zoneA || !zoneB) return;
+      const ends = corridorEndpoints(roomRect(zoneA, layout), roomRect(zoneB, layout));
+      if (!ends) return;
       const hot = burst[edgeKey(choke.FromZoneId, choke.ToZoneId)];
       const limited = choke.MaxOccupancy !== UNLIMITED && choke.MaxOccupancy < UNLIMITED;
 
       ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
-      ctx.strokeStyle = hot ? COLORS.edgeAtBurst : COLORS.edge;
-      ctx.lineWidth = hot ? 5 : (limited ? 3 : 2.5);
-      ctx.setLineDash([]);
-      if (limited && !hot) { ctx.setLineDash([7, 6]); }
+      ctx.moveTo(ends.ax, ends.ay);
+      ctx.lineTo(ends.bx, ends.by);
+      ctx.strokeStyle = hot ? COLORS.corridorHot : COLORS.corridor;
+      ctx.lineWidth = hot ? 4 : 2.5;
+      ctx.setLineDash(limited && !hot ? [7, 6] : []);
       ctx.lineCap = 'round';
       ctx.stroke();
       ctx.setLineDash([]);
 
+      // Gate badge: a compact capsule on the corridor, never a circle that
+      // could be mistaken for a room.
       if (limited) {
-        const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-        ctx.fillStyle = COLORS.badgeBg;
-        ctx.strokeStyle = COLORS.edge;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(mid.x, mid.y, layout.rRes + 4, 0, Math.PI * 2);
+        const midX = (ends.ax + ends.bx) / 2;
+        const midY = (ends.ay + ends.by) / 2;
+        const label = choke.MaxOccupancy === 0 ? 'LOCKED' : 'CAP ' + choke.MaxOccupancy;
+        const bw = label.length * 6.4 + 14;
+        roundedRect(ctx, midX - bw / 2, midY - 9, bw, 18, 9);
+        ctx.fillStyle = COLORS.gateBg;
         ctx.fill();
+        ctx.strokeStyle = hot ? COLORS.corridorHot : COLORS.corridor;
+        ctx.lineWidth = 1;
         ctx.stroke();
-        ctx.fillStyle = hot ? COLORS.edgeAtBurst : COLORS.zoneText;
-        ctx.font = 'bold 10px ' + 'monospace';
+        ctx.fillStyle = hot ? COLORS.corridorHot : COLORS.gateText;
+        ctx.font = 'bold 9px monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(String(choke.MaxOccupancy), mid.x, mid.y);
+        ctx.fillText(label, midX, midY + 0.5);
 
         if (choke.Role) {
-          ctx.font = '7px ' + 'monospace';
+          ctx.font = '8px monospace';
           ctx.fillStyle = COLORS.mutedText;
-          ctx.fillText(choke.Role, mid.x, mid.y + layout.rRes + 11);
+          ctx.fillText(spaceCamel(choke.Role), midX, midY + 17);
         }
       }
     });
   }
 
+  // Loot sits inside its room; never floating in open canvas space. The
+  // caller passes the current claim set so claimed items dim to green.
   function drawResources(ctx, map, frame, layout) {
     const claimed = {};
     frame.claims.forEach(function (id) { claimed[id] = true; });
+
+    const byZone = {};
     map.Resources.forEach(function (res) {
-      const p = px(res.Position, layout);
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, layout.rRes, 0, Math.PI * 2);
-      ctx.fillStyle = claimed[res.Id] ? COLORS.claimed : COLORS.unclaimed;
-      ctx.fill();
+      if (!byZone[res.ZoneId]) byZone[res.ZoneId] = [];
+      byZone[res.ZoneId].push(res);
     });
+
+    map.Zones.forEach(function (zone) {
+      const items = byZone[zone.Id];
+      if (!items || !items.length) return;
+      const rect = roomRect(zone, layout);
+      const y = rect.y + rect.hh - 8;
+      const spacing = 14;
+      // Anchor the loot row to the room's lower-left corner so it never
+      // collides with the centered agent tokens and score labels.
+      const startX = rect.x - rect.hw + 9;
+      items.forEach(function (res, i) {
+        drawDiamond(ctx, startX + i * spacing, y, 5, claimed[res.Id] ? COLORS.claimed : COLORS.unclaimed);
+      });
+    });
+  }
+
+  function drawDiamond(ctx, x, y, r, color) {
+    ctx.beginPath();
+    ctx.moveTo(x, y - r);
+    ctx.lineTo(x + r * 0.72, y);
+    ctx.lineTo(x, y + r);
+    ctx.lineTo(x - r * 0.72, y);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
   }
 
   function drawZones(ctx, map, zoneById, layout) {
     const occupied = zoneCounts(map, state.trajectory.frames[state.index]);
-    const available = zoneUnclaimed(map, state.trajectory.frames[state.index]);
 
     map.Zones.forEach(function (zone) {
-      const p = px(zone.Position, layout);
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, layout.rZone, 0, Math.PI * 2);
-      ctx.fillStyle = COLORS.zoneFill;
+      const rect = roomRect(zone, layout);
+      roundedRect(ctx, rect.x - rect.hw, rect.y - rect.hh, rect.hw * 2, rect.hh * 2, 9);
+      ctx.fillStyle = COLORS.roomFill;
       ctx.fill();
-      ctx.strokeStyle = COLORS.zoneStroke;
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = COLORS.roomStroke;
+      ctx.lineWidth = 1.6;
       ctx.stroke();
 
-      ctx.fillStyle = COLORS.zoneText;
-      ctx.font = '13px ' + 'monospace';
+      // Room title strip.
+      ctx.fillStyle = COLORS.roomText;
+      ctx.font = 'bold 11px monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(String(zone.Id), p.x, p.y);
+      ctx.fillText(roomLabel(zone), rect.x, rect.y - 6);
 
-      const top = p.y - layout.rZone - 8;
-      ctx.textAlign = 'center';
-      const n = occupied[zone.Id] || 0;
-      const r = available[zone.Id] || 0;
-      ctx.font = '10px ' + 'monospace';
-      ctx.fillStyle = COLORS.zoneText;
-      ctx.fillText('ρ' + n, p.x, top);
-      ctx.font = '9px ' + 'monospace';
-      ctx.fillStyle = COLORS.unclaimed;
-      ctx.fillText('◆' + (r > 0 ? '' + r : ''), p.x, top + 12);
-
-      if (zone.Role) {
-        ctx.font = '8px ' + 'monospace';
-        ctx.fillStyle = COLORS.zoneText;
-        ctx.fillText(zone.Role, p.x, p.y + layout.rZone + 12);
-      }
+      // Occupancy badge: a clear fraction when capped, a plain count when not.
+      const present = occupied[zone.Id] || 0;
+      const capped = zone.MaxOccupancy !== UNLIMITED && zone.MaxOccupancy < UNLIMITED;
+      const occ = capped ? present + '/' + zone.MaxOccupancy : String(present);
+      ctx.font = '9px monospace';
+      const bw = occ.length * 6.4 + 12;
+      roundedRect(ctx, rect.x + rect.hw - bw - 5, rect.y - rect.hh + 4, bw, 13, 6);
+      ctx.fillStyle = present > 0 ? 'rgba(122, 162, 247, 0.25)' : 'rgba(148, 163, 184, 0.15)';
+      ctx.fill();
+      ctx.fillStyle = COLORS.mutedText;
+      ctx.fillText(occ, rect.x + rect.hw - bw / 2 - 5, rect.y - rect.hh + 10.5);
     });
   }
 
@@ -457,23 +543,52 @@
     return left;
   }
 
+  function agentColor(agent, roles) {
+    const role = roles && roles[agent.AgentId];
+    if (role === 'Sentry') return COLORS.sentry;
+    if (role === 'Infiltrator') return COLORS.infiltrator;
+    return AGENT_PALETTE[agent.AgentId % AGENT_PALETTE.length];
+  }
+
+  function meanCorridorLength(map, layout) {
+    let total = 0, count = 0;
+    map.ChokePoints.forEach(function (choke) {
+      const a = px(map.Zones[choke.FromZoneId].Position, layout);
+      const b = px(map.Zones[choke.ToZoneId].Position, layout);
+      total += Math.hypot(b.x - a.x, b.y - a.y);
+      count += 1;
+    });
+    return count ? total / count : layout.rAgent * 6;
+  }
+
   function drawAgents(ctx, map, frame, zoneById, layout) {
     const roles = state.trajectory ? state.trajectory.header.AgentRoles : null;
+    const cfg = state.trajectory ? state.trajectory.header.SimulationConfig : null;
     const pool = frame.agents.slice().sort(function (a, b) { return a.AgentId - b.AgentId; });
-    pool.forEach(function (agent, i) {
-      const zonePos = zoneById[agent.ZoneId];
-      if (!zonePos) return;
+    const hopRadius = meanCorridorLength(map, layout) * 0.85;
+
+    // Co-located agents fan out horizontally inside the room.
+    const stationedTotal = {};
+    const stationedSeen = {};
+    pool.forEach(function (agent) {
+      if (!agent.Transit) stationedTotal[agent.ZoneId] = (stationedTotal[agent.ZoneId] || 0) + 1;
+    });
+
+    pool.forEach(function (agent) {
       let x = 0, y = 0;
       if (agent.Transit) {
-        const from = zoneById[agent.Transit.FromZoneId];
-        const to = zoneById[agent.Transit.ToZoneId];
-        const a1 = from ? px(from, layout) : null;
-        const a2 = to ? px(to, layout) : null;
-        if (a1 && a2) {
-          x = a1.x + (a2.x - a1.x) * TRANSIT_FRACTION;
-          y = a1.y + (a2.y - a1.y) * TRANSIT_FRACTION;
+        // Snap strictly to the corridor vector: P(t) = A + t·(B − A), t from
+        // the engine's remaining-ticks countdown.
+        const zoneA = map.Zones[agent.Transit.FromZoneId];
+        const zoneB = map.Zones[agent.Transit.ToZoneId];
+        const ends = corridorEndpoints(roomRect(zoneA, layout), roomRect(zoneB, layout));
+        const total = transitTotalTicks(map, cfg, agent.Transit.FromZoneId, agent.Transit.ToZoneId);
+        const t = Math.min(1, Math.max(0, (total - agent.Transit.RemainingTicks + 1) / total));
+        if (ends) {
+          x = ends.ax + (ends.bx - ends.ax) * t;
+          y = ends.ay + (ends.by - ends.ay) * t;
         } else {
-          const q = px(zonePos, layout);
+          const q = roomRect(zoneA, layout);
           x = q.x; y = q.y;
         }
         ctx.beginPath();
@@ -484,38 +599,58 @@
         ctx.stroke();
         ctx.setLineDash([]);
       } else {
-        const q = px(zonePos, layout);
-        x = q.x; y = q.y;
+        const zone = map.Zones[agent.ZoneId];
+        if (!zone) return;
+        const rect = roomRect(zone, layout);
+        const mates = stationedTotal[agent.ZoneId] || 1;
+        const slot = stationedSeen[agent.ZoneId] || 0;
+        stationedSeen[agent.ZoneId] = slot + 1;
+        x = rect.x + (slot - (mates - 1) / 2) * (layout.rAgent * 2.4);
+        y = rect.y + 2;
+      }
+
+      const color = agentColor(agent, roles);
+      const role = roles && roles[agent.AgentId];
+
+      // The Sentry carries a faint dashed one-hop perception perimeter.
+      if (role === 'Sentry') {
+        ctx.beginPath();
+        ctx.arc(x, y, hopRadius, 0, Math.PI * 2);
+        ctx.strokeStyle = COLORS.perception;
+        ctx.lineWidth = 1.2;
+        ctx.setLineDash([5, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // The Infiltrator carries a cyan extraction marker above the token.
+      if (role === 'Infiltrator') {
+        drawDiamond(ctx, x, y - layout.rAgent - 7, 4.5, COLORS.extraction);
       }
 
       ctx.beginPath();
       ctx.arc(x, y, layout.rAgent, 0, Math.PI * 2);
-      ctx.fillStyle = AGENT_PALETTE[agent.AgentId % AGENT_PALETTE.length];
+      ctx.fillStyle = color;
       ctx.fill();
       ctx.strokeStyle = COLORS.agentRim;
       ctx.lineWidth = 1.5;
       ctx.stroke();
 
       ctx.fillStyle = COLORS.agentRim;
-      ctx.font = 'bold 9px ' + 'monospace';
+      ctx.font = 'bold 9px monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(String(agent.AgentId), x, y);
 
-      ctx.font = '9px ' + 'monospace';
-      ctx.fillText(String(agent.Score), x, y - layout.rAgent - 4);
-
-      const role = roles && roles[agent.AgentId];
-      if (role) {
-        ctx.font = '8px ' + 'monospace';
-        ctx.fillStyle = AGENT_PALETTE[agent.AgentId % AGENT_PALETTE.length];
-        ctx.fillText(role, x, y + layout.rAgent + 12);
-      }
+      ctx.font = '8.5px monospace';
+      ctx.fillStyle = color;
+      const label = (role ? role + ' ' : '') + '· ' + agent.Score;
+      ctx.fillText(label, x, y + layout.rAgent + 10);
 
       if (agent.Transit) {
-        const to = agent.Transit.ToZoneId;
-        ctx.fillStyle = COLORS.edgeAtBurst;
-        ctx.fillText('→' + to + ' (' + agent.Transit.RemainingTicks + ')', x, y + layout.rAgent + 11);
+        ctx.font = '8px monospace';
+        ctx.fillStyle = COLORS.transitRing;
+        ctx.fillText('crossing to ' + map.Zones[agent.Transit.ToZoneId].Id + ' (' + agent.Transit.RemainingTicks + 't)', x, y - layout.rAgent - 8);
       }
     });
   }
@@ -569,9 +704,12 @@
 
     let zrows = '';
     map.Zones.slice().sort(function (a, b) { return a.Id - b.Id; }).forEach(function (zone) {
-      const room = zone.Role ? ' · ' + zone.Role : '';
-      zrows += '<tr><td class="k">Z' + zone.Id + room + '</td><td class="v">ρ' + (crowd[zone.Id] || 0) +
-        ' · ◆' + (zoneUnclaimed(map, frame)[zone.Id] || 0) + '</td></tr>';
+      const room = zone.Role ? spaceCamel(zone.Role) : 'Room ' + zone.Id;
+      const present = crowd[zone.Id] || 0;
+      const loot = zoneUnclaimed(map, frame)[zone.Id] || 0;
+      zrows += '<tr><td class="k">' + room + '</td><td class="v">' +
+        (present ? present + (present === 1 ? ' agent' : ' agents') : 'empty') +
+        ' · ' + (loot ? loot + ' loot' : 'no loot') + '</td></tr>';
     });
     dom.zonesBody.innerHTML = zrows;
   }

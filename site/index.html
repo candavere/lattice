@@ -30,12 +30,15 @@
       <h2>Interactive replay viewer</h2>
       <p class="card-note">
         <code>demo.jsonl</code> loads automatically. Switch presets below or drop
-        any recorded trajectory file onto the canvas to replay it. Zones are
-        rimmed circles labeled with their tactical room (Sentry Post, Treasure
-        Vault, …); amber dots are unclaimed resources, green dots are claimed;
-        agent tokens carry their role (Sentry / Infiltrator), id and live score.
-        Dashed edges are bounded choke points with their capacity and gate role
-        (Portcullis / AirLock Doorway) shown.
+        any recorded trajectory file onto the canvas to replay it. Rooms render
+        as labeled cards (Entry Hall, Sentry Post, Treasure Vault, …) carrying
+        their occupancy; gold diamonds inside a room are unclaimed loot, green
+        ones are claimed. Corridors connect the rooms, with an inline gate
+        badge on each bounded choke (<code>CAP 1</code> / <code>LOCKED</code>
+        plus the gate role — Portcullis, Air Lock Doorway). Tokens slide along
+        corridor vectors while transiting: the red Sentry patrols inside a
+        dashed perception ring and the purple Infiltrator carries a cyan
+        extraction marker.
       </p>
 
       <div class="viewer" id="viewer">
@@ -97,7 +100,7 @@
           <table><tbody id="agents-body"></tbody></table>
         </div>
         <div class="metric">
-          <h3>Zone occupancy (ρ agents · ◆ unclaimed)</h3>
+          <h3>Zone occupancy (agents present · unclaimed loot)</h3>
           <table><tbody id="zones-body"></tbody></table>
         </div>
       </div>

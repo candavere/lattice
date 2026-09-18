@@ -49,10 +49,15 @@ public sealed record ChokeContentionRow(
 
 /// <summary>
 /// Footer facts: where the trajectory was written (null when it streamed to
-/// stdout), its size in bytes, and whether a replay of the recorded turns
-/// reproduced the exact recorded outcome.
+/// stdout), its size in bytes, whether a replay of the recorded turns
+/// reproduced the exact recorded outcome, and the number of ticks that
+/// verification compared (0 when verification did not complete).
 /// </summary>
-public sealed record OutputFooterInfo(string? TrajectoryPath, long? ByteSize, bool DeterminismVerified);
+public sealed record OutputFooterInfo(
+    string? TrajectoryPath,
+    long? ByteSize,
+    bool DeterminismVerified,
+    int VerifiedStepCount = 0);
 
 /// <summary>
 /// Renders the end-of-run console dashboard for <c>simulate</c>: a framed run
@@ -216,7 +221,7 @@ public static class SimulationConsoleRenderer
         }
 
         sink.WriteLine(footer.DeterminismVerified
-            ? $"  determinism  {Green}byte-identical replay verified{Reset}"
+            ? $"  determinism  {Green}byte-identical replay verified across all {footer.VerifiedStepCount} step{(footer.VerifiedStepCount == 1 ? "" : "s")}{Reset}"
             : $"  determinism  {Red}replay diverged — investigate{Reset}");
     }
 

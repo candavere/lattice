@@ -195,7 +195,8 @@ public static class CliApp
                     stopwatch.Elapsed.TotalMilliseconds,
                     rows,
                     flags.TryGetValue("--out", out var path) ? path : null,
-                    trajectory);
+                    trajectory,
+                    DynamicMapRuleSet.None);
             }
 
             return exit;
@@ -284,7 +285,8 @@ public static class CliApp
                 stopwatch.Elapsed.TotalMilliseconds,
                 rows,
                 flags.TryGetValue("--out", out var path) ? path : null,
-                trajectory);
+                trajectory,
+                DynamicMapRuleSet.None);
         }
 
         return exit;
@@ -316,8 +318,10 @@ public static class CliApp
         double elapsedMilliseconds,
         IReadOnlyList<AgentScoreboardRow> rows,
         string? trajectoryPath,
-        string trajectory)
+        string trajectory,
+        DynamicMapRuleSet rules)
     {
+        var verified = VerifyDeterministicReplay(map, config, result, rules);
         SimulationConsoleRenderer.RenderDashboard(
             sink,
             new RunHeaderInfo(
@@ -327,42 +331,63 @@ public static class CliApp
                 result.Metrics.TotalSteps,
                 elapsedMilliseconds),
             rows,
-            ComputeContention(map, config, result),
+            ComputeContention(map, config, result, rules),
             new OutputFooterInfo(
                 trajectoryPath,
                 trajectoryPath is null ? null : SimulationConsoleRenderer.ByteCount(trajectory) + 1,
-                VerifyDeterministicReplay(map, config, result)));
+                verified,
+                verified ? result.Results.Length : 0));
     }
 
     /// <summary>
-    /// Replays the recorded turns through the pure step function and checks
-    /// the final tick's info and agent states against the recorded results —
-    /// the engine-level guarantee that same inputs give byte-identical output.
+    /// Replays the recorded turns through the pure step function — preserving
+    /// any dynamic topology rules the episode ran under — and compares the
+    /// complete stream of serialized step results against the recorded ones.
+    /// Every tick must reproduce byte-for-byte, not just the final tick, so a
+    /// divergence anywhere in the episode is caught. When this returns true
+    /// the footer reports "byte-identical replay verified across all N steps".
     /// </summary>
-    private static bool VerifyDeterministicReplay(MapGraph map, SimulationConfig config, ScenarioResult result)
+    private static bool VerifyDeterministicReplay(
+        MapGraph map,
+        SimulationConfig config,
+        ScenarioResult result,
+        DynamicMapRuleSet rules)
     {
-        var replay = SimulationDriver.Play(map, config, result.Turns);
+        var replay = SimulationDriver.Play(map, config, result.Turns, rules);
         if (replay.Count != result.Results.Length)
         {
             return false;
         }
 
-        var replayed = replay[^1];
-        var recorded = result.Results[^1];
-        return replayed.Info.Equals(recorded.Info)
-            && replayed.Observations[0].AgentStates.SequenceEqual(recorded.Observations[0].AgentStates);
+        for (var tick = 0; tick < replay.Count; tick++)
+        {
+            if (JsonSerializer.Serialize(replay[tick]) != JsonSerializer.Serialize(result.Results[tick]))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /// <summary>
     /// Reconstructs per-choke contention from the recorded turns and results:
     /// an attempt is a Move action across a choke edge by an agent free to
     /// act; the attempt is denied when capacity gating left the agent in its
-    /// origin zone with no transit started.
+    /// origin zone with no transit started. The replay simulation steps the
+    /// episode's dynamic topology rules in lockstep, so each attempt's
+    /// reported capacity is the override active on that tick (portcullises and
+    /// event locks included), falling back to the base map value when static.
     /// </summary>
-    private static IReadOnlyList<ChokeContentionRow> ComputeContention(MapGraph map, SimulationConfig config, ScenarioResult result)
+    private static IReadOnlyList<ChokeContentionRow> ComputeContention(
+        MapGraph map,
+        SimulationConfig config,
+        ScenarioResult result,
+        DynamicMapRuleSet rules)
     {
         var stats = new Dictionary<(int Lo, int Hi), (int Capacity, int Attempts, int Denials)>();
-        var previous = Simulation.CreateInitial(map, config).Agents;
+        var state = Simulation.CreateInitial(map, config, rules);
+        var previous = state.Agents;
 
         for (var tick = 0; tick < result.Results.Length; tick++)
         {
@@ -387,10 +412,12 @@ public static class CliApp
                 stats.TryGetValue(key, out var entry);
                 var after = next[agentId];
                 var denied = after.ZoneId == before.ZoneId && after.Transit is null;
-                stats[key] = (map.ChokePoints[chokeIndex].MaxOccupancy, entry.Attempts + 1, entry.Denials + (denied ? 1 : 0));
+                var capacity = state.Dynamics.EffectiveChokeCapacity(map, chokeIndex);
+                stats[key] = (capacity, entry.Attempts + 1, entry.Denials + (denied ? 1 : 0));
             }
 
             previous = next;
+            state = Simulation.Step(state, turn, config).NextState;
         }
 
         return stats

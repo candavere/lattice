@@ -1,5 +1,22 @@
 # Lattice
+<p align="center">
+  <img src="assets/lattice-logo.svg" alt="LATTICE Logo" width="140" height="140" />
+</p>
 
+<h1 align="center">LATTICE</h1>
+
+<p align="center">
+  <strong>Deterministic Dec-POMDP Tactical Simulation Engine</strong>
+</p>
+
+<p align="center">
+  <a href="#quickstart">Quickstart</a> •
+  <a href="#architecture">Architecture</a> •
+  <a href="#dual-viewport">Visualizer</a> •
+  <a href="#contributing">Contributing</a>
+</p>
+
+---
 <p align="center">
   <a href="https://github.com/candavere/lattice/actions/workflows/ci.yml"><img src="https://github.com/candavere/lattice/actions/workflows/ci.yml/badge.svg" alt="CI build status" /></a>
   <img src="https://img.shields.io/badge/tests-294%20passing-brightgreen" alt="294 unit tests passing" />

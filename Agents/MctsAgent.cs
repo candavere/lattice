@@ -57,17 +57,22 @@ public sealed class MctsAgent : IAgent
 {
     private readonly SimulationConfig _config;
     private readonly MctsSearchConfig _search;
+    private readonly DynamicMapRuleSet _rules;
     private readonly GreedyCollectorAgent[] _rolloutPolicy;
 
     /// <summary>
     /// Creates the agent pinned to the given slot. <paramref name="config"/> is
     /// the episode's own simulation parameters (transit and capacity included),
     /// so rollouts reproduce exactly the physics the live episode obeys.
+    /// <paramref name="rules"/> is the episode's dynamic topology policy (timed
+    /// portcullises, event locks); every rollout fork starts from the
+    /// observation's tick with a dynamics snapshot derived from those rules, so
+    /// the search prices the same choke capacities the live simulation enforces.
     /// <paramref name="seed"/> is accepted for construction parity with the
     /// other agent families; decisions are fully determined by the observation
     /// and never vary with the seed.
     /// </summary>
-    public MctsAgent(int agentId, SimulationConfig config, ulong seed, MctsSearchConfig search)
+    public MctsAgent(int agentId, SimulationConfig config, ulong seed, MctsSearchConfig search, DynamicMapRuleSet? rules = null)
     {
         if (agentId < 0 || agentId >= config.AgentCount)
         {
@@ -78,6 +83,7 @@ public sealed class MctsAgent : IAgent
         AgentId = agentId;
         _config = config;
         _search = search;
+        _rules = rules ?? DynamicMapRuleSet.None;
         _rolloutPolicy = new GreedyCollectorAgent[config.AgentCount];
         for (var i = 0; i < config.AgentCount; i++)
         {
@@ -95,11 +101,27 @@ public sealed class MctsAgent : IAgent
     /// <inheritdoc />
     public AgentAction Decide(Observation observation)
     {
+        // The rollout fork must preserve the episode's dynamic topology: the
+        // live simulation's per-tick choke-capacity overrides are a pure
+        // function of (rules, tick, claims), so they are rebuilt from the
+        // agent's rules for the observation's exact tick. Without this the
+        // search would price moves against the base map even when a timed
+        // portcullis or event lock has the choke sealed at that tick.
         var state = new SimulationState(
             observation.Map,
             observation.AgentStates,
             observation.Claims,
-            StepCount: observation.StepNumber); // fork starts at the live tick so its rotation matches the episode's
+            StepCount: observation.StepNumber)
+        {
+            Dynamics = _rules == DynamicMapRuleSet.None
+                ? DynamicMapOverrides.None
+                : new DynamicMapOverrides
+                {
+                    Rules = _rules,
+                    ChokeCapacities = _rules.ComputeChokeCapacities(
+                        observation.StepNumber, observation.Claims, observation.Map),
+                },
+        };
 
         var candidates = CandidateActions(observation);
         var turn = new AgentAction[_config.AgentCount];
@@ -248,12 +270,19 @@ public sealed class MctsAgentFactory : IAgentFactory
 {
     private readonly SimulationConfig _config;
     private readonly MctsSearchConfig _search;
+    private readonly DynamicMapRuleSet _rules;
     private readonly ulong _familySeed;
 
-    public MctsAgentFactory(SimulationConfig config, MctsSearchConfig search, string name = "MCTS", ulong familySeed = 0)
+    public MctsAgentFactory(
+        SimulationConfig config,
+        MctsSearchConfig search,
+        string name = "MCTS",
+        ulong familySeed = 0,
+        DynamicMapRuleSet? rules = null)
     {
         _config = config;
         _search = search;
+        _rules = rules ?? DynamicMapRuleSet.None;
         Name = name;
         _familySeed = familySeed;
     }
@@ -263,5 +292,10 @@ public sealed class MctsAgentFactory : IAgentFactory
 
     /// <inheritdoc />
     public IAgent Create(int agentId, ulong runSeed) =>
-        new MctsAgent(agentId, _config, _familySeed ^ (runSeed * 1_000_003UL) ^ (ulong)agentId, _search);
+        new MctsAgent(
+            agentId,
+            _config,
+            _familySeed ^ (runSeed * 1_000_003UL) ^ (ulong)agentId,
+            _search,
+            _rules);
 }

@@ -229,4 +229,83 @@ public class MctsAgentTests
             Assert.Equal(0.0, summary.TimeoutRate);
         }
     }
+
+    private static readonly SimulationConfig DynamicConfig = new(AgentCount: 2, MaxTicks: 200, TransitSpeed: 4);
+    private static readonly MapGraph PortcullisMap = PortcullisFixture();
+
+    /// <summary>
+    /// "Portcullis alley": the only resource sits in zone 1, behind a
+    /// single-lane dynamic choke (0-1) on the near side, and the rival greedy
+    /// agent spawns on the far side (zone 2) behind a second single-lane
+    /// choke. Whoever first claims the lone stash decides the outcome, and the
+    /// claim resolution rotates priority between slots by a fixed modular
+    /// schedule, so a crossing launched on the right tick is strictly better
+    /// than idling (which lets the far rival take the stash first) while at
+    /// other ticks the two candidates tie. Relative to the closed window of a
+    /// 2-open/2-closed portcullis: at tick 2 the choke is closed, so a rollout
+    /// that honors the rules must find the crossing dead and wait, while a
+    /// rollout priced against the base map finds it open and takes it; at tick
+    /// 4 the choke has re-opened and even the rules-aware search crosses again.
+    /// </summary>
+    private static MapGraph PortcullisFixture() => new(
+        new[]
+        {
+            new Zone(0, new GridPoint(0, 0)),
+            new Zone(1, new GridPoint(0, 8)),
+            new Zone(2, new GridPoint(0, 16)),
+        },
+        new[] { new ResourceNode(0, 1, new GridPoint(0, 8)) },
+        new[]
+        {
+            new ChokePoint(0, 0, 1, MaxOccupancy: 1),
+            new ChokePoint(1, 1, 2, MaxOccupancy: 1),
+        });
+
+    private static readonly DynamicMapRuleSet PortcullisRules = new(new IDynamicMapRule[]
+    {
+        new TimedPortcullisRule(ChokeId: 0, OpenTicks: 2, ClosedTicks: 2),
+    });
+
+    private static Observation PortcullisObservation(int stepNumber)
+    {
+        var agents = new[]
+        {
+            new AgentState(AgentId: 0, ZoneId: 0, Score: 0),
+            new AgentState(AgentId: 1, ZoneId: 2, Score: 0),
+        };
+        return new Observation(0, PortcullisMap, agents, Array.Empty<int>(), stepNumber);
+    }
+
+    [Fact]
+    public void Rollouts_RespectClosedPortcullis_WhenRulesAreProvided()
+    {
+        var agent = new MctsAgent(0, DynamicConfig, 0, new MctsSearchConfig(rolloutsPerAction: 16, maxDepth: 20), PortcullisRules);
+
+        // Tick 2 is a closed tick (2 of a 2-open/2-closed cycle): rollouts that
+        // honor the rules never cross, so the crossing is worth nothing and the
+        // search falls back to waiting.
+        Assert.Equal(ActionKind.Wait, agent.Decide(PortcullisObservation(stepNumber: 2)).Kind);
+    }
+
+    [Fact]
+    public void Rollouts_WithoutRules_PriceTheClosedCrossingAsOpen()
+    {
+        var agent = new MctsAgent(0, DynamicConfig, 0, new MctsSearchConfig(rolloutsPerAction: 16, maxDepth: 20));
+
+        // The identical tick-2 observation priced without the episode's rules:
+        // the search rolls the crossing out against the base topology and takes
+        // it. The rules themselves, not the observation, change the verdict.
+        Assert.Equal(ActionKind.Move, agent.Decide(PortcullisObservation(stepNumber: 2)).Kind);
+    }
+
+    [Fact]
+    public void Rollouts_StepThroughDynamics_ReopeningThePortcullis()
+    {
+        var agent = new MctsAgent(0, DynamicConfig, 0, new MctsSearchConfig(rolloutsPerAction: 16, maxDepth: 20), PortcullisRules);
+
+        // Tick 2 closed -> wait; tick 4 reopens (4 % 4 = 0 < 2) -> the same
+        // rules-aware search prices the crossing as winning again.
+        Assert.Equal(ActionKind.Wait, agent.Decide(PortcullisObservation(stepNumber: 2)).Kind);
+        Assert.Equal(ActionKind.Move, agent.Decide(PortcullisObservation(stepNumber: 4)).Kind);
+    }
 }

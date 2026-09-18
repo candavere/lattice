@@ -18,15 +18,12 @@ jobs:
         target:
           - os: ubuntu-latest
             rid: linux-x64
-            assembly: lattice-linux-x64
             name: lattice-linux-x64
           - os: windows-latest
             rid: win-x64
-            assembly: lattice-win-x64
             name: lattice-win-x64.exe
           - os: macos-latest
             rid: osx-arm64
-            assembly: lattice-osx-arm64
             name: lattice-osx-arm64
     steps:
       - uses: actions/checkout@v4
@@ -37,7 +34,20 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Publish single-file self-contained binary
-        run: dotnet publish Cli/Lattice.Cli.csproj -c Release --self-contained true -r ${{ matrix.target.rid }} -p:PublishSingleFile=true -p:AssemblyName=${{ matrix.target.assembly }} -o publish
+        # NB: no -p:AssemblyName here. Command-line overrides of AssemblyName
+        # make NuGet restore treat the name as a project key, which surfaces as
+        # "Ambiguous project name '<assembly>'" on every RID leg. Publish under
+        # the default assembly name and rename in a dedicated step instead.
+        run: dotnet publish Cli/Lattice.Cli.csproj -c Release --self-contained true -r ${{ matrix.target.rid }} -p:PublishSingleFile=true -o publish
+
+      - name: Rename binary to release artifact name
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            mv publish/lattice.exe publish/${{ matrix.target.name }}
+          else
+            mv publish/lattice publish/${{ matrix.target.name }}
+          fi
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4

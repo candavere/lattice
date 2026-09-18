@@ -45,13 +45,20 @@ jobs:
             --runs "$RUNS" --steps "$STEPS" --warmup "$WARMUP" \
             --out "$RUNNER_TEMP/throughput.json"
 
+      # The committed baseline is recorded on a bare-metal Apple M1. Shared
+      # macos-14 runners virtualize the CPU, so the sub-microsecond tight loop
+      # (micro_raw_2agent) legitimately wanders well below a stable-workload
+      # threshold due to frequency scaling / scheduler jitter. It is relaxed to
+      # 0.7x while the stable matrix keeps the strict 0.8x gate.
       - name: Compare against committed baseline
         shell: bash
         run: |
           python3 .github/workflows/compare_benchmarks.py \
             benchmarks/throughput_benchmark.json \
             "$RUNNER_TEMP/throughput.json" \
-            --threshold 0.8 --strict-if-matching
+            --threshold 0.8 \
+            --per-workload-threshold micro_raw_2agent=0.7 \
+            --strict-if-matching
 
   cross-host-structure:
     # Deliberately on .NET 8 / ubuntu x64: this job is a structural smoke and

@@ -35,8 +35,8 @@ Four ideas govern every change:
    workload matrix (raw stepping, facility, dynamic topology, stress, MCTS
    policy — see `Analytics/Benchmarking` and `benchmarks/throughput_benchmark.json`
    for the host-scoped reference run) measures the pure
-   `Simulation.Step` core per case, e.g. ≈ 769k steps/s median for the 2-agent
-   micro case on a 2020 Apple M1. Methodology: warm-up that anchors a step
+   `Simulation.Step` core per case, e.g. ≈ 654k steps/s median for the 2-agent
+   micro case on a 2020 Apple M1 (see `benchmarks/throughput_benchmark.json`). Methodology: warm-up that anchors a step
    digest, ≥10 measured iterations, per-step stopwatch + median/mean/std/p95,
    `GC.GetAllocatedBytesForCurrentThread`, and `GC.CollectionCount` for
    Gen0/1/2. Every measured iteration must reproduce the warm-up anchor's step

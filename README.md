@@ -19,7 +19,7 @@
 ---
 <p align="center">
   <a href="https://github.com/candavere/lattice/actions/workflows/ci.yml"><img src="https://github.com/candavere/lattice/actions/workflows/ci.yml/badge.svg" alt="CI build status" /></a>
-  <img src="https://img.shields.io/badge/tests-344%20passing-brightgreen" alt="344 unit tests passing" />
+  <img src="https://img.shields.io/badge/tests-359%20passing-brightgreen" alt="359 unit tests passing" />
   <img src="https://img.shields.io/badge/determinism-byte--identical-blue" alt="byte-identical determinism" />
   <img src="https://img.shields.io/badge/dependencies-BCL%20runtime%20only-blueviolet" alt="runtime dependencies: pure .NET 8 BCL" />
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4" alt=".NET 8" />
@@ -86,8 +86,9 @@ one-to-one onto the classic RL loop:
 <details>
 <summary><b>Glossary: Key Concepts & Terminology</b></summary>
 
-- **BCL-only:** Base Class Library only; runs strictly on core standard .NET
-  with zero external NuGet packages.
+- **BCL-only:** Base Class Library only — zero external runtime dependencies
+  across every production assembly (pure .NET 8 BCL); development and test
+  projects rely on the standard test SDKs (`Microsoft.NET.Test.Sdk`, xUnit).
 - **Headless:** Operates without a window, GPU context, or graphics thread,
   optimized for automated CI and high-speed batch evaluation.
 - **Determinism:** Given the same seed and action sequence, simulations produce

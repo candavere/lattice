@@ -29,16 +29,19 @@
 > A deterministic, headless 2D tactical AI simulation substrate in pure C#
 > (.NET 8). Built to validate, balance, and stress-test high-level game AI
 > architectures (MCTS, Fog-of-War perception, procedural map fairness, and a
-> tactical Dungeon Infiltration & Sentry Patrol scenario) at 0.9–3.5M
-> single-threaded steps/second before game engine integration.
+> tactical Dungeon Infiltration & Sentry Patrol scenario) at **8.8k–661k mean
+> steps/sec** across the standardized benchmark suite before game engine
+> integration (plus 394 decisions/sec for the 32-rollout MCTS policy, which
+> prices per-decision rollout cost, not engine stepping).
 
 Think of Lattice as a digital board game engine running in memory without
 graphics: units traverse a network of connected topological outposts over
 multiple turns, competing for resources under Fog-of-War. Because every
 transition is calculated using pure math rather than approximate continuous
-physics, simulations run at millions of turns per second (measured mean
-0.9–3.5M steps/s on a 2020 Apple M1) with byte-for-byte identical replay
-across any platform.
+physics, the stepping core runs at **8.8k–661k mean steps/sec** (measured on a
+2020 Apple M1 / 8 cores / 8 GiB RAM under .NET 10.0.10 Release / Workstation
+GC, tree `b7459a1` — see the committed `benchmarks/throughput_benchmark.json`)
+with byte-for-byte identical replay across any platform.
 
 <!--
 Proposed GitHub topics for the maintainer (set these in the repo settings):
@@ -444,13 +447,21 @@ committed at `benchmarks/throughput_benchmark.json` was produced on
 GC** (baseline re-anchored on tree `b7459a1` to a conservative full-protocol
 session, so a matching-host pass has real headroom):
 
-| Case | Median throughput | p50 step lat. | p95 step lat. | Alloc / step |
-| --- | --- | --- | --- | --- |
-| `micro_raw_2agent` | 654k steps/s | 1.33 µs | 1.96 µs | 3.2 KB |
-| `facility_static_4agent` | 359k steps/s | 2.50 µs | 3.33 µs | 4.6 KB |
-| `dynamic_contention_4agent` | 233k steps/s | 4.00 µs | 5.33 µs | 7.1 KB |
-| `stress_topology_4agent` | 9.1k steps/s | 100 µs | 151 µs | 104 KB |
-| `policy_lookahead_mcts_32` | 394 decisions/s | 4.9 ms | 6.7 ms | 11.5 MB |
+| Case | Median throughput | Mean throughput | p50 step lat. | p95 step lat. | Alloc / step |
+| --- | --- | --- | --- | --- | --- |
+| `micro_raw_2agent` | 654k steps/s | 661k steps/s | 1.33 µs | 1.96 µs | 3.2 KB |
+| `facility_static_4agent` | 359k steps/s | 356k steps/s | 2.50 µs | 3.33 µs | 4.6 KB |
+| `dynamic_contention_4agent` | 233k steps/s | 229k steps/s | 4.00 µs | 5.33 µs | 7.1 KB |
+| `stress_topology_4agent` | 9.1k steps/s | 8.8k steps/s | 100 µs | 151 µs | 104 KB |
+| `policy_lookahead_mcts_32` | 394 decisions/s | 382 decisions/s | 4.9 ms | 6.7 ms | 11.5 MB |
+
+Every value above is the exact field `MedianThroughputPerSecond` /
+`MeanThroughputPerSecond` / `MedianStepLatencyMicros` / `P95StepLatencyMicros` /
+`AllocationsPerStepBytes` in `benchmarks/throughput_benchmark.json`, produced
+by one protocol on one host: workload `Workloads[].Name`, statistics median
+and mean over 10 measured iterations, host **Apple M1 / 8 cores / 8 GiB RAM /
+macOS 27.0.0**, runtime **.NET 10.0.10**, **Release** configuration, Workstation
+GC, reference tree **`b7459a1`**.
 
 Two honest notes on what the numbers do and do not say:
 

@@ -1,0 +1,112 @@
+name: Benchmarks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: "Measured iterations per workload (default 5)"
+        required: false
+        default: "5"
+      steps:
+        description: "Ticks per iteration for the raw cases (default 50000)"
+        required: false
+        default: "50000"
+      warmup:
+        description: "Warm-up budget in ticks (default 30000)"
+        required: false
+        default: "30000"
+
+jobs:
+  regression-gate:
+    name: Regression gate vs committed baseline (macOS arm64)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Build
+        run: dotnet build Cli/Lattice.Cli.csproj -c Release
+
+      - name: Bench the five-case matrix
+        shell: bash
+        run: |
+          RUNS="${{ inputs.runs || '5' }}"
+          STEPS="${{ inputs.steps || '50000' }}"
+          WARMUP="${{ inputs.warmup || '30000' }}"
+          dotnet run -c Release --project Cli -- benchmark \
+            --runs "$RUNS" --steps "$STEPS" --warmup "$WARMUP" \
+            --out "$RUNNER_TEMP/throughput.json"
+
+      - name: Compare against committed baseline
+        shell: bash
+        run: |
+          python3 .github/workflows/compare_benchmarks.py \
+            benchmarks/throughput_benchmark.json \
+            "$RUNNER_TEMP/throughput.json" \
+            --threshold 0.8 --strict-if-matching
+
+  cross-host-structure:
+    name: Cross-host structural smoke (ubuntu x64)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Build
+        run: dotnet build Cli/Lattice.Cli.csproj -c Release
+
+      - name: Bench (bounded smoke pass)
+        shell: bash
+        run: |
+          dotnet run -c Release --project Cli -- benchmark \
+            --runs 3 --steps 10000 --warmup 10000 \
+            --out "$RUNNER_TEMP/throughput.json"
+
+      - name: Compare against committed baseline (informational)
+        shell: bash
+        run: |
+          python3 .github/workflows/compare_benchmarks.py \
+            benchmarks/throughput_benchmark.json \
+            "$RUNNER_TEMP/throughput.json" \
+            --threshold 0.8
+
+      - name: Schema smoke — workloads present, medians positive
+        shell: bash
+        run: |
+          python3 - "$RUNNER_TEMP/throughput.json" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as handle:
+              artifact = json.load(handle)
+          workloads = artifact["Workloads"]
+          expected = {
+              "micro_raw_2agent",
+              "facility_static_4agent",
+              "dynamic_contention_4agent",
+              "stress_topology_4agent",
+              "policy_lookahead_mcts_32",
+          }
+          names = {workload["Name"] for workload in workloads}
+          assert names == expected, f"workload matrix mismatch: {sorted(names)}"
+          for workload in workloads:
+              assert workload["MedianThroughputPerSecond"] > 0
+              assert workload["MedianStepLatencyMicros"] > 0
+          assert artifact["Metadata"]["RamBytes"] > 0
+          print(
+              f"schema smoke passed: {len(workloads)} workloads, "
+              f"all medians positive"
+          )
+          PY

@@ -1,0 +1,103 @@
+#!/usr/bin/env python3
+"""Compare a freshly measured benchmark artifact against the committed baseline.
+
+Strict mode (--strict-if-matching): when the current host fingerprint matches
+the baseline's (OS family + architecture), fail if ANY workload's median
+throughput fell below --threshold x the baseline median (default 0.8, i.e. a
+20% regression) or a workload disappeared from the matrix.
+
+Cross-host mode: never fails, but prints the side-by-side table and flags any
+workload below the threshold, so OS/arch-mismatched runs still surface drift.
+"""
+
+import argparse
+import json
+import sys
+
+
+def os_family(descriptor: str) -> str:
+    return descriptor.split()[0] if descriptor else ""
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("baseline", help="committed reference artifact (JSON)")
+    parser.add_argument("current", help="freshly measured artifact (JSON)")
+    parser.add_argument("--threshold", type=float, default=0.8,
+                        help="min ratio current/reference median before a "
+                             "regression is flagged (default 0.8 = 20% drop)")
+    parser.add_argument("--strict-if-matching", action="store_true",
+                        help="fail on a regression only when the host "
+                             "fingerprint matches the baseline")
+    args = parser.parse_args()
+
+    with open(args.baseline, encoding="utf-8") as handle:
+        baseline = json.load(handle)
+    with open(args.current, encoding="utf-8") as handle:
+        current = json.load(handle)
+
+    base_meta, curr_meta = baseline["Metadata"], current["Metadata"]
+    base_work = {w["Name"]: w for w in baseline["Workloads"]}
+    curr_work = {w["Name"]: w for w in current["Workloads"]}
+
+    missing = set(base_work) - set(curr_work)
+    if missing:
+        print(f"::error::current artifact is missing workloads: "
+              f"{sorted(missing)}")
+        return 1
+    extra = set(curr_work) - set(base_work)
+    if extra:
+        print(f"note: current artifact added workloads not in the baseline: "
+              f"{sorted(extra)}")
+
+    matched = os_family(base_meta["Os"]) == os_family(curr_meta["Os"]) and \
+        base_meta["Architecture"] == curr_meta["Architecture"]
+    strict = matched and args.strict_if_matching
+
+    print(f"baseline host: {base_meta['Os']} / {base_meta['Architecture']} "
+          f"/ {base_meta['Runtime']}")
+    print(f"current host : {curr_meta['Os']} / {curr_meta['Architecture']} "
+          f"/ {curr_meta['Runtime']}")
+    print(f"fingerprint match: {matched}  (strict gate armed: {strict})")
+    print()
+
+    header = (f"{'workload':<28}{'baseline median':>16}"
+              f"{'current median':>16}{'ratio':>9}")
+    print(header)
+    failed = []
+    for name in sorted(base_work):
+        base_value = base_work[name]["MedianThroughputPerSecond"]
+        curr_value = curr_work[name]["MedianThroughputPerSecond"]
+        ratio = curr_value / base_value if base_value else 0.0
+        print(f"{name:<28}{base_value:>16,.0f}{curr_value:>16,.0f}{ratio:>9.3f}")
+        if curr_value < args.threshold * base_value:
+            failed.append((name, base_value, curr_value, ratio))
+
+    if extra:
+        for name in sorted(extra):
+            print(f"{name:<28}{'-':>16}"
+                  f"{curr_work[name]['MedianThroughputPerSecond']:>16,.0f}"
+                  f"{'(new)':>9}")
+
+    if strict:
+        if failed:
+            print()
+            print("::error::workload regression on a matching host "
+                  f"(threshold factor {args.threshold} = "
+                  f">{100 * (1 - args.threshold):.0f}% drop):")
+            for name, base_value, curr_value, ratio in failed:
+                print(f"  {name}: {curr_value:,.0f} vs baseline "
+                      f"{base_value:,.0f} ({ratio:.1%})")
+            return 1
+        print()
+        print("strict comparison passed: no workload regressed beyond the "
+              "threshold.")
+    else:
+        print()
+        print("cross-host comparison (informational): the strict gate needs "
+              "a matching OS family + architecture.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

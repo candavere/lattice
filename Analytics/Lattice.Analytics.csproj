@@ -12,6 +12,7 @@
     <ProjectReference Include="..\Environment\Lattice.Environment.csproj" />
     <ProjectReference Include="..\Trajectories\Lattice.Trajectories.csproj" />
     <ProjectReference Include="..\Agents\Lattice.Agents.csproj" />
+    <ProjectReference Include="..\Generator\Lattice.Generator.csproj" />
   </ItemGroup>
 
 </Project>

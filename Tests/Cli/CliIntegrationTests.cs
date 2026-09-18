@@ -310,21 +310,17 @@ public class CliIntegrationTests
     }
 
     [Fact]
-    public void Benchmark_PrintsThroughputAndMemory()
+    public void Benchmark_InvalidSteps_NonZeroExit()
     {
-        var (exit, stdout, _) = Run("benchmark", "--ticks", "200");
-
-        Assert.Equal(0, exit);
-        Assert.Contains("ticks=200", stdout);
-        Assert.Contains("steps_per_second=", stdout);
-        Assert.Contains("allocated_bytes=", stdout);
-        Assert.Contains("bytes_per_tick=", stdout);
+        var (exit, _, stderr) = Run("benchmark", "--steps", "-5");
+        Assert.NotEqual(0, exit);
+        Assert.Contains("expects a positive integer", stderr);
     }
 
     [Fact]
-    public void Benchmark_InvalidTicks_NonZeroExit()
+    public void Benchmark_InvalidRuns_NonZeroExit()
     {
-        var (exit, _, stderr) = Run("benchmark", "--ticks", "-5");
+        var (exit, _, stderr) = Run("benchmark", "--runs", "0");
         Assert.NotEqual(0, exit);
         Assert.Contains("expects a positive integer", stderr);
     }
@@ -617,29 +613,64 @@ public class CliIntegrationTests
     }
 
     [Fact]
-    public void Benchmark_WithOutFlag_WritesJsonArtifact()
+    public void Benchmark_WritesWorkloadMatrixJsonArtifact()
     {
         var path = TempPath(".json");
         try
         {
-            var (exit, stdout, stderr) = Run("benchmark", "--ticks", "200", "--out", path);
+            var (exit, stdout, stderr) = Run(
+                "benchmark",
+                "--runs", "1",
+                "--warmup", "40",
+                "--steps", "40",
+                "--commit", "deadbeef",
+                "--cpu", "Unit Test CPU",
+                "--out", path);
 
             Assert.Equal(0, exit);
-            Assert.Contains("runs=5", stdout);
-            Assert.Contains("warmup_ticks=50000", stdout);
-            Assert.Contains("gc_gen0=", stdout);
+            Assert.Equal("", stdout);
             Assert.Contains("wrote", stderr);
 
             using var document = JsonDocument.Parse(File.ReadAllText(path));
-            var report = document.RootElement.GetProperty("Report");
-            Assert.Equal(5, report.GetProperty("Runs").GetInt32());
-            Assert.Equal(200, report.GetProperty("Ticks").GetInt32());
-            Assert.Equal(1000, report.GetProperty("TotalTicks").GetInt32());
-            Assert.Equal(50000, report.GetProperty("WarmupTicks").GetInt32());
-            Assert.True(report.GetProperty("MinStepsPerSecond").GetDouble() <= report.GetProperty("MeanStepsPerSecond").GetDouble());
-            Assert.True(report.GetProperty("MeanStepsPerSecond").GetDouble() <= report.GetProperty("MaxStepsPerSecond").GetDouble());
-            Assert.True(report.GetProperty("GcGen0").GetInt64() >= 0);
-            Assert.True(document.RootElement.GetProperty("Cores").GetInt32() > 0);
+            var metadata = document.RootElement.GetProperty("Metadata");
+            Assert.Equal("deadbeef", metadata.GetProperty("Commit").GetString());
+            Assert.Equal("Unit Test CPU", metadata.GetProperty("Cpu").GetString());
+            Assert.Equal("Release", metadata.GetProperty("Configuration").GetString());
+            Assert.True(metadata.GetProperty("Cores").GetInt32() > 0);
+            Assert.True(metadata.GetProperty("RamBytes").GetInt64() > 0);
+
+            var workloads = document.RootElement.GetProperty("Workloads");
+            Assert.Equal(5, workloads.GetArrayLength());
+            var policy = workloads[4];
+            Assert.Equal("policy_lookahead_mcts_32", policy.GetProperty("Name").GetString());
+            Assert.Equal("decisions", policy.GetProperty("ThroughputMetric").GetString());
+            Assert.Equal(2, policy.GetProperty("Agents").GetInt32());
+            // The --steps override applies to the raw cases; the MCTS policy
+            // case keeps its own catalog budget so a full pass stays bounded.
+            Assert.Equal(100, policy.GetProperty("StepsPerIteration").GetInt32());
+
+            foreach (var workload in workloads.EnumerateArray())
+            {
+                Assert.True(workload.GetProperty("MedianThroughputPerSecond").GetDouble() > 0);
+                Assert.True(workload.GetProperty("MeanThroughputPerSecond").GetDouble() > 0);
+                Assert.True(
+                    workload.GetProperty("P95StepLatencyMicros").GetDouble()
+                    >= workload.GetProperty("MedianStepLatencyMicros").GetDouble());
+                Assert.True(workload.GetProperty("AllocationsPerStepBytes").GetDouble() >= 0);
+                Assert.True(workload.GetProperty("TotalGcGen0").GetInt32() >= 0);
+                Assert.True(workload.GetProperty("TotalGcGen1").GetInt32() >= 0);
+                Assert.True(workload.GetProperty("TotalGcGen2").GetInt32() >= 0);
+            }
+
+            var facility = workloads[1];
+            Assert.Equal("facility_static_4agent", facility.GetProperty("Name").GetString());
+            Assert.Equal("Medium", facility.GetProperty("MapScale").GetString());
+            Assert.False(facility.GetProperty("DynamicTopology").GetBoolean());
+            Assert.Equal(4, facility.GetProperty("Agents").GetInt32());
+
+            var dynamic = workloads[2];
+            Assert.Equal("dynamic_contention_4agent", dynamic.GetProperty("Name").GetString());
+            Assert.True(dynamic.GetProperty("DynamicTopology").GetBoolean());
         }
         finally
         {
@@ -648,20 +679,13 @@ public class CliIntegrationTests
     }
 
     [Fact]
-    public void Benchmark_CommitAndCpuFlags_RecordedInArtifact()
+    public void Benchmark_JsonArtifactWithoutOut_PrintsToStdout()
     {
-        var path = TempPath(".json");
-        try
-        {
-            Assert.Equal(0, Run("benchmark", "--ticks", "200", "--commit", "deadbeef", "--cpu", "Unit Test CPU", "--out", path).ExitCode);
+        var (exit, stdout, _) = Run("benchmark", "--runs", "1", "--warmup", "40", "--steps", "40");
 
-            using var document = JsonDocument.Parse(File.ReadAllText(path));
-            Assert.Equal("deadbeef", document.RootElement.GetProperty("CommitSha").GetString());
-            Assert.Equal("Unit Test CPU", document.RootElement.GetProperty("CpuModel").GetString());
-        }
-        finally
-        {
-            File.Delete(path);
-        }
+        Assert.Equal(0, exit);
+        using var document = JsonDocument.Parse(stdout);
+        Assert.True(document.RootElement.TryGetProperty("Workloads", out var workloads));
+        Assert.Equal(5, workloads.GetArrayLength());
     }
 }

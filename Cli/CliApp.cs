@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using Lattice.Agents;
+using Lattice.Analytics.Benchmarking;
 using Lattice.Cli.Presentation;
 using Lattice.Environment;
 using Lattice.Generator;
@@ -31,9 +32,7 @@ public static class CliApp
 
     private static readonly GeneratorConfig DefaultGeneratorConfig = new(3, 5, 1, 1, 3, GeneratorConfig.DefaultRetryCap);
     private const int DefaultSimulationSteps = 100;
-    private const int DefaultBenchmarkTicks = 200_000;
     private const int DefaultEvaluationRollouts = 32;
-    private const ulong BenchmarkSeed = 42;
 
     private const string DevelopmentSuite = "dev";
     private const string HeldOutSuite = "heldout";
@@ -59,21 +58,6 @@ public static class CliApp
         new(AgentCount: 2, MaxTicks: 200, TransitSpeed: 4);
 
     private static readonly JsonSerializerOptions ArtifactJsonOptions = new() { WriteIndented = true };
-
-    /// <summary>
-    /// The machine-readable benchmark artifact written by <c>benchmark --out</c>:
-    /// the measured report plus the host and provenance facts the throughput
-    /// claim is scoped to (runtime, OS, cores, CPU model, source revision).
-    /// </summary>
-    internal sealed record BenchmarkArtifact(
-        string? CommitSha,
-        string? CpuModel,
-        DateTime CreatedAtUtc,
-        string Runtime,
-        string Os,
-        int Cores,
-        string Architecture,
-        BenchmarkReport Report);
 
     /// <summary>
     /// The machine-readable evaluation artifact written by
@@ -581,51 +565,26 @@ public static class CliApp
     {
         try
         {
-            var (flags, positionals) = ParseFlags(args, "--ticks", "--out", "--commit", "--cpu");
+            var (flags, positionals) = ParseFlags(args, "--runs", "--warmup", "--steps", "--out", "--commit", "--cpu");
             GuardNoPositionals(positionals);
-            var ticks = flags.TryGetValue("--ticks", out var ticksText)
-                ? ParsePositiveInt(ticksText, "--ticks")
-                : DefaultBenchmarkTicks;
+            var runs = flags.TryGetValue("--runs", out var runsText)
+                ? ParsePositiveInt(runsText, "--runs")
+                : WorkloadCatalog.DefaultRuns;
+            var warmupSteps = flags.TryGetValue("--warmup", out var warmupText)
+                ? ParsePositiveInt(warmupText, "--warmup")
+                : WorkloadCatalog.DefaultWarmupSteps;
+            var steps = flags.TryGetValue("--steps", out var stepsText)
+                ? ParsePositiveInt(stepsText, "--steps")
+                : (int?)null;
             var commit = flags.TryGetValue("--commit", out var commitText) ? commitText : null;
             var cpu = flags.TryGetValue("--cpu", out var cpuText) ? cpuText : null;
 
-            var map = MapGenerator.Generate(BenchmarkSeed, DefaultGeneratorConfig);
-            var config = new SimulationConfig(AgentCount: 2, MaxTicks: ticks);
-            var turn = new[] { new AgentAction(ActionKind.Wait), new AgentAction(ActionKind.Wait) };
-            var report = Benchmark.Run(map, config, turn, ticks);
+            var workloads = WorkloadCatalog.BuildAll(steps);
+            var metadata = EnvironmentSample.Capture(commit, cpu);
+            var result = BenchmarkHarness.RunAll(workloads, metadata, runs, warmupSteps);
 
-            var invariant = CultureInfo.InvariantCulture;
-            stdout.WriteLine($"ticks={report.Ticks}");
-            stdout.WriteLine($"runs={report.Runs}");
-            stdout.WriteLine($"total_ticks={report.TotalTicks}");
-            stdout.WriteLine($"warmup_ticks={report.WarmupTicks}");
-            stdout.WriteLine($"elapsed_ms={report.TotalElapsedMs.ToString("0.###", invariant)}");
-            stdout.WriteLine($"mean_steps_per_second={report.MeanStepsPerSecond.ToString("0.#", invariant)}");
-            stdout.WriteLine($"min_steps_per_second={report.MinStepsPerSecond.ToString("0.#", invariant)}");
-            stdout.WriteLine($"max_steps_per_second={report.MaxStepsPerSecond.ToString("0.#", invariant)}");
-            stdout.WriteLine($"stddev_steps_per_second={report.StdDevStepsPerSecond.ToString("0.#", invariant)}");
-            stdout.WriteLine($"allocated_bytes={report.AllocatedBytes}");
-            stdout.WriteLine($"bytes_per_tick={report.BytesPerTick.ToString("0.#", invariant)}");
-            stdout.WriteLine($"gc_gen0={report.GcGen0}");
-            stdout.WriteLine($"gc_gen1={report.GcGen1}");
-            stdout.WriteLine($"gc_gen2={report.GcGen2}");
-
-            if (flags.TryGetValue("--out", out var outPath))
-            {
-                var artifact = new BenchmarkArtifact(
-                    commit,
-                    cpu,
-                    DateTime.UtcNow,
-                    RuntimeDescription(),
-                    OsDescription(),
-                    System.Environment.ProcessorCount,
-                    ArchitectureDescription(),
-                    report);
-                File.WriteAllText(outPath, JsonSerializer.Serialize(artifact, ArtifactJsonOptions) + "\n");
-                stderr.WriteLine($"wrote {outPath}");
-            }
-
-            return Success;
+            var json = JsonSerializer.Serialize(result, ArtifactJsonOptions);
+            return WriteOutput(flags, "--out", json, stdout, stderr);
         }
         catch (Exception ex)
         {
@@ -962,11 +921,15 @@ public static class CliApp
         sink.WriteLine("  analyze   --trajectory <file> [--out <file>]");
         sink.WriteLine("            Report contention, turning points, pathing efficiency, and heatmaps");
         sink.WriteLine("            (compact terminal view without --out, full Markdown report with it)");
-        sink.WriteLine("  benchmark [--ticks <n>] [--out <file>] [--commit <sha>] [--cpu <model>]");
-        sink.WriteLine("            Measure core throughput: 50k-tick warmup, then 5 batches of <n> ticks");
-        sink.WriteLine("            (default 200k each); reports mean/min/max/stddev steps/sec, total managed");
-        sink.WriteLine("            allocation, and GC collection counts; '--out' writes a JSON artifact");
-        sink.WriteLine("            scoped to the host (runtime, OS, cores, CPU model, source revision)");
+        sink.WriteLine("  benchmark [--runs <n>] [--warmup <n>] [--steps <n>] [--out <file>] [--commit <sha>] [--cpu <model>]");
+        sink.WriteLine("            Measure the five-case workload matrix (raw stepping, facility, dynamic");
+        sink.WriteLine("            topology, stress, and MCTS policy) after a warm-up pass; reports per-case");
+        sink.WriteLine("            median/mean/stddev throughput, p50/p95 step latency, per-step allocation,");
+        sink.WriteLine("            and GC counts; '--out' writes a JSON artifact scoped to the host (commit,");
+        sink.WriteLine("            timestamp, runtime, OS, CPU, cores, RAM, GC mode). '--steps' overrides the");
+        sink.WriteLine("            per-iteration budget of the raw stepping cases, so a pass with tiny");
+        sink.WriteLine("            '--steps' and '--runs' makes a quick smoke run; the MCTS policy case keeps");
+        sink.WriteLine("            its own small catalog budget (100 ticks) in every mode");
         sink.WriteLine("  evaluate  [--seed-set dev|heldout[,dev|heldout]] [--rollouts <n>] [--seeds <n>] [--out <file>] [--commit <sha>]");
         sink.WriteLine("            Run the mirrored-seat paired evaluation of MCTS vs the Scout baseline");
         sink.WriteLine("            over a canonical seed suite (dev: 1001..1050, held-out: 2001..2050);");

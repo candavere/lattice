@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using Lattice.Agents;
@@ -14,8 +15,8 @@ namespace Lattice.Cli;
 /// <summary>
 /// The Lattice command-line driver: simulate, analyze, compare, render, and
     /// benchmark subcommands over the seedable environment.
-/// Turns plain `args` into one of five subcommands — `generate`, `simulate`,
-/// `render`, `analyze`, `benchmark` — and routes all
+/// Turns plain `args` into one of six subcommands — `generate`, `simulate`,
+/// `render`, `analyze`, `benchmark`, `evaluate` — and routes all
 /// I/O through caller-supplied writers so it stays a pure function of its
 /// inputs (no hidden state, no ambient reading of Console). The real entry
 /// point (Program.cs) just forwards <see cref="Console.Out"/>/<see cref="Console.Error"/>;
@@ -30,8 +31,63 @@ public static class CliApp
 
     private static readonly GeneratorConfig DefaultGeneratorConfig = new(3, 5, 1, 1, 3, GeneratorConfig.DefaultRetryCap);
     private const int DefaultSimulationSteps = 100;
-    private const int DefaultBenchmarkTicks = 1000;
+    private const int DefaultBenchmarkTicks = 200_000;
+    private const int DefaultEvaluationRollouts = 32;
     private const ulong BenchmarkSeed = 42;
+
+    private const string DevelopmentSuite = "dev";
+    private const string HeldOutSuite = "heldout";
+    private const string EvaluationTargetPolicy = "MCTS";
+    private const string EvaluationBaselinePolicy = "Scout";
+
+    /// <summary>
+    /// The canonical versioned evaluation seed sets: seeds 1001..1050 are the
+    /// development/validation suite (used while tuning), 2001..2050 are the
+    /// held-out suite (used only to grade the locked decision rule). Neither
+    /// set is derived from the other.
+    /// </summary>
+    private static readonly ulong[] DevelopmentEvaluationSeeds = SeedRange(1001, 50);
+    private static readonly ulong[] HeldOutEvaluationSeeds = SeedRange(2001, 50);
+
+    /// <summary>
+    /// The simulation parameters the paired evaluation runs its mirrored
+    /// matches under: two seats, transit timing enabled so positional
+    /// advantage is priced, and a 200-tick budget — enough for any
+    /// DefaultGeneratorConfig map to exhaust its resources.
+    /// </summary>
+    private static readonly SimulationConfig EvaluationSimulationConfig =
+        new(AgentCount: 2, MaxTicks: 200, TransitSpeed: 4);
+
+    private static readonly JsonSerializerOptions ArtifactJsonOptions = new() { WriteIndented = true };
+
+    /// <summary>
+    /// The machine-readable benchmark artifact written by <c>benchmark --out</c>:
+    /// the measured report plus the host and provenance facts the throughput
+    /// claim is scoped to (runtime, OS, cores, CPU model, source revision).
+    /// </summary>
+    internal sealed record BenchmarkArtifact(
+        string? CommitSha,
+        string? CpuModel,
+        DateTime CreatedAtUtc,
+        string Runtime,
+        string Os,
+        int Cores,
+        string Architecture,
+        BenchmarkReport Report);
+
+    /// <summary>
+    /// The machine-readable evaluation artifact written by
+    /// <c>evaluate --out</c>: the per-suite paired-study reports plus the
+    /// host and provenance facts the numbers were produced on.
+    /// </summary>
+    internal sealed record EvaluationArtifact(
+        string? CommitSha,
+        DateTime CreatedAtUtc,
+        string Runtime,
+        string Os,
+        int Cores,
+        string Architecture,
+        PairedStudyReport[] Studies);
 
     /// <summary>
     /// The simulation parameters the <c>--min-fairness</c> gate runs its
@@ -63,6 +119,7 @@ public static class CliApp
             "render" => Render(args[1..], stdout, stderr),
             "analyze" => Analyze(args[1..], stdout, stderr),
             "benchmark" => RunBenchmark(args[1..], stdout, stderr),
+            "evaluate" => Evaluate(args[1..], stdout, stderr),
             _ => UnknownCommand(args[0], stderr),
         };
     }
@@ -120,7 +177,7 @@ public static class CliApp
                 args = args.Where(arg => arg != "--quiet").ToArray();
             }
 
-            var (flags, positionals) = ParseFlags(args, "--seed", "--steps", "--agent", "--scenario", "--out");
+            var (flags, positionals) = ParseFlags(args, "--seed", "--steps", "--agent", "--scenario", "--out", "--rules");
             GuardNoPositionals(positionals);
             var seed = ParseULong(Require(flags, "--seed"), "--seed");
             var steps = flags.TryGetValue("--steps", out var stepsText)
@@ -145,25 +202,29 @@ public static class CliApp
                 ? agentText.ToLowerInvariant()
                 : "greedy";
 
+            var rules = flags.TryGetValue("--rules", out var rulesPath)
+                ? LoadRules(rulesPath)
+                : DynamicMapRuleSet.None;
+
             var config = new SimulationConfig(AgentCount: 2, MaxTicks: steps);
             var map = MapGenerator.Generate(seed, DefaultGeneratorConfig);
             var agent0 = agent switch
             {
                 "greedy" => (IAgent)new GreedyCollectorAgent(0),
                 "random" => new RandomAgent(0, new Rng(seed)),
-                "mcts" => new MctsAgent(0, config, seed, new MctsSearchConfig()),
+                "mcts" => new MctsAgent(0, config, seed, new MctsSearchConfig(), rules),
                 _ => throw new ArgumentException(
                     $"invalid --agent '{agentText}' (expected 'greedy', 'random', or 'mcts')."),
             };
             var contenders = new IAgent[] { agent0, new RandomAgent(1, new Rng(seed)) };
             var stopwatch = Stopwatch.StartNew();
-            var scenarioResult = ScenarioRunner.Run(map, config, contenders, maxSteps: steps);
+            var scenarioResult = ScenarioRunner.Run(map, config, contenders, maxSteps: steps, rules: rules);
             stopwatch.Stop();
 
             var jsonl = new StringBuilder();
             using (var sink = new StringWriter(jsonl))
             {
-                TrajectoryWriter.Record(map, config, seed, scenarioResult.Turns, sink);
+                TrajectoryWriter.Record(map, config, seed, scenarioResult.Turns, sink, rules: rules);
             }
 
             var lastInfo = scenarioResult.Results[^1].Info;
@@ -196,7 +257,7 @@ public static class CliApp
                     rows,
                     flags.TryGetValue("--out", out var path) ? path : null,
                     trajectory,
-                    DynamicMapRuleSet.None);
+                    rules);
             }
 
             return exit;
@@ -225,6 +286,11 @@ public static class CliApp
         if (flags.ContainsKey("--agent"))
         {
             throw new ArgumentException("--agent cannot be used with --scenario infiltration (the roster is fixed: Sentry vs Infiltrator).");
+        }
+
+        if (flags.ContainsKey("--rules"))
+        {
+            throw new ArgumentException("--rules cannot be used with --scenario infiltration (the scenario owns its topology).");
         }
 
         var stopwatch = Stopwatch.StartNew();
@@ -515,29 +581,225 @@ public static class CliApp
     {
         try
         {
-            var (flags, positionals) = ParseFlags(args, "--ticks");
+            var (flags, positionals) = ParseFlags(args, "--ticks", "--out", "--commit", "--cpu");
             GuardNoPositionals(positionals);
             var ticks = flags.TryGetValue("--ticks", out var ticksText)
                 ? ParsePositiveInt(ticksText, "--ticks")
                 : DefaultBenchmarkTicks;
+            var commit = flags.TryGetValue("--commit", out var commitText) ? commitText : null;
+            var cpu = flags.TryGetValue("--cpu", out var cpuText) ? cpuText : null;
 
             var map = MapGenerator.Generate(BenchmarkSeed, DefaultGeneratorConfig);
             var config = new SimulationConfig(AgentCount: 2, MaxTicks: ticks);
             var turn = new[] { new AgentAction(ActionKind.Wait), new AgentAction(ActionKind.Wait) };
-            var result = Lattice.Cli.Benchmark.Run(map, config, turn, ticks);
+            var report = Benchmark.Run(map, config, turn, ticks);
 
             var invariant = CultureInfo.InvariantCulture;
-            stdout.WriteLine($"ticks={result.Ticks}");
-            stdout.WriteLine($"elapsed_ms={result.ElapsedMs.ToString("0.###", invariant)}");
-            stdout.WriteLine($"steps_per_second={result.StepsPerSecond.ToString("0.#", invariant)}");
-            stdout.WriteLine($"allocated_bytes={result.AllocatedBytes}");
-            stdout.WriteLine($"bytes_per_tick={result.BytesPerTick.ToString("0.#", invariant)}");
+            stdout.WriteLine($"ticks={report.Ticks}");
+            stdout.WriteLine($"runs={report.Runs}");
+            stdout.WriteLine($"total_ticks={report.TotalTicks}");
+            stdout.WriteLine($"warmup_ticks={report.WarmupTicks}");
+            stdout.WriteLine($"elapsed_ms={report.TotalElapsedMs.ToString("0.###", invariant)}");
+            stdout.WriteLine($"mean_steps_per_second={report.MeanStepsPerSecond.ToString("0.#", invariant)}");
+            stdout.WriteLine($"min_steps_per_second={report.MinStepsPerSecond.ToString("0.#", invariant)}");
+            stdout.WriteLine($"max_steps_per_second={report.MaxStepsPerSecond.ToString("0.#", invariant)}");
+            stdout.WriteLine($"stddev_steps_per_second={report.StdDevStepsPerSecond.ToString("0.#", invariant)}");
+            stdout.WriteLine($"allocated_bytes={report.AllocatedBytes}");
+            stdout.WriteLine($"bytes_per_tick={report.BytesPerTick.ToString("0.#", invariant)}");
+            stdout.WriteLine($"gc_gen0={report.GcGen0}");
+            stdout.WriteLine($"gc_gen1={report.GcGen1}");
+            stdout.WriteLine($"gc_gen2={report.GcGen2}");
+
+            if (flags.TryGetValue("--out", out var outPath))
+            {
+                var artifact = new BenchmarkArtifact(
+                    commit,
+                    cpu,
+                    DateTime.UtcNow,
+                    RuntimeDescription(),
+                    OsDescription(),
+                    System.Environment.ProcessorCount,
+                    ArchitectureDescription(),
+                    report);
+                File.WriteAllText(outPath, JsonSerializer.Serialize(artifact, ArtifactJsonOptions) + "\n");
+                stderr.WriteLine($"wrote {outPath}");
+            }
+
             return Success;
         }
         catch (Exception ex)
         {
             return Report(ex, stderr);
         }
+    }
+
+    /// <summary>
+    /// Runs the mirrored-seat paired evaluation of the MCTS policy against the
+    /// Scout heuristic baseline over a canonical seed suite, writes the
+    /// machine-readable report artifact, and prints a per-suite summary to
+    /// stderr. The baseline seats are mirrored per seed so spawn bias cancels
+    /// out of the paired delta; the decision rule (mean paired delta &gt; 0 with
+    /// a 95% CI lower bound &gt; 0) is graded on the held-out suite.
+    /// </summary>
+    private static int Evaluate(string[] args, TextWriter stdout, TextWriter stderr)
+    {
+        try
+        {
+            var (flags, positionals) = ParseFlags(args, "--seed-set", "--rollouts", "--seeds", "--out", "--commit");
+            GuardNoPositionals(positionals);
+            var seedSetText = flags.TryGetValue("--seed-set", out var setText)
+                ? setText.ToLowerInvariant()
+                : HeldOutSuite;
+            var suites = seedSetText.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            if (suites.Length == 0)
+            {
+                throw new ArgumentException("--seed-set requires at least one suite.");
+            }
+
+            if (suites.Any(suite => suite is not (DevelopmentSuite or HeldOutSuite)))
+            {
+                throw new ArgumentException(
+                    $"invalid --seed-set '{seedSetText}' (expected '{DevelopmentSuite}' and/or '{HeldOutSuite}').");
+            }
+
+            var rollouts = flags.TryGetValue("--rollouts", out var rolloutsText)
+                ? ParsePositiveInt(rolloutsText, "--rollouts")
+                : DefaultEvaluationRollouts;
+            var seedCap = flags.TryGetValue("--seeds", out var capText)
+                ? ParsePositiveInt(capText, "--seeds")
+                : 50;
+            var commit = flags.TryGetValue("--commit", out var commitText) ? commitText : null;
+
+            var search = new MctsSearchConfig(rolloutsPerAction: rollouts, maxDepth: 12);
+            var teams = new IAgentFactory[]
+            {
+                new MctsAgentFactory(EvaluationSimulationConfig, search, name: EvaluationTargetPolicy),
+                new ScoutCollectorAgentFactory(name: EvaluationBaselinePolicy),
+            };
+            var pairings = new[] { (0, 1), (1, 0) };
+
+            var studies = new List<PairedStudyReport>();
+            foreach (var suite in suites)
+            {
+                var seeds = (suite == DevelopmentSuite ? DevelopmentEvaluationSeeds : HeldOutEvaluationSeeds)
+                    .Take(seedCap)
+                    .ToArray();
+                var spec = new EvaluationSpec(
+                    seeds,
+                    seed => MapGenerator.Generate(seed, DefaultGeneratorConfig),
+                    EvaluationSimulationConfig,
+                    teams,
+                    pairings,
+                    maxSteps: EvaluationSimulationConfig.MaxTicks);
+                var study = PairedStudy.Analyze(
+                    suite,
+                    EvaluationTargetPolicy,
+                    EvaluationBaselinePolicy,
+                    rollouts,
+                    EvaluationSimulationConfig.MaxTicks,
+                    EvaluationHarness.Evaluate(spec));
+                studies.Add(study);
+                WriteEvaluationSummary(stderr, study);
+            }
+
+            var artifact = new EvaluationArtifact(
+                commit,
+                DateTime.UtcNow,
+                RuntimeDescription(),
+                OsDescription(),
+                System.Environment.ProcessorCount,
+                ArchitectureDescription(),
+                studies.ToArray());
+            var json = JsonSerializer.Serialize(artifact, ArtifactJsonOptions);
+            return WriteOutput(flags, "--out", json, stdout, stderr);
+        }
+        catch (Exception ex)
+        {
+            return Report(ex, stderr);
+        }
+    }
+
+    private static void WriteEvaluationSummary(TextWriter stderr, PairedStudyReport study)
+    {
+        var stats = study.Statistics;
+        var invariant = CultureInfo.InvariantCulture;
+        stderr.WriteLine(
+            $"evaluation suite={study.Suite} seeds={stats.Seeds} matches={stats.Matches}" +
+            $" policy={study.TargetPolicy} baseline={study.BaselinePolicy} rollouts={study.RolloutsPerAction}" +
+            $" max_steps={study.MaxStepsPerMatch}");
+        stderr.WriteLine(
+            $"  paired delta   mean={stats.MeanDelta.ToString("0.###", invariant)}" +
+            $"  median={stats.MedianDelta.ToString("0.###", invariant)}" +
+            $"  sd={stats.StdDevDelta.ToString("0.###", invariant)}" +
+            $"  iqr={stats.IqrDelta.ToString("0.###", invariant)}");
+        stderr.WriteLine(
+            $"  95% CI         [{stats.CiLower95.ToString("0.###", invariant)}, {stats.CiUpper95.ToString("0.###", invariant)}]" +
+            $"  -> {(study.Passed ? "PASS" : "FAIL")}");
+        stderr.WriteLine(
+            $"  outcomes       win={Percent(stats.WinRate, invariant)}" +
+            $"  draw={Percent(stats.DrawRate, invariant)}" +
+            $"  loss={Percent(stats.LossRate, invariant)}" +
+            $"  timeout={Percent(stats.TimeoutRate, invariant)}" +
+            $"  contention={Percent(stats.MeanContentionSaturation, invariant)}");
+    }
+
+    private static string Percent(double fraction, CultureInfo invariant) =>
+        (fraction * 100.0).ToString("0.0", invariant) + "%";
+
+    /// <summary>
+    /// Loads a <see cref="DynamicMapRuleSet"/> from a JSON file and re-hydrates
+    /// every rule through its validating constructor, so a file cannot smuggle
+    /// a degenerate schedule (zero-length cycle, negative capacity) past the
+    /// same checks the programmatic API enforces.
+    /// </summary>
+    private static DynamicMapRuleSet LoadRules(string path)
+    {
+        DynamicMapRuleSet loaded;
+        using (var reader = new StreamReader(path))
+        {
+            loaded = JsonSerializer.Deserialize<DynamicMapRuleSet>(reader.ReadToEnd())
+                ?? throw new InvalidDataException($"No dynamic rules could be parsed from '{path}'.");
+        }
+
+        var rules = new List<IDynamicMapRule>();
+        foreach (var rule in loaded.Rules)
+        {
+            rules.Add(rule switch
+            {
+                TimedPortcullisRule portcullis =>
+                    new TimedPortcullisRule(
+                        portcullis.ChokeId,
+                        portcullis.OpenTicks,
+                        portcullis.ClosedTicks,
+                        portcullis.OpenCapacity,
+                        portcullis.ClosedCapacity),
+                EventLockedChokeRule eventLock =>
+                    new EventLockedChokeRule(
+                        eventLock.ChokeId,
+                        eventLock.TriggerResourceId,
+                        eventLock.LockedCapacity),
+                _ => rule,
+            });
+        }
+
+        return new DynamicMapRuleSet(rules);
+    }
+
+    private static string RuntimeDescription() => RuntimeInformation.FrameworkDescription;
+
+    private static string OsDescription() => RuntimeInformation.OSDescription.Trim();
+
+    private static string ArchitectureDescription() => RuntimeInformation.ProcessArchitecture.ToString();
+
+    private static ulong[] SeedRange(ulong start, int count)
+    {
+        var seeds = new ulong[count];
+        for (var i = 0; i < count; i++)
+        {
+            seeds[i] = start + (ulong)i;
+        }
+
+        return seeds;
     }
 
     private static string RenderAscii(TextReader source)
@@ -685,9 +947,11 @@ public static class CliApp
         sink.WriteLine("  generate  --seed <ulong> [--min-fairness <0..1>] [--out <file>]");
         sink.WriteLine("            Generate a valid map (JSON) to stdout or file; with --min-fairness,");
         sink.WriteLine("            retry generation until the mirrored spawn-bias index meets the threshold");
-        sink.WriteLine("  simulate  --seed <ulong> [--steps <n>] [--agent greedy|random|mcts] [--out <file>] [--quiet]");
+        sink.WriteLine("  simulate  --seed <ulong> [--steps <n>] [--agent greedy|random|mcts] [--out <file>] [--quiet] [--rules <file>]");
         sink.WriteLine("            Record a greedy (default)-vs-random episode as trajectory JSONL;");
         sink.WriteLine("            '--agent mcts' substitutes a rollout-based tactical agent for agent 0;");
+        sink.WriteLine("            '--rules' loads a JSON DynamicMapRuleSet (timed portcullises / event locks)");
+        sink.WriteLine("            into the episode, the recorded header, contention, and replay verification;");
         sink.WriteLine("            an ANSI run dashboard renders on stderr unless '--quiet' suppresses it");
         sink.WriteLine("  simulate  --seed <ulong> --scenario infiltration [--steps <n>] [--out <file>] [--quiet]");
         sink.WriteLine("            Record a Dungeon Infiltration & Sentry Patrol episode: fix the roster to");
@@ -698,7 +962,15 @@ public static class CliApp
         sink.WriteLine("  analyze   --trajectory <file> [--out <file>]");
         sink.WriteLine("            Report contention, turning points, pathing efficiency, and heatmaps");
         sink.WriteLine("            (compact terminal view without --out, full Markdown report with it)");
-        sink.WriteLine("  benchmark [--ticks <n>]                       Measure core throughput and allocations");
+        sink.WriteLine("  benchmark [--ticks <n>] [--out <file>] [--commit <sha>] [--cpu <model>]");
+        sink.WriteLine("            Measure core throughput: 50k-tick warmup, then 5 batches of <n> ticks");
+        sink.WriteLine("            (default 200k each); reports mean/min/max/stddev steps/sec, total managed");
+        sink.WriteLine("            allocation, and GC collection counts; '--out' writes a JSON artifact");
+        sink.WriteLine("            scoped to the host (runtime, OS, cores, CPU model, source revision)");
+        sink.WriteLine("  evaluate  [--seed-set dev|heldout[,dev|heldout]] [--rollouts <n>] [--seeds <n>] [--out <file>] [--commit <sha>]");
+        sink.WriteLine("            Run the mirrored-seat paired evaluation of MCTS vs the Scout baseline");
+        sink.WriteLine("            over a canonical seed suite (dev: 1001..1050, held-out: 2001..2050);");
+        sink.WriteLine("            '--out' writes the machine-readable per-seed + statistics artifact");
         sink.WriteLine();
         sink.WriteLine("  -h, --help                                    Show this help and exit");
     }

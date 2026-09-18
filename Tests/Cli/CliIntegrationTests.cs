@@ -1,5 +1,7 @@
 using System.Text.Json;
 using Lattice.Cli;
+using Lattice.Environment;
+using Lattice.Generator;
 using Xunit;
 
 namespace Lattice.Tests.Cli;
@@ -425,6 +427,241 @@ public class CliIntegrationTests
         finally
         {
             File.Delete(trajectory);
+        }
+    }
+
+    [Fact]
+    public void Evaluate_WithOutFlag_WritesJsonArtifact()
+    {
+        var path = TempPath(".json");
+        try
+        {
+            var (exit, stdout, stderr) = Run("evaluate", "--seed-set", "dev", "--rollouts", "2", "--seeds", "2", "--out", path);
+
+            Assert.Equal(0, exit);
+            Assert.Equal("", stdout);
+            Assert.Contains("evaluation suite=dev", stderr);
+            Assert.Contains("-> FAIL", stderr);
+
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            var root = document.RootElement;
+            Assert.True(root.TryGetProperty("CommitSha", out _));
+            Assert.True(root.GetProperty("Studies").GetArrayLength() == 1);
+            Assert.Equal("dev", root.GetProperty("Studies")[0].GetProperty("Suite").GetString());
+            Assert.Equal("MCTS", root.GetProperty("Studies")[0].GetProperty("TargetPolicy").GetString());
+            Assert.Equal(2, root.GetProperty("Studies")[0].GetProperty("PerSeed").GetArrayLength());
+            Assert.Equal(4, root.GetProperty("Studies")[0].GetProperty("Statistics").GetProperty("Matches").GetInt32());
+            Assert.True(root.GetProperty("Studies")[0].GetProperty("Statistics").TryGetProperty("CiLower95", out _));
+            Assert.True(root.GetProperty("Studies")[0].GetProperty("Passed").GetBoolean() == false);
+            Assert.True(root.GetProperty("Cores").GetInt32() > 0);
+            Assert.False(string.IsNullOrEmpty(root.GetProperty("Runtime").GetString()));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Evaluate_StudyReport_IsDeterministicAcrossRuns()
+    {
+        var first = TempPath(".json");
+        var second = TempPath(".json");
+        try
+        {
+            Assert.Equal(0, Run("evaluate", "--seed-set", "dev", "--rollouts", "2", "--seeds", "2", "--out", first).ExitCode);
+            Assert.Equal(0, Run("evaluate", "--seed-set", "dev", "--rollouts", "2", "--seeds", "2", "--out", second).ExitCode);
+
+            using var docA = JsonDocument.Parse(File.ReadAllText(first));
+            using var docB = JsonDocument.Parse(File.ReadAllText(second));
+            Assert.Equal(
+                docA.RootElement.GetProperty("Studies").GetRawText(),
+                docB.RootElement.GetProperty("Studies").GetRawText());
+        }
+        finally
+        {
+            File.Delete(first);
+            File.Delete(second);
+        }
+    }
+
+    [Fact]
+    public void Evaluate_CommitFlag_RecordedInArtifact()
+    {
+        var path = TempPath(".json");
+        try
+        {
+            Assert.Equal(0, Run("evaluate", "--seed-set", "dev", "--rollouts", "2", "--seeds", "2", "--commit", "abc1234", "--out", path).ExitCode);
+
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            Assert.Equal("abc1234", document.RootElement.GetProperty("CommitSha").GetString());
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Evaluate_DefaultsToHeldOutSuite()
+    {
+        var (exit, _, stderr) = Run("evaluate", "--rollouts", "2", "--seeds", "2");
+
+        Assert.Equal(0, exit);
+        Assert.Contains("evaluation suite=heldout", stderr);
+    }
+
+    [Fact]
+    public void Evaluate_MultipleSuites_WritesBothStudies()
+    {
+        var path = TempPath(".json");
+        try
+        {
+            var (exit, stdout, stderr) = Run("evaluate", "--seed-set", "dev,heldout", "--rollouts", "2", "--seeds", "2", "--out", path);
+
+            Assert.Equal(0, exit);
+            Assert.Equal("", stdout);
+            Assert.Contains("evaluation suite=dev", stderr);
+            Assert.Contains("evaluation suite=heldout", stderr);
+
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            Assert.Equal(2, document.RootElement.GetProperty("Studies").GetArrayLength());
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Evaluate_InvalidSeedSet_NonZeroExit()
+    {
+        var (exit, _, stderr) = Run("evaluate", "--seed-set", "staging");
+
+        Assert.NotEqual(0, exit);
+        Assert.Contains("invalid --seed-set", stderr);
+    }
+
+    [Fact]
+    public void Simulate_WithRulesFile_HeaderCarriesDynamicRulesAndReplayVerifies()
+    {
+        var rulesFile = TempPath(".json");
+        var trajectory = TempPath(".jsonl");
+        try
+        {
+            var map = MapGenerator.Generate(7, new GeneratorConfig(3, 5, 1, 1, 3, 50));
+            var rules = new DynamicMapRuleSet(new IDynamicMapRule[]
+            {
+                new TimedPortcullisRule(map.ChokePoints[0].Id, OpenTicks: 2, ClosedTicks: 2),
+            });
+            File.WriteAllText(rulesFile, JsonSerializer.Serialize(rules));
+
+            var (exit, stdout, stderr) = Run("simulate", "--seed", "7", "--rules", rulesFile, "--steps", "15", "--out", trajectory);
+
+            Assert.Equal(0, exit);
+            Assert.Equal("", stdout);
+            Assert.Contains("recorded", stderr);
+            Assert.Contains("byte-identical replay verified", stderr);
+
+            var file = File.ReadAllText(trajectory);
+            Assert.Contains("\"DynamicRules\"", file);
+            Assert.Contains("\"ruleKind\":\"timed-portcullis\"", file);
+        }
+        finally
+        {
+            File.Delete(rulesFile);
+            File.Delete(trajectory);
+        }
+    }
+
+    [Fact]
+    public void Simulate_WithRulesFile_IsDeterministicAcrossRuns()
+    {
+        var rulesFile = TempPath(".json");
+        try
+        {
+            var map = MapGenerator.Generate(7, new GeneratorConfig(3, 5, 1, 1, 3, 50));
+            var rules = new DynamicMapRuleSet(new IDynamicMapRule[]
+            {
+                new TimedPortcullisRule(map.ChokePoints[0].Id, OpenTicks: 2, ClosedTicks: 2),
+            });
+            File.WriteAllText(rulesFile, JsonSerializer.Serialize(rules));
+
+            var first = Run("simulate", "--seed", "7", "--rules", rulesFile, "--steps", "20").Stdout;
+            var second = Run("simulate", "--seed", "7", "--rules", rulesFile, "--steps", "20").Stdout;
+
+            Assert.Equal(first, second);
+        }
+        finally
+        {
+            File.Delete(rulesFile);
+        }
+    }
+
+    [Fact]
+    public void Simulate_MissingRulesFile_NonZeroExit()
+    {
+        var (exit, _, stderr) = Run("simulate", "--seed", "7", "--rules", "does-not-exist.json");
+
+        Assert.NotEqual(0, exit);
+        Assert.Contains("error:", stderr);
+    }
+
+    [Fact]
+    public void Simulate_RulesWithInfiltration_NonZeroExit()
+    {
+        var (exit, _, stderr) = Run("simulate", "--scenario", "infiltration", "--seed", "42", "--rules", "x.json");
+
+        Assert.NotEqual(0, exit);
+        Assert.Contains("--rules cannot be used with --scenario infiltration", stderr);
+    }
+
+    [Fact]
+    public void Benchmark_WithOutFlag_WritesJsonArtifact()
+    {
+        var path = TempPath(".json");
+        try
+        {
+            var (exit, stdout, stderr) = Run("benchmark", "--ticks", "200", "--out", path);
+
+            Assert.Equal(0, exit);
+            Assert.Contains("runs=5", stdout);
+            Assert.Contains("warmup_ticks=50000", stdout);
+            Assert.Contains("gc_gen0=", stdout);
+            Assert.Contains("wrote", stderr);
+
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            var report = document.RootElement.GetProperty("Report");
+            Assert.Equal(5, report.GetProperty("Runs").GetInt32());
+            Assert.Equal(200, report.GetProperty("Ticks").GetInt32());
+            Assert.Equal(1000, report.GetProperty("TotalTicks").GetInt32());
+            Assert.Equal(50000, report.GetProperty("WarmupTicks").GetInt32());
+            Assert.True(report.GetProperty("MinStepsPerSecond").GetDouble() <= report.GetProperty("MeanStepsPerSecond").GetDouble());
+            Assert.True(report.GetProperty("MeanStepsPerSecond").GetDouble() <= report.GetProperty("MaxStepsPerSecond").GetDouble());
+            Assert.True(report.GetProperty("GcGen0").GetInt64() >= 0);
+            Assert.True(document.RootElement.GetProperty("Cores").GetInt32() > 0);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Benchmark_CommitAndCpuFlags_RecordedInArtifact()
+    {
+        var path = TempPath(".json");
+        try
+        {
+            Assert.Equal(0, Run("benchmark", "--ticks", "200", "--commit", "deadbeef", "--cpu", "Unit Test CPU", "--out", path).ExitCode);
+
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            Assert.Equal("deadbeef", document.RootElement.GetProperty("CommitSha").GetString());
+            Assert.Equal("Unit Test CPU", document.RootElement.GetProperty("CpuModel").GetString());
+        }
+        finally
+        {
+            File.Delete(path);
         }
     }
 }

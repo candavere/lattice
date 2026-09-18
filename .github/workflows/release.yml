@@ -60,6 +60,7 @@ jobs:
     name: Attach binaries to GitHub Release
     needs: publish
     runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
     steps:

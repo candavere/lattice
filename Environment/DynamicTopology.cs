@@ -37,13 +37,73 @@ public interface IDynamicMapRule
 /// single-lane gate from traversable to impassable every
 /// <paramref name="OpenTicks"/> / <paramref name="ClosedTicks"/> ticks.
 /// </summary>
-public sealed record TimedPortcullisRule(
-    int ChokeId,
-    int OpenTicks,
-    int ClosedTicks,
-    int OpenCapacity = 1,
-    int ClosedCapacity = 0) : IDynamicMapRule
+public sealed record TimedPortcullisRule : IDynamicMapRule
 {
+    /// <summary>The choke the portcullis governs.</summary>
+    public int ChokeId { get; init; }
+
+    /// <summary>The choke's capacity while the gate is open (base capacity by default).</summary>
+    public int OpenCapacity { get; init; }
+
+    /// <summary>The number of open ticks per cycle.</summary>
+    public int OpenTicks { get; init; }
+
+    /// <summary>The number of closed ticks per cycle.</summary>
+    public int ClosedTicks { get; init; }
+
+    /// <summary>The choke's capacity while the gate is closed (0 by default).</summary>
+    public int ClosedCapacity { get; init; }
+
+    /// <summary>
+    /// Validates the schedule up front so a defective rule fails loudly at
+    /// authoring time instead of silently toggling on a degenerate cycle:
+    /// choke id and capacities must be non-negative, the open/closed windows
+    /// must each be at least one tick, and the two windows summed must fit a
+    /// 32-bit signed integer so the repeating cycle arithmetic
+    /// (<c>stepCount % (OpenTicks + ClosedTicks)</c>) never overflows.
+    /// </summary>
+    public TimedPortcullisRule(int ChokeId, int OpenTicks, int ClosedTicks, int OpenCapacity = 1, int ClosedCapacity = 0)
+    {
+        if (ChokeId < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(ChokeId), ChokeId, "ChokeId must be >= 0.");
+        }
+
+        if (OpenTicks < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(OpenTicks), OpenTicks, "OpenTicks must be >= 1.");
+        }
+
+        if (ClosedTicks < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(ClosedTicks), ClosedTicks, "ClosedTicks must be >= 1.");
+        }
+
+        if (OpenCapacity < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(OpenCapacity), OpenCapacity, "OpenCapacity must be >= 0.");
+        }
+
+        if (ClosedCapacity < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(ClosedCapacity), ClosedCapacity, "ClosedCapacity must be >= 0.");
+        }
+
+        if ((long)OpenTicks + ClosedTicks > int.MaxValue)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(OpenTicks),
+                OpenTicks,
+                $"OpenTicks + ClosedTicks must fit a 32-bit signed integer (int.MaxValue = {int.MaxValue}).");
+        }
+
+        this.ChokeId = ChokeId;
+        this.OpenTicks = OpenTicks;
+        this.ClosedTicks = ClosedTicks;
+        this.OpenCapacity = OpenCapacity;
+        this.ClosedCapacity = ClosedCapacity;
+    }
+
     /// <inheritdoc />
     public int? EffectiveChokeCapacity(int chokeId, int stepCount, IReadOnlyCollection<int> claims)
     {
@@ -63,11 +123,46 @@ public sealed record TimedPortcullisRule(
 /// vault room behind the agent that made the first fetch. The lock is
 /// permanent and applies from the tick after the triggering claim lands.
 /// </summary>
-public sealed record EventLockedChokeRule(
-    int ChokeId,
-    int TriggerResourceId,
-    int LockedCapacity = 0) : IDynamicMapRule
+public sealed record EventLockedChokeRule : IDynamicMapRule
 {
+    /// <summary>The choke the lock seals.</summary>
+    public int ChokeId { get; init; }
+
+    /// <summary>The resource that trips the lock once claimed.</summary>
+    public int TriggerResourceId { get; init; }
+
+    /// <summary>The choke's capacity once locked (0 by default).</summary>
+    public int LockedCapacity { get; init; }
+
+    /// <summary>
+    /// Validates the parameters up front: the choke id and trigger resource
+    /// must be non-negative (a negative trigger id can never be claimed, so
+    /// the lock would be a silent no-op) and the locked capacity must be
+    /// non-negative.
+    /// </summary>
+    public EventLockedChokeRule(int ChokeId, int TriggerResourceId, int LockedCapacity = 0)
+    {
+        if (ChokeId < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(ChokeId), ChokeId, "ChokeId must be >= 0.");
+        }
+
+        if (TriggerResourceId < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(TriggerResourceId), TriggerResourceId, "TriggerResourceId must be >= 0.");
+        }
+
+        if (LockedCapacity < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(LockedCapacity), LockedCapacity, "LockedCapacity must be >= 0.");
+        }
+
+        this.ChokeId = ChokeId;
+        this.TriggerResourceId = TriggerResourceId;
+        this.LockedCapacity = LockedCapacity;
+    }
+
     /// <inheritdoc />
     public int? EffectiveChokeCapacity(int chokeId, int stepCount, IReadOnlyCollection<int> claims)
     {
@@ -106,6 +201,48 @@ public sealed class DynamicMapRuleSet
     public IReadOnlyList<IDynamicMapRule> Rules { get; }
 
     /// <summary>
+    /// Validates every rule against <paramref name="map"/> so a rule that
+    /// references a choke outside the topology is rejected when the rule set
+    /// is bound to an episode — the choke id would otherwise silently never
+    /// apply. Evaluation flows through this on every episode (the initial
+    /// tick's <see cref="DynamicMapOverrides.ForInitialTick"/> delegates to
+    /// <see cref="ComputeChokeCapacities"/>), so a rule set is always checked
+    /// against the map it is evaluated against.
+    /// </summary>
+    public void ValidateFor(MapGraph map)
+    {
+        if (map is null)
+        {
+            throw new ArgumentNullException(nameof(map));
+        }
+
+        foreach (var choke in map.ChokePoints)
+        {
+            if (choke.Id < 0)
+            {
+                throw new ArgumentException(
+                    $"ChokePoint {choke.Id} has a negative id; the map topology is malformed.", nameof(map));
+            }
+        }
+
+        foreach (var rule in Rules)
+        {
+            switch (rule)
+            {
+                case TimedPortcullisRule portcullis when !map.ChokePoints.Any(choke => choke.Id == portcullis.ChokeId):
+                    throw new ArgumentException(
+                        $"TimedPortcullisRule references choke {portcullis.ChokeId}, which does not exist in the map topology.",
+                        nameof(Rules));
+
+                case EventLockedChokeRule eventLock when !map.ChokePoints.Any(choke => choke.Id == eventLock.ChokeId):
+                    throw new ArgumentException(
+                        $"EventLockedChokeRule references choke {eventLock.ChokeId}, which does not exist in the map topology.",
+                        nameof(Rules));
+            }
+        }
+    }
+
+    /// <summary>
     /// Evaluates every rule against the map at <paramref name="stepCount"/>,
     /// returning the choke overrides that differ from the base map values.
     /// Only meaningful overrides are stored, so the result doubles as the
@@ -116,6 +253,8 @@ public sealed class DynamicMapRuleSet
         IReadOnlyCollection<int> claims,
         MapGraph map)
     {
+        ValidateFor(map);
+
         var builder = ImmutableDictionary.CreateBuilder<int, int>();
         foreach (var choke in map.ChokePoints)
         {

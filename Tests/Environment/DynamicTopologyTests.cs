@@ -128,14 +128,67 @@ public class DynamicTopologyTests
     public void DynamicOverrides_DoNotAlterTheBaseMap()
     {
         var map = Line();
+        // An always-felt override (open capacity 0 on a base-capacity-1 choke):
+        // the dynamic snapshot reads 0 at the owning tick while the map's base
+        // topology stays untouched at 1.
         var rules = new DynamicMapRuleSet(new IDynamicMapRule[]
         {
-            new TimedPortcullisRule(ChokeId: 0, OpenTicks: 0, ClosedTicks: 1, ClosedCapacity: 0),
+            new TimedPortcullisRule(ChokeId: 0, OpenTicks: 1, ClosedTicks: 1, OpenCapacity: 0, ClosedCapacity: 0),
         });
 
         var state = Simulation.CreateInitial(map, Config, rules);
         Assert.Equal(0, state.Dynamics.EffectiveChokeCapacity(map, 0));
         Assert.Equal(1, map.ChokePoints[0].MaxOccupancy);
+    }
+
+    [Fact]
+    public void TimedPortcullis_RejectsInvalidSchedules()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new TimedPortcullisRule(ChokeId: 0, OpenTicks: 0, ClosedTicks: 1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new TimedPortcullisRule(ChokeId: 0, OpenTicks: 1, ClosedTicks: 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new TimedPortcullisRule(ChokeId: -1, OpenTicks: 1, ClosedTicks: 1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new TimedPortcullisRule(ChokeId: 0, OpenTicks: 1, ClosedTicks: 1, OpenCapacity: -1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new TimedPortcullisRule(ChokeId: 0, OpenTicks: 1, ClosedTicks: 1, ClosedCapacity: -1));
+    }
+
+    [Fact]
+    public void TimedPortcullis_RejectsCycleThatOverflowsInt()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new TimedPortcullisRule(ChokeId: 0, OpenTicks: int.MaxValue, ClosedTicks: 1));
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new TimedPortcullisRule(ChokeId: 0, OpenTicks: 1, ClosedTicks: int.MaxValue));
+
+        // The largest schedule that still fits an int cycle is accepted.
+        _ = new TimedPortcullisRule(ChokeId: 0, OpenTicks: int.MaxValue - 1, ClosedTicks: 1);
+    }
+
+    [Fact]
+    public void EventLockedChoke_RejectsInvalidParameters()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new EventLockedChokeRule(ChokeId: -1, TriggerResourceId: 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new EventLockedChokeRule(ChokeId: 0, TriggerResourceId: -1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new EventLockedChokeRule(ChokeId: 0, TriggerResourceId: 0, LockedCapacity: -1));
+    }
+
+    [Fact]
+    public void RuleSet_RejectsChokeIdsAbsentFromTheTopology()
+    {
+        var map = Line(); // chokes are ids 0 and 1 only
+
+        var unknownPortcullis = new DynamicMapRuleSet(new IDynamicMapRule[]
+        {
+            new TimedPortcullisRule(ChokeId: 7, OpenTicks: 1, ClosedTicks: 1),
+        });
+        Assert.Throws<ArgumentException>(
+            () => Simulation.CreateInitial(map, Config, unknownPortcullis));
+
+        var unknownLock = new DynamicMapRuleSet(new IDynamicMapRule[]
+        {
+            new EventLockedChokeRule(ChokeId: 9, TriggerResourceId: 0),
+        });
+        Assert.Throws<ArgumentException>(
+            () => Simulation.CreateInitial(map, Config, unknownLock));
     }
 
     [Fact]
@@ -182,7 +235,7 @@ public class DynamicTopologyTests
         var map = Line();
         var rules = new DynamicMapRuleSet(new IDynamicMapRule[]
         {
-            new TimedPortcullisRule(ChokeId: 0, OpenTicks: 0, ClosedTicks: 1, ClosedCapacity: 0),
+            new TimedPortcullisRule(ChokeId: 0, OpenTicks: 1, ClosedTicks: 1, OpenCapacity: 0, ClosedCapacity: 0),
         });
         var environment = new LatticeEnvironment(map, Config, rules);
 

@@ -495,11 +495,13 @@ cross-host comparison table and enforces the structural checks.
 | `--seed-set <dev\|heldout>` | Canonical suites: `dev` = 1001..1050, `heldout` = 2001..2050 (comma-separate to run both) |
 | `--rollouts <n>` | MCTS rollouts per action; default 32 |
 | `--seeds <n>` | Cap on seeds per suite (default 50; the decision rule needs ≥ 30) |
+| `--scenario <standard\|bottleneck>` | Map topology: `standard` = generated maps (default), `bottleneck` = the fixed contention-bearing map with every resource behind capacity-1 chokes |
 | `--commit <sha>` | Source revision recorded in the artifact |
 | `--out <file>` | Write the JSON artifact to a file instead of stdout |
 
 ```sh
 dotnet run --project Cli -- evaluate --seed-set dev,heldout --rollouts 32 --out benchmarks/mcts_evaluation_results.json
+dotnet run --project Cli -- evaluate --seed-set dev --scenario bottleneck --out benchmarks/mcts_evaluation_bottleneck.json
 ```
 
 Runs the empirical evaluation protocol: for every seed, two matches **with
@@ -532,15 +534,39 @@ Scout heuristic** on both suites: the mean paired delta is negative and the
 entire 95% CI sits below 0, so the decision rule fails by a wide margin
 (~1 to 1.5 resource-equivalents per match; zero timeouts). This is a real,
 reproducible finding — every suite run always terminates at
-`resources-exhausted` on ≤ 200 ticks, contention stays at 0 (the maps never
-put both agents on the same claim path), and the per-seed deltas repeat
-byte-for-byte across runs. It is also a *working verdict*, not a bug: the
-harness's whole point is that a rollout budget, map distribution, and
-baseline family produce evidence; the evidence currently says the 1-tick
-scout's back-pressure-aware collection beats this budget's shallow lookahead.
-To challenge the result, raise the budget (`--rollouts 64`, the CLI's next
-canonical config), change the map distribution, or swap the baseline — the
-artifact and README table are the before/after record.
+`resources-exhausted` on ≤ 200 ticks, contention stays at 0 on the default
+maps (the generated topologies never put both agents on the same claim path),
+and the per-seed deltas repeat byte-for-byte across runs. It is also a
+*working verdict*, not a bug: the harness's whole point is that a rollout
+budget, map distribution, and baseline family produce evidence; the evidence
+currently says the 1-tick scout's back-pressure-aware collection beats this
+budget's shallow lookahead.
+
+**This failure is the committed baseline.** It is not a dead-end to be hidden
+— it is the reference any future search or learning policy must beat under
+the identical protocol (mirror-seated, 32-rollout budget, 2 agents / 200
+ticks / transit speed 4, `ScoutCollectorAgent` baseline, the same 50-seed
+dev + held-out suites). A policy that clears the rule (mean paired delta &gt; 0
+and CI lower bound &gt; 0) on these same suites, seeds, and budget supersedes
+this record; the artifact and table below are the before/after comparison.
+To challenge the result, raise the budget (`--rollouts 64`), change the map
+distribution, or swap the baseline — every run records its own delta, CI, and
+verdict.
+
+#### Contention-bearing evaluation (bottleneck maps)
+
+The default generated maps above saturate contention at 0, so they measure
+policy *speed*, not policy *pressure*. The paired harness also ships a fixed
+contention-bearing topology (`--scenario bottleneck`) that places every
+resource in a vault behind capacity-1 chokes, funneling both agents through a
+single shared single-lane gate. On it, transit denials (two agents requesting
+the same capacity-1 choke in one tick) and claim races are actively exercised
+and tracked: `ScenarioMetrics`/`MatchResult` count a tick as contended on
+either a same-resource Collect race or a same-capacity-1-choke transit denial,
+and `PairedStudyStatistics.MeanContentionSaturation` reports the mean. The
+evaluation harness and its tests confirm non-zero contention on this map
+(`BottleneckScenario`), so a study can compare how policies behave under
+funnel pressure rather than only under empty-map latency.
 
 ## Design Decisions
 

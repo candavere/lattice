@@ -604,7 +604,7 @@ public static class CliApp
     {
         try
         {
-            var (flags, positionals) = ParseFlags(args, "--seed-set", "--rollouts", "--seeds", "--out", "--commit");
+            var (flags, positionals) = ParseFlags(args, "--seed-set", "--rollouts", "--seeds", "--out", "--commit", "--scenario");
             GuardNoPositionals(positionals);
             var seedSetText = flags.TryGetValue("--seed-set", out var setText)
                 ? setText.ToLowerInvariant()
@@ -629,6 +629,17 @@ public static class CliApp
                 : 50;
             var commit = flags.TryGetValue("--commit", out var commitText) ? commitText : null;
 
+            var scenario = flags.TryGetValue("--scenario", out var scenarioText)
+                ? scenarioText.ToLowerInvariant()
+                : "standard";
+            Func<ulong, MapGraph> mapFactory = scenario switch
+            {
+                "standard" => seed => MapGenerator.Generate(seed, DefaultGeneratorConfig),
+                "bottleneck" => BottleneckScenario.ForSeed,
+                _ => throw new ArgumentException(
+                    $"invalid --scenario '{scenarioText}' (expected 'standard' and/or 'bottleneck')."),
+            };
+
             var search = new MctsSearchConfig(rolloutsPerAction: rollouts, maxDepth: 12);
             var teams = new IAgentFactory[]
             {
@@ -645,7 +656,7 @@ public static class CliApp
                     .ToArray();
                 var spec = new EvaluationSpec(
                     seeds,
-                    seed => MapGenerator.Generate(seed, DefaultGeneratorConfig),
+                    mapFactory,
                     EvaluationSimulationConfig,
                     teams,
                     pairings,
@@ -930,10 +941,13 @@ public static class CliApp
         sink.WriteLine("            per-iteration budget of the raw stepping cases, so a pass with tiny");
         sink.WriteLine("            '--steps' and '--runs' makes a quick smoke run; the MCTS policy case keeps");
         sink.WriteLine("            its own small catalog budget (100 ticks) in every mode");
-        sink.WriteLine("  evaluate  [--seed-set dev|heldout[,dev|heldout]] [--rollouts <n>] [--seeds <n>] [--out <file>] [--commit <sha>]");
+        sink.WriteLine("  evaluate  [--seed-set dev|heldout[,dev|heldout]] [--rollouts <n>] [--seeds <n>] [--scenario standard|bottleneck] [--out <file>] [--commit <sha>]");
         sink.WriteLine("            Run the mirrored-seat paired evaluation of MCTS vs the Scout baseline");
         sink.WriteLine("            over a canonical seed suite (dev: 1001..1050, held-out: 2001..2050);");
-        sink.WriteLine("            '--out' writes the machine-readable per-seed + statistics artifact");
+        sink.WriteLine("            '--scenario bottleneck' evaluates on the fixed contention-bearing map where");
+        sink.WriteLine("            every resource sits behind capacity-1 chokes, so transit denials and claim");
+        sink.WriteLine("            races surface non-zero contention; '--out' writes the machine-readable");
+        sink.WriteLine("            per-seed + statistics artifact");
         sink.WriteLine();
         sink.WriteLine("  -h, --help                                    Show this help and exit");
     }

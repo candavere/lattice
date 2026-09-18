@@ -56,7 +56,7 @@ public static class ScenarioRunner
             }
 
             turns.Add(turn);
-            if (HasContention(turn))
+            if (HasContention(state, turn))
             {
                 contendedTicks++;
             }
@@ -102,11 +102,31 @@ public static class ScenarioRunner
     }
 
     /// <summary>
+    /// True when this tick is contended. A tick is contended by a claim race
+    /// when at least two distinct agents target the same resource id for
+    /// Collect, OR by a transit denial when at least two distinct agents
+    /// request a Move across the same capacity-1 choke edge in the same tick
+    /// (a single-lane gate only one may hold at a time — the later resolvers
+    /// are denied passage). Counting attempts, not outcomes, is deliberate: it
+    /// measures how often agents compete for the same prize or gate, which is
+    /// exactly the pressure a competitive match is supposed to surface.
+    /// </summary>
+    private static bool HasContention(SimulationState state, AgentAction[] turn)
+    {
+        if (HasClaimRace(turn))
+        {
+            return true;
+        }
+
+        return HasTransitDenial(state, turn);
+    }
+
+    /// <summary>
     /// True when at least one resource id is the Collect target of two or more
     /// distinct agents in this turn. Duplicates within a single agent's action
     /// are impossible by construction (one action per agent).
     /// </summary>
-    private static bool HasContention(AgentAction[] turn)
+    private static bool HasClaimRace(AgentAction[] turn)
     {
         foreach (var action in turn)
         {
@@ -131,6 +151,70 @@ public static class ScenarioRunner
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// True when two or more agents request a Move across the same capacity-1
+    /// choke edge in this turn. Only single-lane (capacity-1) gates are priced:
+    /// a wider choke can absorb multiple simultaneous crossings, so it cannot
+    /// deny transit. The agent's current zone is read from the pre-step state.
+    /// </summary>
+    private static bool HasTransitDenial(SimulationState state, AgentAction[] turn)
+    {
+        var gateRequests = new Dictionary<int, int>();
+        for (var i = 0; i < turn.Length; i++)
+        {
+            var action = turn[i];
+            if (action.Kind != ActionKind.Move)
+            {
+                continue;
+            }
+
+            var current = state.Agents[i].ZoneId;
+            if (action.ZoneId == current)
+            {
+                continue;
+            }
+
+            var chokeIndex = EdgeChoke(state.Map, current, action.ZoneId);
+            if (chokeIndex < 0 || state.Map.ChokePoints[chokeIndex].MaxOccupancy != 1)
+            {
+                continue;
+            }
+
+            gateRequests.TryGetValue(chokeIndex, out var count);
+            gateRequests[chokeIndex] = count + 1;
+        }
+
+        foreach (var count in gateRequests.Values)
+        {
+            if (count > 1)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// The index of the choke backing the undirected edge between two zones,
+    /// or -1 if no choke connects them. Choke capacity is attributed to the
+    /// edge in either direction, so a single-lane choke gates both crossings.
+    /// </summary>
+    private static int EdgeChoke(MapGraph map, int fromZoneId, int toZoneId)
+    {
+        for (var i = 0; i < map.ChokePoints.Length; i++)
+        {
+            var choke = map.ChokePoints[i];
+            if ((choke.FromZoneId == fromZoneId && choke.ToZoneId == toZoneId)
+                || (choke.FromZoneId == toZoneId && choke.ToZoneId == fromZoneId))
+            {
+                return i;
+            }
+        }
+
+        return -1;
     }
 
     private static AgentMetrics[] BuildAgentMetrics(SimulationState state, List<AgentAction[]> turns)

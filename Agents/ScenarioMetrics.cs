@@ -19,11 +19,13 @@ public sealed record AgentMetrics(int AgentId, int Score, int Moves, double Effi
 /// or null when the run was cut short by the caller's step budget (a
 /// "truncated" run that never reached a terminal tick). Contention is defined
 /// tick-by-tick: a tick is "contended" when at least two agents attempted a
-/// Collect of the SAME resource id in that tick, regardless of who won the
-/// claim; ContentionRate is the fraction of recorded ticks that were
-/// contended. Counting attempts (not outcomes) is deliberate — it measures
-/// how often agents race for the same prize, which is exactly the pressure a
-/// competitive match is supposed to surface.
+/// Collect of the SAME resource id in that tick (a claim race), OR when at
+/// least two agents requested a Move across the SAME capacity-1 choke edge in
+/// that tick (a transit denial on a single-lane gate) — regardless of who won
+/// the claim or passage; ContentionRate is the fraction of recorded ticks that
+/// were contended. Counting attempts (not outcomes) is deliberate — it
+/// measures how often agents race for the same prize or gate, which is exactly
+/// the pressure a competitive match is supposed to surface.
 /// </summary>
 public sealed record ScenarioMetrics(
     string? TerminationReason,

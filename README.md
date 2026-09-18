@@ -19,7 +19,7 @@
 ---
 <p align="center">
   <a href="https://github.com/candavere/lattice/actions/workflows/ci.yml"><img src="https://github.com/candavere/lattice/actions/workflows/ci.yml/badge.svg" alt="CI build status" /></a>
-  <img src="https://img.shields.io/badge/tests-294%20passing-brightgreen" alt="294 unit tests passing" />
+  <img src="https://img.shields.io/badge/tests-323%20passing-brightgreen" alt="323 unit tests passing" />
   <img src="https://img.shields.io/badge/determinism-byte--identical-blue" alt="byte-identical determinism" />
   <img src="https://img.shields.io/badge/dependencies-BCL%20only-blueviolet" alt="zero dependencies — BCL only" />
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4" alt=".NET 8" />

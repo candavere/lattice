@@ -120,6 +120,37 @@ main {
 
 /* ---- replay viewport ---- */
 
+.viewport-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 10px;
+  flex-wrap: wrap;
+}
+
+.toggle-group {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.toggle-group .toggle {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+}
+
+.toggle-group .toggle + .toggle {
+  border-left: 1px solid var(--border);
+}
+
+.toggle-group .toggle.active {
+  background: var(--accent-dim);
+  color: #ffffff;
+}
+
 .viewer {
   position: relative;
   border: 1px solid var(--border);

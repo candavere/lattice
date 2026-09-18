@@ -41,6 +41,16 @@
         extraction marker.
       </p>
 
+      <div class="viewport-controls">
+        <div class="toggle-group" role="group" aria-label="Viewport mode">
+          <button class="btn toggle active" id="view-dual" type="button" aria-pressed="true">Dual Split View</button>
+          <button class="btn toggle" id="view-god" type="button" aria-pressed="false">God View</button>
+          <button class="btn toggle" id="view-ego" type="button" aria-pressed="false">Fog-of-War (Ego)</button>
+        </div>
+        <label class="btn" for="ego-agent-select">Observer</label>
+        <select id="ego-agent-select" aria-label="Fog-of-war observer"></select>
+      </div>
+
       <div class="viewer" id="viewer">
         <canvas id="viewer-canvas" aria-label="Trajectory replay canvas">
           Your browser does not support the HTML5 canvas element.

@@ -33,6 +33,12 @@
     infiltrator: INFILTRATOR_COLOR,
     perception: 'rgba(255, 82, 82, 0.55)',
     extraction: '#40C4FF',
+    fogUnknownFill: '#0b0f1a',
+    fogUnknownStroke: '#232c40',
+    fogStaleFill: 'rgba(26, 31, 44, 0.45)',
+    fogStaleStroke: '#44506e',
+    fogText: '#5b6a8a',
+    fogDivider: '#1e293b',
   };
 
   /* ---------------------------------------------------------------- DOM  */
@@ -61,6 +67,21 @@
     dom.presetSelect = document.getElementById('preset-select');
     dom.staticSvg = document.getElementById('static-svg');
     dom.staticCaption = document.getElementById('static-caption');
+    dom.viewDual = document.getElementById('view-dual');
+    dom.viewGod = document.getElementById('view-god');
+    dom.viewEgo = document.getElementById('view-ego');
+    dom.egoSelect = document.getElementById('ego-agent-select');
+
+    dom.viewDual.addEventListener('click', function () { setViewMode('dual'); });
+    dom.viewGod.addEventListener('click', function () { setViewMode('god'); });
+    dom.viewEgo.addEventListener('click', function () { setViewMode('ego'); });
+    dom.egoSelect.addEventListener('change', function () {
+      const picked = parseInt(dom.egoSelect.value, 10);
+      if (Number.isInteger(picked)) {
+        state.egoId = picked;
+        scheduleDraw();
+      }
+    });
 
     dom.playBtn.addEventListener('click', togglePlay);
     dom.stepBackBtn.addEventListener('click', function () { pause(); stepBy(-1); });
@@ -84,9 +105,13 @@
     playing: false,
     timer: null,
     cadenceMs: 420,
-    layout: null,       // { minX, minY, spanX, spanY, sx, sy, offX, offY, rZone, rAgent }
+    layouts: {},        // per-viewport-size layout cache: "WxH" -> layout
     canv: null,         // { cssW, cssH } of last fitted size
     needsDraw: false,
+    viewMode: 'dual',   // 'dual' | 'god' | 'ego'
+    egoId: 0,           // observer slot for the fog-of-war viewport
+    pulseStart: 0,      // performance.now() origin of the ego radar pulse
+    pulseTimer: null,   // interval driving the radar pulse while fog is shown
   };
 
   /* ------------------------------------------------------- trajectory IO  */
@@ -170,7 +195,9 @@
     state.trajectory = traj;
     state.index = 0;
     state.playing = false;
+    state.layouts = {};
     stopTimer();
+    populateEgoSelect(traj);
     dom.playBtn.textContent = 'Play';
     dom.slider.max = String(Math.max(0, traj.frames.length - 1));
     dom.slider.value = '0';
@@ -188,14 +215,46 @@
       ? traj.header.Scenario + ' · ' + (roster && roster.length ? roster.join(' vs ') : '')
       : '';
     hideDom(dom.hint);
+    if (state.viewMode !== 'god') startPulse();
+    scheduleDraw();
+  }
+
+  // The ego observer dropdown: "Agent 0 (Sentry)" style options, defaulting
+  // to the Infiltrator when the trajectory carries that roster.
+  function populateEgoSelect(traj) {
+    const roles = traj.header.AgentRoles || [];
+    const agents = traj.frames.length ? traj.frames[0].agents : [];
+    dom.egoSelect.innerHTML = '';
+    agents.forEach(function (agent) {
+      const option = document.createElement('option');
+      const role = roles[agent.AgentId];
+      option.value = String(agent.AgentId);
+      option.textContent = 'Agent ' + agent.AgentId + (role ? ' (' + role + ')' : '');
+      dom.egoSelect.appendChild(option);
+    });
+    const infiltratorIndex = roles.indexOf('Infiltrator');
+    state.egoId = infiltratorIndex >= 0 ? infiltratorIndex : 0;
+    dom.egoSelect.value = String(state.egoId);
+  }
+
+  function setViewMode(mode) {
+    state.viewMode = mode;
+    const buttons = { dual: dom.viewDual, god: dom.viewGod, ego: dom.viewEgo };
+    Object.keys(buttons).forEach(function (key) {
+      const active = key === mode;
+      buttons[key].classList.toggle('active', active);
+      buttons[key].setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+    if (mode === 'god') stopPulse(); else startPulse();
     scheduleDraw();
   }
 
   function dropTrajectory() {
     stopTimer();
+    stopPulse();
     state.trajectory = null;
     state.playing = false;
-    state.layout = null;
+    state.layouts = {};
     dom.agentsBody.innerHTML = '';
     dom.zonesBody.innerHTML = '';
     dom.terminal.textContent = '';
@@ -226,7 +285,7 @@
     return true;
   }
 
-  function ensureLayout(traj) {
+  function ensureLayout(traj, regionW, regionH) {
     const map = traj.header.Map;
     const zones = map.Zones;
     const resources = map.Resources;
@@ -275,8 +334,8 @@
       if (p.Y > maxY) maxY = p.Y;
     });
 
-    const w = dom.canvas.clientWidth, h = dom.canvas.clientHeight;
-    const cached = state.layout;
+    const w = regionW, h = regionH;
+    const cached = state.layouts[w + 'x' + h];
     if (cached && cached.w === w && cached.h === h && cached.minX === minX && cached.maxX === maxX &&
         cached.minY === minY && cached.maxY === maxY) {
       return cached;
@@ -285,20 +344,21 @@
     const pad = 46;
     const spanX = Math.max(1, maxX - minX);
     const spanY = Math.max(1, maxY - minY);
-    const regionW = Math.max(1, w - 2 * pad);
-    const regionH = Math.max(1, h - 2 * pad);
-    const sx = regionW / spanX;
-    const sy = regionH / spanY;
+    const fitW = Math.max(1, w - 2 * pad);
+    const fitH = Math.max(1, h - 2 * pad);
+    const sx = fitW / spanX;
+    const sy = fitH / spanY;
     const s = Math.min(sx, sy);
     const offX = (w - s * spanX) / 2;
     const offY = (h - s * spanY) / 2;
 
-    state.layout = {
+    const layout = {
       minX: minX, minY: minY, spanX: spanX, spanY: spanY, s: s, offX: offX, offY: offY,
       w: w, h: h,
       rAgent: Math.max(7, Math.min(11, 9 * s / 60)),
     };
-    return state.layout;
+    state.layouts[w + 'x' + h] = layout;
+    return layout;
   }
 
   function px(pos, layout) {
@@ -313,21 +373,182 @@
     clearCanvas();
     if (!traj || !traj.frames.length) return;
 
-    const layout = ensureLayout(traj);
-    if (!layout) return;
-
-    const map = traj.header.Map;
     const frame = traj.frames[state.index];
-    const zoneById = {};
-    map.Zones.forEach(function (z) { zoneById[z.Id] = z.Position; });
+    const w = dom.canvas.clientWidth;
+    const h = dom.canvas.clientHeight;
 
-    drawEdges(ctx, map, frame, zoneById, layout);
-    drawResources(ctx, map, frame, layout);
-    drawZones(ctx, map, zoneById, layout);
-    drawAgents(ctx, map, frame, zoneById, layout);
+    if (state.viewMode === 'dual') {
+      const split = Math.floor(w / 2);
+      drawViewport(ctx, traj, frame, { x: 0, y: 0, w: split - 5, h: h }, null,
+        '[GLOBAL GROUND TRUTH]');
+      ctx.strokeStyle = COLORS.fogDivider;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(split, 6);
+      ctx.lineTo(split, h - 6);
+      ctx.stroke();
+      drawViewport(ctx, traj, frame, { x: split + 5, y: 0, w: w - split - 5, h: h },
+        computePerception(traj, state.index, state.egoId),
+        '[AGENT EGO PERCEPTION — ' + egoLabel(traj) + ']');
+    } else if (state.viewMode === 'ego') {
+      drawViewport(ctx, traj, frame, { x: 0, y: 0, w: w, h: h },
+        computePerception(traj, state.index, state.egoId),
+        '[AGENT EGO PERCEPTION — ' + egoLabel(traj) + ']');
+    } else {
+      drawViewport(ctx, traj, frame, { x: 0, y: 0, w: w, h: h }, null, '[GLOBAL GROUND TRUTH]');
+    }
 
     renderStatus();
     renderMetrics();
+  }
+
+  function egoLabel(traj) {
+    const roles = traj.header.AgentRoles;
+    return roles && roles[state.egoId]
+      ? roles[state.egoId].toUpperCase()
+      : 'AGENT ' + state.egoId;
+  }
+
+  // One rectangular viewport: its own layout, its own fog policy, and an
+  // optional header badge identifying what it shows.
+  function drawViewport(ctx, traj, frame, region, fog, badge) {
+    const layout = ensureLayout(traj, region.w, region.h);
+    if (!layout) return;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(region.x, region.y, region.w, region.h);
+    ctx.clip();
+    ctx.translate(region.x, region.y);
+
+    const map = traj.header.Map;
+    drawEdges(ctx, map, frame, layout, fog);
+    drawResources(ctx, map, frame, layout, fog);
+    drawZones(ctx, map, frame, layout, fog);
+    drawAgents(ctx, map, frame, layout, fog);
+    if (fog) drawHorizonRing(ctx, map, frame, layout, fog);
+
+    ctx.restore();
+
+    if (badge) {
+      ctx.font = 'bold 10px monospace';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      const tw = ctx.measureText(badge).width;
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+      ctx.fillRect(region.x + 8, region.y + 6, tw + 14, 18);
+      ctx.strokeStyle = COLORS.fogDivider;
+      ctx.strokeRect(region.x + 8, region.y + 6, tw + 14, 18);
+      ctx.fillStyle = fog ? COLORS.extraction : COLORS.gateText;
+      ctx.fillText(badge, region.x + 15, region.y + 15);
+    }
+  }
+
+  /* ---------------------------------------------------- fog of war (ego)  */
+
+  function visionHops(traj) {
+    const cfg = traj.header.SimulationConfig;
+    if (cfg && typeof cfg.Vision === 'number' && cfg.Vision >= 1) return cfg.Vision;
+    return 2; // both tactical roster roles perceive two graph hops
+  }
+
+  function adjacency(map) {
+    if (map._adj) return map._adj;
+    const adj = {};
+    map.Zones.forEach(function (z) { adj[z.Id] = []; });
+    map.ChokePoints.forEach(function (c) {
+      adj[c.FromZoneId].push(c.ToZoneId);
+      adj[c.ToZoneId].push(c.FromZoneId);
+    });
+    Object.keys(adj).forEach(function (k) { adj[k].sort(function (a, b) { return a - b; }); });
+    map._adj = adj;
+    return adj;
+  }
+
+  // Zones within `vision` graph hops of `fromZone` (inclusive), BFS.
+  function observedZones(map, fromZone, vision) {
+    const adj = adjacency(map);
+    const seen = {};
+    seen[fromZone] = 0;
+    const frontier = [fromZone];
+    while (frontier.length) {
+      const current = frontier.shift();
+      const depth = seen[current];
+      if (depth >= vision) continue;
+      adj[current].forEach(function (next) {
+        if (seen[next] === undefined) {
+          seen[next] = depth + 1;
+          frontier.push(next);
+        }
+      });
+    }
+    return seen;
+  }
+
+  // Cumulative discovery up to the scrubbed tick: what the observer sees now
+  // (Observed), what it remembers (Stale), and what it has never reached
+  // (Unknown) — plus ghost memories of rival agents last spotted.
+  function computePerception(traj, index, egoId) {
+    const map = traj.header.Map;
+    const vision = visionHops(traj);
+    const egoZone = function (frame) {
+      const ego = frame.agents.find(function (a) { return a.AgentId === egoId; }) || frame.agents[0];
+      return ego.Transit ? ego.Transit.ToZoneId : ego.ZoneId;
+    };
+
+    const lastSeenAt = {};
+    const ghosts = {};
+    for (let ti = 0; ti <= index; ti += 1) {
+      const frame = traj.frames[ti];
+      const seen = observedZones(map, egoZone(frame), vision);
+      Object.keys(seen).forEach(function (zoneId) { lastSeenAt[zoneId] = ti; });
+      frame.agents.forEach(function (agent) {
+        if (agent.AgentId === egoId) return;
+        if (seen[agent.ZoneId] !== undefined) {
+          ghosts[agent.AgentId] = { state: agent, tick: ti };
+        }
+      });
+    }
+
+    const current = observedZones(map, egoZone(traj.frames[index]), vision);
+    const zones = {};
+    map.Zones.forEach(function (zone) {
+      zones[zone.Id] = current[zone.Id] !== undefined
+        ? 'observed'
+        : lastSeenAt[zone.Id] !== undefined ? 'stale' : 'unknown';
+    });
+
+    return { vision: vision, egoId: egoId, zones: zones, ghosts: ghosts };
+  }
+
+  function zoneStatus(fog, zoneId) {
+    return fog ? fog.zones[zoneId] || 'unknown' : 'observed';
+  }
+
+  // The observer's horizon: a dashed sight ring plus a slow radar pulse.
+  function drawHorizonRing(ctx, map, frame, layout, fog) {
+    const ego = frame.agents.find(function (a) { return a.AgentId === fog.egoId; });
+    if (!ego || ego.Transit) return;
+    const rect = roomRect(map.Zones[ego.ZoneId], layout);
+    const base = meanCorridorLength(map, layout) * fog.vision * 0.55;
+    const color = agentColor(ego, state.trajectory && state.trajectory.header.AgentRoles);
+
+    ctx.beginPath();
+    ctx.arc(rect.x, rect.y, base, 0, Math.PI * 2);
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = 0.5;
+    ctx.lineWidth = 1.1;
+    ctx.setLineDash([6, 6]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    const phase = ((performance.now() - state.pulseStart) % 1800) / 1800;
+    ctx.beginPath();
+    ctx.arc(rect.x, rect.y, base * (0.25 + 0.75 * phase), 0, Math.PI * 2);
+    ctx.globalAlpha = 0.28 * (1 - phase);
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
   }
 
   function clearCanvas() {
@@ -404,7 +625,7 @@
     return Math.max(1, Math.ceil(distance / speed));
   }
 
-  function drawEdges(ctx, map, frame, zoneById, layout) {
+  function drawEdges(ctx, map, frame, layout, fog) {
     const burst = transitEdges(frame);
 
     map.ChokePoints.forEach(function (choke) {
@@ -413,22 +634,32 @@
       if (!zoneA || !zoneB) return;
       const ends = corridorEndpoints(roomRect(zoneA, layout), roomRect(zoneB, layout));
       if (!ends) return;
-      const hot = burst[edgeKey(choke.FromZoneId, choke.ToZoneId)];
+      const statA = zoneStatus(fog, choke.FromZoneId);
+      const statB = zoneStatus(fog, choke.ToZoneId);
+      const bothUnknown = statA === 'unknown' && statB === 'unknown';
+      const anyUnknown = statA === 'unknown' || statB === 'unknown';
+      const anyStale = statA === 'stale' || statB === 'stale';
+      const hot = !anyUnknown && burst[edgeKey(choke.FromZoneId, choke.ToZoneId)];
       const limited = choke.MaxOccupancy !== UNLIMITED && choke.MaxOccupancy < UNLIMITED;
 
       ctx.beginPath();
       ctx.moveTo(ends.ax, ends.ay);
       ctx.lineTo(ends.bx, ends.by);
-      ctx.strokeStyle = hot ? COLORS.corridorHot : COLORS.corridor;
+      ctx.strokeStyle = bothUnknown ? COLORS.fogUnknownStroke
+        : anyUnknown ? COLORS.fogStaleStroke
+        : hot ? COLORS.corridorHot
+        : anyStale ? COLORS.fogStaleStroke
+        : COLORS.corridor;
       ctx.lineWidth = hot ? 4 : 2.5;
       ctx.setLineDash(limited && !hot ? [7, 6] : []);
       ctx.lineCap = 'round';
+      if (bothUnknown) ctx.setLineDash([3, 6]);
       ctx.stroke();
       ctx.setLineDash([]);
 
       // Gate badge: a compact capsule on the corridor, never a circle that
-      // could be mistaken for a room.
-      if (limited) {
+      // could be mistaken for a room. Hidden while either side is unexplored.
+      if (limited && !anyUnknown) {
         const midX = (ends.ax + ends.bx) / 2;
         const midY = (ends.ay + ends.by) / 2;
         const label = choke.MaxOccupancy === 0 ? 'LOCKED' : 'CAP ' + choke.MaxOccupancy;
@@ -436,10 +667,10 @@
         roundedRect(ctx, midX - bw / 2, midY - 9, bw, 18, 9);
         ctx.fillStyle = COLORS.gateBg;
         ctx.fill();
-        ctx.strokeStyle = hot ? COLORS.corridorHot : COLORS.corridor;
+        ctx.strokeStyle = hot ? COLORS.corridorHot : anyStale ? COLORS.fogStaleStroke : COLORS.corridor;
         ctx.lineWidth = 1;
         ctx.stroke();
-        ctx.fillStyle = hot ? COLORS.corridorHot : COLORS.gateText;
+        ctx.fillStyle = hot ? COLORS.corridorHot : anyStale ? COLORS.fogText : COLORS.gateText;
         ctx.font = 'bold 9px monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -448,7 +679,9 @@
         if (choke.Role) {
           ctx.font = '8px monospace';
           ctx.fillStyle = COLORS.mutedText;
+          ctx.globalAlpha = anyStale ? 0.55 : 1;
           ctx.fillText(spaceCamel(choke.Role), midX, midY + 17);
+          ctx.globalAlpha = 1;
         }
       }
     });
@@ -456,7 +689,7 @@
 
   // Loot sits inside its room; never floating in open canvas space. The
   // caller passes the current claim set so claimed items dim to green.
-  function drawResources(ctx, map, frame, layout) {
+  function drawResources(ctx, map, frame, layout, fog) {
     const claimed = {};
     frame.claims.forEach(function (id) { claimed[id] = true; });
 
@@ -469,15 +702,19 @@
     map.Zones.forEach(function (zone) {
       const items = byZone[zone.Id];
       if (!items || !items.length) return;
+      const status = zoneStatus(fog, zone.Id);
+      if (status === 'unknown') return; // unexplored rooms reveal nothing
       const rect = roomRect(zone, layout);
       const y = rect.y + rect.hh - 8;
       const spacing = 14;
       // Anchor the loot row to the room's lower-left corner so it never
       // collides with the centered agent tokens and score labels.
       const startX = rect.x - rect.hw + 9;
+      ctx.globalAlpha = status === 'stale' ? 0.35 : 1;
       items.forEach(function (res, i) {
         drawDiamond(ctx, startX + i * spacing, y, 5, claimed[res.Id] ? COLORS.claimed : COLORS.unclaimed);
       });
+      ctx.globalAlpha = 1;
     });
   }
 
@@ -492,36 +729,63 @@
     ctx.fill();
   }
 
-  function drawZones(ctx, map, zoneById, layout) {
-    const occupied = zoneCounts(map, state.trajectory.frames[state.index]);
+  function drawZones(ctx, map, frame, layout, fog) {
+    const occupied = zoneCounts(map, frame);
 
     map.Zones.forEach(function (zone) {
       const rect = roomRect(zone, layout);
-      roundedRect(ctx, rect.x - rect.hw, rect.y - rect.hh, rect.hw * 2, rect.hh * 2, 9);
-      ctx.fillStyle = COLORS.roomFill;
+      const status = zoneStatus(fog, zone.Id);
+      const borderRadius = 9;
+
+      if (status === 'unknown') {
+        // Shrouded silhouette: the observer has never reached this room.
+        roundedRect(ctx, rect.x - rect.hw, rect.y - rect.hh, rect.hw * 2, rect.hh * 2, borderRadius);
+        ctx.fillStyle = COLORS.fogUnknownFill;
+        ctx.fill();
+        ctx.strokeStyle = COLORS.fogUnknownStroke;
+        ctx.lineWidth = 1.4;
+        ctx.setLineDash([4, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = COLORS.fogText;
+        ctx.font = 'bold 10px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('unexplored', rect.x, rect.y);
+        return;
+      }
+
+      roundedRect(ctx, rect.x - rect.hw, rect.y - rect.hh, rect.hw * 2, rect.hh * 2, borderRadius);
+      ctx.fillStyle = status === 'stale' ? COLORS.fogStaleFill : COLORS.roomFill;
       ctx.fill();
-      ctx.strokeStyle = COLORS.roomStroke;
-      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = status === 'stale' ? COLORS.fogStaleStroke : COLORS.roomStroke;
+      ctx.lineWidth = status === 'stale' ? 1.3 : 1.6;
       ctx.stroke();
 
       // Room title strip.
-      ctx.fillStyle = COLORS.roomText;
+      ctx.fillStyle = status === 'stale' ? COLORS.fogText : COLORS.roomText;
       ctx.font = 'bold 11px monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(roomLabel(zone), rect.x, rect.y - 6);
 
-      // Occupancy badge: a clear fraction when capped, a plain count when not.
-      const present = occupied[zone.Id] || 0;
-      const capped = zone.MaxOccupancy !== UNLIMITED && zone.MaxOccupancy < UNLIMITED;
-      const occ = capped ? present + '/' + zone.MaxOccupancy : String(present);
-      ctx.font = '9px monospace';
-      const bw = occ.length * 6.4 + 12;
-      roundedRect(ctx, rect.x + rect.hw - bw - 5, rect.y - rect.hh + 4, bw, 13, 6);
-      ctx.fillStyle = present > 0 ? 'rgba(122, 162, 247, 0.25)' : 'rgba(148, 163, 184, 0.15)';
-      ctx.fill();
-      ctx.fillStyle = COLORS.mutedText;
-      ctx.fillText(occ, rect.x + rect.hw - bw / 2 - 5, rect.y - rect.hh + 10.5);
+      if (status === 'observed') {
+        // Occupancy badge: a clear fraction when capped, a plain count when not.
+        const present = occupied[zone.Id] || 0;
+        const capped = zone.MaxOccupancy !== UNLIMITED && zone.MaxOccupancy < UNLIMITED;
+        const occ = capped ? present + '/' + zone.MaxOccupancy : String(present);
+        ctx.font = '9px monospace';
+        const bw = occ.length * 6.4 + 12;
+        roundedRect(ctx, rect.x + rect.hw - bw - 5, rect.y - rect.hh + 4, bw, 13, 6);
+        ctx.fillStyle = present > 0 ? 'rgba(122, 162, 247, 0.25)' : 'rgba(148, 163, 184, 0.15)';
+        ctx.fill();
+        ctx.fillStyle = COLORS.mutedText;
+        ctx.fillText(occ, rect.x + rect.hw - bw / 2 - 5, rect.y - rect.hh + 10.5);
+      } else {
+        ctx.font = '8px monospace';
+        ctx.fillStyle = COLORS.fogText;
+        ctx.fillText('last known', rect.x, rect.y + 8);
+      }
     });
   }
 
@@ -561,7 +825,7 @@
     return count ? total / count : layout.rAgent * 6;
   }
 
-  function drawAgents(ctx, map, frame, zoneById, layout) {
+  function drawAgents(ctx, map, frame, layout, fog) {
     const roles = state.trajectory ? state.trajectory.header.AgentRoles : null;
     const cfg = state.trajectory ? state.trajectory.header.SimulationConfig : null;
     const pool = frame.agents.slice().sort(function (a, b) { return a.AgentId - b.AgentId; });
@@ -575,6 +839,14 @@
     });
 
     pool.forEach(function (agent) {
+      // Fog rule: the observer is real-time; rivals render only when their
+      // room is inside the current horizon, otherwise as a memory ghost.
+      const isEgo = fog && agent.AgentId === fog.egoId;
+      if (fog && !isEgo && zoneStatus(fog, agent.ZoneId) !== 'observed') {
+        drawGhost(ctx, map, frame, layout, fog, agent, roles);
+        return;
+      }
+
       let x = 0, y = 0;
       if (agent.Transit) {
         // Snap strictly to the corridor vector: P(t) = A + t·(B − A), t from
@@ -612,8 +884,9 @@
       const color = agentColor(agent, roles);
       const role = roles && roles[agent.AgentId];
 
-      // The Sentry carries a faint dashed one-hop perception perimeter.
-      if (role === 'Sentry') {
+      // The Sentry carries a faint dashed perception perimeter — in ground
+      // truth only; the ego viewport replaces it with the horizon ring.
+      if (role === 'Sentry' && !fog) {
         ctx.beginPath();
         ctx.arc(x, y, hopRadius, 0, Math.PI * 2);
         ctx.strokeStyle = COLORS.perception;
@@ -653,6 +926,37 @@
         ctx.fillText('crossing to ' + map.Zones[agent.Transit.ToZoneId].Id + ' (' + agent.Transit.RemainingTicks + 't)', x, y - layout.rAgent - 8);
       }
     });
+  }
+
+  // A stale memory of a rival: translucent token at the zone where the
+  // observer last saw it, labeled with the age of that sighting.
+  function drawGhost(ctx, map, frame, layout, fog, agent, roles) {
+    const ghost = fog.ghosts[agent.AgentId];
+    if (!ghost) return; // never spotted — nothing to remember
+    const zone = map.Zones[ghost.state.ZoneId];
+    if (!zone) return;
+    const rect = roomRect(zone, layout);
+    const x = rect.x;
+    const y = rect.y + 2;
+
+    ctx.globalAlpha = 0.4;
+    ctx.beginPath();
+    ctx.arc(x, y, layout.rAgent, 0, Math.PI * 2);
+    ctx.fillStyle = agentColor(agent, roles);
+    ctx.fill();
+    ctx.globalAlpha = 0.75;
+    ctx.strokeStyle = COLORS.agentRim;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.font = '8px monospace';
+    ctx.fillStyle = COLORS.fogText;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const age = state.index - ghost.tick;
+    ctx.fillText('last seen ' + (age === 0 ? 'now' : age + 't ago'), x, y + layout.rAgent + 10);
+    ctx.globalAlpha = 1;
   }
 
   /* ------------------------------------------------------- status/metrics  */
@@ -771,6 +1075,23 @@
   function applyCadence() {
     const value = parseInt(dom.speedSelect.value, 10);
     if (isFinite(value) && value > 0) state.cadenceMs = value;
+  }
+
+  /* --------------------------------------------------- radar pulse loop  */
+
+  function startPulse() {
+    stopPulse();
+    state.pulseStart = performance.now();
+    state.pulseTimer = setInterval(function () {
+      if (state.trajectory && state.viewMode !== 'god') scheduleDraw();
+    }, 90);
+  }
+
+  function stopPulse() {
+    if (state.pulseTimer) {
+      clearInterval(state.pulseTimer);
+      state.pulseTimer = null;
+    }
   }
 
   /* --------------------------------------------------------------- misc  */

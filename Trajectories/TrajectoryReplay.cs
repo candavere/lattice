@@ -22,7 +22,10 @@ public static class TrajectoryReplay
     /// </summary>
     public static List<StepResult> Replay(TrajectoryRecording recording)
     {
-        var state = Simulation.CreateInitial(recording.Header.Map, recording.Header.SimulationConfig);
+        var state = Simulation.CreateInitial(
+            recording.Header.Map,
+            recording.Header.SimulationConfig,
+            recording.Header.DynamicRules ?? DynamicMapRuleSet.None);
         var results = new List<StepResult>();
 
         foreach (var step in recording.Steps)

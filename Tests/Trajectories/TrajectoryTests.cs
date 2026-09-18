@@ -337,6 +337,106 @@ public class TrajectoryTests
         Assert.Equal(Serialize(recording), Serialize(readBack));
     }
 
+    /// <summary>Three zones in a line, spacing 8 (two ticks at speed 4), one resource in zone 1.</summary>
+    private static MapGraph PortcullisLine() => new(
+        new[]
+        {
+            new Zone(0, new GridPoint(0, 0)),
+            new Zone(1, new GridPoint(0, 8)),
+            new Zone(2, new GridPoint(0, 16)),
+        },
+        new[] { new ResourceNode(0, 1, new GridPoint(0, 8)) },
+        new[]
+        {
+            new ChokePoint(0, 0, 1, MaxOccupancy: 1),
+            new ChokePoint(1, 1, 2),
+        });
+
+    /// <summary>
+    /// A crossing attempt launched precisely when the portcullis is closed:
+    /// every Move issued during the closed window is refused (the portcullis
+    /// is shut for ticks 1-5 on a 1-open/5-closed cycle), so the agent must
+    /// wait for tick 6 to begin crossing and collects only at tick 9. Under
+    /// the base topology the same turns cross immediately and collect at
+    /// tick 3.
+    /// </summary>
+    private static AgentAction[][] PortcullisEpisode() => new[]
+    {
+        new[] { new AgentAction(ActionKind.Wait), new AgentAction(ActionKind.Wait) },
+        new[] { new AgentAction(ActionKind.Move, ZoneId: 1), new AgentAction(ActionKind.Wait) },
+        new[] { new AgentAction(ActionKind.Move, ZoneId: 1), new AgentAction(ActionKind.Wait) },
+        new[] { new AgentAction(ActionKind.Collect, ResourceId: 0), new AgentAction(ActionKind.Wait) },
+        new[] { new AgentAction(ActionKind.Move, ZoneId: 1), new AgentAction(ActionKind.Wait) },
+        new[] { new AgentAction(ActionKind.Move, ZoneId: 1), new AgentAction(ActionKind.Wait) },
+        new[] { new AgentAction(ActionKind.Move, ZoneId: 1), new AgentAction(ActionKind.Wait) },
+        new[] { new AgentAction(ActionKind.Move, ZoneId: 1), new AgentAction(ActionKind.Wait) },
+        new[] { new AgentAction(ActionKind.Collect, ResourceId: 0), new AgentAction(ActionKind.Wait) },
+    };
+
+    [Fact]
+    public void DynamicRules_RoundTripThroughHeader_AndReplayPreservesTopology()
+    {
+        const ulong seed = 0xD3D3UL;
+        var config = new SimulationConfig(2, 20, TransitSpeed: 4);
+        var map = PortcullisLine();
+        var rules = new DynamicMapRuleSet(new IDynamicMapRule[]
+        {
+            new TimedPortcullisRule(ChokeId: 0, OpenTicks: 1, ClosedTicks: 5),
+        });
+
+        var recording = TrajectoryWriter.Record(map, config, seed, PortcullisEpisode(), new StringWriter(), rules: rules);
+        var readBack = TrajectoryReader.Read(new StringReader(SerializeViaWriter(recording)));
+
+        // The header round-trips the episode's policy and schema version.
+        Assert.Equal(2, readBack.Header.SchemaVersion);
+        Assert.Equal(Serialize(rules), Serialize(readBack.Header.DynamicRules));
+
+        // The recording genuinely captured the dynamic topology: replaying the
+        // same turns against the base map splits from the recorded stream the
+        // moment the closed portcullis is probed.
+        var baseStream = SimulationDriver.Play(map, config, PortcullisEpisode());
+        var diverged = false;
+        for (var i = 0; i < Math.Min(baseStream.Count, recording.Steps.Length); i++)
+        {
+            if (Serialize(baseStream[i]) != Serialize(recording.Steps[i].Result))
+            {
+                diverged = true;
+            }
+        }
+
+        Assert.True(diverged, "A base-map replay must diverge from the dynamic recording.");
+
+        // Replaying under the header's rules reproduces every step byte-for-byte.
+        Assert.Empty(TrajectoryReplay.Verify(readBack));
+        Assert.Equal(1, readBack.Final.ResourcesClaimed);
+    }
+
+    [Fact]
+    public void NewerSchemaVersion_IsRejected_AtReadTime()
+    {
+        var config = new SimulationConfig(2, 3);
+        var recording = TrajectoryWriter.Record(TriangleMap, config, 0x3333UL, FullCollectorEpisode(), new StringWriter());
+        var forged = SerializeViaWriter(recording).Replace("\"SchemaVersion\":2", "\"SchemaVersion\":99", StringComparison.Ordinal);
+
+        Assert.Throws<InvalidDataException>(() => TrajectoryReader.Read(new StringReader(forged)));
+    }
+
+    [Fact]
+    public void LegacyHeaderWithoutSchemaVersion_ReadsAsStaticMap()
+    {
+        var config = new SimulationConfig(2, 3);
+        var recording = TrajectoryWriter.Record(TriangleMap, config, 0x4444UL, FullCollectorEpisode(), new StringWriter());
+        var lines = SerializeViaWriter(recording).Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        var legacyHeader = lines[0].Replace(",\"SchemaVersion\":2", "", StringComparison.Ordinal);
+        var legacy = string.Join('\n', new[] { legacyHeader }.Concat(lines.Skip(1)));
+
+        var readBack = TrajectoryReader.Read(new StringReader(legacy));
+
+        Assert.Equal(0, readBack.Header.SchemaVersion);
+        Assert.Null(readBack.Header.DynamicRules);
+        Assert.Empty(TrajectoryReplay.Verify(readBack));
+    }
+
     private sealed class CountingReader : TextReader
     {
         private readonly StringReader inner;

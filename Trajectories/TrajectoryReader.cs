@@ -40,7 +40,14 @@ public static class TrajectoryReader
             throw new InvalidDataException("The header line must be the first line of the trajectory.");
         }
 
-        return DeserializeOrThrow<TrajectoryWriter.HeaderLine>(line, 1).ToModel();
+        var header = DeserializeOrThrow<TrajectoryWriter.HeaderLine>(line, 1).ToModel();
+        if (header.SchemaVersion > TrajectorySchema.CurrentVersion)
+        {
+            throw new InvalidDataException(
+                $"Trajectory header schema version {header.SchemaVersion} is newer than the supported version {TrajectorySchema.CurrentVersion}.");
+        }
+
+        return header;
     }
 
     public static IEnumerable<TrajectoryStep> StreamSteps(TextReader source)

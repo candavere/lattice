@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Lattice.Environment;
 
 namespace Lattice.Trajectories;
@@ -31,11 +32,18 @@ public static class TrajectoryWriter
         AgentAction[][] actions,
         TextWriter sink,
         string? scenario = null,
-        string[]? agentRoles = null)
+        string[]? agentRoles = null,
+        DynamicMapRuleSet? rules = null)
     {
-        var state = Simulation.CreateInitial(map, simulationConfig);
+        var effectiveRules = rules ?? DynamicMapRuleSet.None;
+        // A static-map episode writes no rules at all: the header field is
+        // only present when a non-empty policy governs the recording.
+        var serializedRules = effectiveRules == DynamicMapRuleSet.None ? null : effectiveRules;
+        var state = Simulation.CreateInitial(map, simulationConfig, effectiveRules);
 
-        sink.Write(Serialize(new HeaderLine("header", seed, map, simulationConfig, scenario, agentRoles)) + "\n");
+        sink.Write(Serialize(new HeaderLine(
+            "header", seed, map, simulationConfig, serializedRules, TrajectorySchema.CurrentVersion,
+            Scenario: scenario, AgentRoles: agentRoles)) + "\n");
 
         var steps = new List<TrajectoryStep>();
         Info? lastInfo = null;
@@ -60,7 +68,7 @@ public static class TrajectoryWriter
         sink.Write(Serialize(new FinalLine("final", final)) + "\n");
 
         return new TrajectoryRecording(
-            new TrajectoryHeader(seed, map, simulationConfig),
+            new TrajectoryHeader(seed, map, simulationConfig, serializedRules, TrajectorySchema.CurrentVersion, scenario, agentRoles),
             steps.ToArray(),
             final);
     }
@@ -82,8 +90,10 @@ public static class TrajectoryWriter
             recording.Header.Seed,
             recording.Header.Map,
             recording.Header.SimulationConfig,
-            scenario ?? recording.Header.Scenario,
-            agentRoles ?? recording.Header.AgentRoles)) + "\n");
+            recording.Header.DynamicRules,
+            TrajectorySchema.CurrentVersion,
+            Scenario: scenario ?? recording.Header.Scenario,
+            AgentRoles: agentRoles ?? recording.Header.AgentRoles)) + "\n");
 
         foreach (var step in recording.Steps)
         {
@@ -125,10 +135,12 @@ public static class TrajectoryWriter
         ulong Seed,
         MapGraph Map,
         SimulationConfig SimulationConfig,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] DynamicMapRuleSet? DynamicRules = null,
+        int SchemaVersion = 0,
         string? Scenario = null,
         string[]? AgentRoles = null)
     {
-        public TrajectoryHeader ToModel() => new(Seed, Map, SimulationConfig, Scenario, AgentRoles);
+        public TrajectoryHeader ToModel() => new(Seed, Map, SimulationConfig, DynamicRules, SchemaVersion, Scenario, AgentRoles);
     }
 
     internal sealed record StepLine(string Kind, int StepNumber, AgentAction[] Actions, StepResult Result)

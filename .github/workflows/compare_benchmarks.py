@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 """Compare a freshly measured benchmark artifact against the committed baseline.
 
-Strict mode (--strict-if-matching): when the current host fingerprint matches
-the baseline's (OS family + architecture), fail if ANY workload's median
-throughput fell below --threshold x the baseline median (default 0.8, i.e. a
-20% regression) or a workload disappeared from the matrix.
+Strict mode (--strict-if-matching): fail if ANY workload's median throughput
+fell below --threshold x the baseline median (default 0.8, i.e. a 20%
+regression) or a workload disappeared from the matrix. Strict mode ONLY arms
+when the current host fingerprint matches the baseline's - the OS family, the
+architecture, AND the .NET runtime major version. The runtime constraint is
+deliberate: the committed baseline is recorded under a specific runtime, and
+cross-runtime throughput deltas (e.g. .NET 8 vs the .NET 10 baseline) are
+measurement artifacts, not regressions - so a mismatched runtime degrades to
+the informational cross-host mode instead of failing the gate.
 
 Cross-host mode: never fails, but prints the side-by-side table and flags any
-workload below the threshold, so OS/arch-mismatched runs still surface drift.
+workload below the threshold, so OS/arch/runtime-mismatched runs still surface
+drift.
 """
 
 import argparse
@@ -19,6 +25,10 @@ def os_family(descriptor: str) -> str:
     return descriptor.split()[0] if descriptor else ""
 
 
+def runtime_major(runtime: str) -> str:
+    return runtime.split()[1].split(".")[0] if len(runtime.split()) > 1 else ""
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("baseline", help="committed reference artifact (JSON)")
@@ -28,7 +38,8 @@ def main() -> int:
                              "regression is flagged (default 0.8 = 20% drop)")
     parser.add_argument("--strict-if-matching", action="store_true",
                         help="fail on a regression only when the host "
-                             "fingerprint matches the baseline")
+                             "fingerprint (OS family + architecture + runtime "
+                             "major) matches the baseline")
     args = parser.parse_args()
 
     with open(args.baseline, encoding="utf-8") as handle:
@@ -50,15 +61,28 @@ def main() -> int:
         print(f"note: current artifact added workloads not in the baseline: "
               f"{sorted(extra)}")
 
-    matched = os_family(base_meta["Os"]) == os_family(curr_meta["Os"]) and \
+    os_arch_matched = \
+        os_family(base_meta["Os"]) == os_family(curr_meta["Os"]) and \
         base_meta["Architecture"] == curr_meta["Architecture"]
+    runtime_matched = runtime_major(base_meta["Runtime"]) == \
+        runtime_major(curr_meta["Runtime"])
+    matched = os_arch_matched and runtime_matched
     strict = matched and args.strict_if_matching
 
     print(f"baseline host: {base_meta['Os']} / {base_meta['Architecture']} "
           f"/ {base_meta['Runtime']}")
     print(f"current host : {curr_meta['Os']} / {curr_meta['Architecture']} "
           f"/ {curr_meta['Runtime']}")
-    print(f"fingerprint match: {matched}  (strict gate armed: {strict})")
+    if not os_arch_matched:
+        print("fingerprint: OS family + architecture do not match the "
+              "baseline (strict gate not armed)")
+    elif not runtime_matched:
+        print("fingerprint: runtime major differs from the baseline "
+              f"({runtime_major(base_meta['Runtime'])} vs "
+              f"{runtime_major(curr_meta['Runtime'])}) - strict gate not armed "
+              "to avoid measuring a runtime delta as a regression")
+    else:
+        print(f"fingerprint match: {matched}  (strict gate armed: {strict})")
     print()
 
     header = (f"{'workload':<28}{'baseline median':>16}"
@@ -95,7 +119,7 @@ def main() -> int:
     else:
         print()
         print("cross-host comparison (informational): the strict gate needs "
-              "a matching OS family + architecture.")
+              "a matching OS family + architecture + .NET runtime major.")
     return 0
 
 

@@ -8,17 +8,17 @@ on:
   workflow_dispatch:
     inputs:
       runs:
-        description: "Measured iterations per workload (default 5)"
+        description: "Measured iterations per workload (default 10)"
         required: false
-        default: "5"
+        default: "10"
       steps:
         description: "Ticks per iteration for the raw cases (default 50000)"
         required: false
         default: "50000"
       warmup:
-        description: "Warm-up budget in ticks (default 30000)"
+        description: "Warm-up budget in ticks (default 50000)"
         required: false
-        default: "30000"
+        default: "50000"
 
 jobs:
   regression-gate:
@@ -27,10 +27,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup .NET 8
+      - name: Setup .NET 10 (baseline runtime)
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: "10.0.x"
 
       - name: Build
         run: dotnet build Cli/Lattice.Cli.csproj -c Release
@@ -38,9 +38,9 @@ jobs:
       - name: Bench the five-case matrix
         shell: bash
         run: |
-          RUNS="${{ inputs.runs || '5' }}"
+          RUNS="${{ inputs.runs || '10' }}"
           STEPS="${{ inputs.steps || '50000' }}"
-          WARMUP="${{ inputs.warmup || '30000' }}"
+          WARMUP="${{ inputs.warmup || '50000' }}"
           dotnet run -c Release --project Cli -- benchmark \
             --runs "$RUNS" --steps "$STEPS" --warmup "$WARMUP" \
             --out "$RUNNER_TEMP/throughput.json"
@@ -54,6 +54,11 @@ jobs:
             --threshold 0.8 --strict-if-matching
 
   cross-host-structure:
+    # Deliberately on .NET 8 / ubuntu x64: this job is a structural smoke and
+    # an informational cross-host comparison. Its runtime differs from the
+    # committed baseline, so it must never fail on throughput - the compare
+    # script only arms the strict threshold for a matching OS family +
+    # architecture + .NET runtime major.
     name: Cross-host structural smoke (ubuntu x64)
     runs-on: ubuntu-latest
     steps:

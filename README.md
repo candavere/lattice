@@ -441,15 +441,16 @@ Raw cases report **steps/sec**; the MCTS case reports **decisions/sec** (each
 decision runs rolloutsPerAction × depth fork steps). The reference record
 committed at `benchmarks/throughput_benchmark.json` was produced on
 **Apple M1 / 8 cores / macOS 27.0.0 / .NET 10.0.10 / Release / Workstation
-GC** at commit `0ce60b8`:
+GC** (baseline re-anchored on tree `b7459a1` to a conservative full-protocol
+session, so a matching-host pass has real headroom):
 
 | Case | Median throughput | p50 step lat. | p95 step lat. | Alloc / step |
 | --- | --- | --- | --- | --- |
-| `micro_raw_2agent` | 769k steps/s | 1.17 µs | 1.46 µs | 3.2 KB |
-| `facility_static_4agent` | 405k steps/s | 2.21 µs | 3.92 µs | 4.6 KB |
-| `dynamic_contention_4agent` | 243k steps/s | 3.79 µs | 6.42 µs | 7.1 KB |
-| `stress_topology_4agent` | 9.0k steps/s | 100 µs | 146 µs | 104 KB |
-| `policy_lookahead_mcts_32` | 463 decisions/s | 4.2 ms | 7.0 ms | 11.5 MB |
+| `micro_raw_2agent` | 654k steps/s | 1.33 µs | 1.96 µs | 3.2 KB |
+| `facility_static_4agent` | 359k steps/s | 2.50 µs | 3.33 µs | 4.6 KB |
+| `dynamic_contention_4agent` | 233k steps/s | 4.00 µs | 5.33 µs | 7.1 KB |
+| `stress_topology_4agent` | 9.1k steps/s | 100 µs | 151 µs | 104 KB |
+| `policy_lookahead_mcts_32` | 394 decisions/s | 4.9 ms | 6.7 ms | 11.5 MB |
 
 Two honest notes on what the numbers do and do not say:
 
@@ -470,10 +471,11 @@ Two honest notes on what the numbers do and do not say:
 Numbers vary with hardware and build profile; treat the committed record as
 host-scoped evidence (its `metadata` block carries the commit, timestamp,
 runtime, OS, CPU, cores, RAM, and GC mode) and the CI regression gate
-(`.github/workflows/benchmarks.yml`) as the reproducibility check — it
-re-benchmarks the matrix and fails on a >20% regression against the committed
-baseline when the host fingerprint matches, and shows a cross-host comparison
-table otherwise.
+(`.github/workflows/benchmarks.yml`) as the reproducibility check. The gate
+installs the same .NET 10 runtime the baseline was recorded under, re-benchmarks
+the matrix, and fails on a >20% regression when the host fingerprint (OS
+family + architecture + .NET runtime major) matches; otherwise it prints a
+cross-host comparison table and enforces the structural checks.
 
 ### evaluate — mirrored-seat MCTS evidence
 

@@ -178,4 +178,62 @@ public class ScenarioRunnerTests
 
         Assert.Equal(Json(RunOnce()), Json(RunOnce()));
     }
+
+    [Fact]
+    public void DynamicRules_GovernMovementThroughScenarioRuns()
+    {
+        // A single-lane line map: zone 0 -> zone 1 via the only choke, the
+        // resource sitting just over the bridge. Without rules the greedy
+        // agent crosses and collects; with the choke sealed at capacity 0 on
+        // every tick it is denied passage and ends scoreless.
+        var map = new MapGraph(
+            new[]
+            {
+                new Zone(0, new GridPoint(0, 0)),
+                new Zone(1, new GridPoint(0, 8)),
+            },
+            new[]
+            {
+                new ResourceNode(0, 1, new GridPoint(0, 8)),
+            },
+            new[]
+            {
+                new ChokePoint(0, 0, 1),
+            });
+        var config = new SimulationConfig(AgentCount: 2, MaxTicks: 40, TransitSpeed: 4);
+        var sealedRules = new DynamicMapRuleSet(new IDynamicMapRule[]
+        {
+            new TimedPortcullisRule(ChokeId: 0, OpenTicks: 1, ClosedTicks: 1, OpenCapacity: 0, ClosedCapacity: 0),
+        });
+
+        var staticRun = ScenarioRunner.Run(
+            map, config,
+            new IAgent[] { new GreedyCollectorAgent(0), new WaitAgent(1) },
+            maxSteps: 40);
+        var dynamicRun = ScenarioRunner.Run(
+            map, config,
+            new IAgent[] { new GreedyCollectorAgent(0), new WaitAgent(1) },
+            maxSteps: 40,
+            rules: sealedRules);
+
+        Assert.Equal(1, staticRun.Metrics.Agents[0].Score);
+        Assert.Equal(0, dynamicRun.Metrics.Agents[0].Score);
+        Assert.True(dynamicRun.Metrics.Agents[0].Moves > 0, "The blocked agent kept attempting the crossing.");
+        Assert.Equal(0.0, dynamicRun.Metrics.Agents[0].Efficiency, precision: 9);
+    }
+
+    [Fact]
+    public void NullRules_SkipsDynamicsWithoutBehavioralChange()
+    {
+        var agents = new IAgent[]
+        {
+            new GreedyCollectorAgent(0),
+            new WaitAgent(1),
+        };
+
+        var explicitNone = ScenarioRunner.Run(TriangleMap, TwoPlayer, agents, maxSteps: 40);
+        var defaulted = ScenarioRunner.Run(TriangleMap, TwoPlayer, agents, maxSteps: 40, rules: null);
+
+        Assert.Equal(Json(explicitNone), Json(defaulted));
+    }
 }

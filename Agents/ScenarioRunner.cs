@@ -23,12 +23,16 @@ public static class ScenarioRunner
     /// (and thus any seeded-RNG draw order) is defined regardless of the array
     /// order the caller passed. Throws <see cref="ArgumentException"/> on
     /// malformed agent sets and non-positive budgets.
+    /// <paramref name="rules"/> is the episode's optional dynamic topology
+    /// policy (timed portcullises, event locks); when non-null it seeds the
+    /// initial state's dynamics exactly as a recorded dynamic episode would.
     /// </summary>
     public static ScenarioResult Run(
         MapGraph map,
         SimulationConfig config,
         IAgent[] agents,
-        int maxSteps)
+        int maxSteps,
+        DynamicMapRuleSet? rules = null)
     {
         if (maxSteps < 1)
         {
@@ -37,7 +41,7 @@ public static class ScenarioRunner
 
         ValidateAgents(config, agents);
 
-        var state = Simulation.CreateInitial(map, config);
+        var state = Simulation.CreateInitial(map, config, rules ?? DynamicMapRuleSet.None);
         var observations = BuildObservations(state);
         var turns = new List<AgentAction[]>();
         var results = new List<StepResult>();

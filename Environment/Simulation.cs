@@ -85,15 +85,27 @@ public sealed class SimulationConfig
 
 /// <summary>
 /// The immutable state the step function reads and rewrites: the map, each
-/// agent's zone and score, which resource ids are claimed, and the tick
-/// counter. No hidden mutable state — this record plus the next tick's actions
-/// fully determine the following state (see docs/adr-002.md).
+/// agent's zone and score, which resource ids are claimed, the tick counter,
+/// and the per-tick dynamic topology overrides. No hidden mutable state —
+/// this record plus the next tick's actions fully determine the following
+/// state (see docs/adr-002.md). <see cref="Dynamics"/> is the way the map's
+/// choke capacities may vary across an episode (timed portcullises, event
+/// locks); when empty, the base <see cref="MapGraph"/> topology is used.
 /// </summary>
 public sealed record SimulationState(
     MapGraph Map,
     AgentState[] Agents,
     int[] Claims,
-    int StepCount);
+    int StepCount)
+{
+    /// <summary>
+    /// The dynamic topology overrides effective for this state's tick, plus
+    /// the rule set that advances them. Defaults to
+    /// <see cref="DynamicMapOverrides.None"/>, preserving static-map behavior
+    /// for every caller that never opts into dynamic topology.
+    /// </summary>
+    public DynamicMapOverrides Dynamics { get; init; } = DynamicMapOverrides.None;
+}
 
 /// <summary>
 /// The pure step function's output: the next immutable state together with
@@ -111,10 +123,25 @@ public static class Simulation
     /// <summary>
     /// Builds the initial state for <paramref name="config"/> on
     /// <paramref name="map"/>: agent i round-robins to zone i % zoneCount with
-    /// score 0, nothing is claimed, the tick counter is 0. Throws
-    /// <see cref="ArgumentException"/> for an empty map.
+    /// score 0, nothing is claimed, the tick counter is 0. Equivalent to
+    /// <see cref="CreateInitial(MapGraph, SimulationConfig, DynamicMapRuleSet)"/>
+    /// with the empty rule set. Throws <see cref="ArgumentException"/> for an
+    /// empty map.
     /// </summary>
-    public static SimulationState CreateInitial(MapGraph map, SimulationConfig config)
+    public static SimulationState CreateInitial(MapGraph map, SimulationConfig config) =>
+        CreateInitial(map, config, DynamicMapRuleSet.None);
+
+    /// <summary>
+    /// Builds the initial state as above, but seeds the state's
+    /// <see cref="SimulationState.Dynamics"/> from <paramref name="rules"/>:
+    /// the overrides snapshot is computed for tick 0 and the rule set stays
+    /// attached, so every subsequent <see cref="Step"/> advances the dynamic
+    /// topology through the episode.
+    /// </summary>
+    public static SimulationState CreateInitial(
+        MapGraph map,
+        SimulationConfig config,
+        DynamicMapRuleSet rules)
     {
         if (map.Zones.Length == 0)
         {
@@ -127,18 +154,28 @@ public static class Simulation
             agents[i] = new AgentState(i, i % map.Zones.Length, 0);
         }
 
-        return new SimulationState(map, agents, Array.Empty<int>(), 0);
+        return new SimulationState(map, agents, Array.Empty<int>(), 0)
+        {
+            Dynamics = DynamicMapOverrides.ForInitialTick(rules, map),
+        };
     }
 
     /// <summary>
     /// Advances <paramref name="state"/> by one tick under the agents'
     /// actions. Pure and total: the input state is never mutated and any
     /// action array yields the next state (invalid/missing actions degrade to
-    /// Wait). Resolution is still two-phase (docs/adr-002.md): movement and
-    /// transit resolve first in ascending agent id, respecting edge transit
-    /// and zone/choke capacity, then collects resolve in ascending agent id
-    /// against post-move zones, one claim per resource per tick (lowest id
-    /// wins). Returns the next state plus the tick's <see cref="StepResult"/>.
+    /// Wait). Resolution is two-phase (docs/adr-002.md): movement and transit
+    /// resolve first in tick-interleaved priority order, respecting edge
+    /// transit and zone/choke capacity, then collects resolve in the same
+    /// tick-interleaved order against post-move zones, one claim per resource
+    /// per tick (the tick's highest-priority agent wins). Resolution priority
+    /// is a deterministic rotation of the agent ids — at tick t the first
+    /// resolver is (t mod agentCount) — so no agent index holds a permanent
+    /// tie advantage while replay stays byte-identical for identical inputs.
+    /// The state's <see cref="SimulationState.Dynamics"/> are consulted for
+    /// choke capacity and advanced into the returned state, so dynamic
+    /// topology (portcullises, event locks) folds into the same pure step.
+    /// Returns the next state plus the tick's <see cref="StepResult"/>.
     /// </summary>
     public static StepOutcome Step(SimulationState state, AgentAction[] actions, SimulationConfig config)
     {
@@ -166,19 +203,26 @@ public static class Simulation
         }
 
         // Movement & transit with capacity gating. Agents resolve in
-        // ascending id so the outcome is a total function of the state.
-        // Priority-yield rule: when a capacity-1 choke is contested between
-        // two agents crossing from opposite sides, the lower id is granted
-        // passage (it resolves first and reserves the edge); the yielding
-        // agent stays stationary in its origin zone and re-attempts on a
-        // later tick, so two opposing crossings can never livelock. Transiting
-        // agents never act: their countdown advances one tick this tick and
-        // they arrive when it reaches zero (the transit consumes exactly one
-        // tick per unit of RemainingTicks).
+        // tick-interleaved priority order so the outcome is a total function
+        // of the state and no index enjoys a permanent tie win: at tick t the
+        // first resolver is (t mod agentCount), then the following ids, then
+        // the leading ids — a rotation that returns to ascending order at
+        // t ≡ 0 (mod agentCount). Priority-yield rule: when a capacity-1
+        // choke is contested between two agents crossing from opposite sides,
+        // the higher-priority agent is granted passage (it resolves first and
+        // reserves the edge); the yielding agent stays stationary in its
+        // origin zone and re-attempts on a later tick, so two opposing
+        // crossings can never livelock. Transiting agents never act: their
+        // countdown advances one tick this tick and they arrive when it
+        // reaches zero (the transit consumes exactly one tick per unit of
+        // RemainingTicks). Choke capacity is read through the state's
+        // dynamic overrides first (timed portcullises, event locks), falling
+        // back to the base map when no override exists.
         var nextZones = new int[agentCount];
         var nextTransit = new InTransit?[agentCount];
-        for (var i = 0; i < agentCount; i++)
+        for (var rank = 0; rank < agentCount; rank++)
         {
+            var i = AgentAtResolutionRank(rank, agentCount, state.StepCount);
             var agentState = state.Agents[i];
             if (agentState.Transit is { } transit)
             {
@@ -219,11 +263,11 @@ public static class Simulation
                         transitTicks = TransitTicks(state.Map, current, destination, config.TransitSpeed);
                         if (transitTicks > 1) // one-tick edges arrive instantly; only real crossings occupy the choke
                         {
-                            var chokeIndex = EdgeChoke(state.Map, current, destination);
-                            var chokeCapacity = chokeIndex >= 0
-                                ? state.Map.ChokePoints[chokeIndex].MaxOccupancy
-                                : MapLimits.Unlimited;
-                            travelOpen = chokeCapacity > 0 && edgeLoad[chokeIndex] < chokeCapacity;
+var chokeIndex = EdgeChoke(state.Map, current, destination);
+                        var chokeCapacity = chokeIndex >= 0
+                            ? state.Dynamics.EffectiveChokeCapacity(state.Map, chokeIndex)
+                            : MapLimits.Unlimited;
+                        travelOpen = chokeCapacity > 0 && edgeLoad[chokeIndex] < chokeCapacity;
                         }
                     }
 
@@ -255,14 +299,15 @@ public static class Simulation
             }
         }
 
-        // Collects (ascending id, post-move zones, one claim per resource per
-        // tick). Transiting agents are on an edge and cannot collect, even
-        // from their departure node.
+        // Collects (tick-interleaved priority order, post-move zones, one claim per
+        // resource per tick). Transiting agents are on an edge and cannot
+        // collect, even from their departure node.
         var nextScores = state.Agents.Select(agent => agent.Score).ToArray();
         var rewards = new double[agentCount];
         var nextClaims = new List<int>(state.Claims);
-        for (var i = 0; i < agentCount; i++)
+        for (var rank = 0; rank < agentCount; rank++)
         {
+            var i = AgentAtResolutionRank(rank, agentCount, state.StepCount);
             if (nextTransit[i] is not null)
             {
                 continue;
@@ -300,9 +345,10 @@ public static class Simulation
         }
 
         var claims = nextClaims.ToArray();
+        var nextDynamics = state.Dynamics.Advance(stepCount, claims, state.Map);
         for (var i = 0; i < agentCount; i++)
         {
-            observations[i] = new Observation(i, state.Map, agents, claims);
+            observations[i] = new Observation(i, state.Map, agents, claims, stepCount);
         }
 
         var result = new StepResult(
@@ -311,8 +357,23 @@ public static class Simulation
             new Info(stepCount, isTerminal, reason, winner));
 
         return new StepOutcome(
-            new SimulationState(state.Map, agents, claims, stepCount),
+            new SimulationState(state.Map, agents, claims, stepCount) { Dynamics = nextDynamics },
             result);
+    }
+
+    /// <summary>
+    /// The agent id resolved at <paramref name="rank"/> (rank 0 = first,
+    /// highest priority) for tick <paramref name="stepCount"/>. Resolution
+    /// priority is the deterministic rotation (agentId + stepCount) mod
+    /// agentCount, giving id (rank - stepCount) mod agentCount at that rank.
+    /// Zero-allocation — the whole order is a single modular shift — and
+    /// byte-identical across runs because it is a pure function of the tick.
+    /// At stepCount ≡ 0 the order is 0, 1, ..., agentCount-1, so tick-zero
+    /// behavior (and legacy expectations about it) is unchanged.
+    /// </summary>
+    private static int AgentAtResolutionRank(int rank, int agentCount, int stepCount)
+    {
+        return (rank + agentCount - stepCount % agentCount) % agentCount;
     }
 
     private static AgentAction? At(AgentAction[] actions, int index)
@@ -426,13 +487,29 @@ public static class SimulationDriver
 {
     /// <summary>
     /// Plays <paramref name="actions"/> turn-by-turn on a new simulation over
-    /// <paramref name="map"/>, returning the trajectory of StepResults. Stops
+    /// <paramref name="map"/>, returning the trajectory of StepResults. Stopping
     /// early if a turn's <see cref="Info.IsTerminal"/> is true. Deterministic:
     /// the same map and action sequence always yield the same trajectory.
+    /// Uses the base map topology; see
+    /// <see cref="Play(MapGraph, SimulationConfig, AgentAction[][], DynamicMapRuleSet)"/>
+    /// for dynamic-topology playback.
     /// </summary>
-    public static List<StepResult> Play(MapGraph map, SimulationConfig config, AgentAction[][] actions)
+    public static List<StepResult> Play(MapGraph map, SimulationConfig config, AgentAction[][] actions) =>
+        Play(map, config, actions, DynamicMapRuleSet.None);
+
+    /// <summary>
+    /// Plays <paramref name="actions"/> under <paramref name="rules"/>, the
+    /// dynamic-topology variant: the episode's choke capacities evolve
+    /// tick-by-tick exactly as the live environment would, so the driver stays
+    /// a byte-identical replay of a recorded dynamic episode.
+    /// </summary>
+    public static List<StepResult> Play(
+        MapGraph map,
+        SimulationConfig config,
+        AgentAction[][] actions,
+        DynamicMapRuleSet rules)
     {
-        var state = Simulation.CreateInitial(map, config);
+        var state = Simulation.CreateInitial(map, config, rules);
         var trajectory = new List<StepResult>();
 
         foreach (var turn in actions)
@@ -461,20 +538,36 @@ public sealed class LatticeEnvironment
 {
     private readonly MapGraph _map;
     private readonly SimulationConfig _config;
+    private readonly DynamicMapRuleSet _rules;
     private SimulationState _state;
     private bool _terminal;
 
     /// <summary>
-    /// Wraps <paramref name="map"/> into a ready-to-play environment. The map
-    /// is intentionally supplied (not generated from a seed here) so this
-    /// class stays dependency-free; callers compose a generated map — see
-    /// <see cref="SimulationDriver"/> for seed-driven playback.
+    /// Wraps <paramref name="map"/> into a ready-to-play environment over the
+    /// base map topology. The map is intentionally supplied (not generated from
+    /// a seed here) so this class stays dependency-free; callers compose a
+    /// generated map — see <see cref="SimulationDriver"/> for seed-driven
+    /// playback. See the constructor overload taking a
+    /// <see cref="DynamicMapRuleSet"/> for dynamic-topology environments.
     /// </summary>
     public LatticeEnvironment(MapGraph map, SimulationConfig config)
+        : this(map, config, DynamicMapRuleSet.None)
+    {
+    }
+
+    /// <summary>
+    /// Wraps <paramref name="map"/> into a ready-to-play environment whose
+    /// choke capacities evolve tick-by-tick under <paramref name="rules"/>
+    /// (timed portcullises, event locks). The environment is otherwise
+    /// identical to the base-topology one: same step contract, same
+    /// byte-identical replay.
+    /// </summary>
+    public LatticeEnvironment(MapGraph map, SimulationConfig config, DynamicMapRuleSet rules)
     {
         _map = map;
         _config = config;
-        _state = Simulation.CreateInitial(map, config);
+        _rules = rules ?? DynamicMapRuleSet.None;
+        _state = Simulation.CreateInitial(map, config, _rules);
     }
 
     /// <summary>True once a step has produced a terminal tick.</summary>
@@ -486,7 +579,7 @@ public sealed class LatticeEnvironment
     /// </summary>
     public void Reset()
     {
-        _state = Simulation.CreateInitial(_map, _config);
+        _state = Simulation.CreateInitial(_map, _config, _rules);
         _terminal = false;
     }
 

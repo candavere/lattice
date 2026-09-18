@@ -129,8 +129,13 @@ decision records in `/docs`; see [Design Decisions](#design-decisions).
 
 Each tick takes one `AgentAction` per agent and produces an immutable
 `StepResult`. Actions resolve in two fixed phases: all moves, then all
-collects, each in ascending agent id. Invalid or missing actions degrade to
-`Wait`, so every action array yields a valid next state and no agent can
+collects, each resolved in ascending priority rank, where
+`rank = (agentId + state.StepCount) % agentCount`. At zero-based tick `t`,
+the first agent is `(-t mod agentCount)` (nonnegative modulo), not
+`t mod agentCount`. Agent polling remains in ascending agent id, and pathfinder
+neighbors remain in ascending zone id. Terminal score ties still select the
+lowest agent id. Invalid or missing actions degrade to `Wait`, so every action
+array yields a valid next state and no agent can
 crash or wedge the simulation. `Observation`, `Reward`, `Info`, and `StepResult`
 are plain immutable records that serialize to JSONL without interpretation
 logic; a recording is replayed by re-running the exact recorded action bytes.
@@ -142,7 +147,8 @@ Maps are graphs, not grids. `MapGraph` holds zones (nodes), choke points
 validation checker and the spatial simulator reason about the same structure
 (see adr-001). Zones and choke points carry a `MaxOccupancy` (default
 unlimited; `0` = impassable), enforced as same-tick entry gates triaged in
-ascending agent id. A zone is just a graph node with an optional position —
+ascending priority rank using the same tick-dependent order as collection.
+A zone is just a graph node with an optional position —
 the coordinate embedding exists only where agents need it.
 
 ### Kinematic edge transit

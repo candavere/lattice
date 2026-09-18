@@ -41,9 +41,16 @@ mirror the *map*, not the rules:
    means) — no floating-point arena rule feeds the answer, so it cannot drift
    between machines.
 
-The two runs are also the *minimum* for a mirrored measurement: an ascending-id
-collect tie-break and a first-mover advantage land on both territories equally
-across the pair, and the metric cancels them.
+The two runs are also the *minimum* for a mirrored measurement: each territory
+is evaluated in both agent slots under the same deterministic resolution rule.
+Movement and collection resolve in ascending priority rank,
+`rank = (agentId + state.StepCount) % agentCount`. At zero-based tick `t`,
+the first agent is `(-t mod agentCount)` (nonnegative modulo), not
+`t mod agentCount`. Rotating priority removes a permanent lowest-id contention
+advantage, but does not eliminate spawn or arrival-timing effects; mirrored
+seatings still measure territory-attributed scores across both slots.
+Agent polling remains in ascending agent id, pathfinder neighbors remain in
+ascending zone id, and terminal score ties still select the lowest agent id.
 
 ## Pinning the metric
 

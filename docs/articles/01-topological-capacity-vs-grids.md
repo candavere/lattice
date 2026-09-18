@@ -44,12 +44,17 @@ Occupation is real state, applied at the same tick it matters:
   Because a transiting agent holds the edge slot for the whole crossing (see
   `Simulation.Step`, movement resolution), a capacity-1 choke with a
   multi-tick crossing is a *lane*: precisely one agent in the lane at a time.
-- Contested entry resolves by ascending agent id, so the outcome is a total
-  function of the state — two agents racing into a full door produce the same
-  outcome every time, on every machine. An adversarial crossing of a
-  capacity-1 lane is bounded and deterministic (see the operational tests:
-  no tick ever carries both agents mid-crossing, and the contest dies down to
-  a fixed winner).
+- Contested entry resolves in ascending priority rank,
+  `rank = (agentId + state.StepCount) % agentCount`, as does collection.
+  At zero-based tick `t`, the first agent is `(-t mod agentCount)`
+  (nonnegative modulo), not `t mod agentCount`. The outcome is a total
+  function of the state — identical inputs produce the same outcome on every
+  machine, without a permanent lowest-id contention advantage. An adversarial
+  crossing of a capacity-1 lane grants passage to the first eligible agent
+  and denies the other while the edge is occupied (see the operational tests:
+  no tick ever carries both agents mid-crossing).
+  Agent polling and pathfinder neighbor ordering remain ascending by agent id
+  and zone id respectively; terminal score ties still select the lowest agent id.
 
 ## Why this beats a grid for the stated purpose
 

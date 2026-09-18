@@ -16,11 +16,13 @@ is violated, and no unrequested functionality was added.
 Four ideas govern every change:
 
 1. **Zero external runtime dependencies.** `Lattice.Environment`,
-   `Lattice.Generator`, and `Lattice.Analytics` are Standard BCL only. No
-   NuGet packages, no game engine references, no Newtonsoft.Json, no
-   serialization frameworks. Visualization and tooling may depend on what they
-   need, but they must consume the core only through the public step-contract
-   types.
+   `Lattice.Generator`, `Lattice.Trajectories`, `Lattice.Agents`, and
+   `Lattice.Analytics` are pure .NET 8 BCL with no NuGet packages, no game
+   engine references, no Newtonsoft.Json, no serialization frameworks — the
+   production dependency graph is the standard library alone. `Visualization`
+   and `Cli` may reference the core only through the public step-contract /
+   recording types. Only development and test projects depend on external
+   packages, exclusively `Microsoft.NET.Test.Sdk` and `xUnit`/`xunit.runner`.
 
 2. **Strict platform determinism.** The core guarantee is **same seed + same
    actions → byte-identical trajectory**, on every supported target: .NET 8 on
@@ -30,10 +32,13 @@ Four ideas govern every change:
    iteration order leaks. Determinism is tested, not assumed.
 
 3. **High-throughput, allocation-conscious simulation loops.** The pure
-   `Simulation.Step` loop targets the `>400k steps/second` baseline (sample
-   figures around 430k steps/sec, single-threaded). Keep the hot path free of
-   per-step allocation churn, avoid string concatenation and LINQ in tight
-   loops, and never move work such as logging or serialization into the step.
+   `Simulation.Step` loop measures ≈ 3.0M steps/sec mean (0.86–3.52M across
+   batches; see `benchmarks/throughput_benchmark.json` for the host-scoped
+   reference run) on a 2020 Apple M1. Methodology: 50k-tick warm-up, 5
+   batches, per-batch stopwatch + min/max/std, `GC.CollectionCount` for
+   Gen0/1/2. Keep the hot path free of per-step allocation churn, avoid
+   string concatenation and LINQ in tight loops, and never move work such as
+   logging or serialization into the step.
 
 4. **Clear separation of concerns.** Environment state, topological graph
    definition, and agent decision logic are three distinct layers. The
@@ -108,10 +113,13 @@ results in the PR description.
   on `main` plus your branch; a change that turns a passing test red or adds a
   warning is not mergeable. If legacy behavior is intentionally changing, the
   PR must update the affected pins *in the same commit* with a rationale.
-- **No new external packages in core assemblies.** `Lattice.Environment`,
-  `Lattice.Generator`, and `Lattice.Analytics` remain BCL-only. Dependency
-  proposals for the core are a design decision, not a merge decision — raise
-  them in an issue first.
+- **No new external packages in production assemblies.** Every production
+  project (`Lattice.Environment`, `Lattice.Generator`, `Lattice.Trajectories`,
+  `Lattice.Agents`, `Lattice.Analytics`, `Lattice.Visualization`,
+  `Lattice.Cli`) remains pure .NET 8 BCL. Dependency proposals for the core
+  are a design decision, not a merge decision — raise them in an issue first.
+  Development and test projects may only add `Microsoft.NET.Test.Sdk` or
+  `xUnit` packages; anything else is a design decision too.
 - **Regression tests for bug fixes and topological edge cases.** Any fix —
   especially choke contention, capacity limits, transit bookkeeping, or
   generator constraint edge cases — must ship with a test that fails on the old

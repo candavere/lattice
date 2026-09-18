@@ -66,8 +66,8 @@ replay if you want a chart rather than a node tree.
 
 `Lattice.Trajectories` and `Lattice.Analytics` are plain-file tooling: write
 JSONL to disk, analyze byte-identical reports, run CI gates. The CLI is
-scriptable (`generate`/`simulate`/`render`/`analyze`/`benchmark`) and every
-command is seeded, so a pipeline can regenerate and diff. There is no database,
+scriptable (`generate`/`simulate`/`render`/`analyze`/`benchmark`/`evaluate`)
+and every command is seeded, so a pipeline can regenerate and diff. There is no database,
 service, or daemon layer to provision; a batch run is a shell loop.
 
 ## Presentations to broader collections
@@ -78,15 +78,18 @@ everywhere in this repository:
 - **awesome-game-ai / tactical-ai:** a deterministic, seedable tactical
   substrate with fog-of-war perception, capacity-gated terrain, and MCTS —
   the environment, not agents, is the product.
-- **awesome-dotnet:** C# / .NET 8, nullable enabled, zero runtime dependencies
-  (BCL only) in the simulator and generator; step contracts are plain records.
+- **awesome-dotnet:** C# / .NET 8, nullable enabled, zero external *runtime*
+  dependencies across every production assembly (pure BCL; only the test
+  project references packages — `Microsoft.NET.Test.Sdk` and `xUnit`); step
+  contracts are plain records.
 - **awesome-procedural-generation:** a hard-constraint map generator with
   explicit checker functions, per-constraint unit tests, and a retry loop that
   rejects rather than patches; an optional acceptance gate bakes spawn-fairness
   measurement directly into generation.
 
-Keep the pitch concrete (determinism is asserted, not assumed; the core is
-BCL-only) and it will survive scrutiny — everything above is enforced by
+Keep the pitch concrete (determinism is asserted, not assumed; the production
+dependency graph is the BCL alone) and it will survive scrutiny — everything
+above is enforced by
 tests in `/Tests`.
 
 ## What this subsystem deliberately does not do

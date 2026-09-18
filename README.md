@@ -19,9 +19,9 @@
 ---
 <p align="center">
   <a href="https://github.com/candavere/lattice/actions/workflows/ci.yml"><img src="https://github.com/candavere/lattice/actions/workflows/ci.yml/badge.svg" alt="CI build status" /></a>
-  <img src="https://img.shields.io/badge/tests-323%20passing-brightgreen" alt="323 unit tests passing" />
+  <img src="https://img.shields.io/badge/tests-344%20passing-brightgreen" alt="344 unit tests passing" />
   <img src="https://img.shields.io/badge/determinism-byte--identical-blue" alt="byte-identical determinism" />
-  <img src="https://img.shields.io/badge/dependencies-BCL%20only-blueviolet" alt="zero dependencies — BCL only" />
+  <img src="https://img.shields.io/badge/dependencies-BCL%20runtime%20only-blueviolet" alt="runtime dependencies: pure .NET 8 BCL" />
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4" alt=".NET 8" />
   <a href="https://candavere.github.io/lattice/"><img src="https://img.shields.io/badge/live%20demo-GitHub%20Pages-2ea44f" alt="live demo" /></a>
 </p>
@@ -29,15 +29,16 @@
 > A deterministic, headless 2D tactical AI simulation substrate in pure C#
 > (.NET 8). Built to validate, balance, and stress-test high-level game AI
 > architectures (MCTS, Fog-of-War perception, procedural map fairness, and a
-> tactical Dungeon Infiltration & Sentry Patrol scenario) at >400k steps/second
-> before game engine integration.
+> tactical Dungeon Infiltration & Sentry Patrol scenario) at 0.9–3.5M
+> single-threaded steps/second before game engine integration.
 
 Think of Lattice as a digital board game engine running in memory without
 graphics: units traverse a network of connected topological outposts over
 multiple turns, competing for resources under Fog-of-War. Because every
 transition is calculated using pure math rather than approximate continuous
-physics, simulations run at 400,000+ turns per second with byte-for-byte
-identical replay across any platform.
+physics, simulations run at millions of turns per second (measured mean
+0.9–3.5M steps/s on a 2020 Apple M1) with byte-for-byte identical replay
+across any platform.
 
 <!--
 Proposed GitHub topics for the maintainer (set these in the repo settings):
@@ -47,7 +48,9 @@ dotnet8, procedural-generation, fog-of-war, simulation-engine
 
 A deterministic game AI simulation in pure C#, built for tactical/strategic
 systems design and engineering. Lattice is a headless tactical combat engine
-for .NET: it runs graphics-free, has zero engine or ML dependencies (BCL only),
+for .NET: it runs graphics-free, has no engine or ML runtime dependencies
+(pure .NET 8 BCL across every production assembly — development and test
+projects rely exclusively on .NET, Microsoft.NET.Test.Sdk, and xUnit),
 and ships a pure step-contract simulation core, a seeded procedural map
 generator, a procedural map balance and spawn fairness tester, and a
 recording/reporting toolchain. Agents are a thin demonstration layer — the
@@ -183,6 +186,20 @@ plain data, so mid-crossing frames record and replay byte-identically.
 `Simulation.TransitTicks(map, from, to, speed)` exposes the same arithmetic for
 tooling.
 
+### Dynamic topology
+
+Choke capacity need not be static. A `DynamicMapRuleSet` carries a list of
+`IDynamicMapRule`s — `TimedPortcullisRule` (a choke oscillates between open and
+closed capacity over a `OpenTicks`/`ClosedTicks` cycle) and
+`EventLockedChokeRule` (a choke stays at a locked capacity until a resource is
+collected). The engine applies the rules at every tick boundary as
+`DynamicMapOverrides` (see adr-002 addenda), and the same policy flows through
+rollouts, trajectory headers as `DynamicRules`, contention reporting, and the
+byte-identical replay verification the CLI runs over every recorded episode.
+Rules are serializable JSON (`ruleKind` discriminator) and revalidate through
+their constructors, so file, programmatic API, and recorded headers can never
+drift apart.
+
 ### Bounded perception and stale memory
 
 Observation is a projection of a full state, not a core change: the simulator
@@ -280,7 +297,7 @@ replay a fixed script, and assert byte-identical trajectory JSON across runs.
 
 ## CLI Reference
 
-`Lattice.Cli` exposes five commands (`dotnet run --project Cli -- <command>
+`Lattice.Cli` exposes six commands (`dotnet run --project Cli -- <command>
 ...`, binary name `lattice`). **Every command is seeded** — identical
 arguments always produce identical bytes. Exit status is `0` on success,
 non-zero on any bad argument or runtime error; `--help`/`-h` prints usage.
@@ -321,12 +338,14 @@ stderr; a seed whose retry budget yields no fair map exits non-zero.
 | `--steps <n>`   | Tick budget; default 100. Episode ends on budget or when all resources are claimed |
 | `--agent <greedy\|random\|mcts>` | Policy for player 0 (default `greedy`); `mcts` is the rollout-based tactical agent |
 | `--scenario <infiltration>` | Run the fixed Dungeon Infiltration & Sentry Patrol scenario; `--agent` is forbidden (roster is fixed) |
+| `--rules <file>` | Load a JSON `DynamicMapRuleSet` (timed portcullises / event-locked chokes) into the episode — see [Dynamic topology](#dynamic-topology) |
 | `--out <file>`  | Write trajectory to a file instead of stdout |
 
 ```sh
 dotnet run --project Cli -- simulate --seed 42
 dotnet run --project Cli -- simulate --seed 42 --steps 40
 dotnet run --project Cli -- simulate --seed 42 --steps 40 --agent mcts
+dotnet run --project Cli -- simulate --seed 42 --rules rules.json --steps 60 --out dynamic.jsonl
 dotnet run --project Cli -- simulate --seed 42 --scenario infiltration --steps 100 --out infiltration.jsonl
 ```
 
@@ -335,6 +354,16 @@ procedurally generated map. With `--scenario infiltration`, the fixed
 dungeon is used and the roster is hard-wired to Sentry vs Infiltrator. A
 summary line — steps recorded, termination reason, outcome — goes to
 stderr.
+
+A `--rules` file is a JSON `DynamicMapRuleSet`; rules serialize with a
+`ruleKind` discriminator and are rehydrated through the same validating
+constructors the programmatic API enforces, so a file cannot smuggle a
+degenerate schedule (zero-length cycle, negative capacity) past validation.
+Rules participate in the whole toolchain: they bind to the MCTS agent's
+internal rollout model, are recorded into the trajectory header as
+`DynamicRules`, drive choke contention reporting, and are replayed and
+verified byte-for-byte when the episode is re-run (`byte-identical replay
+verified`).
 
 ### render — replay a recorded trajectory
 
@@ -374,30 +403,107 @@ function of the trajectory: the same file always produces the same report
 
 | Flag | Description |
 | --- | --- |
-| `--ticks <n>` | Simulation ticks to pump; default 1000 |
+| `--ticks <n>` | Simulation ticks per measurement batch; default 200000 |
+| `--commit <sha>` | Source revision to record in the JSON artifact (provenance) |
+| `--cpu <model>` | CPU model string to record in the JSON artifact (provenance) |
+| `--out <file>` | Write the JSON artifact to a file instead of stdout |
 
 ```sh
-dotnet run --project Cli -- benchmark --ticks 1000
+dotnet run --project Cli -- benchmark --ticks 200000 --out benchmarks/throughput_benchmark.json
 ```
 
-Measures a pure `Simulation.Step` loop with no agent, episode, or
-serialization overhead:
+Measures a pure `Simulation.Step` loop with two waiting agents — no agent
+logic, episode, or serialization overhead. The methodology is a proper
+measurement, not a single sample: a 50,000-tick warm-up (JIT + caches), then
+5 measurement batches of `--ticks` each. The report gives mean, min, max,
+and standard deviation of steps/second across the batches, total managed
+allocation, `bytes_per_tick`, and GC collection counts (`GC.CollectionCount`
+for Gen0/1/2 across the measured window):
 
 ```
-ticks=1000
-elapsed_ms=2.306
-steps_per_second=433621.9
-allocated_bytes=704192
-bytes_per_tick=704.2
+ticks=200000
+runs=5
+total_ticks=1000000
+warmup_ticks=50000
+elapsed_ms=462.543
+mean_steps_per_second=2961498.2
+min_steps_per_second=857862.8
+max_steps_per_second=3521920.4
+stddev_steps_per_second=1176173.8
+allocated_bytes=1000001304
+bytes_per_tick=1000.0
+gc_gen0=160
+gc_gen1=0
+gc_gen2=0
 ```
 
-The printed figure is a sample from a typical developer workstation; the
-`>400k steps/second` tagline reflects this workload class (roughly
-half a million pure steps per second, single-threaded, on the .NET 8
-runtime). Absolute numbers vary with hardware and build profile — the
-guarantee the benchmark pins is not a headroom claim but that the loop
-is low-allocation (no per-step logging or serialization in the hot path)
-and never touches the disk or a network until the caller asks it to.
+`--out` writes a JSON artifact plus host/provenance facts — runtime, OS, core
+count, architecture, CPU model, source revision, timestamp — so the numbers
+are scoped to the exact machine that produced them. The record committed at
+`benchmarks/throughput_benchmark.json` is the reference: **Apple M1 / 8
+cores / .NET 8-shaped runtime / macOS**, measured mean **≈ 3.0M steps/s**
+(batch range 0.86–3.52M, std ≈ 1.18M). The guarantee the benchmark pins is
+not a headroom claim but allocation behavior: the hot loop is
+allocation-light — roughly 1 KB managed allocation per tick, linear in tick
+count with no growth under a fixed episode (recorded run: Gen1 and Gen2
+collections both **0**, only ephemeral Gen0 reclamation) — and never touches
+the disk or a network until the caller asks it to. Numbers vary with
+hardware and build profile; treat them as host-scoped evidence, not a
+cross-machine promise.
+
+### evaluate — mirrored-seat MCTS evidence
+
+| Flag | Description |
+| --- | --- |
+| `--seed-set <dev\|heldout>` | Canonical suites: `dev` = 1001..1050, `heldout` = 2001..2050 (comma-separate to run both) |
+| `--rollouts <n>` | MCTS rollouts per action; default 32 |
+| `--seeds <n>` | Cap on seeds per suite (default 50; the decision rule needs ≥ 30) |
+| `--commit <sha>` | Source revision recorded in the artifact |
+| `--out <file>` | Write the JSON artifact to a file instead of stdout |
+
+```sh
+dotnet run --project Cli -- evaluate --seed-set dev,heldout --rollouts 32 --out benchmarks/mcts_evaluation_results.json
+```
+
+Runs the empirical evaluation protocol: for every seed, two matches **with
+mirrored seats** — MCTS at seat 0 vs the `ScoutCollectorAgent` baseline at
+seat 1, and the baseline at seat 0 vs MCTS at seat 1 — on the standard
+generated 2-agent / 200-tick map. The per-seed paired delta
+Δ = avg((score_MCTS − score_Scout) at seat 0, (score_Scout − score_MCTS) at
+seat 1) cancels positional spawn bias, which is why the difference can never
+be explained by "who spawned first". The report covers per-seed rows, mean /
+median / std / IQR of Δ, a 95% confidence interval for the mean on the
+t-distribution, win/draw/loss/timeout rates, mean choke-contention
+saturation, and a decision-rule verdict: **pass** only if mean Δ > 0 and the
+CI lower bound > 0 (studies under 30 seeds are reported as not graded).
+`--out` writes the full artifact; the summary lands on stderr.
+
+### MCTS Empirical Evaluation
+
+Reference result committed at `benchmarks/mcts_evaluation_results.json`
+(source revision `5783ca1`, Apple M1 / 8 cores, MCTS budget 32 rollouts ×
+depth 12, 2 agents / 200 ticks / transit speed 4, baseline
+`ScoutCollectorAgent` with unbounded vision, mirror-seated per seed):
+
+| Suite | Seeds | Mean Δ | 95% CI | Win | Draw | Loss | Timeout | Verdict |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| dev (1001–1050) | 50 | −1.12 | [−1.37, −0.87] | 15% | 27% | 58% | 0% | FAIL |
+| held-out (2001–2050) | 50 | −1.25 | [−1.54, −0.96] | 18% | 14% | 68% | 0% | FAIL |
+
+The 32-rollout MCTS policy **loses the paired comparison to the deterministic
+Scout heuristic** on both suites: the mean paired delta is negative and the
+entire 95% CI sits below 0, so the decision rule fails by a wide margin
+(~1 to 1.5 resource-equivalents per match; zero timeouts). This is a real,
+reproducible finding — every suite run always terminates at
+`resources-exhausted` on ≤ 200 ticks, contention stays at 0 (the maps never
+put both agents on the same claim path), and the per-seed deltas repeat
+byte-for-byte across runs. It is also a *working verdict*, not a bug: the
+harness's whole point is that a rollout budget, map distribution, and
+baseline family produce evidence; the evidence currently says the 1-tick
+scout's back-pressure-aware collection beats this budget's shallow lookahead.
+To challenge the result, raise the budget (`--rollouts 64`, the CLI's next
+canonical config), change the map distribution, or swap the baseline — the
+artifact and README table are the before/after record.
 
 ## Design Decisions
 

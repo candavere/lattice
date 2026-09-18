@@ -85,15 +85,41 @@ public enum SensorSurpriseKind
 /// read-only access for the decision logic and for tests.
 /// Apart from the per-zone/per-resource beliefs, the map records one-rival
 /// sightings, which choke edges are observed currently occupied (for routing
-/// around a saturated choke), and the most recent <see cref="SensorSurpriseKind"/>
-/// so re-planning is observable and testable.
+/// around a saturated choke), a congestion cooldown for chokes that stayed
+/// saturated for several consecutive ticks, and the most recent
+/// <see cref="SensorSurpriseKind"/> so re-planning is observable and testable.
 /// </summary>
 public sealed class AgentBeliefMap
 {
+    /// <summary>
+    /// How many consecutive ticks a choke must be observed saturated before the
+    /// agent treats it as congested rather than transiently busy. A single
+    /// mid-crossing rival is already avoided for that tick; a rival that keeps
+    /// the choke occupied tick after tick means the edge is a bottleneck, not a
+    /// coincidence.
+    /// </summary>
+    public const int CongestionSaturationThreshold = 2;
+
+    /// <summary>
+    /// How many ticks a congested choke stays penalized after the last
+    /// qualifying saturation sighting. The cooldown removes the
+    /// enter-and-immediately-reconsider oscillation: without it an agent that
+    /// steps toward a repeatedly-saturated choke, gets bounced, and re-plans
+    /// the very next tick can ping-pong between two equally blocked routes.
+    /// </summary>
+    public const int CongestionCooldownTicks = 4;
+
     private readonly Dictionary<int, ZoneBelief> _zones = new();
     private readonly Dictionary<int, ResourceBelief> _resources = new();
     private readonly Dictionary<int, EnemySighting> _enemies = new();
     private readonly Dictionary<(int Lo, int Hi), int> _busyEdges = new();
+    private readonly Dictionary<(int Lo, int Hi), EdgeCongestion> _edgeCongestion = new();
+
+    private sealed class EdgeCongestion
+    {
+        public int Streak;
+        public int CooldownUntil = -1;
+    }
 
     /// <summary>Creates an empty belief map for <paramref name="agentId"/>.</summary>
     public AgentBeliefMap(int agentId)
@@ -132,8 +158,9 @@ public sealed class AgentBeliefMap
     /// <summary>
     /// Choke edges observed occupied this/previous ticks, keyed by normalized
     /// (low, high) zone pair with the tick of the sighting. Consult
-    /// <see cref="IsEdgeBusy"/> when routing — the occupancy is transient, so
-    /// older entries are ignored by the planner.
+    /// <see cref="IsEdgeBlocked"/> when routing — the occupancy is transient, so
+    /// older entries are ignored by the planner, and the cooldown extends the
+    /// penalty for chokes that stay saturated.
     /// </summary>
     public IReadOnlyDictionary<(int Lo, int Hi), int> BusyEdges => _busyEdges;
 
@@ -154,6 +181,7 @@ public sealed class AgentBeliefMap
     {
         LastSurprise = SensorSurpriseKind.None;
         var saturatedSeen = false;
+        var saturatedEdges = new HashSet<(int Lo, int Hi)>();
 
         for (var agentId = 0; agentId < observation.Agents.Length; agentId++)
         {
@@ -174,11 +202,15 @@ public sealed class AgentBeliefMap
 
                 if (sight.LastKnownState.Transit is { } transit)
                 {
-                    _busyEdges[(Math.Min(transit.FromZoneId, transit.ToZoneId), Math.Max(transit.FromZoneId, transit.ToZoneId))] = sight.LastSeenTick;
+                    var edge = (Math.Min(transit.FromZoneId, transit.ToZoneId), Math.Max(transit.FromZoneId, transit.ToZoneId));
+                    _busyEdges[edge] = sight.LastSeenTick;
+                    saturatedEdges.Add(edge);
                     saturatedSeen = true;
                 }
             }
         }
+
+        UpdateCongestion(observation.Tick, saturatedEdges);
 
         for (var zoneId = 0; zoneId < observation.Zones.Length; zoneId++)
         {
@@ -258,11 +290,69 @@ public sealed class AgentBeliefMap
     /// <paramref name="toZone"/> was observed occupied at <paramref name="tick"/>.
     /// Older occupancy sightings are stale and ignored, so a saturated choke
     /// only redirects routing for the single tick the occupancy is real-time.
+    /// This is the instantaneous signal; <see cref="IsEdgeBlocked"/> adds the
+    /// congestion cooldown on top.
     /// </summary>
     public bool IsEdgeBusy(int fromZone, int toZone, int tick)
     {
         var lo = Math.Min(fromZone, toZone);
         var hi = Math.Max(fromZone, toZone);
         return _busyEdges.TryGetValue((lo, hi), out var seenTick) && seenTick == tick;
+    }
+
+    /// <summary>
+    /// Whether routing should avoid the choke between
+    /// <paramref name="fromZone"/> and <paramref name="toZone"/> at
+    /// <paramref name="tick"/>: it is occupied this tick
+    /// (<see cref="IsEdgeBusy"/>) or it was congested — observed saturated on
+    /// <see cref="CongestionSaturationThreshold"/> consecutive ticks — and is
+    /// still inside its <see cref="CongestionCooldownTicks"/>-tick cooldown.
+    /// The cooldown keeps an agent from oscillating onto an edge it has
+    /// repeatedly been bounced from.
+    /// </summary>
+    public bool IsEdgeBlocked(int fromZone, int toZone, int tick)
+    {
+        if (IsEdgeBusy(fromZone, toZone, tick))
+        {
+            return true;
+        }
+
+        var lo = Math.Min(fromZone, toZone);
+        var hi = Math.Max(fromZone, toZone);
+        return _edgeCongestion.TryGetValue((lo, hi), out var congestion) && tick <= congestion.CooldownUntil;
+    }
+
+    /// <summary>
+    /// Advances the per-edge congestion streaks with this tick's saturation
+    /// sightings: every observed-saturated edge's streak grows (and arms the
+    /// cooldown once it reaches <see cref="CongestionSaturationThreshold"/>),
+    /// while every edge not saturated this tick has its streak reset. The
+    /// cooldown deadline itself is never shortened, so it always survives the
+    /// full window.
+    /// </summary>
+    private void UpdateCongestion(int tick, HashSet<(int Lo, int Hi)> saturatedEdges)
+    {
+        foreach (var edge in saturatedEdges)
+        {
+            if (!_edgeCongestion.TryGetValue(edge, out var congestion))
+            {
+                congestion = new EdgeCongestion();
+                _edgeCongestion[edge] = congestion;
+            }
+
+            congestion.Streak++;
+            if (congestion.Streak >= CongestionSaturationThreshold)
+            {
+                congestion.CooldownUntil = Math.Max(congestion.CooldownUntil, tick + CongestionCooldownTicks);
+            }
+        }
+
+        foreach (var (edge, congestion) in _edgeCongestion)
+        {
+            if (!saturatedEdges.Contains(edge))
+            {
+                congestion.Streak = 0;
+            }
+        }
     }
 }

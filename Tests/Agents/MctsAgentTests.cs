@@ -23,8 +23,8 @@ public class MctsAgentTests
     /// 2-3 that leads to the only stash (R2-R4), on equidistant access chokes
     /// (0-2 and 1-2, three ticks each). Greedy slot 1 cannot skip its starting
     /// resource (own-zone collect bias), so it reaches the corridor gate one
-    /// tick after slot 0, loses the single-lane choke to ascending-id
-    /// resolution, and arrives at the stash after it is emptied — baseline
+    /// tick after slot 0, is blocked by the occupied single-lane choke,
+    /// and arrives at the stash after it is emptied — baseline
     /// score 1. MCTS prices real transit timing in its rollouts, takes the
     /// corridor first, and sweeps the stash: score 4. Every choke on the
     /// contested path is single-lane and every crossing two or more ticks, so

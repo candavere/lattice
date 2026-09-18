@@ -263,11 +263,11 @@ public static class Simulation
                         transitTicks = TransitTicks(state.Map, current, destination, config.TransitSpeed);
                         if (transitTicks > 1) // one-tick edges arrive instantly; only real crossings occupy the choke
                         {
-var chokeIndex = EdgeChoke(state.Map, current, destination);
-                        var chokeCapacity = chokeIndex >= 0
-                            ? state.Dynamics.EffectiveChokeCapacity(state.Map, chokeIndex)
-                            : MapLimits.Unlimited;
-                        travelOpen = chokeCapacity > 0 && edgeLoad[chokeIndex] < chokeCapacity;
+                            var chokeIndex = EdgeChoke(state.Map, current, destination);
+                            var chokeCapacity = chokeIndex >= 0
+                                ? state.Dynamics.EffectiveChokeCapacity(state.Map, chokeIndex)
+                                : MapLimits.Unlimited;
+                            travelOpen = chokeCapacity > 0 && edgeLoad[chokeIndex] < chokeCapacity;
                         }
                     }
 

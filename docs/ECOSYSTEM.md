@@ -47,7 +47,7 @@ system, and nothing to unsubscribe from.
   position lattice (`GridPoint`) is the only geometry the core guarantees; let
   the renderer own whatever smoothing it wants.
 - Ship deterministic rules to the client and let it predict. Because a seeded
-  run on the same `SimulationConfig` produces byte-identical trajectories,
+  run on the same `SimulationConfig` produces deterministic trajectories,
   replays, deathcams, and ghost data are exactly the recorded action bytes —
   no simulation traffic, no snapshots.
 - Generate maps offline (or at build time) with the seeded generator, gate
@@ -65,8 +65,9 @@ replay if you want a chart rather than a node tree.
 ## Server-side and batch use
 
 `Lattice.Trajectories` and `Lattice.Analytics` are plain-file tooling: write
-JSONL to disk, analyze byte-identical reports, run CI gates. The CLI is
-scriptable (`generate`/`simulate`/`render`/`analyze`/`benchmark`/`evaluate`)
+JSONL to disk, analyze reports, and rely on verified replay equivalence at CI
+gates. The CLI is scriptable
+(`generate`/`simulate`/`render`/`analyze`/`benchmark`/`evaluate`)
 and every command is seeded, so a pipeline can regenerate and diff. There is no database,
 service, or daemon layer to provision; a batch run is a shell loop.
 
@@ -103,6 +104,8 @@ tests in `/Tests`.
   `AgentBeliefMap` model *information*, not the raster behind it — a host that
   needs image-space sensing computes that itself and feeds the result through
   whatever contract it owns.
-- Determinism is defined across machines for *identical* `SimulationConfig`
-  inputs. Callers who mutate the config, hand agents ambient randomness, or
-  patch maps after generation are outside the guarantee.
+- Determinism is defined for *identical* `SimulationConfig` inputs as
+  transition determinism under the specified runtime contract plus per-step
+  serialized `StepResult` replay equivalence across the tested CI platforms.
+  Callers who mutate the config, hand agents ambient randomness, or patch maps
+  after generation are outside the guarantee.

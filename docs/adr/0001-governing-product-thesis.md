@@ -53,12 +53,17 @@ The five evidentiary principles are:
    claim asserted in prose.
 5. **Contractual terminology.** Vocabulary is load-bearing and must never
    drift. Three distinct guarantees are named precisely: *transition
-   determinism* (same state + same actions → same next state), *per-step
-   serialized `StepResult` equivalence* (a replay's reconstructed ticks match
-   the recorded ticks' serialized results), and *raw JSONL byte identity* (two
-   fresh runs from the same seed and actions produce bit-for-bit identical
-   files). Reachability is a graph property — BFS reachability over zones and
-   chokes — never geometric distance.
+   determinism* (under the specified .NET 8 BCL runtime contract, the same
+   state + same actions → the same next state), *per-step serialized
+   `StepResult` equivalence* (a replay's reconstructed ticks match the recorded
+   ticks' serialized results — `TrajectoryReplay.Verify` asserts exactly this),
+   and *raw JSONL byte identity* (two fresh runs from the same seed and actions
+   produce byte-identical files, claimed only where line-ending and formatting
+   normalization is verified on identical host environments). A canonical
+   simulation-state hash tree is **not yet implemented**, and replays therefore
+   verify serialized `StepResult` equality rather than a state digest.
+   Reachability is a graph property — BFS reachability over zones and chokes —
+   never geometric distance.
 
 ## Rationale
 

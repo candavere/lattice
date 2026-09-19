@@ -20,7 +20,7 @@
 <p align="center">
   <a href="https://github.com/candavere/lattice/actions/workflows/ci.yml"><img src="https://github.com/candavere/lattice/actions/workflows/ci.yml/badge.svg" alt="CI build status" /></a>
   <img src="https://img.shields.io/badge/tests-365%20passing-brightgreen" alt="365 unit tests passing" />
-  <img src="https://img.shields.io/badge/determinism-byte--identical-blue" alt="byte-identical determinism" />
+  <img src="https://img.shields.io/badge/determinism-verified--replay--equivalence-blue" alt="verified replay equivalence" />
   <img src="https://img.shields.io/badge/dependencies-BCL%20runtime%20only-blueviolet" alt="runtime dependencies: pure .NET 8 BCL" />
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4" alt=".NET 8" />
   <a href="https://candavere.github.io/lattice/"><img src="https://img.shields.io/badge/live%20demo-GitHub%20Pages-2ea44f" alt="live demo" /></a>
@@ -40,12 +40,16 @@ Lattice is simulation-as-instrument, not game middleware. Agents traverse a
 topological graph of zones and capacity-limited chokes under partial
 observation; a deterministic step contract advances every tick as a pure
 function of the prior state and the recorded actions, so any run can be
-replayed byte-for-byte on any host. The engine, generator, and evaluation
-harness exist to make deterministic experiments easy to run, audit, and
+replayed and verified per-step. Given identical seeds and action sequences,
+simulations produce deterministic state transitions under the specified
+.NET 8 BCL runtime contract. The engine, generator, and evaluation harness
+exist to make deterministic experiments easy to run, audit, and
 statistically inspect — stepping at **8.8k–661k mean steps/sec** (measured on a
 2020 Apple M1 / 8 cores / 8 GiB RAM under .NET 10.0.10 Release / Workstation
-GC, tree `b7459a1` — see the committed `benchmarks/throughput_benchmark.json`)
-with byte-for-byte identical replay across any platform.
+GC, tree `b7459a1` — see the committed `benchmarks/throughput_benchmark.json`).
+Replays guarantee per-step serialized `StepResult` equivalence against the
+canonical golden trajectory across the tested Ubuntu, macOS, and Windows CI
+matrix (`TrajectoryReplay.Verify`).
 
 <!--
 Proposed GitHub topics for the maintainer (set these in the repo settings):
@@ -94,9 +98,9 @@ one-to-one onto the classic RL loop:
   projects rely on the standard test SDKs (`Microsoft.NET.Test.Sdk`, xUnit).
 - **Headless:** Operates without a window, GPU context, or graphics thread,
   optimized for automated CI and high-speed batch evaluation.
-- **Determinism:** Given the same seed and action sequence, simulations produce
-  bit-for-bit identical state transitions across Windows, Linux, and macOS
-  runtimes.
+- **Determinism:** Given identical seeds and action sequences, simulations
+  produce deterministic state transitions under the specified .NET 8 BCL
+  runtime contract.
 - **Topological Graph:** An environment modeled as discrete interconnected
   nodes (zones) and capacity-limited edges (chokes) rather than a continuous
   floating-point coordinate space.
@@ -105,11 +109,13 @@ one-to-one onto the classic RL loop:
 
 The step contract is a zero-dependency C# state machine instrumented for
 deterministic experiment: every tick is a pure function of the previous state
-and the recorded actions. The core guarantee is repeatability — **same seed,
-same actions, same bytes.** Every run on every machine reproduces an identical
-trajectory, because the simulation has no hidden state, no singletons, and no
-ambient randomness. The built-in Monte Carlo Tree Search (MCTS) agent
-demonstrates exactly this contract, pricing candidate actions with
+and the recorded actions. The core guarantee is repeatability under the
+runtime contract — **same seed, same actions, same transitions.** Trajectory
+verification asserts tick-by-tick serialized payload equality. A canonical
+simulation-state hash tree is not yet implemented; raw file-byte identity is
+not asserted across heterogeneous hosts. The simulation has no hidden state,
+no singletons, and no ambient randomness. The built-in Monte Carlo Tree Search
+(MCTS) agent demonstrates exactly this contract, pricing candidate actions with
 deterministic BFS rollouts against the same pure `Step` used by every other
 policy, and the paired evaluation harness turns those runs into statistically
 inspectable comparisons.
@@ -131,8 +137,9 @@ dotnet run --project Cli -- simulate --seed 42 --agent mcts --steps 30 --out dem
 dotnet run --project Cli -- render --trajectory demo.jsonl
 ```
 
-Every command is seeded, so identical arguments reproduce identical bytes on
-any machine. The full command set is `generate`, `simulate`, `render`,
+Every command is seeded, so identical arguments produce identical per-step
+serialized output under the specified .NET 8 BCL runtime contract. The full
+command set is `generate`, `simulate`, `render`,
 `analyze`, `replay`, `benchmark`, and `evaluate` — see the
 [CLI Reference](#cli-reference) below.
 
@@ -192,7 +199,7 @@ zones), a crossing takes
 ticks, computed entirely in integer arithmetic. While crossing, the agent
 carries an `InTransit(From, To, Remaining)` state and counts as an occupant of
 the departure node; it cannot move or collect until arrival. Transit state is
-plain data, so mid-crossing frames record and replay byte-identically.
+plain data, so mid-crossing frames record and replay deterministically.
 `Simulation.TransitTicks(map, from, to, speed)` exposes the same arithmetic for
 tooling.
 
@@ -205,7 +212,7 @@ closed capacity over a `OpenTicks`/`ClosedTicks` cycle) and
 collected). The engine applies the rules at every tick boundary as
 `DynamicMapOverrides` (see adr-002 addenda), and the same policy flows through
 rollouts, trajectory headers as `DynamicRules`, contention reporting, and the
-byte-identical replay verification the CLI runs over every recorded episode.
+per-step replay verification the CLI runs over every recorded episode.
 Rules are serializable JSON (`ruleKind` discriminator) and revalidate through
 their constructors, so file, programmatic API, and recorded headers can never
 drift apart.
@@ -255,8 +262,9 @@ The deterministic outcome taxonomy (all `XOR`-exclusive verdicts):
 | `intercepted-after-exfil` | Infiltrator completes the haul, but is caught at the exit the same tick the episode closes |
 | `timeout` | Budget exhausted before the vault is raided or captured |
 
-Identical parameters always reproduce identical trajectories — same room
-sequence, same choke contention, same final verdict.
+Identical parameters produce the same deterministic trajectory under the
+runtime contract — same room sequence, same choke contention, same final
+verdict.
 
 ### Map fairness and spawn bias
 
@@ -277,8 +285,9 @@ The index can be wired into generation as a retry-loop acceptance gate (see
 
 1. **Pure logic, no hidden state.** No singletons, no static mutable state, no
    ambient randomness. Seeded instances only.
-2. **Determinism first.** Same seed + same actions → byte-identical
-   trajectory, asserted by a permanent determinism test suite.
+2. **Determinism first.** Same seed + same actions → per-step
+   `StepResult`-equivalent trajectory, asserted by a permanent determinism
+   test suite.
 3. **Step contracts are data.** Records serialize to JSONL with no behavior and
    no interpretation logic.
 4. **Hard constraints over probabilistic generation.** The generator rejects
@@ -309,7 +318,8 @@ replay a fixed script, and assert byte-identical trajectory JSON across runs.
 
 `Lattice.Cli` exposes seven commands (`dotnet run --project Cli -- <command>
 ..., binary name `lattice`). **Every command is seeded** — identical
-arguments always produce identical bytes. Exit status is `0` on success,
+arguments produce identical deterministic output under the specified .NET 8
+BCL runtime contract. Exit status is `0` on success,
 non-zero on any bad argument or runtime error; `--help`/`-h` prints usage.
 
 ### generate — write a valid map
@@ -372,8 +382,8 @@ degenerate schedule (zero-length cycle, negative capacity) past validation.
 Rules participate in the whole toolchain: they bind to the MCTS agent's
 internal rollout model, are recorded into the trajectory header as
 `DynamicRules`, drive choke contention reporting, and are replayed and
-verified byte-for-byte when the episode is re-run (`byte-identical replay
-verified`).
+verified per-step against the recorded trajectory when the episode is re-run
+(`byte-identical replay verified`).
 
 ### render — replay a recorded trajectory
 
@@ -442,9 +452,9 @@ reproduces byte-for-byte and every recorded action is in-space, else a
 non-zero exit with the divergence on stderr.
 
 Trajectory replay validation in v2.2.0 enforces tick-by-tick serialized
-`StepResult` equivalence (`TrajectoryReplay.Verify`). A formal canonical
-simulation-state hash tree is slated for future engine revisions; replays do
-not currently assert raw file-byte identity.
+`StepResult` equivalence (`TrajectoryReplay.Verify`). A canonical
+simulation-state hash tree does not currently exist; it is slated for future
+engine revisions. Replays do not assert raw file-byte identity.
 
 ### benchmark — measure the five-case workload matrix
 
@@ -580,7 +590,7 @@ entire 95% CI sits below 0, so the decision rule fails by a wide margin
 reproducible finding — every suite run always terminates at
 `resources-exhausted` on ≤ 200 ticks, contention stays at 0 on the default
 maps (the generated topologies never put both agents on the same claim path),
-and the per-seed deltas repeat byte-for-byte across runs. It is also a
+and the per-seed deltas are reproducible run over run. It is also a
 *working verdict*, not a bug: the harness's whole point is that a rollout
 budget, map distribution, and baseline family produce evidence; the evidence
 currently says the 1-tick scout's back-pressure-aware collection beats this

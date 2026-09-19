@@ -1,0 +1,5 @@
+{
+  "Rules": [
+    { "ruleKind": "timed-portcullis", "ChokeId": 0, "OpenTicks": 2, "ClosedTicks": 2 }
+  ]
+}

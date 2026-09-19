@@ -28,5 +28,8 @@ jobs:
       - name: Build
         run: dotnet build Lattice.sln -c Release --no-restore
 
+      - name: Verify Golden Trajectory Replay Equivalence
+        run: dotnet run -c Release --project Cli -- replay Tests/fixtures/golden_trajectory.jsonl --verify
+
       - name: Test
         run: dotnet test Lattice.sln -c Release --no-build --verbosity normal

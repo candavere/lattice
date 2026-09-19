@@ -688,4 +688,66 @@ public class CliIntegrationTests
         Assert.True(document.RootElement.TryGetProperty("Workloads", out var workloads));
         Assert.Equal(5, workloads.GetArrayLength());
     }
+
+    [Fact]
+    public void Replay_Verify_GeneratedTrajectory_ReturnsSuccess()
+    {
+        var trajectory = TempPath(".jsonl");
+        try
+        {
+            Assert.Equal(0, Run("simulate", "--seed", "7", "--steps", "15", "--out", trajectory).ExitCode);
+
+            var (exit, _, stderr) = Run("replay", trajectory, "--verify");
+
+            Assert.Equal(0, exit);
+            Assert.Contains("replay verified", stderr);
+        }
+        finally
+        {
+            File.Delete(trajectory);
+        }
+    }
+
+    [Fact]
+    public void Replay_Verify_CorruptedTrajectory_NonZeroExit()
+    {
+        var trajectory = TempPath(".jsonl");
+        try
+        {
+            var (exit, _, _) = Run("simulate", "--seed", "7", "--steps", "15", "--out", trajectory);
+            Assert.Equal(0, exit);
+
+            var lines = File.ReadAllLines(trajectory).ToList();
+            // Corrupt the first step's recorded result so replay diverges.
+            lines[1] = lines[1].Replace("\"Kind\":\"step\"", "\"Kind\":\"step\"").Replace("\"Rewards\"", "\"ReWARDS\"");
+            File.WriteAllLines(trajectory, lines);
+
+            var (replayExit, _, stderr) = Run("replay", trajectory, "--verify");
+
+            Assert.NotEqual(0, replayExit);
+            Assert.False(string.IsNullOrEmpty(stderr));
+        }
+        finally
+        {
+            File.Delete(trajectory);
+        }
+    }
+
+    [Fact]
+    public void Replay_MissingPath_NonZeroExit()
+    {
+        var (exit, _, stderr) = Run("replay", "--verify");
+
+        Assert.NotEqual(0, exit);
+        Assert.Contains("missing trajectory path", stderr);
+    }
+
+    [Fact]
+    public void Replay_NonexistentFile_NonZeroExit()
+    {
+        var (exit, _, stderr) = Run("replay", "/definitely/not/here.jsonl", "--verify");
+
+        Assert.NotEqual(0, exit);
+        Assert.False(string.IsNullOrEmpty(stderr));
+    }
 }

@@ -102,6 +102,7 @@ public static class CliApp
             "simulate" => Simulate(args[1..], stdout, stderr),
             "render" => Render(args[1..], stdout, stderr),
             "analyze" => Analyze(args[1..], stdout, stderr),
+            "replay" => Replay(args[1..], stdout, stderr),
             "benchmark" => RunBenchmark(args[1..], stdout, stderr),
             "evaluate" => Evaluate(args[1..], stdout, stderr),
             _ => UnknownCommand(args[0], stderr),
@@ -561,6 +562,76 @@ public static class CliApp
         }
     }
 
+    /// <summary>
+    /// Replays a recorded trajectory and (with <c>--verify</c>) asserts
+    /// per-step serialized <see cref="StepResult"/> equivalence against the
+    /// recording — the cross-platform golden-replay gate. With
+    /// <c>--verify</c> the exit code is 0 only when every recorded tick
+    /// reproduces byte-for-byte; a divergence or structural defect returns a
+    /// non-zero exit. Without <c>--verify</c> it re-serializes the recording
+    /// to stdout so a caller can inspect or re-host it.
+    /// </summary>
+    private static int Replay(string[] args, TextWriter stdout, TextWriter stderr)
+    {
+        try
+        {
+            // --verify is a boolean switch: strip it before the key/value flag
+            // parser so it never demands a trailing value.
+            var verify = args.Contains("--verify", StringComparer.Ordinal);
+            if (verify)
+            {
+                args = args.Where(arg => arg != "--verify").ToArray();
+            }
+
+            var (flags, positionals) = ParseFlags(args, "--trajectory", "--out");
+            var trajectoryPath = flags.TryGetValue("--trajectory", out var flaggedPath)
+                ? flaggedPath
+                : positionals.Count == 1 ? positionals[0] : null;
+            if (trajectoryPath is null)
+            {
+                throw new ArgumentException(
+                    "missing trajectory path (pass a positional path or --trajectory <file>).");
+            }
+
+            if (positionals.Count > (flags.ContainsKey("--trajectory") ? 0 : 1))
+            {
+                throw new ArgumentException($"unexpected argument '{positionals[^1]}'.");
+            }
+
+            TrajectoryRecording recording;
+            using (var reader = new StreamReader(trajectoryPath))
+            {
+                recording = TrajectoryReader.Read(reader);
+            }
+
+            var problems = TrajectoryReplay.Verify(recording);
+            if (problems.Count > 0)
+            {
+                foreach (var problem in problems)
+                {
+                    stderr.WriteLine($"replay error: {problem}");
+                }
+
+                return Failure;
+            }
+
+            if (!verify)
+            {
+                TrajectoryWriter.Write(recording, stdout);
+                return Success;
+            }
+
+            stderr.WriteLine(
+                $"replay verified: {recording.Steps.Length} step(s) byte-identical " +
+                $"(seed {recording.Header.Seed}, schema v{recording.Header.SchemaVersion}).");
+            return Success;
+        }
+        catch (Exception ex)
+        {
+            return Report(ex, stderr);
+        }
+    }
+
     private static int RunBenchmark(string[] args, TextWriter stdout, TextWriter stderr)
     {
         try
@@ -932,6 +1003,11 @@ public static class CliApp
         sink.WriteLine("  analyze   --trajectory <file> [--out <file>]");
         sink.WriteLine("            Report contention, turning points, pathing efficiency, and heatmaps");
         sink.WriteLine("            (compact terminal view without --out, full Markdown report with it)");
+        sink.WriteLine("  replay    <file> [--verify] [--out <file>]");
+        sink.WriteLine("            Re-run a recorded trajectory from its header and, with --verify, assert");
+        sink.WriteLine("            per-step serialized StepResult equivalence against the recording; exit 0");
+        sink.WriteLine("            only when every tick reproduces byte-for-byte (the cross-platform golden");
+        sink.WriteLine("            replay gate). Without --verify it re-serializes the recording to stdout");
         sink.WriteLine("  benchmark [--runs <n>] [--warmup <n>] [--steps <n>] [--out <file>] [--commit <sha>] [--cpu <model>]");
         sink.WriteLine("            Measure the five-case workload matrix (raw stepping, facility, dynamic");
         sink.WriteLine("            topology, stress, and MCTS policy) after a warm-up pass; reports per-case");

@@ -3,20 +3,23 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Lattice — a deterministic, seedable 2D procedural strategy simulation environment. Replay recorded trajectories in the browser.">
-  <title>Lattice — Deterministic Tactical Simulation Replay</title>
+  <meta name="description" content="A testing lab for multi-agent AI: run seeded experiments, replay every decision, compare policies fairly, and audit the evidence behind the result.">
+  <title>Lattice — Auditable Multi-Agent Research &amp; Benchmarking Lab</title>
   <link rel="stylesheet" href="./style.css">
   <script src="./app.js" defer></script>
 </head>
 <body>
   <header class="app-header">
-    <h1>Lattice — Deterministic Tactical Simulation Replay</h1>
+    <h1>Audit AI decisions, not just outcomes.</h1>
     <p class="subtitle">
-      An auditable multi-agent research and benchmarking environment for
-      deterministic Dec-POMDP experiments. Same seed and same actions yield the
-      same serialized trajectory under the .NET 8 BCL runtime contract. Every
-      frame below is replayed from a recorded JSON Lines trajectory; nothing is
-      recomputed in the browser.
+      A testing lab for multi-agent AI: run seeded experiments, replay every
+      decision, compare policies fairly, and audit the evidence behind the
+      result. Lattice is a deterministic, headless, zero-dependency .NET 8
+      research substrate — pure step-contract simulation, seeded procedural
+      maps, an MCTS lookahead policy, and a paired statistical evaluation
+      harness. Same seed and same actions yield the same serialized trajectory
+      under the .NET 8 BCL runtime contract. Every frame below is replayed from
+      a recorded JSON Lines trajectory; nothing is recomputed in the browser.
     </p>
     <div class="badges" aria-label="Repository information">
       <span class="badge"><a href="https://github.com/candavere/lattice">github.com/candavere/lattice</a></span>
@@ -121,9 +124,9 @@
       <h2>Static render of the selected preset</h2>
       <p class="card-note" id="static-note">
         The same run as a single dependency-free animated SVG, painted by the
-        CLI renderer with tactical roles in every tooltip — scroll-stable and
-        printable, for when you want a snapshot rather than an interactive
-        replay.
+        CLI renderer with the recorded agent roles in every tooltip —
+        scroll-stable and printable, for when you want a shareable snapshot
+        rather than an interactive replay.
       </p>
       <object class="demo" id="static-svg" type="image/svg+xml" data="./demo.svg" aria-label="Animated Lattice demo trajectory">
         <p class="fallback">

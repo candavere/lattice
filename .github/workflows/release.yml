@@ -9,62 +9,63 @@ permissions:
   contents: write
 
 jobs:
-  # P0: gate every release on tag/project/CLI version parity before any
-  # native asset is built. A tag that disagrees with the source tree must
-  # never reach the publish matrix.
+  # P0: gate every release on tag/project/CLI version parity and the exact
+  # checked-out commit before any native asset is built. A tag that disagrees
+  # with the source tree — or a build whose release metadata would not target
+  # the triggering commit — must never reach the publish matrix.
   validate:
     name: Tag/project version parity gate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Setup .NET 8
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
           dotnet-version: '8.0.x'
 
-      - name: Assert tag version == project version == CLI --version
+      - name: Assert tag version == every project <Version> == CLI --version
         shell: bash
         run: |
           set -euo pipefail
 
           TAG_VERSION="${GITHUB_REF#refs/tags/v}"
           echo "tag version: $TAG_VERSION"
-
-          # Prefer Directory.Build.props when the repo centralizes versions;
-          # otherwise the CLI project is the canonical source.
-          VERSION_FILE="Directory.Build.props"
-          if [ ! -f "$VERSION_FILE" ]; then
-            VERSION_FILE="Cli/Lattice.Cli.csproj"
-          fi
-
-          PROJECT_VERSION="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' "$VERSION_FILE" | head -n1)"
-          echo "project version ($VERSION_FILE): $PROJECT_VERSION"
-          if [ -z "$PROJECT_VERSION" ]; then
-            echo "::error::no <Version> element found in $VERSION_FILE"
-            exit 1
-          fi
-          if [ "$TAG_VERSION" != "$PROJECT_VERSION" ]; then
-            echo "::error::tag version '$TAG_VERSION' does not match project version '$PROJECT_VERSION' in $VERSION_FILE"
+          echo "checked-out commit SHA: ${GITHUB_SHA}"
+          if [ -z "${GITHUB_SHA:-}" ]; then
+            echo "::error::GITHUB_SHA is empty; release cannot target a commit"
             exit 1
           fi
 
-          # Every production and test project must agree with the tag.
-          for proj in \
-            Environment/Lattice.Environment.csproj \
-            Agents/Lattice.Agents.csproj \
-            Trajectories/Lattice.Trajectories.csproj \
-            Analytics/Lattice.Analytics.csproj \
-            Visualization/Lattice.Visualization.csproj \
-            Cli/Lattice.Cli.csproj \
-            Generator/Lattice.Generator.csproj \
-            Tests/Lattice.Tests.csproj; do
-            PROJ_VERSION="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' "$proj" | head -n1)"
-            echo "  $proj -> $PROJ_VERSION"
-            if [ "$PROJ_VERSION" != "$TAG_VERSION" ]; then
-              echo "::error::$proj declares version '$PROJ_VERSION', expected '$TAG_VERSION'"
+          # The 8 production/test projects that must agree with the tag. The
+          # reference/ scaffold is intentionally excluded: it is not shipped.
+          PROJECTS="
+            Environment/Lattice.Environment.csproj
+            Agents/Lattice.Agents.csproj
+            Trajectories/Lattice.Trajectories.csproj
+            Analytics/Lattice.Analytics.csproj
+            Visualization/Lattice.Visualization.csproj
+            Cli/Lattice.Cli.csproj
+            Generator/Lattice.Generator.csproj
+            Tests/Lattice.Tests.csproj
+          "
+
+          # Verify EVERY <Version> element in every project, not just the first.
+          for proj in $PROJECTS; do
+            test -f "$proj" || { echo "::error::missing project $proj"; exit 1; }
+            MATCHES="$(grep -c '<Version>' "$proj" || true)"
+            if [ "$MATCHES" -eq 0 ]; then
+              echo "::error::$proj declares no <Version> element"
               exit 1
             fi
+            while IFS= read -r line; do
+              PROJ_VERSION="$(printf '%s' "$line" | sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' | tr -d '[:space:]')"
+              echo "  $proj -> $PROJ_VERSION"
+              if [ -z "$PROJ_VERSION" ] || [ "$PROJ_VERSION" != "$TAG_VERSION" ]; then
+                echo "::error::$proj declares version '$PROJ_VERSION', expected '$TAG_VERSION'"
+                exit 1
+              fi
+            done < <(grep '<Version>' "$proj")
           done
 
           echo "building CLI to read its reported version..."
@@ -76,11 +77,12 @@ jobs:
             exit 1
           fi
 
-          echo "version parity verified: tag=$TAG_VERSION project=$PROJECT_VERSION cli=$CLI_VERSION"
+          echo "version parity verified: tag=$TAG_VERSION cli=$CLI_VERSION commit=${GITHUB_SHA}"
 
   # P0: build the exact release assets, exercise each one natively on its own
-  # runner, and upload only the bytes that passed. The release job re-hashes
-  # these same downloaded artifacts, so the checksums cover tested assets.
+  # runner, hash the smoke-tested bytes, and upload only the artifacts that
+  # passed. The release job re-verifies those downloaded bytes against the
+  # checksums captured here, so the hashes cover the exact tested binaries.
   publish:
     name: Build, smoke test, and stage ${{ matrix.target.name }}
     needs: validate
@@ -99,10 +101,10 @@ jobs:
             rid: osx-arm64
             name: lattice-osx-arm64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Setup .NET 8
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
           dotnet-version: '8.0.x'
 
@@ -167,32 +169,60 @@ jobs:
 
           echo "native smoke matrix passed for ${{ matrix.target.name }}"
 
-      - name: Upload the smoke-tested asset
-        uses: actions/upload-artifact@v4
+      - name: Hash the smoke-tested binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          BIN="publish/${{ matrix.target.name }}"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            sha256sum "$BIN" > "publish/${{ matrix.target.name }}.sha256"
+          else
+            sha256sum "$BIN" > "publish/${{ matrix.target.name }}.sha256"
+          fi
+          cat "publish/${{ matrix.target.name }}.sha256"
+
+      - name: Upload the smoke-tested asset and its checksum
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ${{ matrix.target.name }}
-          path: publish/${{ matrix.target.name }}
+          path: |
+            publish/${{ matrix.target.name }}
+            publish/${{ matrix.target.name }}.sha256
           if-no-files-found: error
 
-  # Release job: download the exact tested artifacts, generate the CycloneDX
-  # SBOM and a single SHA256SUMS.txt over those artifacts, then attach all of
-  # them to the GitHub Release for the immutable tag.
+  # Release job: download the exact tested artifacts, regenerate and verify
+  # SHA256SUMS.txt over those downloaded bytes, generate the CycloneDX SBOM,
+  # compose a formal structured release body, then attach everything to the
+  # GitHub Release for the immutable tag.
   release:
-    name: Attach tested binaries, checksums, and SBOM
+    name: Verify, compose, and attach release assets
     needs: publish
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
-      - name: Download all smoke-tested binaries
-        uses: actions/download-artifact@v4
+      - name: Download all smoke-tested binaries and checksums
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           path: artifacts
           merge-multiple: true
 
+      - name: Verify downloaded artifacts against smoke-tested checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd artifacts
+          cat lattice-linux-x64.sha256 lattice-win-x64.exe.sha256 lattice-osx-arm64.sha256 > SHA256SUMS.txt
+          echo "regenerating SHA256SUMS.txt over the downloaded bytes:"
+          sha256sum lattice-linux-x64 lattice-win-x64.exe lattice-osx-arm64 > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          echo "verifying downloaded artifacts match the smoke-tested hashes:"
+          sha256sum -c lattice-linux-x64.sha256 lattice-win-x64.exe.sha256 lattice-osx-arm64.sha256
+          echo "all downloaded artifacts match their smoke-tested checksums"
+
       - name: Setup .NET 8
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
           dotnet-version: '8.0.x'
 
@@ -203,7 +233,7 @@ jobs:
         run: |
           set -euo pipefail
           TAG_VERSION="${GITHUB_REF#refs/tags/v}"
-          dotnet tool install --global CycloneDX
+          dotnet tool install --global CycloneDX --version 6.2.0
           export PATH="$PATH:$HOME/.dotnet/tools"
           # The tool uses the filename verbatim, so name the artifact directly
           # and force JSON (the CycloneDX default is XML).
@@ -211,14 +241,60 @@ jobs:
             -sn Lattice -sv "$TAG_VERSION"
           test -f artifacts/sbom.json
 
-      - name: Generate SHA256SUMS.txt over the tested assets
+      - name: Compose formal structured release body
+        shell: bash
         run: |
           set -euo pipefail
-          cd artifacts
-          sha256sum lattice-linux-x64 lattice-win-x64.exe lattice-osx-arm64 > SHA256SUMS.txt
-          cat SHA256SUMS.txt
+          TAG="${GITHUB_REF#refs/tags/v}"
+          COMMIT="${GITHUB_SHA}"
+          SHORT_COMMIT="${COMMIT:0:8}"
+          cat > RELEASE_NOTES.md <<EOF
+          # Lattice $TAG
 
-      - name: Attach binaries, SHA256SUMS.txt, and sbom.json to the release
-        uses: softprops/action-gh-release@v2
+          **Source**
+          - Version tag: \`v$TAG\`
+          - Source commit: \`$COMMIT\` (\`$SHORT_COMMIT\`)
+          - Status: Research Preview — evaluation by maintainers and collaborators.
+
+          ## Compatibility & schema
+          - Pure .NET 8 (net8.0) BCL runtime; no external native dependencies.
+          - Trajectory schema version \`2\` — \`golden_trajectory.jsonl\` (header \`SchemaVersion: 2\`).
+          - Determinism is scoped to serialized \`StepResult\` equivalence; see docs/SUPPORT_AND_REPRODUCIBILITY.md.
+
+          ## Supported matrix
+          | Asset | OS | Architecture | Runtime |
+          | --- | --- | --- | --- |
+          | \`lattice-linux-x64\` | Linux | x64 | .NET 8 self-contained |
+          | \`lattice-osx-arm64\` | macOS | arm64 | .NET 8 self-contained |
+          | \`lattice-win-x64.exe\` | Windows | x64 | .NET 8 self-contained |
+
+          ## Assets
+          - Binaries (smoke-tested on their native runners): \`lattice-linux-x64\`, \`lattice-osx-arm64\`, \`lattice-win-x64.exe\`
+          - Checksums: \`SHA256SUMS.txt\`
+          - Software bill of materials: \`sbom.json\` (CycloneDX, JSON)
+
+          ## Benchmark, smoke-test, and evaluation artifacts
+          - Smoke matrix (each binary on its own runner): \`--help\`, \`--version\`, \`simulate\` (default and \`--rules\`), \`replay --verify\`, and \`evaluate\` (standard + bottleneck).
+          - Evaluation artifacts: [bottleneck](benchmarks/bottleneck_evaluation_results.json) · [MCTS](benchmarks/mcts_evaluation_results.json)
+          - Throughput benchmark: [summary](benchmarks/throughput_summary.md) · [raw](benchmarks/throughput_benchmark.json)
+
+          ## Known limitations
+          - Research Preview: behaviors, defaults, and output formats may change without deprecation notice.
+          - Determinism guarantees apply to serialized \`StepResult\` equivalence, not bit-identical replay across runtime/host.
+          - Limited OS coverage: x64 Linux, arm64 macOS, x64 Windows only; no 32-bit or arm64 Linux builds in this release.
+
+          ## Checksums
+          \`\`\`
+          $(cd artifacts && sha256sum lattice-linux-x64 lattice-win-x64.exe lattice-osx-arm64)
+          \`\`\`
+
+          SBOM (\`sbom.json\`) enumerates the .NET 8 dependency graph; verify every artifact against \`SHA256SUMS.txt\` before use.
+          EOF
+          cat RELEASE_NOTES.md
+
+      - name: Attach binaries, SHA256SUMS.txt, sbom.json, and release body
+        uses: softprops/action-gh-release@e598afbe1493e6b1bafb1f389cabb956eab91231
         with:
-          files: artifacts/*
+          files: |
+            artifacts/*
+          body_path: RELEASE_NOTES.md

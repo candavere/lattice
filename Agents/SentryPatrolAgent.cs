@@ -33,7 +33,7 @@ public enum SentryMode
 /// the observation stream: all perception and memory live in the
 /// <see cref="PerceptionFilter"/>, and the patrol cursor advances only from
 /// zone observations, so identical observation streams yield identical
-/// actions byte-for-byte.
+/// serialized actions.
 /// </summary>
 public sealed class SentryPatrolAgent : IAgent
 {

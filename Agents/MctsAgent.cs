@@ -45,7 +45,7 @@ public sealed record MctsSearchConfig
 /// reports the total score that action yields across its rollouts. Candidates
 /// are ranked by that integer (<see cref="long"/>) total, never by a
 /// floating-point average, so the win/lose verdict between two actions can
-/// never flip across platforms or via FP rounding. When totals tie, the
+/// never flip via floating-point rounding under the runtime contract. When totals tie, the
 /// tie-break is the canonical candidate order — Wait, then Moves in ascending
 /// zone id, then Collects in ascending resource id — so the decision is a
 /// total function of the observation alone. All search runs on detached

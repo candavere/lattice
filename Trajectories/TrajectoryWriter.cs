@@ -9,8 +9,10 @@ namespace Lattice.Trajectories;
 /// sim config), one line per tick (actions + complete StepResult), and a
 /// final metrics line. Each line is independently parseable JSON; simulation
 /// output is byte-stable so re-recording or replaying yields identical lines.
-/// Newlines are emitted as a bare <c>\n</c> on every platform so written
-/// files are byte-identical across Windows, Linux, and macOS.
+/// Newlines are emitted as a bare <c>\n</c> on every platform, so two
+/// recordings of the same episode are byte-identical once line endings are
+/// normalized and the comparison is made on identical host environments; a
+/// raw cross-host file-byte claim is not asserted here.
 /// </summary>
 public static class TrajectoryWriter
 {

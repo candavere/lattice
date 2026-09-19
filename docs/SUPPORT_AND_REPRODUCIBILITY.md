@@ -8,6 +8,12 @@ the commands that reproduce every committed artifact. It is the operational
 companion to the governing thesis in
 [`adr/0001-governing-product-thesis.md`](adr/0001-governing-product-thesis.md).
 
+> **Release status: Research Preview.** The support contract in this document
+> targets `v2.3.1`. Publishing that release does not by itself qualify Lattice
+> for production use; it remains a research instrument until independent
+> security review, soak testing, and formal fuzzing are complete (see
+> Section 2).
+
 ## Equivalence vocabulary
 
 Four distinct guarantees are used throughout this repository. They are never

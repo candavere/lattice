@@ -42,7 +42,8 @@ public static class BottleneckScenario
 
     /// <summary>
     /// The canonical representative bottleneck topology, procedurally generated
-    /// from <see cref="CanonicalSeed"/>. Same seed, same bytes, on every host.
+    /// from <see cref="CanonicalSeed"/>. Same seed yields the same serialized
+    /// topology under the runtime contract.
     /// </summary>
     public static MapGraph Build() => ForSeed(CanonicalSeed);
 

@@ -7,7 +7,7 @@ namespace Lattice.Analytics.Benchmarking;
 /// on: each agent's zone/score/transit, the claimed resource ids in order,
 /// the tick counter, the step's info (terminal flags, reason, winner), the
 /// rewards, and the per-tick dynamic choke capacities sorted by choke id.
-/// Iterations that produce a byte-identical state-and-result stream collapse
+/// Iterations that produce an identical state-and-result stream collapse
 /// to the same digest, so the harness uses it as a cheap determinism gate:
 /// the first warm-up iteration anchors the reference digest and every later
 /// iteration must reproduce it exactly, or the measurement would be sampling

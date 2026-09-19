@@ -44,7 +44,7 @@ public static class DungeonMapBuilder
     /// on the vault), every other room and gate is fixed, so adjacent seeds
     /// produce the same tactical skeleton with a slightly richer or leaner
     /// objective. Returns a new, immutable <see cref="MapGraph"/> each call;
-    /// the same seed yields a byte-identical graph every time.
+    /// the same seed yields the same graph every time.
     /// </summary>
     public static MapGraph Build(ulong seed)
     {

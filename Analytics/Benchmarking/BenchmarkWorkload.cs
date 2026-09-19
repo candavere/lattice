@@ -95,7 +95,7 @@ public sealed record WorkloadRuntime(
 
 /// <summary>
 /// The canonical five-case benchmark matrix. Seeds and generation configs are
-/// fixed so the maps are byte-identical across revisions, hosts, and replay —
+/// fixed so the maps are identical across revisions and replay on a given host —
 /// a workload's map never changes, only its measured timings do.
 /// </summary>
 public static class WorkloadCatalog

@@ -78,13 +78,17 @@ The evidentiary standard makes three things mandatory for PRs:
    a CI lower bound > 0 — is the verdict. An improvement is demonstrated by
    clearing the rule, not by a narrative.
 3. **Equivalence claims name their level.** Claims of state or replay
-   equivalence must specify which of three tiers they assert:
-   - **Transition determinism:** same state + same actions → same next state.
+   equivalence must specify which of four standards they assert:
+   - **Engine transition determinism:** under the stated .NET 8 BCL runtime
+     contract, same state + same actions → same next state.
    - **Per-step serialized StepResult equivalence:** `TrajectoryReplay.Verify`
-     passes across the supported CI targets (Ubuntu, macOS, and Windows).
-   - **Normalized JSONL byte identity:** asserted only when explicitly verified
-     on identical host configurations.
-   Do not claim raw cross-platform file-byte identity or a canonical
+     passes against the canonical golden trajectory across the supported CI
+     targets (Ubuntu, macOS, and Windows).
+   - **Same-host normalized JSONL byte identity:** asserted only when
+     explicitly verified on identical host configurations.
+   - **No canonical simulation-state hash tree currently exists:** replays
+     verify serialized `StepResult` equality, never a state digest.
+   Do not claim raw cross-host file-byte identity or a canonical
    simulation-state hash unless an explicit canonical hasher was executed. Say
    which tier you changed and which tier your tests assert; the verifier's
    documented capability must match what the code actually enforces.

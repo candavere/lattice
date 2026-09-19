@@ -152,7 +152,7 @@ public sealed class EvaluationSpec
 /// Runs a batch of head-to-head matches: for every (pairing, seed), it
 /// generates the map, builds one fresh agent per side, plays the episode via
 /// <see cref="ScenarioRunner"/>, and accumulates per-pairing statistics. The
-/// harness itself is pure — same spec, byte-identical aggregated numbers —
+/// harness itself is pure — same spec, same aggregated numbers on a given host —
 /// which is what makes win/draw/timeout rates meaningful comparison signals
 /// rather than noisy draws.
 /// </summary>

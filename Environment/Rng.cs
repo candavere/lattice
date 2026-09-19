@@ -5,8 +5,8 @@ namespace Lattice.Environment;
 /// <see cref="System.Random"/> behind explicit-seed-only constructors so every
 /// consumer is forced to state its seed: there is no ambient, unsourced
 /// randomness anywhere in Lattice. Two instances built from the same seed
-/// produce identical sequences, which underlies the byte-identical-trajectory
-/// determinism guarantee.
+/// produce identical sequences, which underlies the deterministic-transition
+/// guarantee.
 /// </summary>
 public sealed class Rng
 {

@@ -114,7 +114,7 @@ public static class MapGenerator
     /// <summary>
     /// Generates a map satisfying every checker from
     /// <paramref name="config"/> under seed <paramref name="seed"/>. Same seed
-    /// plus same config yields a byte-identical map every time; the retry loop
+    /// plus same config yields the same map every time; the retry loop
     /// advances one seeded stream (the canonical <see cref="Rng"/>) and never
     /// resets it. When <paramref name="acceptanceGate"/> is supplied, a
     /// structurally valid candidate must also pass the gate or it is retried

@@ -6,7 +6,7 @@ namespace Lattice.Analytics;
 /// Deterministic graph queries over a <see cref="MapGraph"/>'s choke-point
 /// edges: adjacency lookup, the choke point used for a hop, and unweighted
 /// (edge-count) shortest-path distances via BFS. Pure functions over the map —
-/// no state, no caching, no mutation — so analytics stay byte-identical for
+/// no state, no caching, no mutation — so analytics stay identical for
 /// identical maps. Zones that are not connected by any choke path are at
 /// <see cref="Distance"/> <see cref="int.MaxValue"/>.
 /// </summary>

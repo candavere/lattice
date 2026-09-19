@@ -25,7 +25,7 @@ mirror the *map*, not the rules:
 2. **Play both assignments with the same seeded roster.** Agent 0 takes spawn
    A on the base map and spawn A's *node* on the mirrored map. Both runs step
    through the same pure `Simulation.Step` under the same seeded RNG, so each
-   measurement is byte-identical for identical inputs.
+   measurement is identical for identical inputs on a given host.
 3. **Attribute scores to territories, not agents.** A dominant agent skewing
    both games is canceled by averaging per territory across the pair:
 

@@ -18,7 +18,7 @@ namespace Lattice.Agents;
 /// spawn subgraph, the right spawn subgraph, and the vault subgraph(s). All
 /// resources sit behind capacity-1 chokes, so any claim requires crossing a
 /// contested single lane. Generation is a pure function of the seed — the
-/// same seed yields a byte-identical graph every call, and the retry-free
+/// same seed yields the same graph every call, and the retry-free
 /// construction always returns a connected, valid map.
 /// </summary>
 public static class ProceduralBottleneckGenerator

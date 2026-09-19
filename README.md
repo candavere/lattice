@@ -19,6 +19,7 @@
 ---
 <p align="center">
   <a href="https://github.com/candavere/lattice/actions/workflows/ci.yml"><img src="https://github.com/candavere/lattice/actions/workflows/ci.yml/badge.svg" alt="CI build status" /></a>
+  <img src="https://img.shields.io/badge/status-research%20preview-orange" alt="status: research preview" />
   <img src="https://img.shields.io/badge/tests-365%20passing-brightgreen" alt="365 unit tests passing" />
   <img src="https://img.shields.io/badge/determinism-verified--replay--equivalence-blue" alt="verified replay equivalence" />
   <img src="https://img.shields.io/badge/dependencies-BCL%20runtime%20only-blueviolet" alt="runtime dependencies: pure .NET 8 BCL" />
@@ -35,6 +36,11 @@
 > pure step-contract simulation engine, a seeded procedural map generator, an
 > MCTS lookahead policy, perception-filtered agents, and a paired statistical
 > evaluation harness — instrumented end-to-end for reproducible research.
+>
+> **Status: Research Preview.** Lattice is not yet qualified for production or
+> critical-infrastructure use; the supported matrix, operational boundaries,
+> and reproduction procedures live in
+> [`docs/SUPPORT_AND_REPRODUCIBILITY.md`](docs/SUPPORT_AND_REPRODUCIBILITY.md).
 
 Lattice is simulation-as-instrument, not game middleware. Agents traverse a
 topological graph of zones and capacity-limited chokes under partial
@@ -312,7 +318,8 @@ dotnet test  Lattice.sln      # unit + determinism + replay + benchmark tests
 ```
 
 The determinism tests are permanent gates: they regenerate a map from a seed,
-replay a fixed script, and assert byte-identical trajectory JSON across runs.
+replay a fixed script, and assert serialized-equivalent trajectory JSON across
+runs on the same host.
 
 ## CLI Reference
 
@@ -356,7 +363,7 @@ stderr; a seed whose retry budget yields no fair map exits non-zero.
 | --- | --- |
 | `--seed <ulong>` | Required RNG seed for map generation and agents |
 | `--steps <n>`   | Tick budget; default 100. Episode ends on budget or when all resources are claimed |
-| `--agent <greedy\|random\|mcts>` | Policy for player 0 (default `greedy`); `mcts` is the rollout-based tactical agent |
+| `--agent <greedy\|random\|mcts>` | Policy for player 0 (default `greedy`); `mcts` selects the MCTS evaluation subject |
 | `--scenario <infiltration>` | Run the fixed Dungeon Infiltration & Sentry Patrol scenario; `--agent` is forbidden (roster is fixed) |
 | `--rules <file>` | Load a JSON `DynamicMapRuleSet` (timed portcullises / event-locked chokes) into the episode — see [Dynamic topology](#dynamic-topology) |
 | `--out <file>`  | Write trajectory to a file instead of stdout |
@@ -382,8 +389,7 @@ degenerate schedule (zero-length cycle, negative capacity) past validation.
 Rules participate in the whole toolchain: they bind to the MCTS agent's
 internal rollout model, are recorded into the trajectory header as
 `DynamicRules`, drive choke contention reporting, and are replayed and
-verified per-step against the recorded trajectory when the episode is re-run
-(`byte-identical replay verified`).
+verified per-step against the recorded trajectory when the episode is re-run.
 
 ### render — replay a recorded trajectory
 
@@ -417,7 +423,7 @@ The report covers contention events, turning points, per-agent pathing
 efficiency with archetypes and ratings, resource acquisition timelines,
 zone/edge heatmaps, and a per-agent steps timeline. Analysis is a pure
 function of the trajectory: the same file always produces the same report
-(invariant culture, byte-identical).
+(invariant culture, same-host identical).
 
 ### replay
 
@@ -448,13 +454,23 @@ recorded turn's actions through the identical engine, and compares every
 replayed `StepResult`'s JSON serialization against the recorded one. Without
 `--verify` the recording is re-serialized to stdout so a caller can inspect or
 re-host it; with it, the exit code is `0` only when every recorded tick
-reproduces byte-for-byte and every recorded action is in-space, else a
-non-zero exit with the divergence on stderr.
+reproduces the recorded serialized `StepResult` and every recorded action is
+in-space, else a non-zero exit with the divergence on stderr.
 
-Trajectory replay validation in v2.2.0 enforces tick-by-tick serialized
-`StepResult` equivalence (`TrajectoryReplay.Verify`). A canonical
-simulation-state hash tree does not currently exist; it is slated for future
-engine revisions. Replays do not assert raw file-byte identity.
+Trajectory replay validation enforces tick-by-tick serialized `StepResult`
+equivalence against the canonical golden trajectory across the tested Ubuntu,
+macOS, and Windows CI matrix (`TrajectoryReplay.Verify`). The repository names
+four distinct guarantees and never conflates them:
+
+1. **Engine transition determinism** — under the stated .NET 8 BCL runtime
+   contract, the same state plus the same actions yields the same next state.
+2. **Per-step serialized `StepResult` replay equivalence** — a replay's
+   reconstructed ticks match the recorded ticks' serialized results.
+3. **Same-host normalized JSONL byte identity** — two fresh runs from the same
+   seed and actions produce byte-identical files only where line-ending and
+   formatting normalization is verified on identical host environments.
+4. **No canonical simulation-state hash tree currently exists** — replays verify
+   serialized `StepResult` equality, never a state digest.
 
 ### benchmark — measure the five-case workload matrix
 
@@ -483,8 +499,8 @@ sample:
 | `stress_topology_4agent` | 30 zones / ≥29 chokes | 2 `GreedyCollectorAgent` + 2 `ScoutCollectorAgent` | Large-map contention |
 | `policy_lookahead_mcts_32` | 3 zones | 2 `MctsAgent`s, 32 rollouts / depth 12 | Rollout-search decisions |
 
-Maps are generated from fixed seeds, so every host benchmarks the exact same
-topologies. The protocol is the same for every case: a JIT-settling warm-up
+Maps are generated from fixed seeds, so the same catalog drives identical
+topologies run over run. The protocol is the same for every case: a JIT-settling warm-up
 that anchors an FNV-1a step digest, then `--runs` measured iterations with a
 forced GC sweep before each, per-step latency sampled into one histogram
 (`Stopwatch.GetTimestamp` per tick), throughput per iteration, managed
@@ -549,7 +565,7 @@ cross-host comparison table and enforces the structural checks.
 | `--seed-set <dev\|heldout>` | Canonical suites: `dev` = 1001..1050, `heldout` = 2001..2050 (comma-separate to run both) |
 | `--rollouts <n>` | MCTS rollouts per action; default 32 |
 | `--seeds <n>` | Cap on seeds per suite (default 50; the decision rule needs ≥ 30) |
-| `--scenario <standard\|bottleneck>` | Map topology: `standard` = generated maps (default), `bottleneck` = a seed-varying procedural topology family that funnels both agents through capacity-1 single-lane chokes |
+| `--scenario <standard\|bottleneck>` | Map topology: `standard` = generated maps (default), `bottleneck` = Seeded procedural contention topology family with capacity-1 choke bottlenecks |
 | `--commit <sha>` | Source revision recorded in the artifact |
 | `--out <file>` | Write the JSON artifact to a file instead of stdout |
 
@@ -584,7 +600,8 @@ depth 12, 2 agents / 200 ticks / transit speed 4, baseline
 | held-out (2001–2050) | 50 | −1.25 | [−1.54, −0.96] | 18% | 14% | 68% | 0% | FAIL |
 
 The 32-rollout MCTS policy **loses the paired comparison to the deterministic
-Scout heuristic** on both suites: the mean paired delta is negative and the
+Scout heuristic** on both standard suites (the open generated facility
+layouts): the mean paired delta is negative and the
 entire 95% CI sits below 0, so the decision rule fails by a wide margin
 (~1 to 1.5 resource-equivalents per match; zero timeouts). This is a real,
 reproducible finding — every suite run always terminates at
@@ -611,7 +628,7 @@ verdict.
 
 The default generated maps above saturate contention at 0, so they measure
 policy *speed*, not policy *pressure*. The paired harness also ships a
-seed-varying procedural bottleneck topology family (`--scenario bottleneck`,
+seeded procedural contention topology family (`--scenario bottleneck`,
 `ProceduralBottleneckGenerator`) that funnels both agents through capacity-1
 single-lane chokes into a shared vault. Each trial seed draws a distinct
 topology — choke placement and corridor layout, transit geometry, and the

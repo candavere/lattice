@@ -8,7 +8,7 @@ namespace Lattice.Agents;
 /// no mutable state, agents decide from post-tick Observations exactly as the
 /// logged trajectory exposes them, and the Environment step contract resolves
 /// every race — so the same (map, config, ordered agents, budget) always
-/// yields byte-identical turns, results, and metrics. This is the engine the
+/// yields serially equivalent turns, results, and metrics. This is the engine the
 /// batch evaluation harness builds its statistics on.
 /// </summary>
 public static class ScenarioRunner

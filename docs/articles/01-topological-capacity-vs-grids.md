@@ -48,8 +48,8 @@ Occupation is real state, applied at the same tick it matters:
   `rank = (agentId + state.StepCount) % agentCount`, as does collection.
   At zero-based tick `t`, the first agent is `(-t mod agentCount)`
   (nonnegative modulo), not `t mod agentCount`. The outcome is a total
-  function of the state — identical inputs produce the same outcome on every
-  machine, without a permanent lowest-id contention advantage. An adversarial
+  function of the state — identical inputs produce the same outcome under the
+  runtime contract, without a permanent lowest-id contention advantage. An adversarial
   crossing of a capacity-1 lane grants passage to the first eligible agent
   and denies the other while the edge is occupied (see the operational tests:
   no tick ever carries both agents mid-crossing).
@@ -58,8 +58,9 @@ Occupation is real state, applied at the same tick it matters:
 
 ## Why this beats a grid for the stated purpose
 
-The product guarantees are determinism, byte-identical replay, and a
-measurable notion of map fairness. All three are graph-native:
+The product guarantees are transition determinism, serialized `StepResult`
+replay equivalence, and a measurable notion of map fairness. All three are
+graph-native:
 
 - The step loop allocates nothing that depends on the map's byte footprint; a
   permutation of zone ids cannot change behavior that is a pure function of

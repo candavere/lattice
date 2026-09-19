@@ -7,7 +7,7 @@ namespace Lattice.Environment;
 /// A rule that can override a choke's <see cref="ChokePoint.MaxOccupancy"/>
 /// for a given tick of the episode. Rules are pure and deterministic — the
 /// same (stepCount, claims) always yields the same capacity — so dynamic
-/// topology never breaks the byte-identical replay guarantee. Returning
+/// topology never breaks the serialized replay guarantee. Returning
 /// <c>null</c> means "no override for this choke; fall back to the base
 /// <see cref="MapGraph"/> value". Rules that disagree on one choke resolve
 /// last-in-list-wins when evaluated together by

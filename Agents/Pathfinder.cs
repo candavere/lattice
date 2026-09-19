@@ -7,8 +7,8 @@ namespace Lattice.Agents;
 /// infiltration scenario: BFS hop counts and first hops over choke edges
 /// (expanding neighbors in ascending id so ties resolve predictably) plus the
 /// Chebyshev grid metric used for spatial perception bounds. All math is pure
-/// integer arithmetic over the <see cref="MapGraph"/> topology, identical on
-/// every platform.
+/// integer arithmetic over the <see cref="MapGraph"/> topology, so results are
+/// independent of floating-point and platform arithmetic.
 /// </summary>
 internal static class Pathfinder
 {

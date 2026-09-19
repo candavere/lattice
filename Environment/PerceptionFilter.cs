@@ -82,7 +82,7 @@ public sealed record PartialObservation(
 /// and stale last-known data for anything beyond that it has seen before. It
 /// holds only the observer's own memory — never any part of the simulation
 /// core, which remains vision-agnostic and unchanged. Every input sequence
-/// yields the same output sequence on every machine.
+/// yields the same output sequence under the runtime contract.
 /// </summary>
 public sealed class PerceptionFilter
 {

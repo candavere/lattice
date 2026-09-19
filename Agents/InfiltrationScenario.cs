@@ -46,8 +46,8 @@ public sealed record InfiltrationScenarioResult(
 /// fixed capacity-gated dungeon (<see cref="DungeonMapBuilder"/>) played by a
 /// <see cref="SentryPatrolAgent"/> against an <see cref="InfiltratorAgent"/>
 /// under partial (fog-of-war) observation. Pure and deterministic — the same
-/// seed, vision bounds, and tick budget produce byte-identical turns and an
-/// identical verdict on every machine. This is the orchestrator the CLI
+/// seed, vision bounds, and tick budget produce serially equivalent turns and
+/// the same verdict under the runtime contract. This is the orchestrator the CLI
 /// <c>simulate --scenario infiltration</c> subcommand and the web replay demo
 /// are built on.
 /// </summary>

@@ -67,7 +67,7 @@ replay and analysis exact: any filter, run against the recorded bytes, must
 reproduce the exact projections a live agent saw. Fog is therefore a property
 of the module that consumes the raw state — a host can ship multiple observers
 (fog-of-war scouts, omniscient scoring rigs, heatmap analyzers) against one
-trajectory, all byte-identical.
+trajectory, all serialized-equivalent.
 
 The boundary rule is the load-bearing one: `Lattice.Environment` has no notion
 of vision at all (`SimulationConfig.Vision` only sizes the filter), and
@@ -79,4 +79,4 @@ what makes fog-of-war a projection and not a leak.
 Hidden state is where determinism dies. By pushing perception out of the core
 and behind a pure projection, Lattice gets partial observability — bounded
 cones, stale memory, surprise-driven replanning — with zero new moving parts
-in the step loop and byte-identical replays for any observer.
+in the step loop and serialized-equivalent replays for any observer.

@@ -30,6 +30,12 @@ public static class CliApp
     private const int Success = 0;
     private const int Failure = 1;
 
+    /// <summary>
+    /// The CLI's reported version. Kept in lockstep with the project
+    /// <c>&lt;Version&gt;</c> elements by the release workflow's tag-parity gate.
+    /// </summary>
+    public const string Version = "2.3.1";
+
     private static readonly GeneratorConfig DefaultGeneratorConfig = new(3, 5, 1, 1, 3, GeneratorConfig.DefaultRetryCap);
     private const int DefaultSimulationSteps = 100;
     private const int DefaultEvaluationRollouts = 32;
@@ -93,6 +99,12 @@ public static class CliApp
         if (args[0] is "-h" or "--help")
         {
             WriteUsage(stdout);
+            return Success;
+        }
+
+        if (args is ["--version"] or ["-v"])
+        {
+            stdout.WriteLine(Version);
             return Success;
         }
 
@@ -268,7 +280,7 @@ public static class CliApp
     /// scenario (<see cref="Lattice.Agents.InfiltrationScenario"/>) and records
     /// it as trajectory JSONL whose header carries the scenario name and the
     /// tactical roster, so the renderers and web viewer can label the guard and
-    /// the rogue. Same seed, same bytes.
+    /// the rogue. Same seed, same serialized trajectory under the runtime contract.
     /// </summary>
     private static int SimulateInfiltration(
         Dictionary<string, string> flags,
@@ -404,7 +416,7 @@ public static class CliApp
     /// Replays the recorded turns through the pure step function — preserving
     /// any dynamic topology rules the episode ran under — and compares the
     /// complete stream of serialized step results against the recorded ones.
-    /// Every tick must reproduce byte-for-byte, not just the final tick, so a
+    /// Every tick's serialized result must match, not just the final tick, so a
     /// divergence anywhere in the episode is caught. When this returns true
     /// the footer reports "byte-identical replay verified across all N steps".
     /// </summary>
@@ -631,7 +643,7 @@ public static class CliApp
             }
 
             stderr.WriteLine(
-                $"replay verified: {recording.Steps.Length} step(s) byte-identical " +
+                $"replay verified: {recording.Steps.Length} step(s) serialized-equivalent " +
                 $"(seed {recording.Header.Seed}, schema v{recording.Header.SchemaVersion}).");
             return Success;
         }
@@ -1037,5 +1049,6 @@ public static class CliApp
         sink.WriteLine("            per-seed + statistics artifact");
         sink.WriteLine();
         sink.WriteLine("  -h, --help                                    Show this help and exit");
+        sink.WriteLine("  -v, --version                                 Print the version and exit");
     }
 }

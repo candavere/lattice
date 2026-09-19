@@ -93,4 +93,7 @@ Full per-run dispersion (std-dev of per-iteration throughput) is in the JSON.
   (OS family + architecture + .NET runtime major) matches. The gate installs
   the same .NET 10 runtime the baseline was recorded under, so a cross-runtime
   delta is never misread as a regression; on any mismatch it prints a
-  cross-host comparison table and enforces the structural checks.
+  cross-host comparison table instead of failing. The bounded cross-host
+  smoke pass (ubuntu x64, .NET 8) is classified structurally with
+  `--smoke`: the comparator checks workloads present and medians positive and
+  never adjudicates throughput ratios from a shortened-budget run.

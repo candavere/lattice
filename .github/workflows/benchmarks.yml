@@ -21,6 +21,21 @@ on:
         default: "50000"
 
 jobs:
+  comparator-tests:
+    # The pass/fail decisions of the comparison script power both jobs below,
+    # so they are unit-tested on every push/PR: fingerprint arming, cv-derived
+    # tolerances, per-workload overrides, exit codes, and the structural smoke
+    # classification.
+    name: Decision comparator unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unit-test the benchmark decision comparator
+        shell: bash
+        run: |
+          python3 -m unittest discover -s .github/workflows -p 'test_*.py'
+
   regression-gate:
     name: Regression gate vs committed baseline (macOS arm64)
     runs-on: macos-14
@@ -92,11 +107,13 @@ jobs:
           exit "$rc"
 
   cross-host-structure:
-    # Deliberately on .NET 8 / ubuntu x64: this job is a structural smoke and
-    # an informational cross-host comparison. Its runtime differs from the
-    # committed baseline, so it must never fail on throughput - the compare
-    # script only arms the strict threshold for a matching OS family +
-    # architecture + .NET runtime major.
+    # Deliberately on .NET 8 / ubuntu x64: this job is a structural smoke. Its
+    # runtime differs from the committed baseline, and it runs a bounded smoke
+    # pass (3 runs / 10k steps), so its throughput is NOT comparable to the
+    # full-protocol .NET 10 baseline. The comparison is therefore reclassified
+    # as a structural smoke (--smoke): the comparator verifies the workload
+    # matrix and positive medians but never adjudicates a throughput ratio, so
+    # a cross-runtime delta can never masquerade as a regression.
     name: Cross-host structural smoke (ubuntu x64)
     runs-on: ubuntu-latest
     steps:
@@ -117,39 +134,10 @@ jobs:
             --runs 3 --steps 10000 --warmup 10000 \
             --out "$RUNNER_TEMP/throughput.json"
 
-      - name: Compare against committed baseline (informational)
+      - name: Classify the smoke artifact against the committed baseline
         shell: bash
         run: |
           python3 .github/workflows/compare_benchmarks.py \
             benchmarks/throughput_benchmark.json \
             "$RUNNER_TEMP/throughput.json" \
-            --threshold 0.8
-
-      - name: Schema smoke — workloads present, medians positive
-        shell: bash
-        run: |
-          python3 - "$RUNNER_TEMP/throughput.json" <<'PY'
-          import json
-          import sys
-
-          with open(sys.argv[1], encoding="utf-8") as handle:
-              artifact = json.load(handle)
-          workloads = artifact["Workloads"]
-          expected = {
-              "micro_raw_2agent",
-              "facility_static_4agent",
-              "dynamic_contention_4agent",
-              "stress_topology_4agent",
-              "policy_lookahead_mcts_32",
-          }
-          names = {workload["Name"] for workload in workloads}
-          assert names == expected, f"workload matrix mismatch: {sorted(names)}"
-          for workload in workloads:
-              assert workload["MedianThroughputPerSecond"] > 0
-              assert workload["MedianStepLatencyMicros"] > 0
-          assert artifact["Metadata"]["RamBytes"] > 0
-          print(
-              f"schema smoke passed: {len(workloads)} workloads, "
-              f"all medians positive"
-          )
-          PY
+            --smoke

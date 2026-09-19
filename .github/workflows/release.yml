@@ -9,8 +9,81 @@ permissions:
   contents: write
 
 jobs:
+  # P0: gate every release on tag/project/CLI version parity before any
+  # native asset is built. A tag that disagrees with the source tree must
+  # never reach the publish matrix.
+  validate:
+    name: Tag/project version parity gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Assert tag version == project version == CLI --version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+          echo "tag version: $TAG_VERSION"
+
+          # Prefer Directory.Build.props when the repo centralizes versions;
+          # otherwise the CLI project is the canonical source.
+          VERSION_FILE="Directory.Build.props"
+          if [ ! -f "$VERSION_FILE" ]; then
+            VERSION_FILE="Cli/Lattice.Cli.csproj"
+          fi
+
+          PROJECT_VERSION="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' "$VERSION_FILE" | head -n1)"
+          echo "project version ($VERSION_FILE): $PROJECT_VERSION"
+          if [ -z "$PROJECT_VERSION" ]; then
+            echo "::error::no <Version> element found in $VERSION_FILE"
+            exit 1
+          fi
+          if [ "$TAG_VERSION" != "$PROJECT_VERSION" ]; then
+            echo "::error::tag version '$TAG_VERSION' does not match project version '$PROJECT_VERSION' in $VERSION_FILE"
+            exit 1
+          fi
+
+          # Every production and test project must agree with the tag.
+          for proj in \
+            Environment/Lattice.Environment.csproj \
+            Agents/Lattice.Agents.csproj \
+            Trajectories/Lattice.Trajectories.csproj \
+            Analytics/Lattice.Analytics.csproj \
+            Visualization/Lattice.Visualization.csproj \
+            Cli/Lattice.Cli.csproj \
+            Generator/Lattice.Generator.csproj \
+            Tests/Lattice.Tests.csproj; do
+            PROJ_VERSION="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' "$proj" | head -n1)"
+            echo "  $proj -> $PROJ_VERSION"
+            if [ "$PROJ_VERSION" != "$TAG_VERSION" ]; then
+              echo "::error::$proj declares version '$PROJ_VERSION', expected '$TAG_VERSION'"
+              exit 1
+            fi
+          done
+
+          echo "building CLI to read its reported version..."
+          dotnet build Cli/Lattice.Cli.csproj -c Release
+          CLI_VERSION="$(dotnet run -c Release --project Cli --no-build -- --version | tr -d '\r' | tail -n1)"
+          echo "cli --version: $CLI_VERSION"
+          if [ "$CLI_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::CLI --version '$CLI_VERSION' does not match tag '$TAG_VERSION'"
+            exit 1
+          fi
+
+          echo "version parity verified: tag=$TAG_VERSION project=$PROJECT_VERSION cli=$CLI_VERSION"
+
+  # P0: build the exact release assets, exercise each one natively on its own
+  # runner, and upload only the bytes that passed. The release job re-hashes
+  # these same downloaded artifacts, so the checksums cover tested assets.
   publish:
-    name: Publish ${{ matrix.target.name }}
+    name: Build, smoke test, and stage ${{ matrix.target.name }}
+    needs: validate
     runs-on: ${{ matrix.target.os }}
     strategy:
       fail-fast: false
@@ -33,46 +106,119 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Publish single-file self-contained binary
+      - name: Publish self-contained single-file binary
         # NB: no -p:AssemblyName here. Command-line overrides of AssemblyName
         # make NuGet restore treat the name as a project key, which surfaces as
         # "Ambiguous project name '<assembly>'" on every RID leg. Publish under
         # the default assembly name and rename in a dedicated step instead.
-        run: dotnet publish Cli/Lattice.Cli.csproj -c Release --self-contained true -r ${{ matrix.target.rid }} -p:PublishSingleFile=true -o publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet publish Cli/Lattice.Cli.csproj -c Release \
+            --self-contained true \
+            -r ${{ matrix.target.rid }} \
+            -p:PublishSingleFile=true \
+            -o publish
 
       - name: Rename binary to release artifact name
         shell: bash
         run: |
+          set -euo pipefail
           if [ "$RUNNER_OS" = "Windows" ]; then
             mv publish/lattice.exe publish/${{ matrix.target.name }}
           else
             mv publish/lattice publish/${{ matrix.target.name }}
           fi
 
-      - name: Upload binary artifact
+      - name: Smoke test the exact native asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          BIN="publish/${{ matrix.target.name }}"
+          chmod +x "$BIN" || true
+
+          EXPECTED_VERSION="${GITHUB_REF#refs/tags/v}"
+
+          echo "== $BIN --help =="
+          "$BIN" --help
+
+          echo "== $BIN --version =="
+          VERSION_OUTPUT="$("$BIN" --version | tr -d '\r' | tail -n1)"
+          echo "reported version: $VERSION_OUTPUT"
+          if [ "$VERSION_OUTPUT" != "$EXPECTED_VERSION" ]; then
+            echo "::error::$BIN reported '$VERSION_OUTPUT', expected '$EXPECTED_VERSION'"
+            exit 1
+          fi
+
+          echo "== $BIN simulate --steps 10 --seed 42 =="
+          "$BIN" simulate --steps 10 --seed 42 > /dev/null
+
+          echo "== $BIN simulate --rules Tests/fixtures/golden_dynamic_rules.json --steps 10 --seed 42 =="
+          "$BIN" simulate --rules Tests/fixtures/golden_dynamic_rules.json --steps 10 --seed 42 > /dev/null
+
+          echo "== $BIN replay Tests/fixtures/golden_trajectory.jsonl --verify =="
+          "$BIN" replay Tests/fixtures/golden_trajectory.jsonl --verify
+
+          echo "== $BIN evaluate --scenario standard --seeds 2 --rollouts 8 =="
+          "$BIN" evaluate --scenario standard --seeds 2 --rollouts 8
+
+          echo "== $BIN evaluate --scenario bottleneck --seeds 2 --rollouts 8 =="
+          "$BIN" evaluate --scenario bottleneck --seeds 2 --rollouts 8
+
+          echo "native smoke matrix passed for ${{ matrix.target.name }}"
+
+      - name: Upload the smoke-tested asset
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.target.name }}
-          path: publish/lattice-*
+          path: publish/${{ matrix.target.name }}
           if-no-files-found: error
 
+  # Release job: download the exact tested artifacts, generate the CycloneDX
+  # SBOM and a single SHA256SUMS.txt over those artifacts, then attach all of
+  # them to the GitHub Release for the immutable tag.
   release:
-    name: Attach binaries to GitHub Release
+    name: Attach tested binaries, checksums, and SBOM
     needs: publish
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download all built binaries
+      - name: Download all smoke-tested binaries
         uses: actions/download-artifact@v4
         with:
           path: artifacts
           merge-multiple: true
 
-      - name: Attach binaries to GitHub Release
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore (for SBOM dependency graph)
+        run: dotnet restore Lattice.sln
+
+      - name: Generate CycloneDX SBOM
+        run: |
+          set -euo pipefail
+          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+          dotnet tool install --global CycloneDX
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          # The tool uses the filename verbatim, so name the artifact directly
+          # and force JSON (the CycloneDX default is XML).
+          dotnet CycloneDX Lattice.sln -o artifacts -fn sbom.json -F Json \
+            -sn Lattice -sv "$TAG_VERSION"
+          test -f artifacts/sbom.json
+
+      - name: Generate SHA256SUMS.txt over the tested assets
+        run: |
+          set -euo pipefail
+          cd artifacts
+          sha256sum lattice-linux-x64 lattice-win-x64.exe lattice-osx-arm64 > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Attach binaries, SHA256SUMS.txt, and sbom.json to the release
         uses: softprops/action-gh-release@v2
         with:
           files: artifacts/*

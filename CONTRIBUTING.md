@@ -51,6 +51,40 @@ Four ideas govern every change:
    caller-supplied), and agents are a thin demonstration layer — the
    environment is the product.
 
+## Governing Thesis & Evidentiary Standard
+
+Before any change is accepted, it must answer to the governing product thesis
+and the five evidentiary principles formalized in
+[`docs/adr/0001-governing-product-thesis.md`](docs/adr/0001-governing-product-thesis.md):
+Lattice is simulation-as-instrument — repeated, independently-verifiable
+measurement under deterministic, contention-bearing conditions is the product,
+and every claim must be traceable to committed, reproducible evidence.
+Read that ADR before opening a PR; it is the decision authority for feature
+intake.
+
+The evidentiary standard makes three things mandatory for PRs:
+
+1. **Performance claims ship evidence.** Any PR introducing performance claims
+   must include an accompanying `benchmarks/*.json` artifact produced by the
+   committed harness, with its host metadata (commit, runtime, OS, CPU, GC
+   mode) intact. A claim without a committed artifact is rejected. If you
+   cannot run the full protocol, say so and record the reference numbers you
+   did measure; do not state a number you did not produce.
+2. **Policies and search enhancements are evaluated, not asserted.** Any PR
+   proposing a new policy, planner, or search enhancement must evaluate it on
+   the dev and held-out seed sets under mirrored-seat pairings (the same
+   protocol as `evaluate`), and the decision rule — mean paired delta > 0 with
+   a CI lower bound > 0 — is the verdict. An improvement is demonstrated by
+   clearing the rule, not by a narrative.
+3. **Equivalence claims name their level.** Claims of state or replay
+   equivalence must specify whether they are **transition-deterministic**
+   (same state + same actions → same next state), **serialized StepResult
+   equivalent** (a replay's reconstructed ticks match the recorded ticks'
+   serialized results), or **raw JSONL byte identical** (two fresh runs from
+   the same seed and actions produce bit-for-bit identical files). Say which
+   one you changed and which one your tests assert; the verifier's documented
+   capability must match what the code actually enforces.
+
 ## Development Environment & Prerequisites
 
 - a recent [.NET 8.0 SDK](https://dotnet.microsoft.com/download) (the solution

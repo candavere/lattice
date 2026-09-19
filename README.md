@@ -19,7 +19,7 @@
 ---
 <p align="center">
   <a href="https://github.com/candavere/lattice/actions/workflows/ci.yml"><img src="https://github.com/candavere/lattice/actions/workflows/ci.yml/badge.svg" alt="CI build status" /></a>
-  <img src="https://img.shields.io/badge/tests-359%20passing-brightgreen" alt="359 unit tests passing" />
+  <img src="https://img.shields.io/badge/tests-365%20passing-brightgreen" alt="365 unit tests passing" />
   <img src="https://img.shields.io/badge/determinism-byte--identical-blue" alt="byte-identical determinism" />
   <img src="https://img.shields.io/badge/dependencies-BCL%20runtime%20only-blueviolet" alt="runtime dependencies: pure .NET 8 BCL" />
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4" alt=".NET 8" />
@@ -133,7 +133,8 @@ dotnet run --project Cli -- render --trajectory demo.jsonl
 
 Every command is seeded, so identical arguments reproduce identical bytes on
 any machine. The full command set is `generate`, `simulate`, `render`,
-`analyze`, and `benchmark` — see the [CLI Reference](#cli-reference) below.
+`analyze`, `replay`, `benchmark`, and `evaluate` — see the
+[CLI Reference](#cli-reference) below.
 
 ## Architecture & Modules
 
@@ -145,7 +146,7 @@ any machine. The full command set is `generate`, `simulate`, `render`,
 | `/Trajectories` | JSONL trajectory read/write/replay/step utilities | `TrajectoryModel`, `TrajectoryWriter`, `TrajectoryReader`, `TrajectoryReplay` |
 | `/Analytics` | Trajectory analysis — contention, pathing efficiency, heatmaps, Markdown reports; spawn-bias fairness profiling; the five-case reproducibility benchmark harness | `TrajectoryAnalyzer`, `IncidentDetector`, `CounterfactualEvaluator`, `MapFairnessEvaluator`, `ReportGenerator`, `MapTraversal`, `WorkloadCatalog`, `BenchmarkHarness` |
 | `/Visualization` | ASCII terminal renderer + dependency-free CSS-animated SVG exporter | `AsciiRenderer`, `SvgRenderer`, `SvgViewport`, `SvgTrajectoryExporter`, `TrajectoryPlayback` |
-| `/Cli` | Driver: `generate` / `simulate` / `render` / `analyze` / `benchmark` / `evaluate` | `CliApp`, `Program` |
+| `/Cli` | Driver: `generate` / `simulate` / `render` / `analyze` / `replay` / `benchmark` / `evaluate` | `CliApp`, `Program` |
 | `/Tests` | Unit, determinism, replay, and benchmark tests (one per module) | — |
 | `/docs` | ADR-style design-decision records (`adr-001`, `adr-002`, `adr-003`) | — |
 
@@ -306,8 +307,8 @@ replay a fixed script, and assert byte-identical trajectory JSON across runs.
 
 ## CLI Reference
 
-`Lattice.Cli` exposes six commands (`dotnet run --project Cli -- <command>
-...`, binary name `lattice`). **Every command is seeded** — identical
+`Lattice.Cli` exposes seven commands (`dotnet run --project Cli -- <command>
+..., binary name `lattice`). **Every command is seeded** — identical
 arguments always produce identical bytes. Exit status is `0` on success,
 non-zero on any bad argument or runtime error; `--help`/`-h` prints usage.
 
@@ -407,6 +408,43 @@ efficiency with archetypes and ratings, resource acquisition timelines,
 zone/edge heatmaps, and a per-agent steps timeline. Analysis is a pure
 function of the trajectory: the same file always produces the same report
 (invariant culture, byte-identical).
+
+### replay
+
+Replay recorded trajectory files and optionally verify per-step serialized
+equivalence against the simulation engine.
+
+```bash
+# Replay a trajectory interactively or headless
+dotnet run -c Release --project Cli -- replay <path-to-trajectory.jsonl>
+
+# Replay with strict per-step serialized StepResult verification
+dotnet run -c Release --project Cli -- replay <path-to-trajectory.jsonl> --verify
+```
+
+Flags:
+
+- `<file>`: Path to a valid Schema v2 `.jsonl` trajectory.
+- `--verify`: Reconstructs the simulation state and dynamic topology rules from
+  the header, steps the engine identically, and asserts tick-by-tick serialized
+  `StepResult` equality.
+- `--out <file>`: Write the re-serialized recording to a file instead of stdout
+  (interactive mode only).
+
+`--verify` checks **per-step serialized-result equivalence**, not raw
+file-byte identity: `TrajectoryReplay.Verify` rebuilds a fresh simulation from
+the header (seed + map + simulation config + `DynamicRules`), feeds each
+recorded turn's actions through the identical engine, and compares every
+replayed `StepResult`'s JSON serialization against the recorded one. Without
+`--verify` the recording is re-serialized to stdout so a caller can inspect or
+re-host it; with it, the exit code is `0` only when every recorded tick
+reproduces byte-for-byte and every recorded action is in-space, else a
+non-zero exit with the divergence on stderr.
+
+Trajectory replay validation in v2.2.0 enforces tick-by-tick serialized
+`StepResult` equivalence (`TrajectoryReplay.Verify`). A formal canonical
+simulation-state hash tree is slated for future engine revisions; replays do
+not currently assert raw file-byte identity.
 
 ### benchmark — measure the five-case workload matrix
 
@@ -606,6 +644,12 @@ original standard suites to replace that record.
 The decision records in `/docs` explain *why* the contracts are shaped the way
 they are:
 
+- **adr-0001 — Governing product thesis and evidentiary standards.** Why Lattice
+  is an instrument for reproducible research, how the five evidentiary
+  principles (auditability, policies as evaluation subjects, negative results,
+  empirical provenance, contractual terminology) gate feature intake, and which
+  claims need which committed evidence. See
+  `docs/adr/0001-governing-product-thesis.md`.
 - **adr-001 — MapGraph is a graph over zones, not a grid.** Checkers and
   capacity/transit logic operate on nodes and edges; coordinates are an
   optional embedding.

@@ -25,11 +25,12 @@ Four ideas govern every change:
    packages, exclusively `Microsoft.NET.Test.Sdk` and `xUnit`/`xunit.runner`.
 
 2. **Strict platform determinism.** The core guarantee is **same seed + same
-   actions → byte-identical trajectory**, on every supported target: .NET 8 on
-   Linux, macOS, and Windows, on x64 and ARM64. There is no ambient randomness,
-   no hidden mutable state, no `System.Random` without an explicit seeded
-   instance, and no behavior that depends on `GetHashCode`, culture, or
-   iteration order leaks. Determinism is tested, not assumed.
+   actions → deterministic transitions under the pure .NET 8 BCL runtime, and
+   verified per-step serialized StepResult equivalence on all supported CI
+   targets**: .NET 8 on Linux, macOS, and Windows, on x64 and ARM64. There is
+   no ambient randomness, no hidden mutable state, no `System.Random` without
+   an explicit seeded instance, and no behavior that depends on `GetHashCode`,
+   culture, or iteration order leaks. Determinism is tested, not assumed.
 
 3. **High-throughput, allocation-conscious simulation loops.** The five-case
    workload matrix (raw stepping, facility, dynamic topology, stress, MCTS
@@ -77,13 +78,16 @@ The evidentiary standard makes three things mandatory for PRs:
    a CI lower bound > 0 — is the verdict. An improvement is demonstrated by
    clearing the rule, not by a narrative.
 3. **Equivalence claims name their level.** Claims of state or replay
-   equivalence must specify whether they are **transition-deterministic**
-   (same state + same actions → same next state), **serialized StepResult
-   equivalent** (a replay's reconstructed ticks match the recorded ticks'
-   serialized results), or **raw JSONL byte identical** (two fresh runs from
-   the same seed and actions produce bit-for-bit identical files). Say which
-   one you changed and which one your tests assert; the verifier's documented
-   capability must match what the code actually enforces.
+   equivalence must specify which of three tiers they assert:
+   - **Transition determinism:** same state + same actions → same next state.
+   - **Per-step serialized StepResult equivalence:** `TrajectoryReplay.Verify`
+     passes across the supported CI targets (Ubuntu, macOS, and Windows).
+   - **Normalized JSONL byte identity:** asserted only when explicitly verified
+     on identical host configurations.
+   Do not claim raw cross-platform file-byte identity or a canonical
+   simulation-state hash unless an explicit canonical hasher was executed. Say
+   which tier you changed and which tier your tests assert; the verifier's
+   documented capability must match what the code actually enforces.
 
 ## Development Environment & Prerequisites
 
@@ -113,8 +117,9 @@ capacity triage, or agent heuristics risk silently re-tilting a trajectory.
 Run the determinism verification below **before** submitting and keep the
 results in the PR description.
 
-1. **Replay byte-identical across consecutive runs.** Record an episode to
-   JSONL, then re-record the same seed/actions on a fresh process and diff:
+1. **Normalized JSONL byte identity on an identical host.** Record an episode
+   to JSONL, then re-record the same seed/actions on a fresh process on the
+   same host configuration and diff:
 
    ```sh
    dotnet run --project Cli -c Release -- simulate --seed 42 --steps 100 --out a.jsonl
@@ -123,23 +128,29 @@ results in the PR description.
    ```
 
    If you changed resolution logic, do the same with `--agent mcts` (the
-   search must still traverse deterministically).
+   search must still traverse deterministically). This asserts normalized
+   file-byte identity on one host configuration; it is not evidence of raw
+   cross-platform file-byte identity.
 
-2. **Cross-platform determinism.** Determinism is a property of the code, not
-   the machine. CI runs the suite on Linux, macOS, and Windows (x64 and
-   ARM64); confirm the platform matrix is green in your PR. If you cannot run
-   all platforms locally, say so explicitly so reviewers know the matrix is
-   the coverage.
+2. **Per-step serialized StepResult equivalence across the CI matrix.**
+   `TrajectoryReplay.Verify` must pass on Ubuntu, macOS, and Windows (x64 and
+   ARM64) — that is serialized-result equivalence against the recorded
+   trajectory, not raw cross-platform file-byte identity. CI runs the suite on
+   the full matrix; confirm it is green in your PR. If you cannot run all
+   platforms locally, say so explicitly so reviewers know the matrix is the
+   coverage.
 
 3. **Floating-point hygiene.** No simulation rule may depend on IEEE
    double/float comparisons in tie-break or ordering decisions; tie-breaks
    must be integer-quantized (union/record order, id, distance). Call this out
    in the PR if your change touches scoring or search ranking.
 
-4. **Determinism regression tests.** Add or extend a determinism test that pins
-   the changed behavior: same seed + same actions produce identical JSON,
-   asserted rather than eyeballed. See `/Tests` for the existing suite — new
-   deterministic behavior without a pinning test will be sent back.
+4. **Determinism regression tests.** Add or extend a determinism test that
+   pins the changed behavior — same seed + same actions producing identical
+   transitions, and (where applicable) a passing per-step serialized
+   `StepResult` replay — asserted rather than eyeballed. See `/Tests` for the
+   existing suite; new deterministic behavior without a pinning test will be
+   sent back.
 
 ## Pull Request Guidelines
 

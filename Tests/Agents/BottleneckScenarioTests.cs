@@ -6,11 +6,12 @@ using Xunit;
 namespace Lattice.Tests.Agents;
 
 /// <summary>
-/// Validates the contention-bearing bottleneck evaluation topology: the map
-/// structure (every resource behind a capacity-1 choke), that the shared
-/// single-lane gate produces transit-denial contention under opposing
-/// crossings, and that a greedy paired run on the map yields non-zero
-/// contention saturation through the evaluation harness.
+/// Validates the procedural contention-bearing bottleneck evaluation topology
+/// family: the structural invariant (every resource behind a capacity-1 choke,
+/// reached only through a shared single-lane vault gate), that distinct seeds
+/// yield distinct topologies, that the shared gate produces transit-denial
+/// contention, and that greedy paired runs on the family report non-zero
+/// contention saturation and terminate by resource exhaustion.
 /// </summary>
 public class BottleneckScenarioTests
 {
@@ -21,46 +22,91 @@ public class BottleneckScenarioTests
     {
         var map = Map();
 
-        // Four zones in a line: spawn A (0), spawn B (1), choke room (2), vault (3).
-        Assert.Equal(4, map.Zones.Length);
+        var antechamber = Antechamber(map);
+        Assert.True(map.Zones.Length >= 3);
+
+        // Both spawns can reach the shared antechamber, and the antechamber
+        // reaches a vault through the single shared gate — no shortcut bypasses
+        // the funnel.
+        Assert.True(Reachable(map, SpawnLeft, antechamber), "left spawn must reach the antechamber.");
+        Assert.True(Reachable(map, SpawnRight, antechamber), "right spawn must reach the antechamber.");
+        Assert.True(map.Zones.Any(zone => zone.Role == BottleneckScenario.VaultRole)
+            && map.ChokePoints.Any(choke =>
+                (choke.FromZoneId == antechamber && map.Zones[choke.ToZoneId].Role == BottleneckScenario.VaultRole)
+                || (choke.ToZoneId == antechamber && map.Zones[choke.FromZoneId].Role == BottleneckScenario.VaultRole)),
+            "the antechamber must connect to a vault through the shared gate.");
 
         // Every choke is a capacity-1 single-lane gate.
+        Assert.NotEmpty(map.ChokePoints);
         Assert.All(map.ChokePoints, choke => Assert.Equal(1, choke.MaxOccupancy));
 
-        // Both spawns reach the choke room, and the choke room reaches the vault
-        // through a single shared gate — no shortcut bypasses the bottleneck.
-        Assert.Contains(map.ChokePoints, choke =>
-            (choke.FromZoneId == 0 && choke.ToZoneId == 2) ||
-            (choke.FromZoneId == 2 && choke.ToZoneId == 0));
-        Assert.Contains(map.ChokePoints, choke =>
-            (choke.FromZoneId == 1 && choke.ToZoneId == 2) ||
-            (choke.FromZoneId == 2 && choke.ToZoneId == 1));
-        Assert.Contains(map.ChokePoints, choke =>
-            (choke.FromZoneId == 2 && choke.ToZoneId == 3) ||
-            (choke.FromZoneId == 3 && choke.ToZoneId == 2));
-
-        // Every resource lives in the vault, behind the capacity-1 chokes.
+        // Every resource lives in a vault zone, reachable only through the
+        // capacity-1 gates funneling into the vault subgraph.
         Assert.NotEmpty(map.Resources);
-        Assert.All(map.Resources, resource => Assert.Equal(3, resource.ZoneId));
+        Assert.All(map.Resources, resource =>
+            Assert.Equal(BottleneckScenario.VaultRole, map.Zones[resource.ZoneId].Role));
+    }
+
+    [Fact]
+    public void DistinctSeeds_ProduceDistinctTopologies()
+    {
+        var seedA = 101UL;
+        var seedB = 102UL;
+
+        var mapA = BottleneckScenario.ForSeed(seedA);
+        var mapB = BottleneckScenario.ForSeed(seedB);
+
+        Assert.NotEqual(
+            (mapA.Zones.Length, mapA.Resources.Length, mapA.ChokePoints.Length),
+            (mapB.Zones.Length, mapB.Resources.Length, mapB.ChokePoints.Length));
+    }
+
+    [Fact]
+    public void SameSeed_ProducesByteIdenticalTopology()
+    {
+        var first = BottleneckScenario.ForSeed(4242UL);
+        var second = BottleneckScenario.ForSeed(4242UL);
+
+        Assert.Equal(first.Zones.Length, second.Zones.Length);
+        Assert.Equal(first.Resources.Length, second.Resources.Length);
+        Assert.Equal(first.ChokePoints.Length, second.ChokePoints.Length);
+        for (var i = 0; i < first.Zones.Length; i++)
+        {
+            Assert.Equal(first.Zones[i], second.Zones[i]);
+        }
     }
 
     [Fact]
     public void OpposingCrossingsOnTheSharedCapacityOneGate_AreCountedAsTransitDenial()
     {
-        // Both agents race into the choke room and then both request the shared
-        // capacity-1 gate (2,3) on the same tick to enter the vault; only one
-        // may hold the single lane, so the later resolver is denied passage — a
-        // transit denial that must surface as contention. Scripts are padded
-        // with Waits across the transit window because scripted actions are
-        // consumed every tick, whether or not the agent is mid-crossing.
+        // A minimal funnel: two spawns (0, 1) both enter a shared antechamber
+        // (2) over capacity-1 gates, which leads to the vault (3) through one
+        // shared capacity-1 gate. Both agents request the shared gate on the
+        // same tick, so the single lane denies the later resolver — a transit
+        // denial that must surface as contention.
         var config = new SimulationConfig(AgentCount: 2, MaxTicks: 10, TransitSpeed: 4);
+        var map = new MapGraph(
+            new[]
+            {
+                new Zone(0, new GridPoint(0, 0)),
+                new Zone(1, new GridPoint(8, 0)),
+                new Zone(2, new GridPoint(4, 0)),
+                new Zone(3, new GridPoint(4, 8)),
+            },
+            new[] { new ResourceNode(0, 3, new GridPoint(4, 9)) },
+            new[]
+            {
+                new ChokePoint(0, 0, 2, MaxOccupancy: 1),
+                new ChokePoint(1, 1, 2, MaxOccupancy: 1),
+                new ChokePoint(2, 2, 3, MaxOccupancy: 1),
+            });
         var agents = new IAgent[]
         {
-            new ScriptedAgent(0, Move(2), Wait(), Wait(), Move(3)),
-            new ScriptedAgent(1, Move(2), Wait(), Wait(), Move(3)),
+            new ScriptedAgent(0, Move(2), Move(3), Wait(), Wait()),
+            new ScriptedAgent(1, Move(2), Move(3), Wait(), Wait()),
         };
 
-        var result = ScenarioRunner.Run(Map(), config, agents, maxSteps: 5);
+        var result = ScenarioRunner.Run(map, config, agents, maxSteps: 5);
 
         Assert.True(result.Metrics.ContendedTicks > 0,
             $"expected transit-denial contention on the shared gate; got {result.Metrics.ContendedTicks} contended ticks.");
@@ -68,7 +114,7 @@ public class BottleneckScenarioTests
     }
 
     [Fact]
-    public void GreedyPairedRunOnBottleneckMap_ReportsNonZeroContention()
+    public void GreedyPairedRunOnBottleneckMaps_ReportsNonZeroContention()
     {
         var config = new SimulationConfig(AgentCount: 2, MaxTicks: 200, TransitSpeed: 4);
         var teams = new IAgentFactory[]
@@ -87,7 +133,7 @@ public class BottleneckScenarioTests
         var batch = EvaluationHarness.Evaluate(spec);
 
         Assert.All(batch.Matches, match => Assert.True(match.ContentionRate > 0.0,
-            $"seed {match.Seed} produced zero contention on the bottleneck map."));
+            $"seed {match.Seed} produced zero contention on its procedural bottleneck map."));
         Assert.All(batch.Pairings, pairing => Assert.True(pairing.MeanContentionRate > 0.0));
     }
 
@@ -108,6 +154,58 @@ public class BottleneckScenarioTests
         Assert.Equal(Map().Resources.Length, result.Metrics.Agents.Sum(agent => agent.Score));
     }
 
+    private static int SpawnLeft => 0;
+
+    private static int SpawnRight => 1;
+
+    private static int Antechamber(MapGraph map) =>
+        map.Zones.First(zone => zone.Role == BottleneckScenario.AntechamberRole).Id;
+
+    private static bool Reachable(MapGraph map, int from, int to)
+    {
+        var visited = new HashSet<int> { from };
+        var frontier = new Queue<int>();
+        frontier.Enqueue(from);
+
+        while (frontier.Count > 0)
+        {
+            var current = frontier.Dequeue();
+            foreach (var neighbor in Neighbors(map, current))
+            {
+                if (neighbor == to)
+                {
+                    return true;
+                }
+
+                if (visited.Add(neighbor))
+                {
+                    frontier.Enqueue(neighbor);
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static IEnumerable<int> Neighbors(MapGraph map, int zone)
+    {
+        var result = new List<int>();
+        foreach (var choke in map.ChokePoints)
+        {
+            if (choke.FromZoneId == zone)
+            {
+                result.Add(choke.ToZoneId);
+            }
+            else if (choke.ToZoneId == zone)
+            {
+                result.Add(choke.FromZoneId);
+            }
+        }
+
+        return result.OrderBy(x => x);
+    }
+
     private static AgentAction Move(int zoneId) => new(ActionKind.Move, zoneId);
+
     private static AgentAction Wait() => new(ActionKind.Wait);
 }

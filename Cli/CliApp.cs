@@ -96,6 +96,12 @@ public static class CliApp
             return Success;
         }
 
+        if (IsKnownCommand(args[0]) && args[1..].Any(arg => arg is "-h" or "--help"))
+        {
+            WriteUsage(stdout);
+            return Success;
+        }
+
         return args[0] switch
         {
             "generate" => Generate(args[1..], stdout, stderr),
@@ -108,6 +114,10 @@ public static class CliApp
             _ => UnknownCommand(args[0], stderr),
         };
     }
+
+    private static bool IsKnownCommand(string command) =>
+        command is "generate" or "simulate" or "render" or "analyze"
+            or "replay" or "benchmark" or "evaluate";
 
     private static int Generate(string[] args, TextWriter stdout, TextWriter stderr)
     {
@@ -565,11 +575,10 @@ public static class CliApp
     /// <summary>
     /// Replays a recorded trajectory and (with <c>--verify</c>) asserts
     /// per-step serialized <see cref="StepResult"/> equivalence against the
-    /// recording — the cross-platform golden-replay gate. With
-    /// <c>--verify</c> the exit code is 0 only when every recorded tick
-    /// reproduces byte-for-byte; a divergence or structural defect returns a
-    /// non-zero exit. Without <c>--verify</c> it re-serializes the recording
-    /// to stdout so a caller can inspect or re-host it.
+    /// recording. With <c>--verify</c> the exit code is 0 only when every
+    /// recorded tick's serialized result matches; a divergence or structural
+    /// defect returns a non-zero exit. Without <c>--verify</c> it re-serializes
+    /// the recording to stdout so a caller can inspect or re-host it.
     /// </summary>
     private static int Replay(string[] args, TextWriter stdout, TextWriter stderr)
     {
@@ -981,7 +990,9 @@ public static class CliApp
 
     private static void WriteUsage(TextWriter sink)
     {
-        sink.WriteLine("lattice — seeded deterministic procedural strategy/tactical simulation");
+        sink.WriteLine("Lattice: An auditable multi-agent research and benchmarking environment for");
+        sink.WriteLine("deterministic Dec-POMDP experiments under partial observability, dynamic topology,");
+        sink.WriteLine("and resource contention.");
         sink.WriteLine();
         sink.WriteLine("usage: lattice <command> [options]");
         sink.WriteLine();
@@ -990,7 +1001,7 @@ public static class CliApp
         sink.WriteLine("            retry generation until the mirrored spawn-bias index meets the threshold");
         sink.WriteLine("  simulate  --seed <ulong> [--steps <n>] [--agent greedy|random|mcts] [--out <file>] [--quiet] [--rules <file>]");
         sink.WriteLine("            Record a greedy (default)-vs-random episode as trajectory JSONL;");
-        sink.WriteLine("            '--agent mcts' substitutes a rollout-based tactical agent for agent 0;");
+        sink.WriteLine("            '--agent mcts' selects the MCTS evaluation subject for agent 0;");
         sink.WriteLine("            '--rules' loads a JSON DynamicMapRuleSet (timed portcullises / event locks)");
         sink.WriteLine("            into the episode, the recorded header, contention, and replay verification;");
         sink.WriteLine("            an ANSI run dashboard renders on stderr unless '--quiet' suppresses it");
@@ -1004,10 +1015,10 @@ public static class CliApp
         sink.WriteLine("            Report contention, turning points, pathing efficiency, and heatmaps");
         sink.WriteLine("            (compact terminal view without --out, full Markdown report with it)");
         sink.WriteLine("  replay    <file> [--verify] [--out <file>]");
-        sink.WriteLine("            Re-run a recorded trajectory from its header and, with --verify, assert");
-        sink.WriteLine("            per-step serialized StepResult equivalence against the recording; exit 0");
-        sink.WriteLine("            only when every tick reproduces byte-for-byte (the cross-platform golden");
-        sink.WriteLine("            replay gate). Without --verify it re-serializes the recording to stdout");
+        sink.WriteLine("            Re-run a recorded trajectory from its header. With --verify:");
+        sink.WriteLine("            Reconstructs the episode from the header and asserts tick-by-tick");
+        sink.WriteLine("            serialized StepResult equivalence. Without --verify it re-serializes");
+        sink.WriteLine("            the recording to stdout");
         sink.WriteLine("  benchmark [--runs <n>] [--warmup <n>] [--steps <n>] [--out <file>] [--commit <sha>] [--cpu <model>]");
         sink.WriteLine("            Measure the five-case workload matrix (raw stepping, facility, dynamic");
         sink.WriteLine("            topology, stress, and MCTS policy) after a warm-up pass; reports per-case");
@@ -1020,8 +1031,8 @@ public static class CliApp
         sink.WriteLine("  evaluate  [--seed-set dev|heldout[,dev|heldout]] [--rollouts <n>] [--seeds <n>] [--scenario standard|bottleneck] [--out <file>] [--commit <sha>]");
         sink.WriteLine("            Run the mirrored-seat paired evaluation of MCTS vs the Scout baseline");
         sink.WriteLine("            over a canonical seed suite (dev: 1001..1050, held-out: 2001..2050);");
-        sink.WriteLine("            '--scenario bottleneck' evaluates on the fixed contention-bearing map where");
-        sink.WriteLine("            every resource sits behind capacity-1 chokes, so transit denials and claim");
+        sink.WriteLine("            '--scenario bottleneck' selects the seeded procedural contention topology");
+        sink.WriteLine("            family with capacity-1 choke bottlenecks, so transit denials and claim");
         sink.WriteLine("            races surface non-zero contention; '--out' writes the machine-readable");
         sink.WriteLine("            per-seed + statistics artifact");
         sink.WriteLine();

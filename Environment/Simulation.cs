@@ -171,7 +171,8 @@ public static class Simulation
     /// per tick (the tick's highest-priority agent wins). Resolution priority
     /// is a deterministic rotation of the agent ids — at tick t the first
     /// resolver is (t mod agentCount) — so no agent index holds a permanent
-    /// tie advantage while replay stays byte-identical for identical inputs.
+    /// tie advantage and identical inputs replay to equivalent per-step
+    /// serialized StepResults.
     /// The state's <see cref="SimulationState.Dynamics"/> are consulted for
     /// choke capacity and advanced into the returned state, so dynamic
     /// topology (portcullises, event locks) folds into the same pure step.
@@ -367,7 +368,7 @@ public static class Simulation
     /// priority is the deterministic rotation (agentId + stepCount) mod
     /// agentCount, giving id (rank - stepCount) mod agentCount at that rank.
     /// Zero-allocation — the whole order is a single modular shift — and
-    /// byte-identical across runs because it is a pure function of the tick.
+    /// identical across runs because it is a pure function of the tick.
     /// At stepCount ≡ 0 the order is 0, 1, ..., agentCount-1, so tick-zero
     /// behavior (and legacy expectations about it) is unchanged.
     /// </summary>
@@ -501,7 +502,8 @@ public static class SimulationDriver
     /// Plays <paramref name="actions"/> under <paramref name="rules"/>, the
     /// dynamic-topology variant: the episode's choke capacities evolve
     /// tick-by-tick exactly as the live environment would, so the driver stays
-    /// a byte-identical replay of a recorded dynamic episode.
+    /// a per-step serialized StepResult-equivalent replay of a recorded
+    /// dynamic episode.
     /// </summary>
     public static List<StepResult> Play(
         MapGraph map,
@@ -559,8 +561,8 @@ public sealed class LatticeEnvironment
     /// Wraps <paramref name="map"/> into a ready-to-play environment whose
     /// choke capacities evolve tick-by-tick under <paramref name="rules"/>
     /// (timed portcullises, event locks). The environment is otherwise
-    /// identical to the base-topology one: same step contract, same
-    /// byte-identical replay.
+    /// identical to the base-topology one: same step contract, same per-step
+    /// serialized StepResult-equivalent replay.
     /// </summary>
     public LatticeEnvironment(MapGraph map, SimulationConfig config, DynamicMapRuleSet rules)
     {
@@ -640,8 +642,8 @@ public sealed class SimulationFork
     /// <summary>
     /// Advances the fork's private state by one tick via the pure
     /// <see cref="Simulation.Step"/> and returns the <see cref="StepResult"/>.
-    /// Identical action sequences yield byte-identical results on every fork,
-    /// so a re-rolled branch is deterministic by construction.
+    /// Identical action sequences yield identical StepResult serializations on
+    /// every fork, so a re-rolled branch is deterministic by construction.
     /// </summary>
     public StepResult Step(AgentAction[] actions)
     {

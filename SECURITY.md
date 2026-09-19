@@ -9,7 +9,7 @@
 
 ## Reporting a Vulnerability
 
-Lattice is a zero-dependency, headless tactical simulation engine designed for local execution and deterministic evaluation. It does not bind network sockets, expose web APIs, or store user credentials.
+Lattice is a zero-dependency, headless multi-agent research and benchmarking environment designed for local execution and deterministic evaluation. It does not bind network sockets, expose web APIs, or store user credentials.
 
 If you identify a potential security issue (such as an uncontrolled memory allocation vector, parser denial-of-service via malformed JSONL trajectories, or algorithmic complexity vulnerabilities during graph verification):
 

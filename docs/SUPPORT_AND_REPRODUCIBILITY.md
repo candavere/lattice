@@ -8,11 +8,11 @@ the commands that reproduce every committed artifact. It is the operational
 companion to the governing thesis in
 [`adr/0001-governing-product-thesis.md`](adr/0001-governing-product-thesis.md).
 
-> **Release status: Research Preview.** The support contract in this document
-> targets `v2.3.1`. Publishing that release does not by itself qualify Lattice
-> for production use; it remains a research instrument until independent
-> security review, soak testing, and formal fuzzing are complete (see
-> Section 2).
+> **Release status: Research Preview — evaluation by maintainers and
+> collaborators.** The support contract in this document targets `v2.3.1`.
+> Publishing that release does not by itself qualify Lattice for production
+> use; it remains a research instrument until independent security review,
+> soak testing, and formal fuzzing are complete (see Section 2).
 
 ## Equivalence vocabulary
 
@@ -28,15 +28,19 @@ interchangeable, and no document may upgrade one into another:
    serialized `StepResult`s equal the recorded ones. `TrajectoryReplay.Verify`
    asserts exactly this on the tested CI platforms; the `replay --verify`
    command below exercises it.
-3. **Canonical simulation-state hash tree.** **Not currently implemented.**
+3. **Same-host normalized JSONL byte identity.** Two fresh episodes recorded
+   from the same seed and the same actions produce byte-identical JSONL only
+   where line-ending and formatting normalization is verified on identical host
+   environments, and only on hosts where that identity is explicitly tested.
+   This guarantee is deliberately narrow: newlines are written as a bare `\n`
+   on every platform, but a raw byte identity claim is still scoped to
+   identical environments and is not a cross-host guarantee.
+4. **Canonical simulation-state hash tree.** **Not currently implemented.**
    Replay verifies serialized `StepResult` equality, not a state digest, so
-   there is no canonical hash tree to compare against.
-4. **Raw cross-host file-byte identity.** Two fresh runs from the same seed and
-   the same actions produce byte-identical JSONL only where line-ending and
-   formatting normalization is verified on identical host environments.
-   Newlines are written as a bare `\n` on every platform, but a raw byte
-   identity claim is still scoped to identical environments and is not a
-   cross-host guarantee.
+   there is no canonical hash tree to compare against. The benchmark harness's
+   FNV-1a step digest is an internal repeatability check — it anchors one
+   warm-up iteration and proves later iterations did not go off-script — not a
+   canonical simulation-state hash.
 
 ## 1. Target Support Matrix
 

@@ -6,9 +6,12 @@ namespace Lattice.Trajectories;
 /// <summary>
 /// Verifies a recorded trajectory by re-running it: recorded actions are
 /// fed into a fresh simulation built from the recorded header (seed map +
-/// simulation config) and each replayed <see cref="StepResult"/> must match
-/// the recorded one byte-for-byte. This is the replay gate that catches any
-/// future rule change that breaks determinism or format compatibility.
+/// simulation config) and each replayed <see cref="StepResult"/>'s JSON
+/// serialization must equal the recorded one — per-step serialized StepResult
+/// equivalence. This is a serialized-result comparison, never a state digest:
+/// no canonical simulation-state hash tree currently exists. The replay gate
+/// catches any future rule change that breaks determinism or format
+/// compatibility.
 /// </summary>
 public static class TrajectoryReplay
 {
@@ -46,8 +49,10 @@ public static class TrajectoryReplay
     /// <summary>
     /// Replays <paramref name="recording"/> and returns every discrepancy
     /// found (empty = the recording verifies). Checks action-space validity
-    /// of every recorded turn, step-count agreement, and byte-identical
-    /// StepResults against the recorded ones.
+    /// of every recorded turn, step-count agreement, and per-step serialized
+    /// StepResult equivalence against the recorded ones. Equivalence is
+    /// serialized-result equality, never a state digest — no canonical
+    /// simulation-state hash tree currently exists.
     /// </summary>
     public static IReadOnlyList<string> Verify(TrajectoryRecording recording)
     {

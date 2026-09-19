@@ -84,10 +84,12 @@ The evidentiary standard makes three things mandatory for PRs:
    - **Per-step serialized StepResult equivalence:** `TrajectoryReplay.Verify`
      passes against the canonical golden trajectory across the supported CI
      targets (Ubuntu, macOS, and Windows).
-   - **Same-host normalized JSONL byte identity:** asserted only when
-     explicitly verified on identical host configurations.
+- **Same-host normalized JSONL byte identity:** asserted only when
+      explicitly verified on identical host configurations.
    - **No canonical simulation-state hash tree currently exists:** replays
-     verify serialized `StepResult` equality, never a state digest.
+      verify serialized `StepResult` equality, never a state digest. The
+      benchmark FNV-1a step digest anchors a warm-up iteration as an internal
+      repeatability check; it is not a canonical simulation-state hash.
    Do not claim raw cross-host file-byte identity or a canonical
    simulation-state hash unless an explicit canonical hasher was executed. Say
    which tier you changed and which tier your tests assert; the verifier's

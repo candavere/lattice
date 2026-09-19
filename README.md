@@ -37,9 +37,10 @@
 > MCTS lookahead policy, perception-filtered agents, and a paired statistical
 > evaluation harness — instrumented end-to-end for reproducible research.
 >
-> **Status: Research Preview.** Lattice is not yet qualified for production or
-> critical-infrastructure use; the supported matrix, operational boundaries,
-> and reproduction procedures live in
+> **Status: Research Preview — evaluation by maintainers and collaborators.**
+> Lattice is not yet qualified for production or critical-infrastructure use;
+> the supported matrix, operational boundaries, and reproduction procedures
+> live in
 > [`docs/SUPPORT_AND_REPRODUCIBILITY.md`](docs/SUPPORT_AND_REPRODUCIBILITY.md).
 
 Lattice is simulation-as-instrument, not game middleware. Agents traverse a
@@ -465,12 +466,16 @@ four distinct guarantees and never conflates them:
 1. **Engine transition determinism** — under the stated .NET 8 BCL runtime
    contract, the same state plus the same actions yields the same next state.
 2. **Per-step serialized `StepResult` replay equivalence** — a replay's
-   reconstructed ticks match the recorded ticks' serialized results.
+   reconstructed ticks match the recorded ticks' serialized results
+   (`TrajectoryReplay.Verify` asserts exactly this).
 3. **Same-host normalized JSONL byte identity** — two fresh runs from the same
    seed and actions produce byte-identical files only where line-ending and
-   formatting normalization is verified on identical host environments.
+   formatting normalization is verified on identical host environments and that
+   identity is explicitly tested there.
 4. **No canonical simulation-state hash tree currently exists** — replays verify
-   serialized `StepResult` equality, never a state digest.
+   serialized `StepResult` equality, never a state digest. The benchmark
+   harness's FNV-1a step digest anchors a warm-up iteration as an internal
+   repeatability check; it is not a canonical simulation-state hash.
 
 ### benchmark — measure the five-case workload matrix
 
@@ -555,8 +560,12 @@ runtime, OS, CPU, cores, RAM, and GC mode) and the CI regression gate
 (`.github/workflows/benchmarks.yml`) as the reproducibility check. The gate
 installs the same .NET 10 runtime the baseline was recorded under, re-benchmarks
 the matrix, and fails on a >20% regression when the host fingerprint (OS
-family + architecture + .NET runtime major) matches; otherwise it prints a
-cross-host comparison table and enforces the structural checks.
+family + architecture + .NET runtime major) matches. On any fingerprint
+mismatch it prints a cross-host comparison table instead of failing — a
+cross-runtime delta is a measurement artifact, not a regression — and the
+bounded cross-host smoke pass (ubuntu x64, .NET 8) is classified structurally
+(`--smoke`): the comparator verifies the workload matrix and positive medians
+but never adjudicates a throughput ratio from a run with a shortened budget.
 
 ### evaluate — mirrored-seat MCTS evidence
 

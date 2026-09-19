@@ -6,7 +6,7 @@
 <h1 align="center">LATTICE</h1>
 
 <p align="center">
-  <strong>Deterministic Dec-POMDP Tactical Simulation Engine</strong>
+  <strong>An auditable multi-agent research &amp; benchmarking environment for deterministic experiments</strong>
 </p>
 
 <p align="center">
@@ -26,46 +26,49 @@
   <a href="https://candavere.github.io/lattice/"><img src="https://img.shields.io/badge/live%20demo-GitHub%20Pages-2ea44f" alt="live demo" /></a>
 </p>
 
-> A deterministic, headless 2D tactical AI simulation substrate in pure C#
-> (.NET 8). Built to validate, balance, and stress-test high-level game AI
-> architectures (MCTS, Fog-of-War perception, procedural map fairness, and a
-> tactical Dungeon Infiltration & Sentry Patrol scenario) at **8.8k–661k mean
-> steps/sec** across the standardized benchmark suite before game engine
-> integration (plus 394 decisions/sec for the 32-rollout MCTS policy, which
-> prices per-decision rollout cost, not engine stepping).
+> **Lattice** is an auditable multi-agent research and benchmarking environment
+> for deterministic experiments under partial observability, dynamic topology,
+> and resource contention. Every run is replayable, every comparison is seeded
+> and statistically inspectable, and negative results are first-class evidence.
+>
+> Concretely, Lattice is a headless, zero-dependency C# (.NET 8) substrate: a
+> pure step-contract simulation engine, a seeded procedural map generator, an
+> MCTS lookahead policy, perception-filtered agents, and a paired statistical
+> evaluation harness — instrumented end-to-end for reproducible research.
 
-Think of Lattice as a digital board game engine running in memory without
-graphics: units traverse a network of connected topological outposts over
-multiple turns, competing for resources under Fog-of-War. Because every
-transition is calculated using pure math rather than approximate continuous
-physics, the stepping core runs at **8.8k–661k mean steps/sec** (measured on a
+Lattice is simulation-as-instrument, not game middleware. Agents traverse a
+topological graph of zones and capacity-limited chokes under partial
+observation; a deterministic step contract advances every tick as a pure
+function of the prior state and the recorded actions, so any run can be
+replayed byte-for-byte on any host. The engine, generator, and evaluation
+harness exist to make deterministic experiments easy to run, audit, and
+statistically inspect — stepping at **8.8k–661k mean steps/sec** (measured on a
 2020 Apple M1 / 8 cores / 8 GiB RAM under .NET 10.0.10 Release / Workstation
 GC, tree `b7459a1` — see the committed `benchmarks/throughput_benchmark.json`)
 with byte-for-byte identical replay across any platform.
 
 <!--
 Proposed GitHub topics for the maintainer (set these in the repo settings):
-game-ai, tactical-ai, game-development, determinism, mcts, headless-simulation,
-dotnet8, procedural-generation, fog-of-war, simulation-engine
+deterministic-simulation, multi-agent, benchmarking, mcts, research-environment,
+dotnet8, procedural-generation, partial-observability, simulation-engine, dec-pomdp
 -->
 
-A deterministic game AI simulation in pure C#, built for tactical/strategic
-systems design and engineering. Lattice is a headless tactical combat engine
-for .NET: it runs graphics-free, has no engine or ML runtime dependencies
-(pure .NET 8 BCL across every production assembly — development and test
-projects rely exclusively on .NET, Microsoft.NET.Test.Sdk, and xUnit),
-and ships a pure step-contract simulation core, a seeded procedural map
-generator, a procedural map balance and spawn fairness tester, and a
-recording/reporting toolchain. Agents are a thin demonstration layer — the
-environment is the product.
+Lattice frames multi-agent decision-making as a reproducible research
+instrument: every production assembly is pure .NET 8 BCL, every run is seeded,
+every trajectory is replay-verifiable, and every paired comparison reports a
+confidence interval with negative results kept as first-class evidence. Agents
+are a thin demonstration layer — the environment and the evaluation harness are
+the product.
 
 ## Who Is This For?
 
-- **Game Designers & Systems Engineers:** Pre-balance procedural map seeds,
-  detect choke-point congestion, and evaluate layout fairness before building
-  3D environments.
-- **AI & Systems Researchers:** Benchmark lookahead planners (MCTS, custom
-  heuristics) under verifiable partial observability without state leakage.
+- **Multi-Agent & Systems Researchers:** Run seeded, mirror-seated paired
+  evaluations of decision policies (MCTS, heuristics) under verifiable partial
+  observability, dynamic topology, and resource contention — with confidence
+  intervals and negative results kept as evidence.
+- **Reinforcement-Learning Engineers:** Use the step-contract environment and
+  the procedural bottleneck suite as a deterministic, contention-bearing
+  benchmark for lookahead planners before any distributed training loop.
 - **.NET & Systems Programmers:** Study high-throughput, low-allocation C#
   systems programming operating on standard BCL primitives with zero
   third-party dependencies.
@@ -100,14 +103,16 @@ one-to-one onto the classic RL loop:
 
 </details>
 
-Turn-based tactical play is a zero-dependency C# game state machine: every tick
-is a pure function of the previous state and the recorded actions. The core
-guarantee is repeatability — **same seed, same actions, same bytes.** Every run
-on every machine reproduces an identical trajectory, because the simulation has
-no hidden state, no singletons, and no ambient randomness. The built-in Monte
-Carlo Tree Search (MCTS) agent demonstrates exactly this contract, pricing
-candidate actions with deterministic BFS rollouts against the same pure `Step`
-used by every other policy.
+The step contract is a zero-dependency C# state machine instrumented for
+deterministic experiment: every tick is a pure function of the previous state
+and the recorded actions. The core guarantee is repeatability — **same seed,
+same actions, same bytes.** Every run on every machine reproduces an identical
+trajectory, because the simulation has no hidden state, no singletons, and no
+ambient randomness. The built-in Monte Carlo Tree Search (MCTS) agent
+demonstrates exactly this contract, pricing candidate actions with
+deterministic BFS rollouts against the same pure `Step` used by every other
+policy, and the paired evaluation harness turns those runs into statistically
+inspectable comparisons.
 
 ## Quickstart
 

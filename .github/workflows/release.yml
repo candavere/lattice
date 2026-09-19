@@ -173,12 +173,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          BIN="publish/${{ matrix.target.name }}"
-          if [ "$RUNNER_OS" = "Windows" ]; then
-            sha256sum "$BIN" > "publish/${{ matrix.target.name }}.sha256"
-          else
-            sha256sum "$BIN" > "publish/${{ matrix.target.name }}.sha256"
-          fi
+          # cd into publish/ so the recorded path is just the basename. When the
+          # release job later runs `sha256sum -c` from the flat artifacts/ dir,
+          # the checksum must not embed the stale `publish/` prefix.
+          (cd publish && sha256sum "${{ matrix.target.name }}" > "${{ matrix.target.name }}.sha256")
           cat "publish/${{ matrix.target.name }}.sha256"
 
       - name: Upload the smoke-tested asset and its checksum
@@ -199,6 +197,8 @@ jobs:
     needs: publish
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
@@ -213,7 +213,6 @@ jobs:
         run: |
           set -euo pipefail
           cd artifacts
-          cat lattice-linux-x64.sha256 lattice-win-x64.exe.sha256 lattice-osx-arm64.sha256 > SHA256SUMS.txt
           echo "regenerating SHA256SUMS.txt over the downloaded bytes:"
           sha256sum lattice-linux-x64 lattice-win-x64.exe lattice-osx-arm64 > SHA256SUMS.txt
           cat SHA256SUMS.txt

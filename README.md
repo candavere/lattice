@@ -501,13 +501,13 @@ cross-host comparison table and enforces the structural checks.
 | `--seed-set <dev\|heldout>` | Canonical suites: `dev` = 1001..1050, `heldout` = 2001..2050 (comma-separate to run both) |
 | `--rollouts <n>` | MCTS rollouts per action; default 32 |
 | `--seeds <n>` | Cap on seeds per suite (default 50; the decision rule needs ≥ 30) |
-| `--scenario <standard\|bottleneck>` | Map topology: `standard` = generated maps (default), `bottleneck` = the fixed contention-bearing map with every resource behind capacity-1 chokes |
+| `--scenario <standard\|bottleneck>` | Map topology: `standard` = generated maps (default), `bottleneck` = a seed-varying procedural topology family that funnels both agents through capacity-1 single-lane chokes |
 | `--commit <sha>` | Source revision recorded in the artifact |
 | `--out <file>` | Write the JSON artifact to a file instead of stdout |
 
 ```sh
 dotnet run --project Cli -- evaluate --seed-set dev,heldout --rollouts 32 --out benchmarks/mcts_evaluation_results.json
-dotnet run --project Cli -- evaluate --seed-set dev --scenario bottleneck --out benchmarks/mcts_evaluation_bottleneck.json
+dotnet run --project Cli -- evaluate --seed-set dev,heldout --rollouts 32 --seeds 30 --scenario bottleneck --out benchmarks/bottleneck_evaluation_results.json
 ```
 
 Runs the empirical evaluation protocol: for every seed, two matches **with
@@ -559,20 +559,47 @@ To challenge the result, raise the budget (`--rollouts 64`), change the map
 distribution, or swap the baseline — every run records its own delta, CI, and
 verdict.
 
-#### Contention-bearing evaluation (bottleneck maps)
+#### Contention-bearing evaluation (procedural bottleneck maps)
 
 The default generated maps above saturate contention at 0, so they measure
-policy *speed*, not policy *pressure*. The paired harness also ships a fixed
-contention-bearing topology (`--scenario bottleneck`) that places every
-resource in a vault behind capacity-1 chokes, funneling both agents through a
-single shared single-lane gate. On it, transit denials (two agents requesting
-the same capacity-1 choke in one tick) and claim races are actively exercised
-and tracked: `ScenarioMetrics`/`MatchResult` count a tick as contended on
-either a same-resource Collect race or a same-capacity-1-choke transit denial,
-and `PairedStudyStatistics.MeanContentionSaturation` reports the mean. The
-evaluation harness and its tests confirm non-zero contention on this map
-(`BottleneckScenario`), so a study can compare how policies behave under
-funnel pressure rather than only under empty-map latency.
+policy *speed*, not policy *pressure*. The paired harness also ships a
+seed-varying procedural bottleneck topology family (`--scenario bottleneck`,
+`ProceduralBottleneckGenerator`) that funnels both agents through capacity-1
+single-lane chokes into a shared vault. Each trial seed draws a distinct
+topology — choke placement and corridor layout, transit geometry, and the
+vault's resource count and distribution across one or two capacity-gated
+vault zones all vary — while preserving the invariant that both spawn arms are
+geometric mirror images, so both agents always reach the shared single-lane
+gate on the same tick and actively contend. On these maps, transit denials
+(two agents requesting the same capacity-1 choke in one tick) and claim races
+are exercised and tracked: `ScenarioMetrics`/`MatchResult` count a tick as
+contended on either a same-resource Collect race or a same-capacity-1-choke
+transit denial, and `PairedStudyStatistics.MeanContentionSaturation` reports
+the mean.
+
+Reference procedural-bottleneck result committed at
+`benchmarks/bottleneck_evaluation_results.json` (source revision `1c6fa80`,
+Apple M1 / 8 cores / .NET 10.0.10, MCTS budget 32 rollouts × depth 12, 2
+agents / 200 ticks / transit speed 4, baseline `ScoutCollectorAgent`, the
+first 30 dev + 30 held-out seeds, mirror-seated per seed):
+
+| Suite | Seeds | Mean Δ | 95% CI | Win | Draw | Loss | Timeout | Contention | Verdict |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| dev (1001–1030) | 30 | +1.42 | [+1.11, +1.73] | 55% | 8% | 37% | 0% | 22% | PASS |
+| held-out (2001–2030) | 30 | +1.38 | [+1.07, +1.69] | 53% | 23% | 23% | 0% | 27% | PASS |
+
+Under funnel pressure the result **inverts**: the same 32-rollout MCTS policy
+that loses on the empty standard maps *wins* the paired comparison to the Scout
+baseline on the procedural bottleneck family — the mean paired delta is
+positive and the entire 95% CI sits above 0 on both suites, with non-zero
+choke-contention saturation (22–27%) and non-zero statistical dispersion
+(stddev ≈ 0.83, IQR = 1). This is a real, reproducible finding of the
+environment, not a tuned parameter: rollouts, depth, step budget, and baseline
+are identical to the standard suite; only the topology distribution changed.
+It does **not** supersede the standard-suite negative baseline — the two are
+complementary evidence on different map distributions (empty-map latency vs.
+contention-bearing pressure), and a policy must still clear the rule on the
+original standard suites to replace that record.
 
 ## Design Decisions
 

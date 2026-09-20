@@ -22,25 +22,24 @@ untouched.
 | Field | Value |
 | --- | --- |
 | Release tag | `v2.3.2` |
-| Source commit | published with the release; confirm with `git rev-parse 'v2.3.2^{commit}'` (see Section 1.3) |
+| Source commit | `4f7816fa5594f7097d6b2978c6c626553d075326` |
 | Release URL | `https://github.com/candavere/lattice/releases/tag/v2.3.2` |
 | Runtime contract | Pure .NET 8 (`net8.0`) base class library; self-contained single-file binaries |
 
 ### 1.1 Published assets and SHA-256 checksums
 
-The checksums for `v2.3.2` are the exact published values recorded in
-`SHA256SUMS.txt` attached to the release, and they independently match the
-SHA-256 download digests that the GitHub release API reports for each asset.
-Verify the downloaded bytes against the attached manifest before executing any
-binary (Section 1.2).
+The checksums below are the exact published values: they are the digests
+embedded in `SHA256SUMS.txt` attached to the release, and they independently
+match the SHA-256 download digests that the GitHub release API reports for each
+asset. The release API reports `immutable: true` for `v2.3.2`.
 
-| Asset | SHA-256 |
-| --- | --- |
-| `lattice-linux-x64` | published in `SHA256SUMS.txt` attached to the release |
-| `lattice-osx-arm64` | published in `SHA256SUMS.txt` attached to the release |
-| `lattice-win-x64.exe` | published in `SHA256SUMS.txt` attached to the release |
-| `SHA256SUMS.txt` | published in the release API metadata |
-| `sbom.json` | published in the release API metadata |
+| Asset | Size (bytes) | SHA-256 |
+| --- | ---: | --- |
+| `lattice-linux-x64` | 67,130,095 | `a9457f805c7a2a68472828994b9c8291e3bd37c76073213d9e7b8fc0edd71876` |
+| `lattice-osx-arm64` | 74,075,672 | `55fbc448fa50949b1e97a3d2e1956a95c56d440f963587464bf5a64361918f07` |
+| `lattice-win-x64.exe` | 67,853,590 | `879539e0fb6749a7795b2b2d6e07a7f1f8a7a809ea1c147f0e7148948c4f3afd` |
+| `SHA256SUMS.txt` | 254 | `9bf4955bd14385e275617c2cd46125a3c4ed8b538778ede1049163a749d9939c` |
+| `sbom.json` | 18,304 | `b0446e15817479f3b134ef3584f6a8964a7d4ab05d14ce4616c8e41ba4e83a30` |
 
 Direct download URLs (one per asset):
 
@@ -84,7 +83,7 @@ must contain only BCL/runtime components.
 
 ### 1.3 The source commit is part of the record
 
-`v2.3.2` is built from the commit the `v2.3.2` tag points at. A
+`v2.3.2` was built from commit `4f7816fa5594f7097d6b2978c6c626553d075326`. A
 reviewer who also wants source provenance can confirm the pinned commit in the
 repository:
 
@@ -93,7 +92,7 @@ git ls-remote --tags https://github.com/candavere/lattice.git 'v2.3.2'
 # expect: <object-id-of-tag>  refs/tags/v2.3.2
 git show-ref --verify refs/tags/v2.3.2   # after cloning
 git rev-parse 'v2.3.2^{commit}'
-# expect: the commit id printed by the release workflow and `git ls-remote` above
+# expect: 4f7816fa5594f7097d6b2978c6c626553d075326
 ```
 
 ---

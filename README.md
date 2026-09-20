@@ -57,6 +57,15 @@ published immutable release through the turnkey challenge guide in
 release `v2.3.1` (commit `c0e8342`), with published SHA-256 checksums, four
 scripted experiments, and a standardized reporting template.
 
+The engine's load-bearing transition and perception laws are specified
+formally, implementation-agnostically, for clean-room auditors and
+independent oracles in
+[`docs/INVARIANT_SPECIFICATION.md`](docs/INVARIANT_SPECIFICATION.md): the
+kinematic/choke capacity gate, deterministic conflict resolution, resource
+conservation and monotonicity, the graph-reachability perception boundary, and
+the step-determinism vs. replay-equivalence contract, plus three falsifiable
+external challenge questions and the oracle-report submission contract.
+
 Lattice is simulation-as-instrument, not game middleware. Agents traverse a
 topological graph of zones and capacity-limited chokes under partial
 observation; a deterministic step contract advances every tick as a pure

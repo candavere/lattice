@@ -28,6 +28,13 @@ interchangeable, and no document may upgrade one into another:
    serialized `StepResult`s equal the recorded ones. `TrajectoryReplay.Verify`
    asserts exactly this on the tested CI platforms; the `replay --verify`
    command below exercises it.
+
+The four guarantees above are formalized as an implementation-agnostic,
+clean-room contract in
+[`INVARIANT_SPECIFICATION.md`](INVARIANT_SPECIFICATION.md) — the transition
+laws an independent oracle or checker in any language must reproduce, plus
+three falsifiable external challenge questions and the submission contract for
+oracle verification reports.
 3. **Same-host normalized JSONL byte identity.** Two fresh episodes recorded
    from the same seed and the same actions produce byte-identical JSONL only
    where line-ending and formatting normalization is verified on identical host
@@ -212,6 +219,12 @@ per-step serialized `StepResult` replay equivalence, the standard-vs-bottleneck
 smoke), and provides a standardized reporting template for filing public
 issues. In this section the procedures below are the maintainer-oriented
 source-tree equivalents; the packet is the external-reviewer entry point.
+
+The transition and perception laws those experiments exercise are pinned as
+formal, implementation-agnostic invariants in
+[`INVARIANT_SPECIFICATION.md`](INVARIANT_SPECIFICATION.md). An external
+evaluator who wants to build an independent oracle or checker in any language
+should work from that specification rather than from the source tree.
 
 All commands run from a clean checkout of `candavere/lattice` at the repository
 root, with the .NET 8 SDK installed. They are Release-configuration runs and

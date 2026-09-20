@@ -418,7 +418,9 @@ public static class CliApp
     /// complete stream of serialized step results against the recorded ones.
     /// Every tick's serialized result must match, not just the final tick, so a
     /// divergence anywhere in the episode is caught. When this returns true
-    /// the footer reports "byte-identical replay verified across all N steps".
+    /// the footer reports "serialized StepResult replay equivalence verified
+    /// across all N steps" — equivalence of the per-step serialized result
+    /// stream, not raw file-byte identity of the artifact across hosts.
     /// </summary>
     private static bool VerifyDeterministicReplay(
         MapGraph map,

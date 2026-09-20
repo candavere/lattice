@@ -7,7 +7,10 @@ namespace Lattice.Tests.Property;
 /// Step determinism: applying the same actions to the same immutable state
 /// twice — literally re-invoking <see cref="Simulation.Step"/> — must yield
 /// byte-identical next states and step results (no hidden mutable state, no
-/// hash-ordering nondeterminism, per docs/adr-002.md). This is the primitive
+/// hash-ordering nondeterminism, per docs/adr-002.md). "Byte-identical"
+/// here is in-process serialized byte identity of the step results on the
+/// same host under the same .NET 8 BCL contract — not a cross-host or
+/// cross-runtime artifact promise. This is the primitive
 /// underneath the trajectory-replay guarantee and the generator determinism
 /// claim, asserted directly across every generated scenario and turn.
 /// </summary>

@@ -221,7 +221,7 @@ public static class SimulationConsoleRenderer
         }
 
         sink.WriteLine(footer.DeterminismVerified
-            ? $"  determinism  {Green}byte-identical replay verified across all {footer.VerifiedStepCount} step{(footer.VerifiedStepCount == 1 ? "" : "s")}{Reset}"
+            ? $"  determinism  {Green}serialized StepResult replay equivalence verified across all {footer.VerifiedStepCount} step{(footer.VerifiedStepCount == 1 ? "" : "s")}{Reset}"
             : $"  determinism  {Red}replay diverged — investigate{Reset}");
     }
 

@@ -10,7 +10,9 @@ namespace Lattice.Tests.Trajectories;
 /// <summary>
 /// Full-pipeline trajectory tests: record an episode to JSONL, read it back,
 /// re-write it, and replay the recorded actions into a fresh simulation —
-/// everything must stay byte-identical.
+/// the round-trip re-write must stay byte-identical on the same host under
+/// the normalized JSONL byte contract (line endings normalized), while replay
+/// equivalence is per-step serialized <see cref="StepResult"/> identity.
 /// </summary>
 public class TrajectoryTests
 {

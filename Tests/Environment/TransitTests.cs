@@ -10,8 +10,10 @@ namespace Lattice.Tests.Environment;
 /// takes an integer number of ticks (Manhattan length / cruise speed, minimum
 /// 1) and the agent is represented by an <see cref="InTransit"/> state until
 /// it arrives. Transit must be exact, deterministic, wired into the JSONL
-/// trajectory format (so replay still verifies byte-identical), and invisible
-/// to in-transit agents — they cannot act until arrival.
+/// trajectory format (so replay still verifies per-step serialized
+/// <see cref="StepResult"/> equivalence, and repeated same-host recordings
+/// remain byte-identical under the normalized JSONL byte contract), and
+/// invisible to in-transit agents — they cannot act until arrival.
 /// </summary>
 public class TransitTests
 {

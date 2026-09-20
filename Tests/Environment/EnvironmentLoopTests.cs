@@ -9,7 +9,8 @@ namespace Lattice.Tests.Environment;
 /// Verifies the stateful <see cref="LatticeEnvironment"/> wrapper, the
 /// <see cref="SimulationDriver"/> playback loop, and the end-to-end
 /// determinism guarantee (same seed + same actions -> byte-identical
-/// trajectory, re-generated from scratch per run — docs/adr-002.md).
+/// serialized trajectory when re-generated from scratch on the same host
+/// under the normalized JSONL contract — docs/adr-002.md).
 /// </summary>
 public class EnvironmentLoopTests
 {

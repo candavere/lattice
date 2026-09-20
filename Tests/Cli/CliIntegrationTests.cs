@@ -213,7 +213,7 @@ public class CliIntegrationTests
             Assert.Contains("LATTICE SIMULATION RUN", stderr);
             Assert.Contains("AGENT SCOREBOARD", stderr);
             Assert.Contains("CHOKE CONTENTION", stderr);
-            Assert.Contains("byte-identical replay verified", stderr);
+            Assert.Contains("serialized StepResult replay equivalence verified", stderr);
             Assert.Contains("\u001b[", stderr); // ANSI decoration present when not quiet
         }
         finally
@@ -557,7 +557,7 @@ public class CliIntegrationTests
             Assert.Equal(0, exit);
             Assert.Equal("", stdout);
             Assert.Contains("recorded", stderr);
-            Assert.Contains("byte-identical replay verified", stderr);
+            Assert.Contains("serialized StepResult replay equivalence verified", stderr);
 
             var file = File.ReadAllText(trajectory);
             Assert.Contains("\"DynamicRules\"", file);

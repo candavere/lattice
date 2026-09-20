@@ -1,0 +1,28 @@
+{
+  "stryker-config": {
+    "project": "Lattice.Environment.csproj",
+    "test-projects": [
+      "Tests/Lattice.Tests.csproj"
+    ],
+    "mutate": [
+      "**/Simulation.cs",
+      "**/PerceptionFilter.cs"
+    ],
+    "reporters": [
+      "html",
+      "json",
+      "cleartexttree"
+    ],
+    "configuration": "Release",
+    "coverage-analysis": "perTest",
+    "ignore-methods": [
+      "*Exception.ctor"
+    ],
+    "test-case-filter": "FullyQualifiedName!~Lattice.Tests.Performance",
+    "thresholds": {
+      "high": 80,
+      "low": 60,
+      "break": 0
+    }
+  }
+}

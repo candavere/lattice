@@ -138,6 +138,67 @@ public class CapacityTests
     }
 
     [Fact]
+    public void OneTickKinematicEdge_BypassesTheChokeOccupancyGate()
+    {
+        // A crossing that takes exactly one tick arrives instantly and never
+        // occupies the choke, even when the choke itself is impassable
+        // (capacity 0).
+        var map = TwoZoneMap(chokeOccupancy: 0);
+        var config = new SimulationConfig(2, 20, TransitSpeed: 10); // ceil(10/10) = 1 tick
+
+        var outcome = Simulation.Step(
+            TwoAgentsAt(map, 0),
+            new[] { new AgentAction(ActionKind.Move, ZoneId: 1), new AgentAction(ActionKind.Move, ZoneId: 1) },
+            config);
+
+        Assert.Equal(1, outcome.NextState.Agents[0].ZoneId);
+        Assert.Equal(1, outcome.NextState.Agents[1].ZoneId);
+        Assert.All(outcome.NextState.Agents, agent => Assert.Null(agent.Transit));
+    }
+
+    [Fact]
+    public void ArrivingAgent_OccupiesTheDestinationNode_AgainstSameTickMovers()
+    {
+        // An agent that completes its crossing this tick holds a slot in the
+        // destination node for the whole tick: a lower-priority mover into a
+        // capacity-1 zone that fills with that arrival must be refused on the
+        // node gate alone (the choke is unbounded).
+        var map = TwoZoneMap(zone1Occupancy: 1, chokeOccupancy: MapLimits.Unlimited);
+        var config = new SimulationConfig(2, 20);
+        var state = new SimulationState(
+            map,
+            new[]
+            {
+                new AgentState(0, 0, 0, new InTransit(0, 1, 1)),
+                new AgentState(1, 0, 0),
+            },
+            Array.Empty<int>(),
+            0);
+
+        var outcome = Simulation.Step(state, new[] { new AgentAction(ActionKind.Wait), new AgentAction(ActionKind.Move, ZoneId: 1) }, config);
+
+        Assert.Equal(1, outcome.NextState.Agents[0].ZoneId);
+        Assert.Null(outcome.NextState.Agents[0].Transit);
+        Assert.Equal(0, outcome.NextState.Agents[1].ZoneId);
+        Assert.Null(outcome.NextState.Agents[1].Transit);
+    }
+
+    [Fact]
+    public void NonTerminalStep_OnAResourcelessMap_ReportsNeitherEndNorWinner()
+    {
+        // A map without resources cannot exhaust itself: the episode ends at
+        // the tick limit, never on an (empty) claim, and a non-terminal step
+        // reports no winner.
+        var map = TwoZoneMap();
+        var config = new SimulationConfig(2, 20);
+        var outcome = Simulation.Step(TwoAgentsAt(map, 0), new[] { new AgentAction(ActionKind.Wait), new AgentAction(ActionKind.Wait) }, config);
+
+        Assert.False(outcome.Result.Info.IsTerminal);
+        Assert.Null(outcome.Result.Info.Reason);
+        Assert.Null(outcome.Result.Info.WinnerAgentId);
+    }
+
+    [Fact]
     public void CapacityResolution_IsDeterministic_ForIdenticalInputs()
     {
         var map = TwoZoneMap(zone1Occupancy: 1);

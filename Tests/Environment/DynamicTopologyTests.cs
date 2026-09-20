@@ -242,8 +242,10 @@ public class DynamicTopologyTests
         environment.Step(new[] { new AgentAction(ActionKind.Move, ZoneId: 1) });
         environment.Reset();
 
-        // A fresh step from the reset state must still see the closed choke.
+        // A fresh step from the reset state must still see the closed choke:
+        // the move is refused outright — the agent never starts a crossing.
         var blocked = environment.Step(new[] { new AgentAction(ActionKind.Move, ZoneId: 1) });
         Assert.Equal(0, blocked.Observations[0].AgentStates[0].ZoneId);
+        Assert.Null(blocked.Observations[0].AgentStates[0].Transit);
     }
 }

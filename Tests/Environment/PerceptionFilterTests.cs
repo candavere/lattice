@@ -76,6 +76,7 @@ public class PerceptionFilterTests
         Assert.Equal(0, partial.Agents[0].LastKnownState!.ZoneId);
         Assert.Equal(KnowledgeStatus.Unknown, partial.Agents[1].Status);
         Assert.Null(partial.Agents[1].LastKnownState);
+        Assert.Equal(-1, partial.Agents[1].LastSeenTick);
 
         // Claimed resource 1 sits in masked zone 2 -> excluded from visible claims.
         Assert.Empty(partial.VisibleClaims);
@@ -210,6 +211,42 @@ public class PerceptionFilterTests
         filter.Reset();
         var reborn = filter.Project(2, BuildObservation(state));
         Assert.Equal(KnowledgeStatus.Unknown, reborn.Zones[2].Status);
+    }
+
+    [Fact]
+    public void Reset_ClearsPreviouslyObservedZoneResourceAndRival()
+    {
+        // Seed memory: from zone 0 (cone {0,1,3}) the observer records
+        // R0@zone 1 and the rival standing in zone 1.
+        var filter = new PerceptionFilter(Ring, agentId: 0, vision: 1);
+        _ = filter.Project(1, ObservationFor(observerZone: 0, rivalZone: 1, claims: new[] { 0 }));
+
+        filter.Reset();
+
+        // Re-project from zone 3, whose cone {3,0,2} excludes zone 1: nothing
+        // cached may resurface as Stale — a fresh episode forgets it all.
+        var reborn = filter.Project(2, ObservationFor(observerZone: 3, rivalZone: 1, claims: new[] { 0 }));
+        Assert.Equal(KnowledgeStatus.Unknown, reborn.Zones[1].Status);
+        Assert.Equal(KnowledgeStatus.Unknown, reborn.Resources[0].Status);
+        Assert.Equal(KnowledgeStatus.Unknown, reborn.Agents[1].Status);
+    }
+
+    [Fact]
+    public void Project_RejectsZeroTicks()
+    {
+        var observation = ObservationFor(observerZone: 0, rivalZone: 2, claims: new[] { 1 });
+        var filter = new PerceptionFilter(Ring, agentId: 0, vision: 1);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => filter.Project(tick: 0, observation));
+    }
+
+    [Fact]
+    public void Project_RejectsObservationWithoutTheObserver()
+    {
+        var observation = new Observation(0, Ring, new[] { new AgentState(1, 3, 0) }, Array.Empty<int>());
+        var filter = new PerceptionFilter(Ring, agentId: 0, vision: 1);
+
+        Assert.Throws<ArgumentException>(() => filter.Project(1, observation));
     }
 
     [Fact]

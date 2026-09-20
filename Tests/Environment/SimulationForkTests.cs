@@ -120,4 +120,37 @@ public class SimulationForkTests
         Assert.True(fork.IsTerminal);
         Assert.Equal(9, fork.Snapshot.StepCount);
     }
+
+    [Fact]
+    public void Fork_OfAResourcelessState_IsNotTerminal()
+    {
+        var map = new MapGraph(
+            new[]
+            {
+                new Zone(0, new GridPoint(0, 0)),
+                new Zone(1, new GridPoint(10, 0)),
+            },
+            Array.Empty<ResourceNode>(),
+            new[] { new ChokePoint(0, 0, 1) });
+        var config = new SimulationConfig(2, 20);
+        var state = Simulation.CreateInitial(map, config);
+
+        var fork = SimulationFork.Create(state, config);
+
+        Assert.False(fork.IsTerminal);
+    }
+
+    [Fact]
+    public void Fork_AtTheTickLimit_IsImmediatelyTerminal()
+    {
+        var atLimit = new SimulationState(
+            Map,
+            new[] { new AgentState(0, 0, 0), new AgentState(1, 1, 0) },
+            Array.Empty<int>(),
+            20);
+
+        var fork = SimulationFork.Create(atLimit, new SimulationConfig(2, 20));
+
+        Assert.True(fork.IsTerminal);
+    }
 }

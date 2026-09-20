@@ -37,6 +37,45 @@ public class TransitTests
             new ChokePoint(1, 1, 2),
         });
 
+    /// <summary>
+    /// Zones 0-1-2 spaced 10 apart with a resource in zone 0 (a departure
+    /// node) and unbounded chokes (0-1), (1-2).
+    /// </summary>
+    private static MapGraph DepartureResourceMap() => new(
+        new[]
+        {
+            new Zone(0, new GridPoint(0, 0)),
+            new Zone(1, new GridPoint(10, 0)),
+            new Zone(2, new GridPoint(20, 0)),
+        },
+        new[]
+        {
+            new ResourceNode(0, 0, new GridPoint(1, 0)),
+        },
+        new[]
+        {
+            new ChokePoint(0, 0, 1),
+            new ChokePoint(1, 1, 2),
+        });
+
+    /// <summary>
+    /// Zones 0-1-2 spaced 10 apart; choke (0-1) is capped at one agent while
+    /// choke (1-2) is unbounded.
+    /// </summary>
+    private static MapGraph CappedReverseMap() => new(
+        new[]
+        {
+            new Zone(0, new GridPoint(0, 0)),
+            new Zone(1, new GridPoint(10, 0)),
+            new Zone(2, new GridPoint(20, 0)),
+        },
+        Array.Empty<ResourceNode>(),
+        new[]
+        {
+            new ChokePoint(0, 0, 1, MaxOccupancy: 1),
+            new ChokePoint(1, 1, 2),
+        });
+
     private static string Json(object value) => JsonSerializer.Serialize(value);
 
     [Fact]
@@ -111,6 +150,49 @@ public class TransitTests
         Assert.Null(t4.NextState.Agents[0].Transit);
         Assert.Equal(1, t4.NextState.Agents[0].Score);
         Assert.Contains(0, t4.NextState.Claims);
+    }
+
+    [Fact]
+    public void TransitingAgent_CannotCollectFromItsDepartureNode()
+    {
+        var config = new SimulationConfig(2, 20, TransitSpeed: 3);
+        var state = Simulation.CreateInitial(DepartureResourceMap(), config);
+
+        var t1 = Simulation.Step(state, new[] { new AgentAction(ActionKind.Move, ZoneId: 1), new AgentAction(ActionKind.Wait) }, config);
+        Assert.Equal(new InTransit(0, 1, 3), t1.NextState.Agents[0].Transit);
+
+        // Mid-crossing, agent 0 tries to collect the resource in the node it
+        // departed. Transiting agents are on the edge and cannot collect, even
+        // from their departure node.
+        var t2 = Simulation.Step(t1.NextState, new[] { new AgentAction(ActionKind.Collect, ResourceId: 0), new AgentAction(ActionKind.Wait) }, config);
+        Assert.Equal(new InTransit(0, 1, 2), t2.NextState.Agents[0].Transit);
+        Assert.Equal(0, t2.NextState.Agents[0].Score);
+        Assert.Empty(t2.NextState.Claims);
+    }
+
+    [Fact]
+    public void ReverseTraversal_ResolvesTheChokeThatActuallyBindsItsEdge()
+    {
+        // Both agents cross into zone 1, agent 1 from the far side (2->1). A
+        // reverse traversal must key its capacity gate off choke (1-2) — not
+        // off the (0-1) choke agent 0 is already occupying at capacity.
+        var config = new SimulationConfig(2, 20, TransitSpeed: 3);
+        var map = CappedReverseMap();
+        var state = new SimulationState(
+            map,
+            new[]
+            {
+                new AgentState(0, 0, 0),
+                new AgentState(1, 2, 0),
+            },
+            Array.Empty<int>(),
+            0);
+
+        var outcome = Simulation.Step(state, new[] { new AgentAction(ActionKind.Move, ZoneId: 1), new AgentAction(ActionKind.Move, ZoneId: 1) }, config);
+
+        Assert.Equal(new InTransit(0, 1, 3), outcome.NextState.Agents[0].Transit);
+        Assert.Equal(new InTransit(2, 1, 3), outcome.NextState.Agents[1].Transit);
+        Assert.Equal(2, outcome.NextState.Agents[1].ZoneId);
     }
 
     [Fact]

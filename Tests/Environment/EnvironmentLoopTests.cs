@@ -123,4 +123,33 @@ public class EnvironmentLoopTests
         Assert.Throws<ArgumentOutOfRangeException>(() => new SimulationConfig(5, 10));
         Assert.Throws<ArgumentOutOfRangeException>(() => new SimulationConfig(2, 0));
     }
+
+    [Fact]
+    public void SimulationConfig_RejectsInvalidTransitSpeed()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new SimulationConfig(2, 10, TransitSpeed: -1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new SimulationConfig(2, 10, TransitSpeed: int.MinValue));
+
+        _ = new SimulationConfig(2, 10, TransitSpeed: SimulationConfig.InstantTransit);
+        _ = new SimulationConfig(2, 10, TransitSpeed: 1);
+    }
+
+    [Fact]
+    public void Environment_Reset_ClearsTheTerminalFlag()
+    {
+        var config = new SimulationConfig(2, 2);
+        var env = new LatticeEnvironment(Map, config);
+
+        env.Step(new[] { new AgentAction(ActionKind.Wait), new AgentAction(ActionKind.Wait) });
+        env.Step(new[] { new AgentAction(ActionKind.Wait), new AgentAction(ActionKind.Wait) });
+        Assert.True(env.IsTerminal);
+
+        env.Reset();
+
+        // The reset must lift the terminal latch: a fresh episode starts
+        // cleanly rather than answering "terminal" until its first step.
+        Assert.False(env.IsTerminal);
+        var first = env.Step(new[] { new AgentAction(ActionKind.Wait), new AgentAction(ActionKind.Wait) });
+        Assert.Equal(1, first.Info.StepNumber);
+    }
 }

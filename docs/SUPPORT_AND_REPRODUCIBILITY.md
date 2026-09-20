@@ -98,7 +98,17 @@ produced, and those recorded values are the only provenance a result carries.
   security reviews, soak testing, and formal fuzzing.** The engine is a
   zero-dependency, headless, local-execution library that binds no network
   sockets and stores no credentials; see [`../SECURITY.md`](../SECURITY.md) for
-  the current disclosure process and supported release line.
+  the current disclosure process and supported release line. For calibration:
+  the repository does contain an **in-process, seeded mutation/fuzz regression
+  harness** — deterministic seeded fuzz suites under `Tests/Fuzz/` (parser,
+  CLI arguments, dynamic rules) and pinned Stryker mutation analysis over the
+  transition-bearing files (`stryker-config.json`) — and
+  these run reproducibly in CI and locally. **External coverage-guided fuzzing
+  remains deferred**: no libFuzzer-, AFL-, or OSS-Fuzz-style campaign has been
+  run, and the "formal fuzzing" exclusion above refers to that external
+  campaign, not to the committed in-process harness. The mutation analysis is
+  summarized in
+  [`../benchmarks/mutation_stryker_summary.json`](../benchmarks/mutation_stryker_summary.json).
 - Any claim of an operating system, architecture, or runtime not listed in
   Section 1 is unsupported until it is added to the matrix and exercised by CI.
 
@@ -191,6 +201,16 @@ The golden fixtures used to pin these invariants are
 
 ### Release immutability policy
 
+- **`immutable: true` is scoped exclusively to `v2.3.1` and the forthcoming
+  `v2.3.2`.** Only these two lines carry the immutable publishing policy below:
+  permanently pinned tags, checksummed permanently attached assets, and
+  corrections-by-supersession. `v2.3.1` is the immutable release already
+  published at commit `c0e8342`; `v2.3.2` is the prepared patch release that
+  supersedes it with the parser hardening, property suites, and fuzz fixtures.
+- **`v2.3.0` is historical, untouched, but was published under
+  `immutable: false`.** It predates the immutable publishing policy, remains in
+  place as part of the record, and is never modified, retagged, or deleted —
+  but its assets carry no immutability or checksum-permanence promise.
 - **Published release tags are permanent and immutable.** A `v*` tag that has
   been pushed is never moved, re-pointed, or deleted.
 - **Attached release assets are permanent and immutable.** Once a binary asset

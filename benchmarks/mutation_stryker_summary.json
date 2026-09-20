@@ -1,0 +1,109 @@
+{
+  "artifact": "docs/artifacts/stryker_summary.json",
+  "tool": {
+    "name": "dotnet-stryker",
+    "version": "5.0.0",
+    "config": "stryker-config.json",
+    "invocation": "dotnet tool restore && dotnet stryker --config-file stryker-config.json"
+  },
+  "source": {
+    "repository": "candavere/lattice",
+    "headCommit": "31e587d65793641f6a9bb99d0372590760e53a8",
+    "note": "Analysis ran against the working tree at head commit 31e587d; the mutation-scoped files Environment/Simulation.cs and Environment/PerceptionFilter.cs are byte-identical to that commit."
+  },
+  "scope": {
+    "project": "Lattice.Environment.csproj",
+    "testProjects": [
+      "Tests/Lattice.Tests.csproj"
+    ],
+    "mutate": [
+      "**/Simulation.cs",
+      "**/PerceptionFilter.cs"
+    ],
+    "configuration": "Release",
+    "coverageAnalysis": "perTest",
+    "testCaseFilter": "FullyQualifiedName!~Lattice.Tests.Performance",
+    "thresholds": {
+      "high": 80,
+      "low": 60,
+      "break": 0
+    }
+  },
+  "results": {
+    "totalMutants": 520,
+    "statusCounts": {
+      "CompileError": 25,
+      "Ignored": 241,
+      "Killed": 250,
+      "NoCoverage": 1,
+      "Survived": 3
+    },
+    "killed": 250,
+    "survived": 3,
+    "noCoverage": 1,
+    "ignored": 241,
+    "compileError": 25,
+    "timeout": 0,
+    "mutationScorePercent": 98.43,
+    "scoreDefinition": "killed / (killed + survived + noCoverage), as reported by Stryker ('The final mutation score is 98.43 %')."
+  },
+  "survivorClassifications": [
+    {
+      "id": "217",
+      "file": "Environment/PerceptionFilter.cs",
+      "location": {
+        "line": 222,
+        "column": 9
+      },
+      "mutator": "Statement mutation",
+      "replacement": ";",
+      "status": "Survived",
+      "classification": "EQUIVALENT_MUTANT",
+      "rationale": "The mutated statement is a redundant duplicate of _agentLastSeenTicks.Clear() inside Reset() (the same dictionary is already cleared at line 219); removing it is semantically equivalent for every reachable state, so no test can kill it."
+    },
+    {
+      "id": "351",
+      "file": "Environment/Simulation.cs",
+      "location": {
+        "line": 258,
+        "column": 36
+      },
+      "mutator": "Equality mutation",
+      "replacement": "zoneCapacity >= 0",
+      "status": "Survived",
+      "classification": "BOUNDARY_EQUIVALENT_UNDER_GENERATOR_DOMAIN",
+      "rationale": "zoneCapacity is Map.Zones[destination].MaxOccupancy, which the procedural generator constrains to be at least 1, so 'zoneCapacity > 0' and 'zoneCapacity >= 0' agree on every generator-reachable state; the mutant is not distinguishable by any suite that drives the engine through the generator."
+    },
+    {
+      "id": "388",
+      "file": "Environment/Simulation.cs",
+      "location": {
+        "line": 309,
+        "column": 28
+      },
+      "mutator": "Equality mutation",
+      "replacement": "rank <= agentCount",
+      "status": "Survived",
+      "classification": "SURVIVED_BOUNDARY",
+      "rationale": "Off-by-one at the resolution loop bound: rank == agentCount adds one extra resolution-rank iteration whose effects the current suite does not exercise. A genuine survivor, tracked for a follow-up assertion."
+    },
+    {
+      "id": "480",
+      "file": "Environment/Simulation.cs",
+      "location": {
+        "line": 439,
+        "column": 16
+      },
+      "mutator": "UnaryMinusExpression to UnaryPlusExpression mutation",
+      "replacement": "+1",
+      "status": "NoCoverage",
+      "classification": "NO_COVERAGE",
+      "rationale": "The EdgeChoke not-found sentinel 'return -1' is never exercised by any test, so flipping it to '+1' goes undetected; the not-found path is unreachable through generator-reachable maps."
+    }
+  ],
+  "rawReport": {
+    "json": "StrykerOutput/2026-09-20.23-53-30/reports/mutation-report.json (generated locally, not checked in)",
+    "html": "StrykerOutput/2026-09-20.23-53-30/reports/mutation-report.html (generated locally, not checked in)"
+  },
+  "dispositionNote": "Raw counts are transcribed from the Stryker JSON report by direct parsing, not estimated. The committed gate remains the stryker-config.json thresholds; per FINDING-005 the per-run HTML/JSON report is not checked in \u2014 this summary artifact is the committed machine-readable record of this calibration run."
+}

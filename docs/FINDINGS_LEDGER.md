@@ -15,6 +15,16 @@ No entry is ever rewritten or laundered into promotional summary — when a
 later finding extends an earlier one, it is filed as a new entry that
 supersedes by reference, and the original entry keeps its identifier.
 
+This ledger is a **maintained historical log**. Its append-only character is
+enforced by editorial policy and by git history, not by an automated
+verification script; if a scripted append-only audit (one that machine-checks
+that historical entries are never mutated) is introduced, this status will be
+reviewed and the replacement documented here. Each resolution also carries a
+**resolution release status**: entries resolved before the `v2.3.1` tag commit
+`c0e8342` are tagged `RELEASED_IN_v2.3.1`; entries resolved after that tag are
+tagged `MAIN_ONLY` and, where they are packaged into the forthcoming `v2.3.2`
+patch release, additionally tagged `RELEASED_IN_v2.3.2`.
+
 ## Record schema
 
 | Field | Meaning | Allowed values |
@@ -27,6 +37,7 @@ supersedes by reference, and the original entry keeps its identifier.
 | **Severity & Confidence** | Impact; confidence in the observation | Severity `High` / `Medium` / `Low`; Confidence `Confirmed` / `Bounded` |
 | **Disposition** | What happened with the finding | `FIXED`, `ACCEPTED_LIMITATION`, `REJECTED_WITH_EVIDENCE`, or `OPEN` |
 | **Resolution & Evidence Link** | Commit SHA, test file, fixture, or documentation section that closes or bounds the finding | repository-relative path or `long-sha` |
+| **Resolution Release Status** | Which published/prepared release contains the resolution | `RELEASED_IN_v2.3.1`, `MAIN_ONLY`, or `MAIN_ONLY → RELEASED_IN_v2.3.2` |
 
 ## Closure standards
 
@@ -60,6 +71,7 @@ schema is defined in [`reproduction_packet.md`](reproduction_packet.md)
 | **Severity & Confidence** | High / Confirmed |
 | **Disposition** | `FIXED` |
 | **Resolution & Evidence Link** | Documentation narrowed to per-step serialized `StepResult` equivalence and a research-preview boundary in `6e361af`, `7cd3ac1`, `c18bc87`, `d14a471`, `abb78fa`. Cross-platform executable verification of the replay contract was added in `1c6fa80` (windows, linux, macos) against `Tests/fixtures/golden_trajectory.jsonl`. The four-tier equivalence vocabulary is specified in `docs/SUPPORT_AND_REPRODUCIBILITY.md`, Section 1 (Equivalence vocabulary) and Section 5 (Replay verification); the invariant is formalized as Invariant 5 in `docs/INVARIANT_SPECIFICATION.md`. |
+| **Resolution & Release Status** | `RELEASED_IN_v2.3.1` (all closure commits predate the `c0e8342` tag commit). |
 
 ## FINDING-002 — Benchmark gate sensitivity
 
@@ -73,6 +85,7 @@ schema is defined in [`reproduction_packet.md`](reproduction_packet.md)
 | **Severity & Confidence** | Medium / Confirmed |
 | **Disposition** | `FIXED` |
 | **Resolution & Evidence Link** | Retry-on-jitter and coefficient-of-variation-derived per-workload tolerances implemented in `75a1ffa`; the hosted-runner comparator was reclassified as a structural smoke with a unit-tested comparator and a deliberately bounded smoke scope in `af28837`; macos runner runtime alignment in `4a64820`/`d604fc0`. The comparator contract is covered by unit tests in `.github/workflows/test_compare_benchmarks.py` (tolerances, fingerprinting, exit codes, smoke classification). |
+| **Resolution & Release Status** | `RELEASED_IN_v2.3.1` (all closure commits predate the `c0e8342` tag commit). |
 
 ## FINDING-003 — Release asset staging failure
 
@@ -86,6 +99,7 @@ schema is defined in [`reproduction_packet.md`](reproduction_packet.md)
 | **Severity & Confidence** | High / Confirmed |
 | **Disposition** | `FIXED` |
 | **Resolution & Evidence Link** | Staging path layout and token permission model corrected in `c0e8342`; the tagged release `v2.3.1` points at that commit, so the fix is included in the shipped assets. Release hygiene is further enforced by tag-to-project version parity, a native smoke matrix, SHA-256 checksum generation, and SBOM emission in `f6b2e33` and `bc24c0b`; published checksums are exercised by [`reproduction_packet.md`](reproduction_packet.md). |
+| **Resolution & Release Status** | `RELEASED_IN_v2.3.1` (the fix lands in the `c0e8342` tag commit itself). |
 
 ## FINDING-004 — Trajectory parser truncation and null-guard gaps
 
@@ -99,6 +113,7 @@ schema is defined in [`reproduction_packet.md`](reproduction_packet.md)
 | **Severity & Confidence** | High / Confirmed |
 | **Disposition** | `FIXED` |
 | **Resolution & Evidence Link** | `cd3a00b` introduced typed `InvalidDataException` guards naming the offending field and line number; five committed regression fixtures in `Tests/fixtures/fuzz/` (`trajectory_null_simulation_config.jsonl`, `trajectory_missing_map_resources.jsonl`, `trajectory_short_final_scores.jsonl`, `trajectory_null_final_scores.jsonl`, `trajectory_null_actions.jsonl`); the expected exception contract is enforced in `Tests/Fuzz/ExceptionContract.cs`. Green suite confirmed at the recorded commit. |
+| **Resolution & Release Status** | `MAIN_ONLY` → `RELEASED_IN_v2.3.2` (the closure commit `cd3a00b` postdates the `c0e8342` tag commit and is packaged into the `v2.3.2` patch release). |
 
 ## FINDING-005 — Mutation-coverage survivors in the transition surface
 
@@ -112,6 +127,7 @@ schema is defined in [`reproduction_packet.md`](reproduction_packet.md)
 | **Severity & Confidence** | Medium / Confirmed |
 | **Disposition** | `FIXED` |
 | **Resolution & Evidence Link** | Tooling pinned in `.config/dotnet-tools.json` and mutation scope configured in `stryker-config.json` (`8eb86fc`); twelve targeted tests added in `ce2620b` across `Tests/Environment/CapacityTests.cs`, `DynamicTopologyTests.cs`, `EnvironmentLoopTests.cs`, `PerceptionFilterTests.cs`, `SimulationForkTests.cs`, and `TransitTests.cs`. The scoped mutation score recorded at the calibration run was 98.43% (calibrated strategy; `high` 80 / `low` 60 / `break` 0 thresholds are the committed gate). Boundary: the per-run HTML/JSON Stryker report is generated locally and is not checked in; the committed gate is the config, not the report artifact. |
+| **Resolution & Release Status** | `MAIN_ONLY` → `RELEASED_IN_v2.3.2` (the closure commits `8eb86fc` and `ce2620b` postdate the `c0e8342` tag commit and are packaged into the `v2.3.2` patch release). |
 
 ## FINDING-006 — Context-dependent policy divergence (preserved negative result)
 
@@ -125,6 +141,7 @@ schema is defined in [`reproduction_packet.md`](reproduction_packet.md)
 | **Severity & Confidence** | High / Confirmed |
 | **Disposition** | `ACCEPTED_LIMITATION` — the negative result is preserved, publicly disclosed, and explicitly scoped to research preview; no production-confidence claim is made from either direction. |
 | **Resolution & Evidence Link** | Both raw artifacts are committed and cited: `benchmarks/mcts_evaluation_results.json` (source revision `5783ca1`) and `benchmarks/bottleneck_evaluation_results.json` (source revision `1c6fa80`). The procedural bottleneck generator and paired contention harness were added in `c568897` and `cb91bc3`/`f4af28d`; the empirical artifact was committed in `e6ba4bf`. Research-preview scoping and calibration of the surrounding claims are in `6e361af`, `67ad127`, and `abb78fa`. |
+| **Resolution & Release Status** | `RELEASED_IN_v2.3.1` (all closure commits predate the `c0e8342` tag commit). |
 
 ---
 

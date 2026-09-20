@@ -22,8 +22,9 @@ that historical entries are never mutated) is introduced, this status will be
 reviewed and the replacement documented here. Each resolution also carries a
 **resolution release status**: entries resolved before the `v2.3.1` tag commit
 `c0e8342` are tagged `RELEASED_IN_v2.3.1`; entries resolved after that tag are
-tagged `MAIN_ONLY` and, where they are packaged into the forthcoming `v2.3.2`
-patch release, additionally tagged `RELEASED_IN_v2.3.2`.
+tagged `MAIN_ONLY` and, where they are packaged into the published `v2.3.2`
+release (tag `v2.3.2` → commit `4f7816f`), additionally tagged
+`RELEASED_IN_v2.3.2`.
 
 ## Record schema
 
@@ -37,7 +38,7 @@ patch release, additionally tagged `RELEASED_IN_v2.3.2`.
 | **Severity & Confidence** | Impact; confidence in the observation | Severity `High` / `Medium` / `Low`; Confidence `Confirmed` / `Bounded` |
 | **Disposition** | What happened with the finding | `FIXED`, `ACCEPTED_LIMITATION`, `REJECTED_WITH_EVIDENCE`, or `OPEN` |
 | **Resolution & Evidence Link** | Commit SHA, test file, fixture, or documentation section that closes or bounds the finding | repository-relative path or `long-sha` |
-| **Resolution Release Status** | Which published/prepared release contains the resolution | `RELEASED_IN_v2.3.1`, `MAIN_ONLY`, or `MAIN_ONLY → RELEASED_IN_v2.3.2` |
+| **Resolution Release Status** | Which published release contains the resolution | `RELEASED_IN_v2.3.1`, `MAIN_ONLY`, or `MAIN_ONLY → RELEASED_IN_v2.3.2` |
 
 ## Closure standards
 

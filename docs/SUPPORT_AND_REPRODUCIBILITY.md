@@ -9,7 +9,7 @@ companion to the governing thesis in
 [`adr/0001-governing-product-thesis.md`](adr/0001-governing-product-thesis.md).
 
 > **Release status: Research Preview — evaluation by maintainers and
-> collaborators.** The support contract in this document targets `v2.3.1`.
+> collaborators.** The support contract in this document targets `v2.3.2`.
 > Publishing that release does not by itself qualify Lattice for production
 > use; it remains a research instrument until independent security review,
 > soak testing, and formal fuzzing are complete (see Section 2).
@@ -201,12 +201,13 @@ The golden fixtures used to pin these invariants are
 
 ### Release immutability policy
 
-- **`immutable: true` is scoped exclusively to `v2.3.1` and the forthcoming
-  `v2.3.2`.** Only these two lines carry the immutable publishing policy below:
+- **`immutable: true` is scoped exclusively to `v2.3.1` and `v2.3.2`, both
+  published.** Only these two lines carry the immutable publishing policy below:
   permanently pinned tags, checksummed permanently attached assets, and
-  corrections-by-supersession. `v2.3.1` is the immutable release already
-  published at commit `c0e8342`; `v2.3.2` is the prepared patch release that
-  supersedes it with the parser hardening, property suites, and fuzz fixtures.
+  corrections-by-supersession. `v2.3.1` is published at commit `c0e8342`;
+  `v2.3.2` is published and immutable at commit `4f7816f` (tag `v2.3.2` →
+  commit `4f7816fa5594f7097d6b2978c6c626553d075326`), superseding `v2.3.1`
+  with the parser hardening, property suites, and fuzz fixtures.
 - **`v2.3.0` is historical, untouched, but was published under
   `immutable: false`.** It predates the immutable publishing policy, remains in
   place as part of the record, and is never modified, retagged, or deleted —
@@ -228,9 +229,10 @@ The golden fixtures used to pin these invariants are
 ### External reproduction challenge packet
 
 Independent external evaluators should begin with the self-contained, turnkey
-guide in [`reproduction_packet.md`](reproduction_packet.md). It anchors solely
-to the published immutable release `v2.3.1` (commit
-`c0e834266a0da8f482cfc327e72a988040a770a1`), lists the exact published SHA-256
+guide in [`reproduction_packet.md`](reproduction_packet.md). It anchors to
+`v2.3.2` (commit `4f7816fa5594f7097d6b2978c6c626553d075326`), the current
+published immutable release; `v2.3.1` remains historical under
+corrections-by-supersession. It lists the exact published SHA-256
 checksums and download URLs for the three platform binaries, `SHA256SUMS.txt`,
 and `sbom.json`, gives the pre-execution verification command, defines four
 scripted reproduction experiments with pass/fail criteria (CLI parity,

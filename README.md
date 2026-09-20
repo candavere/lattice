@@ -66,6 +66,18 @@ conservation and monotonicity, the graph-reachability perception boundary, and
 the step-determinism vs. replay-equivalence contract, plus three falsifiable
 external challenge questions and the oracle-report submission contract.
 
+Governance of these claims is kept in two public records and inspected as a
+routine part of verification:
+
+- [`docs/FINDINGS_LEDGER.md`](docs/FINDINGS_LEDGER.md) — the append-only,
+  transparent record of criticisms, edge cases, and resolved issues (replay
+  claim calibration, benchmark-gate sensitivity, a release staging failure,
+  parser guard findings, mutation-survivor gaps, and a preserved negative
+  result), each with provenance, severity, disposition, and closing evidence.
+- [`docs/CLAIM_CALIBRATION_MATRIX.md`](docs/CLAIM_CALIBRATION_MATRIX.md) —
+  maps every public claim in README, `site/`, and the ADRs to its proving
+  artifact, tested matrix, documented boundary, and wording status.
+
 Lattice is simulation-as-instrument, not game middleware. Agents traverse a
 topological graph of zones and capacity-limited chokes under partial
 observation; a deterministic step contract advances every tick as a pure

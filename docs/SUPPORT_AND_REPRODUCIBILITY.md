@@ -226,6 +226,19 @@ formal, implementation-agnostic invariants in
 evaluator who wants to build an independent oracle or checker in any language
 should work from that specification rather than from the source tree.
 
+Two companion records keep the audit chain honest:
+
+- [`FINDINGS_LEDGER.md`](FINDINGS_LEDGER.md) — the public, append-only findings
+  ledger documenting criticisms, edge cases, and resolved issues (including
+  replay-claim calibration, benchmark-gate sensitivity, a release staging
+  failure, parser guard gaps, mutation-survivor coverage, and a preserved
+  negative result), each with provenance, severity, disposition, and closing
+  evidence link.
+- [`CLAIM_CALIBRATION_MATRIX.md`](CLAIM_CALIBRATION_MATRIX.md) — the audit
+  matrix mapping every public claim in the README, the published site, and the
+  architectural decision records to its proving artifact, tested matrix,
+  documented boundary, and wording status.
+
 All commands run from a clean checkout of `candavere/lattice` at the repository
 root, with the .NET 8 SDK installed. They are Release-configuration runs and
 require no network access once the SDK and dependencies are restored.
@@ -235,6 +248,11 @@ require no network access once the SDK and dependencies are restored.
 ```sh
 dotnet test Tests/Lattice.Tests.csproj -c Release
 ```
+
+The test suite's results are interpreted against the public governance
+records — historical defects and closings in
+[`FINDINGS_LEDGER.md`](FINDINGS_LEDGER.md) and the claim-to-evidence audit
+matrix in [`CLAIM_CALIBRATION_MATRIX.md`](CLAIM_CALIBRATION_MATRIX.md).
 
 ### Golden trajectory replay verification
 

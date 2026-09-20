@@ -43,6 +43,14 @@
 > live in
 > [`docs/SUPPORT_AND_REPRODUCIBILITY.md`](docs/SUPPORT_AND_REPRODUCIBILITY.md).
 
+### Development and Verification Method
+
+Lattice is developed through AI-assisted implementation under human direction,
+architectural specification, and review. Claims are accepted into the
+repository only when they map to committed code, deterministic tests, CI
+workflows, or benchmark artifacts. AI assistance is treated as an authoring
+method, never as independent validation.
+
 Lattice is simulation-as-instrument, not game middleware. Agents traverse a
 topological graph of zones and capacity-limited chokes under partial
 observation; a deterministic step contract advances every tick as a pure

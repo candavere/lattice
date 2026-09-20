@@ -95,6 +95,17 @@ The evidentiary standard makes three things mandatory for PRs:
    which tier you changed and which tier your tests assert; the verifier's
    documented capability must match what the code actually enforces.
 
+## Development and Verification Method
+
+The canonical disclosure below (mirrored from the project README) governs how
+contributions are authored and accepted:
+
+> ### Development and Verification Method
+> Lattice is developed through AI-assisted implementation under human direction, architectural specification, and review. Claims are accepted into the repository only when they map to committed code, deterministic tests, CI workflows, or benchmark artifacts. AI assistance is treated as an authoring method, never as independent validation.
+
+Human review is part of the authoring workflow; it does not constitute
+independent third-party validation.
+
 ## Development Environment & Prerequisites
 
 - a recent [.NET 8.0 SDK](https://dotnet.microsoft.com/download) (the solution

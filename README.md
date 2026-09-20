@@ -51,6 +51,12 @@ repository only when they map to committed code, deterministic tests, CI
 workflows, or benchmark artifacts. AI assistance is treated as an authoring
 method, never as independent validation.
 
+Independent external reviewers can reproduce the empirical claims of the
+published immutable release through the turnkey challenge guide in
+[`docs/reproduction_packet.md`](docs/reproduction_packet.md) — pinned to
+release `v2.3.1` (commit `c0e8342`), with published SHA-256 checksums, four
+scripted experiments, and a standardized reporting template.
+
 Lattice is simulation-as-instrument, not game middleware. Agents traverse a
 topological graph of zones and capacity-limited chokes under partial
 observation; a deterministic step contract advances every tick as a pure
@@ -157,6 +163,10 @@ serialized output under the specified .NET 8 BCL runtime contract. The full
 command set is `generate`, `simulate`, `render`,
 `analyze`, `replay`, `benchmark`, and `evaluate` — see the
 [CLI Reference](#cli-reference) below.
+
+To verify the claims of the published release asset-for-asset without building
+anything, work through the
+[Reproduction Challenge Packet](docs/reproduction_packet.md).
 
 ## Architecture & Modules
 

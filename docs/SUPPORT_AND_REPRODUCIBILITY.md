@@ -198,6 +198,21 @@ The golden fixtures used to pin these invariants are
 
 ## 5. Step-by-Step Reproduction Procedures
 
+### External reproduction challenge packet
+
+Independent external evaluators should begin with the self-contained, turnkey
+guide in [`reproduction_packet.md`](reproduction_packet.md). It anchors solely
+to the published immutable release `v2.3.1` (commit
+`c0e834266a0da8f482cfc327e72a988040a770a1`), lists the exact published SHA-256
+checksums and download URLs for the three platform binaries, `SHA256SUMS.txt`,
+and `sbom.json`, gives the pre-execution verification command, defines four
+scripted reproduction experiments with pass/fail criteria (CLI parity,
+per-step serialized `StepResult` replay equivalence, the standard-vs-bottleneck
+"one policy, two conclusions" paired evaluation, and a structural benchmark
+smoke), and provides a standardized reporting template for filing public
+issues. In this section the procedures below are the maintainer-oriented
+source-tree equivalents; the packet is the external-reviewer entry point.
+
 All commands run from a clean checkout of `candavere/lattice` at the repository
 root, with the .NET 8 SDK installed. They are Release-configuration runs and
 require no network access once the SDK and dependencies are restored.

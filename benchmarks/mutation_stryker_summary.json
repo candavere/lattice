@@ -1,5 +1,5 @@
 {
-  "artifact": "docs/artifacts/stryker_summary.json",
+  "artifact": "benchmarks/mutation_stryker_summary.json",
   "tool": {
     "name": "dotnet-stryker",
     "version": "5.0.0",

@@ -24,7 +24,21 @@ public static class TrajectoryReader
         var header = ReadHeader(source);
         TrajectoryFinal? final = null;
         var steps = ReadSteps(source, value => final = value).ToArray();
-        return new TrajectoryRecording(header, steps, final!);
+        var recording = new TrajectoryRecording(header, steps, final!);
+
+        if (recording.Final.FinalScores is null)
+        {
+            throw new InvalidDataException("The final line has no 'FinalScores'.");
+        }
+
+        if (recording.Final.FinalScores.Length != recording.Header.SimulationConfig.AgentCount)
+        {
+            throw new InvalidDataException(
+                $"Final 'FinalScores' has {recording.Final.FinalScores.Length} entries, " +
+                $"but the simulation config declares {recording.Header.SimulationConfig.AgentCount} agent(s).");
+        }
+
+        return recording;
     }
 
     public static TrajectoryHeader ReadHeader(TextReader source)
@@ -41,6 +55,22 @@ public static class TrajectoryReader
         }
 
         var header = DeserializeOrThrow<TrajectoryWriter.HeaderLine>(line, 1).ToModel();
+        if (header.SimulationConfig is null)
+        {
+            throw new InvalidDataException("The header line has no 'SimulationConfig'.");
+        }
+
+        if (header.Map is null)
+        {
+            throw new InvalidDataException("The header line has no 'Map'.");
+        }
+
+        if (header.Map.Zones is null || header.Map.Resources is null || header.Map.ChokePoints is null)
+        {
+            throw new InvalidDataException(
+                "The header line's 'Map' is missing its 'Zones', 'Resources', or 'ChokePoints' topology.");
+        }
+
         if (header.SchemaVersion > TrajectorySchema.CurrentVersion)
         {
             throw new InvalidDataException(
@@ -83,6 +113,16 @@ public static class TrajectoryReader
                     }
 
                     var step = DeserializeOrThrow<TrajectoryWriter.StepLine>(line, lineNumber).ToModel();
+                    if (step.Actions is null)
+                    {
+                        throw new InvalidDataException($"Line {lineNumber} has no 'Actions'.");
+                    }
+
+                    if (step.Result is null)
+                    {
+                        throw new InvalidDataException($"Line {lineNumber} has no 'Result'.");
+                    }
+
                     if (step.StepNumber != stepCount + 1)
                     {
                         throw new InvalidDataException(

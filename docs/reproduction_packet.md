@@ -1,4 +1,4 @@
-# Lattice v2.3.1 — Immutable-Release Reproduction Challenge Packet
+# Lattice v2.3.2 — Immutable-Release Reproduction Challenge Packet
 
 This packet is a self-contained, turnkey guide for an independent external
 reviewer who wants to verify Lattice's empirical claims **using published
@@ -7,9 +7,13 @@ downloading the release is required for Experiments 1, 3, and 4. Experiment 2
 offers both an asset-only path and a source-pinned path against the canonical
 golden trajectory.
 
-Everything below anchors to the immutable release **v2.3.1**. The release tag
-and its assets are permanent; if a defect is ever found, the project corrects
-it by publishing a higher version, never by rewriting this one.
+Everything below anchors to the immutable release **v2.3.2** — the remediated
+release that supersedes `v2.3.1` with the parser hardening, deterministic
+property and fuzz suites, and calibrated claims. The release tag and its
+assets are permanent; if a defect is ever found, the project corrects
+it by publishing a higher version, never by rewriting this one. `v2.3.1`
+remains published and immutable alongside it; `v2.3.0` is historical and
+untouched.
 
 ---
 
@@ -17,34 +21,35 @@ it by publishing a higher version, never by rewriting this one.
 
 | Field | Value |
 | --- | --- |
-| Release tag | `v2.3.1` |
-| Source commit | `c0e834266a0da8f482cfc327e72a988040a770a1` |
-| Release URL | `https://github.com/candavere/lattice/releases/tag/v2.3.1` |
+| Release tag | `v2.3.2` |
+| Source commit | published with the release; confirm with `git rev-parse 'v2.3.2^{commit}'` (see Section 1.3) |
+| Release URL | `https://github.com/candavere/lattice/releases/tag/v2.3.2` |
 | Runtime contract | Pure .NET 8 (`net8.0`) base class library; self-contained single-file binaries |
 
 ### 1.1 Published assets and SHA-256 checksums
 
-The checksums below are the exact published values: they are the digests
-embedded in `SHA256SUMS.txt` attached to the release, and they independently
-match the SHA-256 download digests that the GitHub release API reports for each
-asset.
+The checksums for `v2.3.2` are the exact published values recorded in
+`SHA256SUMS.txt` attached to the release, and they independently match the
+SHA-256 download digests that the GitHub release API reports for each asset.
+Verify the downloaded bytes against the attached manifest before executing any
+binary (Section 1.2).
 
-| Asset | Size (bytes) | SHA-256 |
-| --- | ---: | --- |
-| `lattice-linux-x64` | 67,128,559 | `f439f3c6c172e34f7b363451ca7e057e8b371fa57c3978ceb3e75898d5f62192` |
-| `lattice-osx-arm64` | 74,075,672 | `182eda9077dd8fc5a2273192432ba9fcd73714f5f405cf1cd861dd260c2d9c35` |
-| `lattice-win-x64.exe` | 67,853,590 | `e62a6d9aa2f5a5b7012515c4491ac42f17878a15458dbfbcbbdc083eb7ddff51` |
-| `SHA256SUMS.txt` | 254 | `9f5c9c2a00970d2e0600bfa105178c20da5581c44dcd73e6cbe2a38851a65044` |
-| `sbom.json` | 18,304 | `38a2b7049f0aef34a1d51ab2f5dbae038c8c6b6cbf1f95733ea7bca0a0079fc3` |
+| Asset | SHA-256 |
+| --- | --- |
+| `lattice-linux-x64` | published in `SHA256SUMS.txt` attached to the release |
+| `lattice-osx-arm64` | published in `SHA256SUMS.txt` attached to the release |
+| `lattice-win-x64.exe` | published in `SHA256SUMS.txt` attached to the release |
+| `SHA256SUMS.txt` | published in the release API metadata |
+| `sbom.json` | published in the release API metadata |
 
 Direct download URLs (one per asset):
 
 ```
-https://github.com/candavere/lattice/releases/download/v2.3.1/lattice-linux-x64
-https://github.com/candavere/lattice/releases/download/v2.3.1/lattice-osx-arm64
-https://github.com/candavere/lattice/releases/download/v2.3.1/lattice-win-x64.exe
-https://github.com/candavere/lattice/releases/download/v2.3.1/SHA256SUMS.txt
-https://github.com/candavere/lattice/releases/download/v2.3.1/sbom.json
+https://github.com/candavere/lattice/releases/download/v2.3.2/lattice-linux-x64
+https://github.com/candavere/lattice/releases/download/v2.3.2/lattice-osx-arm64
+https://github.com/candavere/lattice/releases/download/v2.3.2/lattice-win-x64.exe
+https://github.com/candavere/lattice/releases/download/v2.3.2/SHA256SUMS.txt
+https://github.com/candavere/lattice/releases/download/v2.3.2/sbom.json
 ```
 
 ### 1.2 Pre-execution integrity verification
@@ -79,16 +84,16 @@ must contain only BCL/runtime components.
 
 ### 1.3 The source commit is part of the record
 
-`v2.3.1` was built from commit `c0e834266a0da8f482cfc327e72a988040a770a1`. A
+`v2.3.2` is built from the commit the `v2.3.2` tag points at. A
 reviewer who also wants source provenance can confirm the pinned commit in the
 repository:
 
 ```sh
-git ls-remote --tags https://github.com/candavere/lattice.git 'v2.3.1'
-# expect: <object-id-of-tag>  refs/tags/v2.3.1
-git show-ref --verify refs/tags/v2.3.1   # after cloning
-git rev-parse 'v2.3.1^{commit}'
-# expect: c0e834266a0da8f482cfc327e72a988040a770a1
+git ls-remote --tags https://github.com/candavere/lattice.git 'v2.3.2'
+# expect: <object-id-of-tag>  refs/tags/v2.3.2
+git show-ref --verify refs/tags/v2.3.2   # after cloning
+git rev-parse 'v2.3.2^{commit}'
+# expect: the commit id printed by the release workflow and `git ls-remote` above
 ```
 
 ---
@@ -111,7 +116,7 @@ Commands:
 
 Expected output:
 
-1. `--version` prints exactly `2.3.1` on stdout and exits `0`.
+1. `--version` prints exactly `2.3.2` on stdout and exits `0`.
 2. `--help` prints the usage surface to stdout and exits `0`. The surface must
    list the seven commands `generate`, `simulate`, `render`, `analyze`,
    `replay`, `benchmark`, `evaluate`, plus `-h, --help` and `-v, --version`.
@@ -120,11 +125,11 @@ Pass if:
 
 | Check | Criterion |
 | --- | --- |
-| Version parity | stdout is exactly `2.3.1` (no extra prefix/suffix) |
+| Version parity | stdout is exactly `2.3.2` (no extra prefix/suffix) |
 | Exit code | `0` for both commands |
 | Command surface | All seven commands appear in `--help` |
 
-Fail if: the version string differs from `2.3.1`, either command exits
+Fail if: the version string differs from `2.3.2`, either command exits
 non-zero, `--help` omits a documented command, or the binary is not the exact
 hash-verified asset from Section 1.2.
 
@@ -162,7 +167,7 @@ Source-pinned path (canonical golden trajectory, requires the pinned commit):
 
 ```sh
 git clone https://github.com/candavere/lattice.git lattice
-git -C lattice checkout c0e834266a0da8f482cfc327e72a988040a770a1
+git -C lattice checkout v2.3.2
 cd lattice
 ./lattice replay Tests/fixtures/golden_trajectory.jsonl --verify
 ```
@@ -260,7 +265,7 @@ Reviewers are asked to paste this template — filled in — with their report t
 make every pass/fail judgment independently checkable.
 
 ```markdown
-## Reproduction report — Lattice v2.3.1
+## Reproduction report — Lattice v2.3.2
 
 ### Host environment
 - CPU model: `<model string>`
@@ -309,7 +314,7 @@ make every pass/fail judgment independently checkable.
 ### Reporting
 - File a public issue at:
   https://github.com/candavere/lattice/issues/new
-  Title it `Reproduction report — Lattice v2.3.1` and paste the full template.
+  Title it `Reproduction report — Lattice v2.3.2` and paste the full template.
 ```
 
 Notes for honest reporting:
@@ -333,5 +338,5 @@ Notes for honest reporting:
   describes one host; this packet's structural smoke pass cannot be used as an
   authoritative throughput adjudicator across arbitrary machines.
 - **Release immutability is honored.** This packet reads only the published
-  `v2.3.1` tag and its attached assets; it does not modify, retag, or rewrite
-  `v2.3.1` or any earlier release.
+  `v2.3.2` tag and its attached assets; it does not modify, retag, or rewrite
+  `v2.3.2`, `v2.3.1`, or any earlier release.

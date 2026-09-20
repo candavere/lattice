@@ -20,7 +20,7 @@
 <p align="center">
   <a href="https://github.com/candavere/lattice/actions/workflows/ci.yml"><img src="https://github.com/candavere/lattice/actions/workflows/ci.yml/badge.svg" alt="CI build status" /></a>
   <img src="https://img.shields.io/badge/status-research%20preview-orange" alt="status: research preview" />
-  <img src="https://img.shields.io/badge/tests-365%20passing-brightgreen" alt="365 unit tests passing" />
+  <img src="https://img.shields.io/badge/tests-417%20passing-brightgreen" alt="417 unit tests passing" />
   <img src="https://img.shields.io/badge/determinism-verified--replay--equivalence-blue" alt="verified replay equivalence" />
   <img src="https://img.shields.io/badge/dependencies-BCL%20runtime%20only-blueviolet" alt="runtime dependencies: pure .NET 8 BCL" />
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4" alt=".NET 8" />

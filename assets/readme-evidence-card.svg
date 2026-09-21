@@ -1,0 +1,60 @@
+<svg width="960" height="320" viewBox="0 0 960 320" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>Lattice evidence card: mirror-seated paired deltas, MCTS versus Scout</title>
+  <desc>Standard generated maps: mean paired delta -1.12, 95% CI [-1.37, -0.87], hypothesis not confirmed. Procedural bottleneck maps: mean paired delta +1.42, 95% CI [+1.11, +1.73], hypothesis confirmed. Same policy; the environment changed the conclusion.</desc>
+
+  <style>
+    .panel { fill: #0e1a24; stroke: #3d5a68; }
+    .label { font-family: "SF Mono", "Consolas", "Menlo", monospace; fill: #5c7684; }
+    .mapname { font-family: "SF Mono", "Consolas", "Menlo", monospace; fill: #d7e2e8; font-weight: 600; }
+    .big { font-family: "SF Mono", "Consolas", "Menlo", monospace; fill: #ffffff; }
+    .ci { font-family: "SF Mono", "Consolas", "Menlo", monospace; fill: #8ea2ad; }
+    .zero { stroke: #3d5a68; stroke-width: 1.2; stroke-dasharray: 3 4; }
+    .whisker { stroke-width: 3; stroke-linecap: round; }
+    .cap { stroke-width: 3; }
+    .dot { }
+    .fail { fill: #f5a623; }
+    .pass { fill: #1fb6a6; }
+    .btxt { font-family: "SF Mono", "Consolas", "Menlo", monospace; font-weight: 700; letter-spacing: 1px; }
+    .foot { font-family: "SF Mono", "Consolas", "Menlo", monospace; fill: #5c7684; }
+  </style>
+
+  <rect width="960" height="320" rx="14" class="panel" />
+
+  <!-- header -->
+  <text x="48" y="46" class="mapname" font-size="20">Same policy, two map distributions</text>
+  <text x="48" y="70" class="label" font-size="14">Mirror-seated MCTS vs Scout · mean paired delta, 95% CI (dev suite, 32 rollouts)</text>
+
+  <!-- zero reference -->
+  <line x1="480" y1="112" x2="480" y2="196" class="zero" />
+  <text x="480" y="212" text-anchor="middle" class="label" font-size="13">0 (Scout baseline)</text>
+
+  <!-- STANDARD maps whisker -->
+  <line x1="384" y1="132" x2="419" y2="132" class="whisker fail" />
+  <line x1="384" y1="124" x2="384" y2="140" class="cap fail" />
+  <line x1="419" y1="124" x2="419" y2="140" class="cap fail" />
+  <circle cx="402" cy="132" r="7" class="dot fail" />
+  <text x="228" y="128" text-anchor="middle" class="mapname" font-size="16">STANDARD MAPS</text>
+  <text x="228" y="168" text-anchor="middle" class="ci" font-size="16">CI [-1.37, -0.87]</text>
+  <text x="228" y="148" text-anchor="middle" class="big" font-size="30">-1.12</text>
+
+  <!-- BOTTLENECK maps whisker -->
+  <line x1="558" y1="132" x2="601" y2="132" class="whisker pass" />
+  <line x1="558" y1="124" x2="558" y2="140" class="cap pass" />
+  <line x1="601" y1="124" x2="601" y2="140" class="cap pass" />
+  <circle cx="579" cy="132" r="7" class="dot pass" />
+  <text x="732" y="128" text-anchor="middle" class="mapname" font-size="16">BOTTLENECK MAPS</text>
+  <text x="732" y="168" text-anchor="middle" class="ci" font-size="16">CI [+1.11, +1.73]</text>
+  <text x="732" y="148" text-anchor="middle" class="big" font-size="30">+1.42</text>
+
+  <!-- verdict badges -->
+  <rect x="110" y="100" width="78" height="26" rx="13" class="fail" opacity="0.9" />
+  <text x="149" y="117" text-anchor="middle" class="btxt" font-size="14" fill="#0e1a24">FAIL</text>
+  <rect x="694" y="100" width="88" height="26" rx="13" class="pass" opacity="0.9" />
+  <text x="738" y="117" text-anchor="middle" class="btxt" font-size="14" fill="#0e1a24">PASS</text>
+
+  <!-- footer -->
+  <line x1="48" y1="238" x2="912" y2="238" stroke="#2a3a4a" stroke-width="1" />
+  <text x="48" y="266" class="label" font-size="14">FAIL = hypothesis not confirmed · PASS = hypothesis confirmed</text>
+  <text x="48" y="288" class="foot" font-size="13">Source: benchmarks/mcts_evaluation_results.json (standard) ·</text>
+  <text x="48" y="306" class="foot" font-size="13">benchmarks/bottleneck_evaluation_results.json (bottleneck)</text>
+</svg>

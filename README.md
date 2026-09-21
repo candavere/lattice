@@ -21,6 +21,10 @@ and every claim on this page links to the committed artifact that produced it.
 Two ways in: **[run your first experiment](#run-your-first-experiment)** or
 **[inspect the evidence](#inspect-the-evidence)**.
 
+<p align="center">
+  <img src="assets/readme-evidence-card.svg" alt="Evidence card: same 32-rollout MCTS policy, two map distributions — standard maps Δ −1.12 [−1.37, −0.87] (FAIL, MCTS loses), bottleneck maps Δ +1.42 [+1.11, +1.73] (PASS, MCTS wins). Both deltas are committed, mirror-seated paired results." width="720" />
+</p>
+
 ## Proof strip
 
 | Claim | Exact scope | Evidence |

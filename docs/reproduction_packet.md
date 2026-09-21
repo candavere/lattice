@@ -5,7 +5,10 @@ reviewer who wants to verify Lattice's empirical claims **using published
 release assets alone**. No source checkout, build, or network access beyond
 downloading the release is required for Experiments 1, 3, and 4. Experiment 2
 offers both an asset-only path and a source-pinned path against the canonical
-golden trajectory.
+golden trajectory. The governing replication protocol — provenance capture,
+pass/fail criteria, and result ingestion — is defined in
+[`VALIDATION_PLAN.md`](VALIDATION_PLAN.md); this packet is its execution
+procedures.
 
 Everything below anchors to the immutable release **v2.3.2** — the remediated
 release that supersedes `v2.3.1` with the parser hardening, deterministic

@@ -55,7 +55,10 @@ Independent external reviewers can reproduce the empirical claims of the
 published immutable release through the turnkey challenge guide in
 [`docs/reproduction_packet.md`](docs/reproduction_packet.md) — pinned to
 release `v2.3.2` (commit `4f7816f`), with published SHA-256 checksums, four
-scripted experiments, and a standardized reporting template.
+scripted experiments, and a standardized reporting template. The governing
+protocol for that replication — provenance requirements, pass/fail criteria,
+and how results are ingested into the findings ledger — is defined in
+[`docs/VALIDATION_PLAN.md`](docs/VALIDATION_PLAN.md).
 
 The engine's load-bearing transition and perception laws are specified
 formally, implementation-agnostically, for clean-room auditors and

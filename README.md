@@ -54,7 +54,7 @@ method, never as independent validation.
 Independent external reviewers can reproduce the empirical claims of the
 published immutable release through the turnkey challenge guide in
 [`docs/reproduction_packet.md`](docs/reproduction_packet.md) — pinned to
-release `v2.3.1` (commit `c0e8342`), with published SHA-256 checksums, four
+release `v2.3.2` (commit `4f7816f`), with published SHA-256 checksums, four
 scripted experiments, and a standardized reporting template.
 
 The engine's load-bearing transition and perception laws are specified

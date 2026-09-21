@@ -100,7 +100,8 @@ serialized output under the specified .NET 8 BCL runtime contract.
 
 The full command set is `generate`, `simulate`, `render`, `analyze`, `replay`,
 `benchmark`, and `evaluate` — a compact reference is in the
-[Reference](#reference) section.
+[Reference](#reference) section, and the complete flag-by-flag reference lives
+in [`docs/CLI.md`](docs/CLI.md).
 
 ## Inspect the evidence
 
@@ -160,57 +161,11 @@ Four ideas carry the whole design:
 <details>
 <summary><strong>Contracts in more detail</strong></summary>
 
-**Step resolution order.** Each tick takes one `AgentAction` per agent and
-produces an immutable `StepResult`. Actions resolve in two fixed phases —
-all moves, then all collects — each resolved in ascending priority rank,
-`rank = (agentId + state.StepCount) % agentCount`. At zero-based tick `t` the
-first agent is `(-t mod agentCount)` (nonnegative modulo), not `t mod
-agentCount`. Invalid or missing actions degrade to `Wait`, so every action
-array yields a valid next state.
-
-**Topological graph space.** `MapGraph` holds zones, chokes, and resources;
-connectivity and degree are first-class (adr-001). Zones and chokes carry a
-`MaxOccupancy` (default unlimited; `0` = impassable), enforced as same-tick
-entry gates in the same tick-dependent order as collection. Coordinates are
-an optional embedding.
-
-**Kinematic edge transit.** With `TransitSpeed = s` and choke length `d`
-(Manhattan distance), a crossing takes `max(1, ⌈d / s⌉)` ticks in integer
-arithmetic. A crossing agent carries `InTransit(From, To, Remaining)`, counts
-as an occupant of the departure node, and cannot move or collect until
-arrival. `Simulation.TransitTicks(map, from, to, speed)` exposes the same
-arithmetic.
-
-**Dynamic topology.** A `DynamicMapRuleSet` carries `TimedPortcullisRule`
-(open/closed over an `OpenTicks`/`ClosedTicks` cycle) and
-`EventLockedChokeRule` (locked until a resource is collected). Rules apply at
-every tick boundary as `DynamicMapOverrides`, serialize as JSON with a
-`ruleKind` discriminator, and revalidate through their constructors, so a file
-cannot smuggle a degenerate schedule past validation.
-
-**Bounded perception and stale memory.** A vision horizon of `V` choke-edge
-hops defines what an agent sees. `Observed` = in cone this tick; `Stale` =
-seen before, last-known data plus sighting tick; `Unknown` = never seen.
-Agents route through `AgentBeliefMap` over exits they have actually seen.
-
-**Immutable forking.** `SimulationState` is one immutable record, so a snapshot
-is a shared reference. `SimulationFork` steps a captured state through the same
-pure `Simulation.Step`, so forking a recording at tick K and re-rolling an
-alternative sequence can never mutate the source state, the recording, or a
-sibling fork.
-
-**Dungeon Infiltration & Sentry Patrol.** Six rooms, capacity-1 chokes, a
-seeded vault chest count (2–3), a guard on a fixed patrol that pivots to
-pursuit, and a belief-map infiltrator that collects the vault then extracts.
-The deterministic outcome taxonomy — `exfiltrated` / `intercepted` /
-`intercepted-after-exfil` / `timeout` — is an emergent property of the
-topology and the choke arithmetic, not the agents' internal logic.
-
-**Map fairness and spawn bias.** `MapFairnessEvaluator` plays the same policy
-twice in mirrored seatings (the only way to invert the fixed spawn-to-id
-binding) and reports a normalized
-`SpawnBiasIndex = |meanScore[spawnA] − meanScore[spawnB]| / totalResources`
-(0 = balanced, 1 = one-sided). It can gate generation via `--min-fairness`.
+Step resolution order, the topological graph space, kinematic edge transit,
+dynamic topology, bounded perception, immutable forking, the Dungeon
+Infiltration & Sentry Patrol scenario, and map-fairness measurement are
+spelled out with their enforcement tests in
+[`docs/MECHANICS.md`](docs/MECHANICS.md).
 
 </details>
 
@@ -273,7 +228,9 @@ case to 653,736 steps/s on the micro case; the MCTS case reports decisions/s,
 and the number that matters to you depends on your workload. Numbers vary with
 hardware and build profile. The CI regression gate in
 `.github/workflows/benchmarks.yml` re-benchmarks the matrix and fails on a
->20% regression when the host fingerprint matches. Workload medians and
+>20% regression when the host fingerprint matches. The full protocol,
+reproduction commands, and the honest-reading notes are in
+[`docs/BENCHMARKING.md`](docs/BENCHMARKING.md); work-load medians and
 latency/alloc breakdowns are in
 [`benchmarks/throughput_summary.md`](benchmarks/throughput_summary.md).
 
@@ -308,146 +265,8 @@ argument or runtime error.
 | `benchmark` | Run the five-case workload matrix | `--runs`, `--warmup`, `--commit`, `--cpu`, `--out` |
 | `evaluate` | Mirror-seated paired MCTS study | `--seed-set`, `--rollouts`, `--seeds`, `--scenario`, `--out` |
 
-<details>
-<summary><strong>Full CLI reference</strong></summary>
-
-**generate — write a valid map**
-
-| Flag | Description |
-| :--- | :--- |
-| `--seed <ulong>` | Required RNG seed; same seed → same map |
-| `--min-fairness <0..1>` | Reject candidates whose measured `SpawnBiasIndex` exceeds the threshold; retry, never patch |
-| `--out <file>` | Write JSON to a file instead of stdout |
-
-```sh
-dotnet run --project Cli -- generate --seed 123
-dotnet run --project Cli -- generate --seed 123 --out map.json
-dotnet run --project Cli -- generate --seed 123 --min-fairness 0.3
-```
-
-Output is compact PascalCase JSON, the same shape the trajectory header
-embeds. With `--min-fairness`, candidates run through the mirrored fairness
-arena (greedy policy, two agents, 200 ticks, transit speed 8); a seed whose
-retry budget yields no fair map exits non-zero.
-
-**simulate — record an episode as JSONL**
-
-| Flag | Description |
-| :--- | :--- |
-| `--seed <ulong>` | Required RNG seed for map generation and agents |
-| `--steps <n>` | Tick budget; default 100. Episode ends on budget or when all resources are claimed |
-| `--agent <greedy\|random\|mcts>` | Policy for player 0 (default `greedy`); `mcts` selects the evaluation subject |
-| `--scenario <infiltration>` | Fixed Dungeon Infiltration & Sentry Patrol scenario; `--agent` is forbidden |
-| `--rules <file>` | Load a JSON `DynamicMapRuleSet` into the episode |
-| `--out <file>` | Write trajectory to a file instead of stdout |
-
-```sh
-dotnet run --project Cli -- simulate --seed 42
-dotnet run --project Cli -- simulate --seed 42 --steps 40
-dotnet run --project Cli -- simulate --seed 42 --steps 40 --agent mcts
-dotnet run --project Cli -- simulate --seed 42 --rules rules.json --steps 60 --out dynamic.jsonl
-dotnet run --project Cli -- simulate --seed 42 --scenario infiltration --steps 100 --out infiltration.jsonl
-```
-
-Without `--scenario`, runs `GreedyCollectorAgent` vs `RandomAgent` on a
-procedurally generated map. A summary line — steps recorded, termination
-reason, outcome — goes to stderr.
-
-**render — replay a recorded trajectory**
-
-| Flag | Description |
-| :--- | :--- |
-| `--trajectory <file>` | Required JSONL trajectory |
-| `--format <ascii\|svg>` | `ascii` (default) or `svg` |
-| `--out <file>` | Write output to a file instead of stdout |
-
-```sh
-dotnet run --project Cli -- render --trajectory out/trajectory.jsonl
-dotnet run --project Cli -- render --trajectory out/trajectory.jsonl --format svg --out frame.svg
-```
-
-`ascii` streams terminal frames; `svg` emits one self-contained,
-CSS-animated, dependency-free SVG.
-
-**analyze — report on a recorded trajectory**
-
-| Flag | Description |
-| :--- | :--- |
-| `--trajectory <file>` | Required JSONL trajectory |
-| `--out <file>` | Write the full Markdown report to a file instead of the terminal view |
-
-```sh
-dotnet run --project Cli -- analyze --trajectory out/trajectory.jsonl
-dotnet run --project Cli -- analyze --trajectory out/trajectory.jsonl --out report.md
-```
-
-The report covers contention events, turning points, per-agent pathing
-efficiency, resource timelines, zone/edge heatmaps, and a per-agent steps
-timeline. Analysis is a pure function of the trajectory.
-
-**replay**
-
-```bash
-# Replay a trajectory interactively or headless
-dotnet run -c Release --project Cli -- replay <path-to-trajectory.jsonl>
-
-# Replay with strict per-step serialized StepResult verification
-dotnet run -c Release --project Cli -- replay <path-to-trajectory.jsonl> --verify
-```
-
-`--verify` rebuilds the simulation state and dynamic topology rules from the
-header, steps the engine identically, and asserts tick-by-tick serialized
-`StepResult` equality — not raw file-byte identity. The exit code is `0` only
-when every recorded tick reproduces its serialized `StepResult`. The same
-check runs against the canonical golden trajectory on the Ubuntu, macOS, and
-Windows CI matrix.
-
-**benchmark — measure the five-case workload matrix**
-
-| Flag | Description |
-| :--- | :--- |
-| `--runs <n>` | Measured iterations per workload; default 10 |
-| `--warmup <n>` | Warm-up budget in ticks (realized as 1–2 full iterations); default 50000 |
-| `--steps <n>` | Per-iteration ticks for raw cases (smoke passes); MCTS case keeps its own catalog budget |
-| `--commit <sha>` | Source revision recorded in the artifact (provenance) |
-| `--cpu <model>` | CPU model string recorded in the artifact (provenance) |
-| `--out <file>` | Write the JSON artifact to a file instead of stdout |
-
-```sh
-dotnet run --project Cli -- benchmark --runs 10 --warmup 50000 --out benchmarks/throughput_benchmark.json
-```
-
-Five reproducible workloads, one harness protocol: JIT-settling warm-up that
-anchors an FNV-1a step digest, measured iterations with a forced GC sweep
-before each, per-step latency into one histogram, managed allocation via
-`GC.GetAllocatedBytesForCurrentThread`, and Gen0/1/2 collection-count deltas.
-Every measured iteration must reproduce the warm-up anchor's step digest —
-off-script runs fail loudly instead of reporting timings.
-
-**evaluate — mirrored-seat MCTS evidence**
-
-| Flag | Description |
-| :--- | :--- |
-| `--seed-set <dev\|heldout>` | Canonical suites: `dev` = 1001..1050, `heldout` = 2001..2050 |
-| `--rollouts <n>` | MCTS rollouts per action; default 32 |
-| `--seeds <n>` | Cap on seeds per suite (default 50; the decision rule needs ≥ 30) |
-| `--scenario <standard\|bottleneck>` | `standard` = generated maps; `bottleneck` = capacity-1 choke contention family |
-| `--commit <sha>` | Source revision recorded in the artifact |
-| `--out <file>` | Write the JSON artifact to a file instead of stdout |
-
-```sh
-dotnet run --project Cli -- evaluate --seed-set dev,heldout --rollouts 32 --out benchmarks/mcts_evaluation_results.json
-dotnet run --project Cli -- evaluate --seed-set dev,heldout --rollouts 32 --seeds 30 --scenario bottleneck --out benchmarks/bottleneck_evaluation_results.json
-```
-
-For every seed, two matches with mirrored seats. The per-seed paired delta
-Δ = avg((score_MCTS − score_Scout) at seat 0, (score_Scout − score_MCTS) at
-seat 1) cancels positional spawn bias. The report covers Δ statistics, a 95%
-confidence interval on the mean, win/draw/loss/timeout rates, contention
-saturation, and a verdict: **pass** only if mean Δ > 0 and the CI lower bound
-> 0.
-
-</details>
+The full flag-by-flag reference — every flag, its description, semantics, and
+worked examples — lives in [`docs/CLI.md`](docs/CLI.md).
 
 ## Trust, boundaries, and further reading
 

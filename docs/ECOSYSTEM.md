@@ -71,6 +71,23 @@ gates. The CLI is scriptable
 and every command is seeded, so a pipeline can regenerate and diff. There is no database,
 service, or daemon layer to provision; a batch run is a shell loop.
 
+## Reinforcement Learning & Simulation Interface Mapping
+
+The step-contract surface maps almost one-to-one onto the classic RL loop:
+
+| Lattice (.NET 8 C#) | Gymnasium / PettingZoo Concept | Architectural Role |
+| :--- | :--- | :--- |
+| `Simulation.Step(actions)` | `env.step(actions)` | Advances active simulation state by exactly one tick |
+| `Observation` | `observation` | Agent's egocentric, hop-bounded partial sensor horizon |
+| `SimulationFork` | `copy.deepcopy(env)` | Allocation-conscious, immutable counterfactual rollout sandbox |
+| `AgentAction` | `action` | Strongly-typed discrete action (`Move`, `Collect`, `Wait`) |
+| `MapFairnessEvaluator` | N/A (Procedural Benchmark) | Automated symmetric seat-inversion balance profiler |
+
+A host RL loop consumes the same four records (`Simulation.Step` returns a
+fresh `SimulationState` plus `Observations`, `Rewards`, `Info`), so a trainer
+sees the classic `obs, reward, done, info` surface while the environment keeps
+its determinism, replay, and contention contracts.
+
 ## Presentations to broader collections
 
 If you catalog Lattice somewhere community-facing, the same framing is used

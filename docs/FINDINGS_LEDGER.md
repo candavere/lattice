@@ -130,6 +130,20 @@ schema is defined in [`reproduction_packet.md`](reproduction_packet.md)
 | **Resolution & Evidence Link** | Tooling pinned in `.config/dotnet-tools.json` and mutation scope configured in `stryker-config.json` (`8eb86fc`); twelve targeted tests added in `ce2620b` across `Tests/Environment/CapacityTests.cs`, `DynamicTopologyTests.cs`, `EnvironmentLoopTests.cs`, `PerceptionFilterTests.cs`, `SimulationForkTests.cs`, and `TransitTests.cs`. The scoped mutation score recorded at the calibration run was 98.43% (calibrated strategy; `high` 80 / `low` 60 / `break` 0 thresholds are the committed gate). Boundary: the per-run HTML/JSON Stryker report is generated locally and is not checked in; the committed gate is the config, not the report artifact. |
 | **Resolution & Release Status** | `MAIN_ONLY` → `RELEASED_IN_v2.3.2` (the closure commits `8eb86fc` and `ce2620b` postdate the `c0e8342` tag commit and are packaged into the `v2.3.2` patch release). |
 
+## FINDING-007 — EdgeChoke not-found path uncovered; fuzz-harness kill attribution is batch-state dependent
+
+| Field | Value |
+| --- | --- |
+| **ID** | `FINDING-007` |
+| **Date** | 2026-09-22 |
+| **Source / Provenance** | `AI_ASSISTED_REVIEW` |
+| **Target Surface** | `Environment/Simulation.cs` — `EdgeChoke` not-found sentinel and the collect-loop resolution bound; `Tests/Fuzz/CliArgumentFuzzTests.cs` |
+| **Observation** | (a) The `EdgeChoke` not-found sentinel (`return -1` in `Simulation.cs`) was never exercised: a crossing over a choke-less pair silently skipped the not-found branch, so a corrupt map indexing an absent choke would silently charge `edgeLoad[+1]` instead of surfacing an indexed-out failure. Stryker previously recorded the `-1 → +1` mutant as `NoCoverage`. (b) The resolution-collect loop bound `rank < agentCount` is semantically identical under the `rank <= agentCount` mutant — the extra rank re-resolves the rank-0 agent, which is already processed and claim-gated — yet the CLI-argument fuzz harness reported a kill for that mutant in one batch run. The fuzz harness writes its generated scenario/rule/replay fixtures under a fixed `/tmp/lattice-fuzz-cli-<seed>` workspace and only writes a file when it does not already exist; under Stryker's parallel per-mutant batches a race on that shared workspace changes generated vectors between mutants, so a mutant that deterministically survives a sequential run can appear killed in a batch. The same pattern affected the `zoneCapacity > 0 → >= 0` mutant. |
+| **Severity & Confidence** | 439: High / Confirmed. Kill attribution flakiness: Medium / Confirmed (reproduced both as survivor and as batch-killed across runs). |
+| **Disposition** | (a) `FIXED` — the uncovered not-found path is now exercised and its loud-failure contract asserted. (b) `ACCEPTED_LIMITATION` — the two survivors are equivalent mutants; deterministic full-suite runs pass against each applied mutant, and the fuzz-attributed kills are documented as batch-state artifacts rather than real detections. |
+| **Resolution & Evidence Link** | `TransitAcrossMissingChoke_FailsLoudly_InsteadOfSilentlyChargingSiblingEdge` in `Tests/Environment/TransitTests.cs` and `ResolutionRotation_WrapRank_DoesNotDoubleAwardOrDoubleClaim` in `Tests/Environment/SimulationStepTests.cs` (added in the Stage-3 commit). Baseline record: `benchmarks/mutation_stryker_summary.json` (99.61% raw clean Stryker; reproducible killed/survived disposition and survivor rationales corrected for the line-222 `_agentLastSeenTicks` claim). Determinism checks: full 419-test suite passes with each of the 258 and 309 mutants applied to a clean tree; `CliArgumentFuzzTests` passes three consecutive isolated runs against each. |
+| **Resolution & Release Status** | `MAIN_ONLY` (postdates `v2.3.2` tag commit `4f7816f`; not packaged into any published release). |
+
 ## FINDING-006 — Context-dependent policy divergence (preserved negative result)
 
 | Field | Value |
@@ -156,6 +170,7 @@ schema is defined in [`reproduction_packet.md`](reproduction_packet.md)
 | `FINDING-004` | 2026-09-20 | `TrajectoryReader` input guards | High | `FIXED` | `cd3a00b` |
 | `FINDING-005` | 2026-09-20 | Transition-surfaces mutation coverage | Medium | `FIXED` | `ce2620b` (+ `8eb86fc`) |
 | `FINDING-006` | 2026-09-19 | Policy-environment claims | High | `ACCEPTED_LIMITATION` | `e6ba4bf` (+ `abb78fa`) |
+| `FINDING-007` | 2026-09-22 | EdgeChoke not-found path + batch-state kill attribution | High | `FIXED` / `ACCEPTED_LIMITATION` | Stage-3 commit (`TransitTests`, `SimulationStepTests`, summary artifact) |
 
 The ledger is maintained under the governing evidentiary standards of
 [`adr/0001-governing-product-thesis.md`](adr/0001-governing-product-thesis.md);

@@ -8,8 +8,8 @@
   },
   "source": {
     "repository": "candavere/lattice",
-    "headCommit": "31e587d65793641f6a9bb99d0372590760e53a8",
-    "note": "Analysis ran against the working tree at head commit 31e587d; the mutation-scoped files Environment/Simulation.cs and Environment/PerceptionFilter.cs are byte-identical to that commit."
+    "headCommit": "053f3eb18fbf89152787f5fe40687c033ae3a304",
+    "note": "Analysis ran against the working tree at head commit 053f3eb with the Stage-3 test edits (Tests/Environment/TransitTests.cs, Tests/Environment/SimulationStepTests.cs) applied but uncommitted; the mutation-scoped files Environment/Simulation.cs and Environment/PerceptionFilter.cs are byte-identical to that commit."
   },
   "scope": {
     "project": "Lattice.Environment.csproj",
@@ -34,18 +34,19 @@
     "statusCounts": {
       "CompileError": 25,
       "Ignored": 241,
-      "Killed": 250,
-      "NoCoverage": 1,
-      "Survived": 3
+      "Killed": 252,
+      "Survived": 1,
+      "Timeout": 1,
+      "NoCoverage": 0
     },
-    "killed": 250,
-    "survived": 3,
-    "noCoverage": 1,
+    "killed": 252,
+    "survived": 1,
+    "timeout": 1,
+    "noCoverage": 0,
     "ignored": 241,
     "compileError": 25,
-    "timeout": 0,
-    "mutationScorePercent": 98.43,
-    "scoreDefinition": "killed / (killed + survived + noCoverage), as reported by Stryker ('The final mutation score is 98.43 %')."
+    "mutationScorePercent": 99.61,
+    "scoreDefinition": "(killed + timeout) / (killed + survived + timeout + noCoverage), as reported by Stryker ('The final mutation score is 99.61 %')."
   },
   "survivorClassifications": [
     {
@@ -59,7 +60,7 @@
       "replacement": ";",
       "status": "Survived",
       "classification": "EQUIVALENT_MUTANT",
-      "rationale": "The mutated statement is a redundant duplicate of _agentLastSeenTicks.Clear() inside Reset() (the same dictionary is already cleared at line 219); removing it is semantically equivalent for every reachable state, so no test can kill it."
+      "rationale": "The mutated statement removes _agentLastSeenTicks.Clear() from Reset(). _agentLastSeenTicks is only ever read at line 201 inside the else-if guarded by _agentLastKnown.TryGetValue(...), and _agentLastKnown is cleared unconditionally at line 221; the two dictionaries are always written together (lines 195-196). Removing the line-222 clear therefore cannot change any observable post-Reset read. The prior artifact's rationale ('same dictionary already cleared at line 219') was wrong: line 219 clears _zoneLastSeenTicks, not _agentLastSeenTicks. Corrected here; classification unchanged."
     },
     {
       "id": "351",
@@ -70,9 +71,9 @@
       },
       "mutator": "Equality mutation",
       "replacement": "zoneCapacity >= 0",
-      "status": "Survived",
-      "classification": "BOUNDARY_EQUIVALENT_UNDER_GENERATOR_DOMAIN",
-      "rationale": "zoneCapacity is Map.Zones[destination].MaxOccupancy, which the procedural generator constrains to be at least 1, so 'zoneCapacity > 0' and 'zoneCapacity >= 0' agree on every generator-reachable state; the mutant is not distinguishable by any suite that drives the engine through the generator."
+      "status": "Killed (flaky attribution), deterministic survivor",
+      "classification": "EQUIVALENT_MUTANT",
+      "rationale": "nodeOpen = capacity > 0 && nodeLoad < capacity vs the mutant capacity >= 0 && nodeLoad < capacity. nodeLoad is a per-zone reservation count (initialized to 0, only incremented), so 'nodeLoad < 0' is always false: for capacity == 0 the mutant's nodeOpen is also false (identical outcome), and for capacity >= 1 both conjuncts agree. Verified: with this mutant applied to a clean tree, the full 419-test suite passes standalone (dotnet test, Release), and CliArgumentFuzzTests passes in three consecutive isolated runs. The raw clean Stryker run attributes a kill to CliArgumentFuzzTests; that attribution is a batch-mode artifact (the fuzz harness shares a temp workspace and only writes missing files, so concurrent worker runs race on file state) and does not reproduce. Remains an equivalent survivor."
     },
     {
       "id": "388",
@@ -83,10 +84,12 @@
       },
       "mutator": "Equality mutation",
       "replacement": "rank <= agentCount",
-      "status": "Survived",
-      "classification": "SURVIVED_BOUNDARY",
-      "rationale": "Off-by-one at the resolution loop bound: rank == agentCount adds one extra resolution-rank iteration whose effects the current suite does not exercise. A genuine survivor, tracked for a follow-up assertion."
-    },
+      "status": "Killed (flaky attribution), deterministic survivor",
+      "classification": "EQUIVALENT_MUTANT",
+      "rationale": "The extra iteration rank == agentCount re-resolves the same agent as rank 0: AgentAtResolutionRank(agentCount, agentCount, t) = (2*agentCount - t % agentCount) % agentCount = (agentCount - t % agentCount) % agentCount = AgentAtResolutionRank(0, agentCount, t). That agent was already processed at rank 0; a claim it made is now in claimsSet (no double award) and a blocked/waiting/transiting agent is blocked again identically. Verified: with this mutant applied to a clean tree, the full 419-test suite passes standalone (dotnet test, Release, including the new ResolutionRotation_WrapRank_DoesNotDoubleAwardOrDoubleClaim test), and CliArgumentFuzzTests passes in three consecutive isolated runs. The raw clean Stryker run attributes a kill to CliArgumentFuzzTests; that attribution is a batch-mode artifact (shared temp workspace, concurrency race) and does not reproduce. The wrap-boundary test pins the boundary but cannot kill an equivalent mutant."
+    }
+  ],
+  "killedInThisCalibration": [
     {
       "id": "480",
       "file": "Environment/Simulation.cs",
@@ -96,14 +99,15 @@
       },
       "mutator": "UnaryMinusExpression to UnaryPlusExpression mutation",
       "replacement": "+1",
-      "status": "NoCoverage",
-      "classification": "NO_COVERAGE",
-      "rationale": "The EdgeChoke not-found sentinel 'return -1' is never exercised by any test, so flipping it to '+1' goes undetected; the not-found path is unreachable through generator-reachable maps."
+      "status": "Killed",
+      "classification": "FIXED_BY_TEST",
+      "rationale": "EdgeChoke's not-found sentinel 'return -1' flips to 'return +1', so a corrupt crossing over a missing choke would silently charge edgeLoad[1] instead of throwing. Previously NoCoverage (statusCounts NoCoverage 1 at the prior calibration). New test TransitAcrossMissingChoke_FailsLoudly_InsteadOfSilentlyChargingSiblingEdge (Tests/Environment/TransitTests.cs) drives agent 0 InTransit over a choke-less pair and asserts IndexOutOfRangeException; verified deterministic: with the mutant applied the test fails, with the base code it passes and asserts the loud failure. Genuine kill; tracked NoCoverage gap closed."
     }
   ],
   "rawReport": {
-    "json": "StrykerOutput/2026-09-20.23-53-30/reports/mutation-report.json (generated locally, not checked in)",
-    "html": "StrykerOutput/2026-09-20.23-53-30/reports/mutation-report.html (generated locally, not checked in)"
+    "json": "StrykerOutput/2026-09-22.04-55-01/reports/mutation-report.json (generated locally, not checked in)",
+    "html": "StrykerOutput/2026-09-22.04-55-01/reports/mutation-report.html (generated locally, not checked in)",
+    "runNote": "This is the clean baseline: leftover fuzz temp state under /tmp/lattice-fuzz-cli-* was cleared before the run, and dotnet tool restore was rerun. A previous same-day run (StrykerOutput/2026-09-22.04-26-54) reported Killed 252 / Survived 2 / NoCoverage 0 (99.21%) before cleanup; its two 'fuzz-killed' attribution counts were the flaky survivors recorded here."
   },
-  "dispositionNote": "Raw counts are transcribed from the Stryker JSON report by direct parsing, not estimated. The committed gate remains the stryker-config.json thresholds; per FINDING-005 the per-run HTML/JSON report is not checked in \u2014 this summary artifact is the committed machine-readable record of this calibration run."
+  "dispositionNote": "Raw counts are transcribed from the Stryker JSON report by direct parsing, not estimated. The two Killed attributions to CliArgumentFuzzTests (mutants 258 and 309) are non-reproducible batch-mode artifacts of the fuzz harness's shared temp workspace and are classified EQUIVALENT_MUTANT with direct evidence: the full suite passes against each applied mutant. The one reproducible gain over the prior calibration is mutant 480 (EdgeChoke not-found sentinel), which moved NoCoverage -> Killed via the committed corrupt-transit test. The committed gate remains the stryker-config.json thresholds; per FINDING-005 the per-run HTML/JSON report is not checked in \u2014 this summary artifact is the committed machine-readable record of this calibration run."
 }

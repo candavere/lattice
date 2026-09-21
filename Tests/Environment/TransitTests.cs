@@ -230,6 +230,31 @@ public class TransitTests
     }
 
     [Fact]
+    public void TransitAcrossMissingChoke_FailsLoudly_InsteadOfSilentlyChargingSiblingEdge()
+    {
+        // An in-transit record routes from a node that has no choke edge to
+        // the destination (zone 0 -> zone 2 on LineMap, where only (0-1) and
+        // (1-2) exist). Such a state is structurally impossible for the
+        // generator, but a hand-built or replayed-corrupt state must fail
+        // loudly rather than silently attribute the crossing to a sibling
+        // choke. EdgeChoke's not-found sentinel (-1) cannot render a valid
+        // edgeLoad index, so the step must throw instead of mis-accounting.
+        var config = new SimulationConfig(2, 20, TransitSpeed: 3);
+        var map = LineMap();
+        var corrupt = new SimulationState(
+            map,
+            new[]
+            {
+                new AgentState(0, 0, 0, Transit: new InTransit(0, 2, 3)),
+                new AgentState(1, 1, 0),
+            },
+            Array.Empty<int>(),
+            0);
+
+        Assert.Throws<IndexOutOfRangeException>(() => Simulation.Step(corrupt, new[] { new AgentAction(ActionKind.Wait), new AgentAction(ActionKind.Wait) }, config));
+    }
+
+    [Fact]
     public void TransitEpisode_RecordsInTransitFrames_AndReplaysByteIdentically()
     {
         var config = new SimulationConfig(2, 20, TransitSpeed: 3);

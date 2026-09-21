@@ -239,6 +239,44 @@ public class SimulationStepTests
     }
 
     [Fact]
+    public void ResolutionRotation_WrapRank_DoesNotDoubleAwardOrDoubleClaim()
+    {
+        // The resolution order is a modular rotation,
+        // AgentAtResolutionRank(rank) = (rank + agentCount - stepCount % agentCount)
+        // % agentCount, so the rank == agentCount address wraps back onto the
+        // rank-0 agent. Re-processing that (already-resolved) top-priority
+        // agent must not grant a second reward or a second claim: claimsSet
+        // and the reward-once contract keep the step a fixed point of the
+        // wrap. stepCount 1 rotates top priority to agent 3, so the wrap
+        // re-resolves a non-leading id — the general case, not just id 0.
+        var config = new SimulationConfig(AgentCount: 4, MaxTicks: 20);
+        var state = new SimulationState(
+            Map,
+            new[]
+            {
+                new AgentState(0, 1, 0),
+                new AgentState(1, 1, 0),
+                new AgentState(2, 1, 0),
+                new AgentState(3, 1, 0),
+            },
+            Array.Empty<int>(),
+            StepCount: 1);
+
+        var outcome = Simulation.Step(state, new[]
+        {
+            new AgentAction(ActionKind.Collect, ResourceId: 0),
+            new AgentAction(ActionKind.Collect, ResourceId: 0),
+            new AgentAction(ActionKind.Collect, ResourceId: 0),
+            new AgentAction(ActionKind.Collect, ResourceId: 0),
+        }, config);
+
+        Assert.Single(outcome.NextState.Claims);
+        Assert.Equal(0, outcome.NextState.Claims[0]);
+        Assert.Equal(1, outcome.Result.Rewards.Sum(reward => reward.Value));
+        Assert.Equal(1, outcome.NextState.Agents.Sum(agent => agent.Score));
+    }
+
+    [Fact]
     public void CreateInitial_Throws_OnEmptyMap()
     {
         var emptyMap = new MapGraph(Array.Empty<Zone>(), Array.Empty<ResourceNode>(), Array.Empty<ChokePoint>());

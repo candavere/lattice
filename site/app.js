@@ -98,6 +98,12 @@
     dom.slider = document.getElementById('scrub-slider');
     dom.tickReadout = document.getElementById('tick-readout');
     dom.source = document.getElementById('source-label');
+    // The no-canvas fallback link inside <canvas> stays in the tab order
+    // even when the canvas renders, as an invisible stop. Remove it.
+    if (dom.canvas && dom.canvas.getContext && dom.canvas.getContext('2d')) {
+      const fallback = dom.canvas.querySelector('a');
+      if (fallback) fallback.setAttribute('tabindex', '-1');
+    }
     dom.roster = document.getElementById('roster-label');
     dom.terminal = document.getElementById('terminal-label');
     dom.agentsBody = document.getElementById('agents-body');
@@ -149,6 +155,13 @@
     document.addEventListener('dragover', preventDefaultFileDrop);
     document.addEventListener('drop', handleDrop);
     window.addEventListener('resize', onViewportResize);
+    if (typeof reducedMotionQuery.addEventListener === 'function') {
+      reducedMotionQuery.addEventListener('change', function () {
+        if (reducedMotionQuery.matches && state.playing) pause();
+        updateTransportDisabled();
+        scheduleDraw();
+      });
+    }
 
     refreshViewButtons();
     loadResults();

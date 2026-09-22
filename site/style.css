@@ -429,8 +429,6 @@ main {
 .btn.primary:hover { background: var(--accent); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
-.transport .spacer { flex: 1; }
-
 .scrub {
   flex: 1 1 220px;
   display: flex;

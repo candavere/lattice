@@ -8,8 +8,8 @@
 
 <p align="center">
   <a href="https://github.com/candavere/lattice/actions/workflows/ci.yml"><img src="https://github.com/candavere/lattice/actions/workflows/ci.yml/badge.svg" alt="CI build status" /></a>
+  <a href="https://github.com/candavere/lattice/actions/workflows/benchmarks.yml"><img src="https://github.com/candavere/lattice/actions/workflows/benchmarks.yml/badge.svg" alt="Benchmarks workflow status" /></a>
   <img src="https://img.shields.io/badge/status-research%20preview-orange" alt="status: research preview" />
-  <img src="https://img.shields.io/badge/.NET-8.0-512BD4" alt=".NET 8" />
 </p>
 
 Lattice is a headless .NET 8 environment where every run is seeded, comparisons

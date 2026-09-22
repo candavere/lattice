@@ -19,10 +19,40 @@
       evidence — rather than trusting a black box.
     </p>
     <p class="guiding-question">What can one agent know, and why does the result change?</p>
+    <details class="honest-fog" open>
+      <summary>About the &ldquo;fog&rdquo; on this page</summary>
+      <p>
+        The treasure recordings were captured with <strong>unbounded</strong> vision (the study
+        suite used <code>Vision = -1</code>), so the engine never recorded &ldquo;fog&rdquo; &mdash;
+        there is no fog field in the recording. The dashed sightline the agent view draws is a
+        <strong>reconstruction by this page</strong>, computed from recorded positions using a
+        2-hop rule (&ldquo;which rooms could a 2-hop agent see?&rdquo;). It is the page&rsquo;s
+        honest answer to an &ldquo;audit it yourself&rdquo; prompt &mdash; not a claim about what
+        the engine knew, and never &ldquo;the Vault was unseen&rdquo;. On the Agent view it is
+        labelled &ldquo;reconstructed sightline&rdquo;, not &ldquo;recorded fog&rdquo;.
+      </p>
+    </details>
     <p class="recorded-note">
       This page <strong>replays recorded evidence</strong>. Every frame below is read from a
       committed recording; your browser does not run a new simulation.
     </p>
+    <aside class="moment-callout" aria-label="The moment to watch">
+      <h3 class="moment-label">The moment to watch &mdash; ticks 9&ndash;13</h3>
+      <p>
+        The <strong>Treasure Vault drifts out of the Sentry&rsquo;s reconstructed 2-hop
+        sightline</strong> while the Infiltrator is still inside it, looting. Step to tick 9 in
+        the Infiltrator recording, keep the view on <em>Agent view (Sentry)</em>, and watch the
+        Vault&rsquo;s room fall out of the dashed ring &mdash; even though ground truth still
+        shows it. Watch the explanation sentence for the vault change right there.
+      </p>
+      <p class="moment-honest" id="moment-arena">
+        Honest framing: this is page-<em>reconstructed</em> sight from recorded positions. The
+        engine recorded <strong>no fog</strong> (unbounded vision); the dashed 2-hop ring is
+        this page&rsquo;s reconstruction, so &ldquo;drops out of sight&rdquo; here always means
+        &ldquo;out of the reconstructed 2-hop sightline&rdquo; &mdash; never &ldquo;the engine
+        could not see it&rdquo;.
+      </p>
+    </aside>
     <div class="badges" aria-label="Repository information">
       <span class="badge"><a href="https://github.com/candavere/lattice">github.com/candavere/lattice</a></span>
       <span class="badge">net8.0 · BCL only</span>

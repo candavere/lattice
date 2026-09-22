@@ -1,60 +1,57 @@
-<svg width="960" height="320" viewBox="0 0 960 320" xmlns="http://www.w3.org/2000/svg" role="img">
-  <title>Lattice evidence card: mirror-seated paired deltas, MCTS versus Scout</title>
-  <desc>Standard generated maps: mean paired delta -1.12, 95% CI [-1.37, -0.87], hypothesis not confirmed. Procedural bottleneck maps: mean paired delta +1.42, 95% CI [+1.11, +1.73], hypothesis confirmed. Same policy; the environment changed the conclusion.</desc>
+<svg width="960" height="560" viewBox="0 0 960 560" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>The map changes which policy wins</title>
+  <desc>Same two policies, MCTS and Scout, evaluated on two map distributions. Standard maps: MCTS loses to Scout, mean paired delta −1.12, 95% CI [−1.37, −0.87]. Bottleneck maps: MCTS wins over Scout, mean paired delta +1.42, 95% CI [+1.11, +1.73]. Environment conditions change which policy wins.</desc>
 
   <style>
-    .panel { fill: #0e1a24; stroke: #3d5a68; }
-    .label { font-family: "SF Mono", "Consolas", "Menlo", monospace; fill: #5c7684; }
-    .mapname { font-family: "SF Mono", "Consolas", "Menlo", monospace; fill: #d7e2e8; font-weight: 600; }
-    .big { font-family: "SF Mono", "Consolas", "Menlo", monospace; fill: #ffffff; }
-    .ci { font-family: "SF Mono", "Consolas", "Menlo", monospace; fill: #8ea2ad; }
-    .zero { stroke: #3d5a68; stroke-width: 1.2; stroke-dasharray: 3 4; }
-    .whisker { stroke-width: 3; stroke-linecap: round; }
-    .cap { stroke-width: 3; }
-    .dot { }
-    .fail { fill: #f5a623; }
-    .pass { fill: #1fb6a6; }
-    .btxt { font-family: "SF Mono", "Consolas", "Menlo", monospace; font-weight: 700; letter-spacing: 1px; }
-    .foot { font-family: "SF Mono", "Consolas", "Menlo", monospace; fill: #5c7684; }
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; }
+    .eyebrow { font-size: 18px; font-weight: 600; letter-spacing: 3px; fill: #7d8590; }
+    .headline { font-size: 42px; font-weight: 700; fill: #e6edf3; }
+    .subhead { font-size: 25px; fill: #9da7b1; }
+    .panel-label { font-size: 22px; font-weight: 600; fill: #8b949e; }
+    .panel-result { font-size: 33px; font-weight: 700; fill: #e6edf3; }
+    .panel-delta { font-size: 28px; font-weight: 700; }
+    .panel-ci { font-size: 22px; fill: #9da7b1; }
+    .conclusion { font-size: 26px; font-weight: 600; fill: #e6edf3; }
+    .footer { font-size: 13px; fill: #6e7681; }
   </style>
 
-  <rect width="960" height="320" rx="14" class="panel" />
+  <defs>
+    <clipPath id="panel1"><rect x="56" y="190" width="848" height="124" rx="12" /></clipPath>
+    <clipPath id="panel2"><rect x="56" y="328" width="848" height="124" rx="12" /></clipPath>
+  </defs>
+
+  <!-- canvas -->
+  <rect width="960" height="560" rx="16" fill="#0d1117" stroke="#30363d" />
 
   <!-- header -->
-  <text x="48" y="46" class="mapname" font-size="20">Same policy, two map distributions</text>
-  <text x="48" y="70" class="label" font-size="14">Mirror-seated MCTS vs Scout · mean paired delta, 95% CI (dev suite, 32 rollouts)</text>
+  <text x="56" y="62" class="eyebrow">COMMITTED EXPERIMENT</text>
+  <text x="56" y="110" class="headline">The map changes which policy wins</text>
+  <text x="56" y="152" class="subhead">Same two policies. Different environment conditions.</text>
 
-  <!-- zero reference -->
-  <line x1="480" y1="112" x2="480" y2="196" class="zero" />
-  <text x="480" y="212" text-anchor="middle" class="label" font-size="13">0 (Scout baseline)</text>
+  <!-- panel 1: standard maps -->
+  <rect x="56" y="190" width="848" height="124" rx="12" fill="#161b22" stroke="#30363d" />
+  <g clip-path="url(#panel1)">
+    <rect x="56" y="190" width="6" height="124" fill="#ff7b72" />
+  </g>
+  <text x="82" y="234" class="panel-label">Standard maps</text>
+  <text x="82" y="286" class="panel-result">MCTS loses to Scout</text>
+  <text x="878" y="234" text-anchor="end" class="panel-delta" fill="#ff7b72">Mean paired delta −1.12</text>
+  <text x="878" y="286" text-anchor="end" class="panel-ci">95% CI [−1.37, −0.87]</text>
 
-  <!-- STANDARD maps whisker -->
-  <line x1="384" y1="132" x2="419" y2="132" class="whisker fail" />
-  <line x1="384" y1="124" x2="384" y2="140" class="cap fail" />
-  <line x1="419" y1="124" x2="419" y2="140" class="cap fail" />
-  <circle cx="402" cy="132" r="7" class="dot fail" />
-  <text x="228" y="128" text-anchor="middle" class="mapname" font-size="16">STANDARD MAPS</text>
-  <text x="228" y="168" text-anchor="middle" class="ci" font-size="16">CI [-1.37, -0.87]</text>
-  <text x="228" y="148" text-anchor="middle" class="big" font-size="30">-1.12</text>
+  <!-- panel 2: bottleneck maps -->
+  <rect x="56" y="328" width="848" height="124" rx="12" fill="#161b22" stroke="#30363d" />
+  <g clip-path="url(#panel2)">
+    <rect x="56" y="328" width="6" height="124" fill="#3fbfb2" />
+  </g>
+  <text x="82" y="372" class="panel-label">Bottleneck maps</text>
+  <text x="82" y="424" class="panel-result">MCTS wins over Scout</text>
+  <text x="878" y="372" text-anchor="end" class="panel-delta" fill="#3fbfb2">Mean paired delta +1.42</text>
+  <text x="878" y="424" text-anchor="end" class="panel-ci">95% CI [+1.11, +1.73]</text>
 
-  <!-- BOTTLENECK maps whisker -->
-  <line x1="558" y1="132" x2="601" y2="132" class="whisker pass" />
-  <line x1="558" y1="124" x2="558" y2="140" class="cap pass" />
-  <line x1="601" y1="124" x2="601" y2="140" class="cap pass" />
-  <circle cx="579" cy="132" r="7" class="dot pass" />
-  <text x="732" y="128" text-anchor="middle" class="mapname" font-size="16">BOTTLENECK MAPS</text>
-  <text x="732" y="168" text-anchor="middle" class="ci" font-size="16">CI [+1.11, +1.73]</text>
-  <text x="732" y="148" text-anchor="middle" class="big" font-size="30">+1.42</text>
-
-  <!-- verdict badges -->
-  <rect x="110" y="100" width="78" height="26" rx="13" class="fail" opacity="0.9" />
-  <text x="149" y="117" text-anchor="middle" class="btxt" font-size="14" fill="#0e1a24">FAIL</text>
-  <rect x="694" y="100" width="88" height="26" rx="13" class="pass" opacity="0.9" />
-  <text x="738" y="117" text-anchor="middle" class="btxt" font-size="14" fill="#0e1a24">PASS</text>
+  <!-- conclusion -->
+  <rect x="56" y="466" width="848" height="48" rx="12" fill="#161b22" stroke="#30363d" />
+  <text x="480" y="499" text-anchor="middle" class="conclusion">Environment conditions change which policy wins.</text>
 
   <!-- footer -->
-  <line x1="48" y1="238" x2="912" y2="238" stroke="#2a3a4a" stroke-width="1" />
-  <text x="48" y="266" class="label" font-size="14">FAIL = hypothesis not confirmed · PASS = hypothesis confirmed</text>
-  <text x="48" y="288" class="foot" font-size="13">Source: benchmarks/mcts_evaluation_results.json (standard) ·</text>
-  <text x="48" y="306" class="foot" font-size="13">benchmarks/bottleneck_evaluation_results.json (bottleneck)</text>
+  <text x="56" y="542" class="footer">Sources: benchmarks/mcts_evaluation_results.json (standard) · benchmarks/bottleneck_evaluation_results.json (bottleneck)</text>
 </svg>

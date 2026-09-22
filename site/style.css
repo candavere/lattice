@@ -455,6 +455,64 @@ main {
   white-space: nowrap;
 }
 
+/* ---- explore-the-replay disclosure ---- */
+
+.explore {
+  margin: 10px 0 0;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 2px 12px;
+  background: var(--panel-2);
+}
+
+.explore summary {
+  cursor: pointer;
+  padding: 8px 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--accent);
+  user-select: none;
+}
+
+.explore summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.explore[open] summary { border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+
+.explore-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  padding-bottom: 12px;
+}
+
+.explore .file-btn {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.explore .file-btn input[type="file"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  font-size: 0;
+}
+
+.explore .file-btn:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.explore select { min-height: 34px; }
+
 /* ---- status line ---- */
 
 .statusbar {
@@ -697,6 +755,11 @@ footer.app-footer .fine { margin-top: 6px; font-size: 0.78rem; opacity: 0.8; }
   }
 
   .transport select {
+    min-height: 44px;
+  }
+
+  .explore-row .btn,
+  .explore-row select {
     min-height: 44px;
   }
 

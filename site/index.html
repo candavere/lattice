@@ -49,8 +49,6 @@
           <button class="btn toggle" id="view-agent" type="button" aria-pressed="false">Agent view</button>
           <button class="btn toggle" id="view-split" type="button" aria-pressed="false">Side-by-side</button>
         </div>
-        <label class="btn" for="ego-agent-select">View as</label>
-        <select id="ego-agent-select" aria-label="Observed agent in Agent view"></select>
       </div>
 
       <div class="viewer" id="viewer">
@@ -84,23 +82,50 @@
                  aria-label="Scrub through recorded ticks" disabled>
           <span class="tick-readout" id="tick-readout">—</span>
         </div>
-        <div class="spacer"></div>
-        <label class="btn" for="preset-select">Preset</label>
-        <select id="preset-select" aria-label="Recording preset">
-          <option value="demo">Demo sampling (MCTS vs Random)</option>
-          <option value="infiltration">Infiltration (Sentry vs Infiltrator)</option>
-          <option value="custom" disabled>Custom… (local file)</option>
-        </select>
-        <label class="btn" for="speed-select">Speed</label>
-        <select id="speed-select" aria-label="Playback speed">
-          <option value="800">0.5×</option>
-          <option value="420" selected>1×</option>
-          <option value="200">2×</option>
-          <option value="90">4×</option>
-        </select>
-        <label class="btn" for="file-input">Load recording…</label>
-        <input type="file" id="file-input" accept=".jsonl,application/json,text/plain" hidden>
       </div>
+
+      <details class="explore">
+        <summary>Explore the replay</summary>
+        <div class="explore-row">
+          <label class="btn" for="preset-select">Preset</label>
+          <select id="preset-select" aria-label="Recording preset">
+            <option value="demo">Demo sampling (MCTS vs Random)</option>
+            <option value="infiltration">Infiltration (Sentry vs Infiltrator)</option>
+            <option value="custom" disabled>Custom… (local file)</option>
+          </select>
+
+          <label class="btn" for="speed-select">Speed</label>
+          <select id="speed-select" aria-label="Playback speed">
+            <option value="800">0.5×</option>
+            <option value="420" selected>1×</option>
+            <option value="200">2×</option>
+            <option value="90">4×</option>
+          </select>
+
+          <label class="btn" for="ego-agent-select">View as</label>
+          <select id="ego-agent-select" aria-label="Observed agent in Agent view"></select>
+
+          <label class="btn file-btn" for="file-input">
+            Load recording…
+            <input type="file" id="file-input" accept=".jsonl,application/json,text/plain" class="file-input">
+          </label>
+        </div>
+        <div class="metrics">
+          <div class="metric">
+            <h3>Trajectory</h3>
+            <p class="stat-line">claim <span id="stat-claimed">—</span> · steps <span id="stat-steps">—</span></p>
+            <p class="stat-line">seed <span id="stat-seed">—</span> · agents <span id="stat-agents">—</span></p>
+          </div>
+          <div class="metric">
+            <h3>Agents</h3>
+            <table><tbody id="agents-body"></tbody></table>
+          </div>
+          <div class="metric">
+            <h3>Zone occupancy (agents present · unclaimed loot)</h3>
+            <table><tbody id="zones-body"></tbody></table>
+          </div>
+        </div>
+      </details>
 
       <section class="legend" aria-label="Map legend">
         <h3>Map legend</h3>
@@ -159,22 +184,6 @@
       </section>
 
       <div id="message" role="status"></div>
-
-      <div class="metrics">
-        <div class="metric">
-          <h3>Trajectory</h3>
-          <p class="stat-line">claim <span id="stat-claimed">—</span> · steps <span id="stat-steps">—</span></p>
-          <p class="stat-line">seed <span id="stat-seed">—</span> · agents <span id="stat-agents">—</span></p>
-        </div>
-        <div class="metric">
-          <h3>Agents</h3>
-          <table><tbody id="agents-body"></tbody></table>
-        </div>
-        <div class="metric">
-          <h3>Zone occupancy (agents present · unclaimed loot)</h3>
-          <table><tbody id="zones-body"></tbody></table>
-        </div>
-      </div>
     </section>
 
     <section class="card" aria-labelledby="results-title">

@@ -115,8 +115,9 @@
     dom.presetSelect = document.getElementById('preset-select');
     dom.staticSvg = document.getElementById('static-svg');
     dom.staticTitle = document.getElementById('static-title');
-    dom.staticCaption = document.getElementById('static-caption');
+    dom.staticOpen = document.getElementById('static-open');
     dom.staticOpenLink = document.getElementById('static-open-link');
+    dom.staticCaption = document.getElementById('static-caption');
     dom.viewGround = document.getElementById('view-ground');
     dom.viewAgent = document.getElementById('view-agent');
     dom.viewSplit = document.getElementById('view-split');
@@ -157,6 +158,7 @@
   /* ------------------------------------------------------- viewer state  */
 
   const narrowQuery = window.matchMedia('(max-width: 640px)');
+  const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
 
   const state = {
     trajectory: null,   // { header, steps, final, frames[], fileName, maxTicks }
@@ -308,6 +310,8 @@
     dom.staticTitle.textContent = 'Static render of ' + preset.name;
     dom.staticOpenLink.textContent = 'Open ' + preset.staticName;
     dom.staticOpenLink.href = preset.staticSvg;
+    dom.staticOpen.textContent = 'Open ' + preset.staticName + ' directly';
+    dom.staticOpen.href = preset.staticSvg;
   }
 
   /* ----------------------------------------------------------- view mode  */
@@ -1400,7 +1404,10 @@
     if (state.playing) { pause(); return; }
     const traj = state.trajectory;
     if (!traj || !traj.frames.length || dom.playBtn.disabled) return;
-    dom.playBtn.disabled = false; // set again below; keep enabled once loaded
+    if (reducedMotionQuery.matches) {
+      showMessage('Reduced-motion: autoplay is off — use +1 Tick / −1 Tick or the scrubber', false);
+      return;
+    }
     if (state.index >= traj.frames.length - 1) setIndex(0);
     state.playing = true;
     dom.playBtn.textContent = 'Pause';
@@ -1446,7 +1453,10 @@
   function updateTransportDisabled() {
     const has = state.trajectory && state.trajectory.frames.length > 0;
     const last = has ? state.trajectory.frames.length - 1 : 0;
-    dom.playBtn.disabled = !has;
+    dom.playBtn.disabled = !has || reducedMotionQuery.matches;
+    dom.playBtn.title = reducedMotionQuery.matches
+      ? 'Autoplay is disabled with reduced motion; step with +1 Tick / −1 Tick or the scrubber'
+      : '';
     dom.stepBackBtn.disabled = !has || state.index === 0;
     dom.stepFwdBtn.disabled = !has || state.index >= last;
     dom.slider.disabled = !has;
@@ -1456,6 +1466,7 @@
 
   function startPulse() {
     stopPulse();
+    if (reducedMotionQuery.matches) return;
     state.pulseStart = performance.now();
     state.pulseTimer = setInterval(function () {
       if (state.trajectory && effectiveView() !== 'ground') scheduleDraw();

@@ -29,7 +29,7 @@ Two ways in: **[run your first experiment](#run-your-first-experiment)** or
 
 | Claim | Exact scope | Evidence |
 | :--- | :--- | :--- |
-| **98.43% mutation score** | `Simulation.cs` + `PerceptionFilter.cs` only — 250 killed / 3 survived / 1 no-coverage (241 ignored, 25 compile-error; score is killed ÷ killed+survived+noCoverage). Not whole-repository coverage. | [`benchmarks/mutation_stryker_summary.json`](benchmarks/mutation_stryker_summary.json) |
+| **99.61% scoped mutation score** | `Simulation.cs` + `PerceptionFilter.cs` only, Stryker.NET 5.0.0 — 252 killed / 1 timed out / 1 survived / 0 no-coverage (241 ignored, 25 compile-error; score is (killed + timeout) ÷ (killed + survived + timeout + noCoverage)). Not whole-repository coverage. | [`benchmarks/mutation_stryker_summary.json`](benchmarks/mutation_stryker_summary.json), [FINDING-007](docs/FINDINGS_LEDGER.md#finding-007--edgechoke-not-found-path-uncovered-fuzz-harness-kill-attribution-is-batch-state-dependent) |
 | **Per-step serialized `StepResult` replay equivalence** | Canonical golden trajectory [`Tests/fixtures/golden_trajectory.jsonl`](Tests/fixtures/golden_trajectory.jsonl), verified on the tested Ubuntu, macOS, and Windows CI matrix. Per-step equality — not byte identity, not a state hash. | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) replay-verify step |
 | **Paired 95% confidence intervals, negative result kept** | 32-rollout MCTS vs Scout, mirror-seated. Standard dev Δ −1.12 [−1.37, −0.87] (FAIL). Bottleneck dev Δ +1.42 [+1.11, +1.73] (PASS). | [`benchmarks/mcts_evaluation_results.json`](benchmarks/mcts_evaluation_results.json), [`benchmarks/bottleneck_evaluation_results.json`](benchmarks/bottleneck_evaluation_results.json) |
 

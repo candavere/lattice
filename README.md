@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/lattice-logo.svg" alt="Lattice" width="96" height="96" />
+  <img src="assets/lattice-logo.svg" alt="Lattice" width="288" height="288" />
 </p>
 
 # Lattice

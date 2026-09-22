@@ -39,6 +39,7 @@
     {
       name: 'benchmarks/mcts_evaluation_results.json',
       url: 'https://raw.githubusercontent.com/candavere/lattice/' + PINNED_SHA + '/benchmarks/mcts_evaluation_results.json',
+      fallbackUrl: './benchmarks/mcts_evaluation_results.json',
       blob: 'https://github.com/candavere/lattice/blob/' + PINNED_SHA + '/benchmarks/mcts_evaluation_results.json',
       suiteLabel: 'Standard generated maps',
       ids: {
@@ -49,6 +50,7 @@
     {
       name: 'benchmarks/bottleneck_evaluation_results.json',
       url: 'https://raw.githubusercontent.com/candavere/lattice/' + PINNED_SHA + '/benchmarks/bottleneck_evaluation_results.json',
+      fallbackUrl: './benchmarks/bottleneck_evaluation_results.json',
       blob: 'https://github.com/candavere/lattice/blob/' + PINNED_SHA + '/benchmarks/bottleneck_evaluation_results.json',
       suiteLabel: 'Procedural bottleneck maps',
       ids: {
@@ -1329,25 +1331,41 @@
   function loadResults() {
     dom.resultsStatus = document.getElementById('results-status');
     let pending = RESULT_ARTIFACTS.length;
-    let failures = [];
+    const failures = [];
+    let usedFallback = 0;
 
     RESULT_ARTIFACTS.forEach(function (artifact) {
-      fetch(artifact.url)
-        .then(function (res) {
-          if (!res.ok) throw new Error('HTTP ' + res.status);
-          return res.json();
-        })
+      fetchArtifact(artifact.url)
         .then(function (json) {
-          renderResult(json, artifact);
+          renderResult(json, artifact, false);
         })
         .catch(function (err) {
-          failures.push(artifact.name + ' (' + err.message + ')');
-          afterEach();
+          // The page is being viewed somewhere the pinned network revision
+          // cannot be reached (offline, corporate egress, ...). Fall back to
+          // the committed same-origin copy and say so honestly: the numbers
+          // still come from this repository's recorded study, not from a fresh
+          // simulation, but the byte-for-byte provenance links to the pinned
+          // revision are unavailable from this machine.
+          if (!artifact.fallbackUrl) throw err;
+          return fetchArtifact(artifact.fallbackUrl).then(function (json) {
+            usedFallback += 1;
+            renderResult(json, artifact, true);
+          });
+        })
+        .catch(function (err) {
+          failures.push(artifact.name + '(' + err.message + ')');
         })
         .then(function () {
           afterEach();
         });
     });
+
+    function fetchArtifact(url) {
+      return fetch(url).then(function (res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status + ' for ' + url);
+        return res.json();
+      });
+    }
 
     function afterEach() {
       pending -= 1;
@@ -1355,15 +1373,20 @@
       if (failures.length) {
         dom.resultsStatus.className = 'result-status error';
         dom.resultsStatus.textContent = 'Could not load ' + failures.join(', ') +
-          ' from the pinned revision. Numbers are not shown — open the artifacts directly.';
+          ' from the pinned revision or its committed same-origin copy. Numbers are not shown — open the artifacts directly.';
         return;
       }
       dom.resultsStatus.className = 'result-status ok';
-      dom.resultsStatus.textContent = 'Committed values shown, loaded from the artifacts above and pinned at ' + PINNED_SHA.slice(0, 7) + '.';
+      let note = 'Committed values shown, loaded from the artifacts above and pinned at ' + PINNED_SHA.slice(0, 7) + '.';
+      if (usedFallback) {
+        note += ' ' + usedFallback + ' artifact' + (usedFallback > 1 ? 's shown from the committed ' : ' shown from the committed ') +
+          'same-origin copy — the pinned network revision was not reachable from this machine, so those blob links point at the copy committed in this repository.';
+      }
+      dom.resultsStatus.textContent = note;
     }
   }
 
-  function renderResult(json, artifact) {
+  function renderResult(json, artifact, fromFallback) {
     if (!json || !Array.isArray(json.Studies)) throw new Error('unexpected artifact structure');
     const dev = json.Studies.find(function (s) { return s.Suite === 'dev'; }) || json.Studies[0];
     const heldout = json.Studies.find(function (s) { return s.Suite === 'heldout'; });
@@ -1372,7 +1395,10 @@
 
     const ids = artifact.ids;
     const link = document.getElementById(ids.link);
-    link.setAttribute('href', artifact.blob);
+    // If we served the committed same-origin copy, point the link at that
+    // committed file rather than the pinned-revision blob that this machine
+    // could not reach — the bytes are identical, and the provenance is honest.
+    link.setAttribute('href', fromFallback ? artifact.fallbackUrl : artifact.blob);
 
     document.getElementById(ids.proto).textContent =
       dev.TargetPolicy + ' (' + dev.RolloutsPerAction + ' rollouts/action) vs ' +

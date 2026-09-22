@@ -205,12 +205,12 @@
       })
       .then(function (text) {
         const traj = parseTrajectory(text);
-        adoptTrajectory(traj, PRESETS.demo.name, 'demo');
-        showMessage('loaded built-in demo recording (seed ' + traj.header.Seed + ')', false);
+        adoptTrajectory(traj, PRESETS.infiltration.name, 'infiltration');
+        showMessage('loaded preset recording ' + PRESETS.infiltration.name + ' (seed ' + traj.header.Seed + ')', false);
       })
       .catch(function (err) {
         dropTrajectory();
-        dom.source.textContent = 'demo unavailable — drop a .jsonl recording to play';
+        dom.source.textContent = 'infiltration unavailable — drop a .jsonl recording to play';
         showMessage('could not load ' + DEFAULT_TRAJECTORY + ' (' + err.message + ')', true);
       });
   }
@@ -333,7 +333,9 @@
   function setStaticPreset(key) {
     const preset = PRESETS[key];
     if (!preset) return;
-    dom.staticSvg.data = preset.staticSvg;
+    if (dom.staticSvg.getAttribute('data') !== preset.staticSvg) {
+      dom.staticSvg.data = preset.staticSvg;
+    }
     dom.staticCaption.innerHTML = preset.caption;
     dom.staticTitle.textContent = 'Static render of ' + preset.name;
     dom.staticOpenLink.textContent = 'Open ' + preset.staticName;

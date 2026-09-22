@@ -8,7 +8,11 @@
 (function () {
   'use strict';
 
-  const DEFAULT_TRAJECTORY = './demo.jsonl';
+  // The guided hero is the infiltration recording (Sentry vs Infiltrator): its
+  // "moment to watch" (ticks 8-13, the Vault drifting out of the Sentry's
+  // reconstructed 2-hop sightline) is what the hero copy walks a visitor
+  // through. The demo.jsonl (MCTS card) stays reachable from the Preset menu.
+  const DEFAULT_TRAJECTORY = './infiltration.jsonl';
 
   // Pinned revision the page's evidence links and result fetches target.
   // The binary/JSON artifacts are immutable at this SHA.
@@ -311,8 +315,17 @@
       option.textContent = 'Agent ' + agent.AgentId + (role ? ' (' + role + ')' : '');
       dom.egoSelect.appendChild(option);
     });
+    // Guided hero: the sightline the page reconstructs belongs to the Sentry, so
+    // the observed-agent dropdown should open on the Sentry &mdash; where the
+    // Vault is seen to drift out of the dashed ring in the moment to watch.
+    const sentryIndex = roles.indexOf('Sentry');
     const infiltratorIndex = roles.indexOf('Infiltrator');
-    state.egoId = infiltratorIndex >= 0 ? infiltratorIndex : 0;
+    // Ego default = the Sentry: the reconstructed 2-hop sightline this page draws
+    // is the Sentry's, so the vault drifting out of its dashed ring at ticks
+    // 9&ndash;13 is the moment to watch from exactly the agent page architecture
+    // reconstructs for the hero path. The Infiltrator stays selectable in the
+    // dropdown &mdash; the dropdown is never locked to one agent.
+    state.egoId = sentryIndex >= 0 ? sentryIndex : (infiltratorIndex >= 0 ? infiltratorIndex : 0);
     dom.egoSelect.value = String(state.egoId);
     dom.egoSelect.disabled = agents.length < 2;
   }

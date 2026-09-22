@@ -1,15 +1,63 @@
 /* Lattice — replay viewer.
    Deterministic trajectory (JSON Lines) player rendered to a high-DPI canvas.
-   Self-contained ES2017+, zero external dependencies. */
+   Self-contained ES2017+, zero external dependencies.
+
+   The viewer replays recorded frames only; nothing in the browser is
+   recomputed from a simulation. */
 
 (function () {
   'use strict';
 
   const DEFAULT_TRAJECTORY = './demo.jsonl';
+
+  // Pinned revision the page's evidence links and result fetches target.
+  // The binary/JSON artifacts are immutable at this SHA.
+  const PINNED_SHA = '6463e4865dd4831efe0952d64de0f8bfaf22f9a4';
+
   const PRESETS = {
-    demo: { url: './demo.jsonl', name: 'demo.jsonl', staticSvg: './demo.svg', caption: 'Seed 42, MCTS vs Random, 30 ticks. Recorded with lattice simulate and rendered as a dependency-free CSS-animated SVG with lattice render --format svg.' },
-    infiltration: { url: './infiltration.jsonl', name: 'infiltration.jsonl', staticSvg: './infiltration.svg', caption: 'Seed 42, Dungeon Infiltration & Sentry Patrol: the Infiltrator raids the Treasure Vault under a patrolling Sentry. Recorded with lattice simulate --scenario infiltration and rendered as an animated SVG with lattice render --format svg.' },
+    demo: {
+      url: './demo.jsonl',
+      name: 'demo.jsonl',
+      repoPath: 'site/demo.jsonl',
+      staticSvg: './demo.svg',
+      staticName: 'demo.svg',
+      caption: 'Seed 42, MCTS (agent 0) vs Random (agent 1), 30 ticks. Recorded with lattice simulate --seed 42 --agent mcts --steps 30 and rendered as a dependency-free CSS-animated SVG with lattice render --format svg.',
+      reproduce: 'dotnet run --project Cli -- simulate --seed 42 --agent mcts --steps 30 --out demo.jsonl',
+    },
+    infiltration: {
+      url: './infiltration.jsonl',
+      name: 'infiltration.jsonl',
+      repoPath: 'site/infiltration.jsonl',
+      staticSvg: './infiltration.svg',
+      staticName: 'infiltration.svg',
+      caption: 'Seed 42, Dungeon Infiltration & Sentry Patrol: the Infiltrator raids the Treasure Vault under a patrolling Sentry. Recorded with lattice simulate --seed 42 --scenario infiltration --steps 100 and rendered as an animated SVG with lattice render --format svg.',
+      reproduce: 'dotnet run --project Cli -- simulate --seed 42 --scenario infiltration --steps 100 --out infiltration.jsonl',
+    },
   };
+
+  const RESULT_ARTIFACTS = [
+    {
+      name: 'benchmarks/mcts_evaluation_results.json',
+      url: 'https://raw.githubusercontent.com/candavere/lattice/' + PINNED_SHA + '/benchmarks/mcts_evaluation_results.json',
+      blob: 'https://github.com/candavere/lattice/blob/' + PINNED_SHA + '/benchmarks/mcts_evaluation_results.json',
+      suiteLabel: 'Standard generated maps',
+      ids: {
+        proto: 'std-proto', delta: 'std-delta', ci: 'std-ci', seeds: 'std-seeds',
+        verdict: 'std-verdict', heldout: 'std-heldout', link: 'std-link', commit: 'std-commit',
+      },
+    },
+    {
+      name: 'benchmarks/bottleneck_evaluation_results.json',
+      url: 'https://raw.githubusercontent.com/candavere/lattice/' + PINNED_SHA + '/benchmarks/bottleneck_evaluation_results.json',
+      blob: 'https://github.com/candavere/lattice/blob/' + PINNED_SHA + '/benchmarks/bottleneck_evaluation_results.json',
+      suiteLabel: 'Procedural bottleneck maps',
+      ids: {
+        proto: 'bot-proto', delta: 'bot-delta', ci: 'bot-ci', seeds: 'bot-seeds',
+        verdict: 'bot-verdict', heldout: 'bot-heldout', link: 'bot-link', commit: 'bot-commit',
+      },
+    },
+  ];
+
   const UNLIMITED = 2147483647; // MapLimits.Unlimited, as serialized by the writer
 
   const AGENT_PALETTE = ['#F7768E', '#BB9AF7', '#73DACA', '#FF9E64'];
@@ -66,15 +114,22 @@
     dom.fileInput = document.getElementById('file-input');
     dom.presetSelect = document.getElementById('preset-select');
     dom.staticSvg = document.getElementById('static-svg');
+    dom.staticTitle = document.getElementById('static-title');
     dom.staticCaption = document.getElementById('static-caption');
-    dom.viewDual = document.getElementById('view-dual');
-    dom.viewGod = document.getElementById('view-god');
-    dom.viewEgo = document.getElementById('view-ego');
+    dom.staticOpenLink = document.getElementById('static-open-link');
+    dom.viewGround = document.getElementById('view-ground');
+    dom.viewAgent = document.getElementById('view-agent');
+    dom.viewSplit = document.getElementById('view-split');
     dom.egoSelect = document.getElementById('ego-agent-select');
+    dom.sentence = document.getElementById('tick-sentence');
+    dom.legendRoles = document.getElementById('legend-roles');
+    dom.provGrid = document.getElementById('prov-grid');
+    dom.provOpen = document.getElementById('prov-open');
+    dom.provRepro = document.getElementById('prov-repro');
 
-    dom.viewDual.addEventListener('click', function () { setViewMode('dual'); });
-    dom.viewGod.addEventListener('click', function () { setViewMode('god'); });
-    dom.viewEgo.addEventListener('click', function () { setViewMode('ego'); });
+    dom.viewGround.addEventListener('click', function () { setViewMode('ground'); });
+    dom.viewAgent.addEventListener('click', function () { setViewMode('agent'); });
+    dom.viewSplit.addEventListener('click', function () { setViewMode('split'); });
     dom.egoSelect.addEventListener('change', function () {
       const picked = parseInt(dom.egoSelect.value, 10);
       if (Number.isInteger(picked)) {
@@ -92,12 +147,16 @@
     dom.presetSelect.addEventListener('change', handlePresetChoice);
     document.addEventListener('dragover', preventDefaultFileDrop);
     document.addEventListener('drop', handleDrop);
-    window.addEventListener('resize', scheduleDraw);
+    window.addEventListener('resize', onViewportResize);
 
+    refreshViewButtons();
+    loadResults();
     loadDefault();
   });
 
   /* ------------------------------------------------------- viewer state  */
+
+  const narrowQuery = window.matchMedia('(max-width: 640px)');
 
   const state = {
     trajectory: null,   // { header, steps, final, frames[], fileName, maxTicks }
@@ -108,8 +167,9 @@
     layouts: {},        // per-viewport-size layout cache: "WxH" -> layout
     canv: null,         // { cssW, cssH } of last fitted size
     needsDraw: false,
-    viewMode: 'dual',   // 'dual' | 'god' | 'ego'
-    egoId: 0,           // observer slot for the fog-of-war viewport
+    viewMode: narrowQuery.matches ? 'ground' : 'split', // 'ground' | 'agent' | 'split'
+    lastFocus: 'ground', // last single-view choice, preserved across breakpoints
+    egoId: 0,           // observed-agent slot for the Agent view
     pulseStart: 0,      // performance.now() origin of the ego radar pulse
     pulseTimer: null,   // interval driving the radar pulse while fog is shown
   };
@@ -124,7 +184,7 @@
       })
       .then(function (text) {
         const traj = parseTrajectory(text);
-        adoptTrajectory(traj, 'demo.jsonl');
+        adoptTrajectory(traj, PRESETS.demo.name, 'demo');
         showMessage('loaded built-in demo recording (seed ' + traj.header.Seed + ')', false);
       })
       .catch(function (err) {
@@ -205,21 +265,23 @@
     dom.fileInput.title = fileName;
     if (presetKey && PRESETS[presetKey]) {
       dom.presetSelect.value = presetKey;
-      dom.staticSvg.data = PRESETS[presetKey].staticSvg;
-      dom.staticCaption.innerHTML = PRESETS[presetKey].caption;
+      setStaticPreset(presetKey);
     } else {
       dom.presetSelect.value = 'custom';
+      // A local file never changes the built-in static render.
     }
     const roster = traj.header.AgentRoles;
     dom.roster.textContent = traj.header.Scenario
       ? traj.header.Scenario + ' · ' + (roster && roster.length ? roster.join(' vs ') : '')
-      : '';
+      : (roster && roster.length ? roster.join(' vs ') : '');
     hideDom(dom.hint);
-    if (state.viewMode !== 'god') startPulse();
+    renderProvenance(traj, fileName, presetKey);
+    renderLegendRoles(traj);
+    if (state.viewMode !== 'ground') startPulse();
     scheduleDraw();
   }
 
-  // The ego observer dropdown: "Agent 0 (Sentry)" style options, defaulting
+  // The observed-agent dropdown: "Agent 0 (Sentry)" style options, defaulting
   // to the Infiltrator when the trajectory carries that roster.
   function populateEgoSelect(traj) {
     const roles = traj.header.AgentRoles || [];
@@ -235,18 +297,51 @@
     const infiltratorIndex = roles.indexOf('Infiltrator');
     state.egoId = infiltratorIndex >= 0 ? infiltratorIndex : 0;
     dom.egoSelect.value = String(state.egoId);
+    dom.egoSelect.disabled = agents.length < 2;
+  }
+
+  function setStaticPreset(key) {
+    const preset = PRESETS[key];
+    if (!preset) return;
+    dom.staticSvg.data = preset.staticSvg;
+    dom.staticCaption.innerHTML = preset.caption;
+    dom.staticTitle.textContent = 'Static render of ' + preset.name;
+    dom.staticOpenLink.textContent = 'Open ' + preset.staticName;
+    dom.staticOpenLink.href = preset.staticSvg;
+  }
+
+  /* ----------------------------------------------------------- view mode  */
+
+  function onViewportResize() {
+    refreshViewButtons();
+    scheduleDraw();
+  }
+
+  // The view actually rendered: on narrow screens a chosen 'split' mode
+  // degrades to the user's last single-view choice rather than trapping them.
+  function effectiveView() {
+    if (state.viewMode === 'split' && narrowQuery.matches) return state.lastFocus;
+    return state.viewMode;
   }
 
   function setViewMode(mode) {
+    if (mode === 'ground' || mode === 'agent') state.lastFocus = mode;
     state.viewMode = mode;
-    const buttons = { dual: dom.viewDual, god: dom.viewGod, ego: dom.viewEgo };
-    Object.keys(buttons).forEach(function (key) {
-      const active = key === mode;
-      buttons[key].classList.toggle('active', active);
-      buttons[key].setAttribute('aria-pressed', active ? 'true' : 'false');
-    });
-    if (mode === 'god') stopPulse(); else startPulse();
+    refreshViewButtons();
+    if (effectiveView() === 'ground') stopPulse(); else startPulse();
     scheduleDraw();
+  }
+
+  function setPressed(el, isPressed) {
+    el.classList.toggle('active', isPressed);
+    el.setAttribute('aria-pressed', isPressed ? 'true' : 'false');
+  }
+
+  function refreshViewButtons() {
+    const eff = effectiveView();
+    setPressed(dom.viewGround, eff === 'ground');
+    setPressed(dom.viewAgent, eff === 'agent');
+    setPressed(dom.viewSplit, state.viewMode === 'split');
   }
 
   function dropTrajectory() {
@@ -263,6 +358,14 @@
     dom.statSteps.textContent = '—';
     dom.statSeed.textContent = '—';
     dom.statAgents.textContent = '—';
+    dom.egoSelect.innerHTML = '';
+    dom.egoSelect.disabled = true;
+    dom.legendRoles.innerHTML = '';
+    dom.provGrid.innerHTML = '';
+    dom.provOpen.innerHTML = '';
+    dom.provRepro.innerHTML = '';
+    dom.sentence.textContent = 'Load a recording to see its frames described here.';
+    updateTransportDisabled();
     clearCanvas();
     showDom(dom.hint);
   }
@@ -376,11 +479,11 @@
     const frame = traj.frames[state.index];
     const w = dom.canvas.clientWidth;
     const h = dom.canvas.clientHeight;
+    const view = effectiveView();
 
-    if (state.viewMode === 'dual') {
+    if (view === 'split') {
       const split = Math.floor(w / 2);
-      drawViewport(ctx, traj, frame, { x: 0, y: 0, w: split - 5, h: h }, null,
-        '[GLOBAL GROUND TRUTH]');
+      drawViewport(ctx, traj, frame, { x: 0, y: 0, w: split - 5, h: h }, null, 'Ground truth');
       ctx.strokeStyle = COLORS.fogDivider;
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -389,17 +492,19 @@
       ctx.stroke();
       drawViewport(ctx, traj, frame, { x: split + 5, y: 0, w: w - split - 5, h: h },
         computePerception(traj, state.index, state.egoId),
-        '[AGENT EGO PERCEPTION — ' + egoLabel(traj) + ']');
-    } else if (state.viewMode === 'ego') {
+        'Agent view · ' + egoLabel(traj));
+    } else if (view === 'agent') {
       drawViewport(ctx, traj, frame, { x: 0, y: 0, w: w, h: h },
         computePerception(traj, state.index, state.egoId),
-        '[AGENT EGO PERCEPTION — ' + egoLabel(traj) + ']');
+        'Agent view · ' + egoLabel(traj));
     } else {
-      drawViewport(ctx, traj, frame, { x: 0, y: 0, w: w, h: h }, null, '[GLOBAL GROUND TRUTH]');
+      drawViewport(ctx, traj, frame, { x: 0, y: 0, w: w, h: h }, null, 'Ground truth');
     }
 
     renderStatus();
     renderMetrics();
+    updateSentence();
+    updateTransportDisabled();
   }
 
   function egoLabel(traj) {
@@ -1018,6 +1123,263 @@
     dom.zonesBody.innerHTML = zrows;
   }
 
+  /* ------------------------------------------- plain-language tick sentence  */
+
+  function roleLabel(agentId) {
+    const roles = state.trajectory && state.trajectory.header.AgentRoles;
+    return roles && roles[agentId] ? 'Agent ' + agentId + ' (' + roles[agentId] + ')' : 'Agent ' + agentId;
+  }
+
+  function zoneName(zoneId) {
+    const zone = state.trajectory && state.trajectory.header.Map && state.trajectory.header.Map.Zones[zoneId];
+    return zone ? roomLabel(zone) : 'room ' + zoneId;
+  }
+
+  function describeRivalSight(skel, index) {
+    const traj = state.trajectory;
+    const frame = traj.frames[index];
+    const ego = frame.agents.find(function (a) { return a.AgentId === state.egoId; });
+    if (!ego) return 'the observed agent is absent from this frame';
+    const rivalIds = frame.agents.filter(function (a) { return a.AgentId !== state.egoId; });
+    if (!rivalIds.length) return 'no rival agents in this recording';
+
+    const inView = rivalIds.filter(function (a) { return skel.zones[a.ZoneId] === 'observed'; });
+    const clauses = [];
+    if (inView.length) {
+      clauses.push('sees ' + inView.map(function (a) { return roleLabel(a.AgentId); }).join(' and '));
+    }
+    Object.keys(skel.ghosts).forEach(function (id) {
+      const ghost = skel.ghosts[id];
+      const age = index - ghost.tick;
+      clauses.push('last saw ' + roleLabel(Number(id)) + (age === 0 ? ' moments ago' : ' ' + age + ' ticks ago'));
+    });
+    if (!clauses.length) clauses.push('no rivals in view');
+    return clauses.join('; ');
+  }
+
+  function describeFrame() {
+    const traj = state.trajectory;
+    if (!traj || !traj.frames.length) return 'No recording loaded.';
+    const last = traj.frames.length - 1;
+    const index = state.index;
+    const frame = traj.frames[index];
+    const view = effectiveView();
+    const map = traj.header.Map;
+    let sentence;
+
+    if (view === 'split') {
+      // A split is the comparison; describe the agent's side, the part that
+      // differs from the ground truth on the left.
+      sentence = describeFrameAgentSide(traj, index, last, frame, map);
+    } else if (view === 'ground') {
+      if (!frame.agents || !frame.agents.length) {
+        sentence = 'This recorded frame carries no agent states.';
+      } else {
+        const spots = frame.agents.map(function (a) {
+          if (a.Transit) return roleLabel(a.AgentId) + ' crossing ' + zoneName(a.Transit.FromZoneId) + ' to ' + zoneName(a.Transit.ToZoneId);
+          return roleLabel(a.AgentId) + ' in ' + zoneName(a.ZoneId);
+        });
+        sentence = spots.join('; ') + '; ' + frame.claims.length + ' of ' + map.Resources.length +
+          ' resource' + (map.Resources.length === 1 ? '' : 's') + ' claimed.';
+      }
+    } else {
+      sentence = describeFrameAgentSide(traj, index, last, frame, map);
+    }
+
+    if (index === last && traj.final && traj.final.Metrics) {
+      const fin = traj.final.Metrics;
+      const winner = fin.WinnerAgentId !== null && fin.WinnerAgentId !== undefined
+        ? ': ' + roleLabel(fin.WinnerAgentId) + ' wins' : '';
+      const scores = Array.isArray(fin.FinalScores) && fin.FinalScores.length
+        ? ' ' + fin.FinalScores.join('–') : '';
+      sentence += ' Recording ends at tick ' + fin.TotalSteps + ' (' + fin.Reason + ')' + winner + scores + '.';
+    }
+
+    return 'Recorded frame · tick ' + index + ' of ' + last + ' — ' + sentence;
+  }
+
+  function describeFrameAgentSide(traj, index, last, frame, map) {
+    if (!frame.agents || !frame.agents.length) {
+      return 'This recorded frame carries no agent states.';
+    }
+    const skel = computePerception(traj, index, state.egoId);
+    let observed = 0, stale = 0, unknown = 0;
+    map.Zones.forEach(function (z) {
+      if (skel.zones[z.Id] === 'observed') observed += 1;
+      else if (skel.zones[z.Id] === 'stale') stale += 1;
+      else unknown += 1;
+    });
+    let s = 'From ' + roleLabel(state.egoId) + "'s recorded position: " +
+      observed + ' of ' + map.Zones.length + ' rooms observed, ' +
+      stale + ' last known, ' + unknown + ' unexplored';
+    const rivals = describeRivalSight(skel, index);
+    s += '; ' + rivals + '.';
+    return s;
+  }
+
+  function updateSentence() {
+    const traj = state.trajectory;
+    const text = describeFrame();
+    if (dom.sentence.textContent !== text) {
+      dom.sentence.textContent = text;
+    }
+    // Polite live region while the user drives; mute during autoplay so a
+    // screen reader is not spammed on every tick.
+    dom.sentence.setAttribute('aria-live', state.playing ? 'off' : 'polite');
+    const view = effectiveView();
+    dom.canvas.setAttribute('aria-label', 'Replay view: ' +
+      (view === 'split' ? 'side-by-side comparison of ground truth and agent view' :
+        view === 'agent' ? 'Agent view — ' + egoLabel(traj) : 'Ground truth') +
+      ', tick ' + state.index + ' of ' + (traj ? traj.frames.length - 1 : 0));
+  }
+
+  /* ----------------------------------------------------------- provenance  */
+
+  function renderProvenance(traj, fileName, presetKey) {
+    const hdr = traj.header;
+    const cfg = hdr.SimulationConfig || {};
+    const isBuiltIn = !!(presetKey && PRESETS[presetKey]);
+    const schema = typeof hdr.SchemaVersion === 'number' ? hdr.SchemaVersion : 0;
+
+    const rows = [
+      ['Recording', fileName + (isBuiltIn ? ' (built-in)' : ' (local file)')],
+      ['Seed', String(hdr.Seed)],
+      ['Scenario', hdr.Scenario ? hdr.Scenario : 'sampling run (no scenario)'],
+      ['Agent roles', hdr.AgentRoles && hdr.AgentRoles.length ? hdr.AgentRoles.join(' vs ') : 'not recorded in the header'],
+      ['Wire schema', 'v' + schema + (schema === 0 ? ' — recorded before the current v2 stamp' : '')],
+      ['Ticks', String(Math.max(0, traj.frames.length - 1)) + ' recorded'],
+      ['Config', 'agents ' + (cfg.AgentCount !== undefined ? cfg.AgentCount : '?') +
+        ' · max ticks ' + (cfg.MaxTicks !== undefined ? cfg.MaxTicks : '?') +
+        ' · vision ' + (cfg.Vision !== undefined ? cfg.Vision : '?')],
+      ['Rooms / resources / gates',
+        hdr.Map.Zones.length + ' / ' + hdr.Map.Resources.length + ' / ' + hdr.Map.ChokePoints.length],
+    ];
+
+    let html = '';
+    rows.forEach(function (row) {
+      html += '<dt>' + row[0] + '</dt><dd>' + row[1] + '</dd>';
+    });
+    dom.provGrid.innerHTML = html;
+
+    let openHtml = '';
+    if (isBuiltIn) {
+      const preset = PRESETS[presetKey];
+      openHtml = '<a href="./' + preset.name + '">Open ' + preset.name + '</a> · ' +
+        '<a href="https://github.com/candavere/lattice/blob/' + PINNED_SHA + '/' + preset.repoPath + '">View in repository</a>';
+      dom.provOpen.innerHTML = openHtml;
+      dom.provRepro.textContent = preset.reproduce;
+    } else {
+      openHtml = '<span class="local-note">Local file — not in the repository.</span>';
+      dom.provOpen.innerHTML = openHtml;
+      let commands = 'dotnet run --project Cli -- replay "' + fileName + '" --verify';
+      if (hdr.Scenario && !hdr.DynamicRules) {
+        commands = 'dotnet run --project Cli -- simulate --seed ' + hdr.Seed +
+          ' --scenario ' + hdr.Scenario +
+          (cfg.MaxTicks ? ' --steps ' + cfg.MaxTicks : '') +
+          ' --out verified.jsonl\n' + commands;
+      } else if (hdr.DynamicRules) {
+        commands = 'dotnet run --project Cli -- simulate --seed ' + hdr.Seed +
+          ' --rules <recorded-rules-file> --out verified.jsonl\n' + commands;
+      }
+      dom.provRepro.textContent = commands;
+    }
+  }
+
+  // Role legend chips, grounded in the loaded recording's roster (or the
+  // viewer's default palette when the header records no roles).
+  function renderLegendRoles(traj) {
+    const agents = traj.frames.length ? traj.frames[0].agents : [];
+    const roles = traj.header.AgentRoles || [];
+    let html = '';
+    agents.slice().sort(function (a, b) { return a.AgentId - b.AgentId; }).forEach(function (agent) {
+      const color = agentColor(agent, roles);
+      const name = roles[agent.AgentId] ? roleLabel(agent.AgentId) : 'Agent ' + agent.AgentId;
+      html += '<li><span class="swatch" style="background:' + color + '"></span>' + name + '</li>';
+    });
+    dom.legendRoles.innerHTML = html || '<li>No agents recorded.</li>';
+  }
+
+  /* ------------------------------------------- committed results panel  */
+
+  function fmt2(value) {
+    return (value >= 0 ? '+' : '') + value.toFixed(2);
+  }
+
+  function fmtCi(lo, up) {
+    return '[' + lo.toFixed(2) + ', ' + up.toFixed(2) + ']';
+  }
+
+  function loadResults() {
+    dom.resultsStatus = document.getElementById('results-status');
+    let pending = RESULT_ARTIFACTS.length;
+    let failures = [];
+
+    RESULT_ARTIFACTS.forEach(function (artifact) {
+      fetch(artifact.url)
+        .then(function (res) {
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return res.json();
+        })
+        .then(function (json) {
+          renderResult(json, artifact);
+        })
+        .catch(function (err) {
+          failures.push(artifact.name + ' (' + err.message + ')');
+          afterEach();
+        })
+        .then(function () {
+          afterEach();
+        });
+    });
+
+    function afterEach() {
+      pending -= 1;
+      if (pending > 0) return;
+      if (failures.length) {
+        dom.resultsStatus.className = 'result-status error';
+        dom.resultsStatus.textContent = 'Could not load ' + failures.join(', ') +
+          ' from the pinned revision. Numbers are not shown — open the artifacts directly.';
+        return;
+      }
+      dom.resultsStatus.className = 'result-status ok';
+      dom.resultsStatus.textContent = 'Committed values shown, loaded from the artifacts above and pinned at ' + PINNED_SHA.slice(0, 7) + '.';
+    }
+  }
+
+  function renderResult(json, artifact) {
+    if (!json || !Array.isArray(json.Studies)) throw new Error('unexpected artifact structure');
+    const dev = json.Studies.find(function (s) { return s.Suite === 'dev'; }) || json.Studies[0];
+    const heldout = json.Studies.find(function (s) { return s.Suite === 'heldout'; });
+    const stats = dev && dev.Statistics;
+    if (!stats) throw new Error('no study statistics in artifact');
+
+    const ids = artifact.ids;
+    const link = document.getElementById(ids.link);
+    link.setAttribute('href', artifact.blob);
+
+    document.getElementById(ids.proto).textContent =
+      dev.TargetPolicy + ' (' + dev.RolloutsPerAction + ' rollouts/action) vs ' +
+      dev.BaselinePolicy + ' · mirror-seated · max ' + dev.MaxStepsPerMatch + ' steps/match · ' + dev.Suite + ' suite';
+
+    document.getElementById(ids.delta).textContent = fmt2(stats.MeanDelta);
+    document.getElementById(ids.ci).textContent = fmtCi(stats.CiLower95, stats.CiUpper95);
+    document.getElementById(ids.seeds).textContent =
+      stats.Seeds + ' seeds · ' + stats.Matches + ' mirror-seated matches';
+
+    const verdict = document.getElementById(ids.verdict);
+    verdict.textContent = (dev.Passed ? 'PASS — ' : 'FAIL — ') + dev.Decision;
+    verdict.className = 'result-verdict ' + (dev.Passed ? 'pass' : 'fail');
+
+    if (heldout && heldout.Statistics) {
+      const hs = heldout.Statistics;
+      document.getElementById(ids.heldout).textContent = 'Held-out suite (same file): ' +
+        (heldout.Passed ? 'PASS' : 'FAIL') + ' Δ ' + fmt2(hs.MeanDelta) + ' · ' + fmtCi(hs.CiLower95, hs.CiUpper95);
+    }
+
+    document.getElementById(ids.commit).textContent =
+      artifact.name + ' · study recorded at ' + json.CommitSha + ' · pinned at ' + PINNED_SHA.slice(0, 7);
+  }
+
   /* ----------------------------------------------------------- transport  */
 
   function stepBy(delta) {
@@ -1037,17 +1399,20 @@
   function togglePlay() {
     if (state.playing) { pause(); return; }
     const traj = state.trajectory;
-    if (!traj || !traj.frames.length) return;
+    if (!traj || !traj.frames.length || dom.playBtn.disabled) return;
+    dom.playBtn.disabled = false; // set again below; keep enabled once loaded
     if (state.index >= traj.frames.length - 1) setIndex(0);
     state.playing = true;
     dom.playBtn.textContent = 'Pause';
     startTimer();
+    updateTransportDisabled();
   }
 
   function pause() {
     state.playing = false;
     dom.playBtn.textContent = 'Play';
     stopTimer();
+    updateTransportDisabled();
   }
 
   function startTimer() {
@@ -1077,13 +1442,23 @@
     if (isFinite(value) && value > 0) state.cadenceMs = value;
   }
 
+  // A control only looks active when its action is currently available.
+  function updateTransportDisabled() {
+    const has = state.trajectory && state.trajectory.frames.length > 0;
+    const last = has ? state.trajectory.frames.length - 1 : 0;
+    dom.playBtn.disabled = !has;
+    dom.stepBackBtn.disabled = !has || state.index === 0;
+    dom.stepFwdBtn.disabled = !has || state.index >= last;
+    dom.slider.disabled = !has;
+  }
+
   /* --------------------------------------------------- radar pulse loop  */
 
   function startPulse() {
     stopPulse();
     state.pulseStart = performance.now();
     state.pulseTimer = setInterval(function () {
-      if (state.trajectory && state.viewMode !== 'god') scheduleDraw();
+      if (state.trajectory && effectiveView() !== 'ground') scheduleDraw();
     }, 90);
   }
 
@@ -1109,7 +1484,7 @@
   function showMessage(text, isError) {
     dom.message.className = isError ? 'error' : 'success';
     dom.message.textContent = text;
-    dom.message.style.display = isError ? 'block' : 'block';
+    dom.message.style.display = 'block';
     if (!isError) {
       window.clearTimeout(showMessage.timerId);
       showMessage.timerId = window.setTimeout(function () { dom.message.style.display = 'none'; }, 4000);
@@ -1135,6 +1510,8 @@
       SimulationConfig: decoded[0].SimulationConfig || {},
       Scenario: decoded[0].Scenario || null,
       AgentRoles: decoded[0].AgentRoles || null,
+      SchemaVersion: decoded[0].SchemaVersion,
+      DynamicRules: decoded[0].DynamicRules || null,
     };
     const steps = [];
     let final = null;

@@ -3,27 +3,28 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="A testing lab for multi-agent AI: run seeded experiments, replay every decision, compare policies fairly, and audit the evidence behind the result.">
-  <title>Lattice — Auditable Multi-Agent Research &amp; Benchmarking Lab</title>
+  <meta name="description" content="A testing lab for multi-agent AI: replay recorded experiments, compare what each agent could see, and audit the committed evidence behind the result.">
+  <title>Lattice — a testing lab for AI decision-making</title>
   <link rel="stylesheet" href="./style.css">
   <script src="./app.js" defer></script>
 </head>
 <body>
+  <a class="skip-link" href="#viewer">Skip to the replay viewer</a>
+
   <header class="app-header">
     <h1>Audit AI decisions, not just outcomes.</h1>
     <p class="subtitle">
-      A testing lab for multi-agent AI: run seeded experiments, replay every
-      decision, compare policies fairly, and audit the evidence behind the
-      result. Lattice is a deterministic, headless, zero-dependency .NET 8
-      research substrate — pure step-contract simulation, seeded procedural
-      maps, an MCTS lookahead policy, and a paired statistical evaluation
-      harness. Same seed and same actions yield the same serialized trajectory
-      under the .NET 8 BCL runtime contract. Every frame below is replayed from
-      a recorded JSON Lines trajectory; nothing is recomputed in the browser.
+      Lattice is a testing lab for AI decision-making. Run a seeded experiment,
+      replay what happened, compare what each agent could see, and audit the
+      evidence — rather than trusting a black box.
+    </p>
+    <p class="guiding-question">What can one agent know, and why does the result change?</p>
+    <p class="recorded-note">
+      This page <strong>replays recorded evidence</strong>. Every frame below is read from a
+      committed recording; your browser does not run a new simulation.
     </p>
     <div class="badges" aria-label="Repository information">
       <span class="badge"><a href="https://github.com/candavere/lattice">github.com/candavere/lattice</a></span>
-      <span class="badge"><a href="https://candavere.github.io/lattice/">live demo</a></span>
       <span class="badge">net8.0 · BCL only</span>
       <span class="badge">deterministic replay</span>
     </div>
@@ -31,35 +32,33 @@
 
   <main>
     <section class="card">
-      <h2>Interactive replay viewer</h2>
-      <p class="card-note">
-        <code>demo.jsonl</code> loads automatically. Switch presets below or drop
-        any recorded trajectory file onto the canvas to replay it. Rooms render
-        as labeled cards (Entry Hall, Sentry Post, Treasure Vault, …) carrying
-        their occupancy; gold diamonds inside a room are unclaimed loot, green
-        ones are claimed. Corridors connect the rooms, with an inline gate
-        badge on each bounded choke (<code>CAP 1</code> / <code>LOCKED</code>
-        plus the gate role — Portcullis, Air Lock Doorway). Tokens slide along
-        corridor vectors while transiting: the red Sentry patrols inside a
-        dashed perception ring and the purple Infiltrator carries a cyan
-        extraction marker.
-      </p>
+      <h2>Watch a recorded replay</h2>
 
-      <div class="viewport-controls">
-        <div class="toggle-group" role="group" aria-label="Viewport mode">
-          <button class="btn toggle active" id="view-dual" type="button" aria-pressed="true">Dual Split View</button>
-          <button class="btn toggle" id="view-god" type="button" aria-pressed="false">God View</button>
-          <button class="btn toggle" id="view-ego" type="button" aria-pressed="false">Fog-of-War (Ego)</button>
+      <ol class="tour">
+        <li><strong>Play the recording.</strong> Press <em>Play</em> below the map, or use
+            <em>+1 Tick</em> / <em>−1 Tick</em> to step through it.</li>
+        <li><strong>Compare Ground truth with the agent's view.</strong> Switch the view control
+            directly above the map.</li>
+        <li><strong>Watch the evidence and explanation change by tick.</strong> The sentence under
+            the map describes each recorded frame as you move.</li>
+      </ol>
+
+      <div class="viewport-controls" role="group" aria-label="Replay view controls">
+        <div class="toggle-group" role="group" aria-label="View mode">
+          <button class="btn toggle" id="view-ground" type="button" aria-pressed="true">Ground truth</button>
+          <button class="btn toggle" id="view-agent" type="button" aria-pressed="false">Agent view</button>
+          <button class="btn toggle" id="view-split" type="button" aria-pressed="false">Side-by-side</button>
         </div>
-        <label class="btn" for="ego-agent-select">Observer</label>
-        <select id="ego-agent-select" aria-label="Fog-of-war observer"></select>
+        <label class="btn" for="ego-agent-select">View as</label>
+        <select id="ego-agent-select" aria-label="Observed agent in Agent view"></select>
       </div>
 
       <div class="viewer" id="viewer">
-        <canvas id="viewer-canvas" aria-label="Trajectory replay canvas">
-          Your browser does not support the HTML5 canvas element.
+        <canvas id="viewer-canvas" role="img" aria-label="Replay view">
+          Your browser does not support the HTML5 canvas element. Read the metrics below, or
+          open the recording directly: <a href="./demo.jsonl">demo.jsonl</a>.
         </canvas>
-        <div id="viewer-hint">
+        <div id="viewer-hint" hidden>
           <div>
             Replay view is empty.<br>
             <code>demo.jsonl</code> failed to load here — <strong>drag a
@@ -68,21 +67,29 @@
         </div>
       </div>
 
+      <div class="sentence">
+        <p class="sentence-label">About this recorded frame</p>
+        <p id="tick-sentence" class="sentence-text" aria-live="polite">
+          Load a recording to see its frames described here.
+        </p>
+        <p class="sentence-note">Described from fields in the loaded recording — not a new simulation.</p>
+      </div>
+
       <div class="transport">
-        <button class="btn primary" id="play-btn" type="button">Play</button>
-        <button class="btn" id="step-back-btn" type="button">−1 Tick</button>
-        <button class="btn" id="step-fwd-btn" type="button">+1 Tick</button>
+        <button class="btn primary" id="play-btn" type="button" disabled>Play</button>
+        <button class="btn" id="step-back-btn" type="button" disabled>−1 Tick</button>
+        <button class="btn" id="step-fwd-btn" type="button" disabled>+1 Tick</button>
         <div class="scrub">
-          <label for="scrub-slider" class="visually-hidden">Scrub through ticks</label>
-          <input type="range" id="scrub-slider" min="0" max="0" value="0" step="1" aria-label="Scrub through ticks">
-          <span class="tick-readout" id="tick-readout">0 / 0</span>
+          <input type="range" id="scrub-slider" min="0" max="0" value="0" step="1"
+                 aria-label="Scrub through recorded ticks" disabled>
+          <span class="tick-readout" id="tick-readout">—</span>
         </div>
         <div class="spacer"></div>
         <label class="btn" for="preset-select">Preset</label>
-        <select id="preset-select" aria-label="Recoding preset">
-          <option value="demo">Demo sampling (Greedy vs Random)</option>
+        <select id="preset-select" aria-label="Recording preset">
+          <option value="demo">Demo sampling (MCTS vs Random)</option>
           <option value="infiltration">Infiltration (Sentry vs Infiltrator)</option>
-          <option value="custom">Custom…</option>
+          <option value="custom" disabled>Custom… (local file)</option>
         </select>
         <label class="btn" for="speed-select">Speed</label>
         <select id="speed-select" aria-label="Playback speed">
@@ -95,11 +102,61 @@
         <input type="file" id="file-input" accept=".jsonl,application/json,text/plain" hidden>
       </div>
 
+      <section class="legend" aria-label="Map legend">
+        <h3>Map legend</h3>
+        <ul class="legend-grid">
+          <li><span class="swatch" style="background:#f7768e"></span>
+              <b>Agent token</b> — number = agent id; color = role when recorded.</li>
+          <li><span class="swatch" style="background:#e0af68"></span>
+              <b>Unclaimed resource</b> (gold) inside its room.</li>
+          <li><span class="swatch" style="background:#3da66b"></span>
+              <b>Claimed resource</b> (green).</li>
+          <li><span class="swatch line-swatch solid"></span><span class="swatch line-swatch hot"></span>
+              <b>Corridor</b> — grey is idle, amber is used by an agent this tick.</li>
+          <li><span class="swatch line-swatch dashed"></span>
+              <b>Capacity gate</b> — <span class="mono">CAP n</span> or <span class="mono">LOCKED</span> along a corridor.</li>
+          <li><span class="swatch ring-swatch sight"></span>
+              <b>Sentry sight ring</b> (dashed) around a patrolling guard.</li>
+          <li><span class="swatch" style="background:#40c4ff"></span>
+              <b>Extraction marker</b> (cyan) above an infiltrator, when one is present.</li>
+        </ul>
+
+        <p class="legend-heading" id="legend-roles-head">Roles in this recording</p>
+        <ul class="legend-roles" id="legend-roles"></ul>
+
+        <details class="legend-details">
+          <summary>Agent view details</summary>
+          <ul class="legend-grid">
+            <li><span class="swatch room-swatch observed"></span>
+                <b>Observed room</b> — inside the agent's sight horizon this tick.</li>
+            <li><span class="swatch room-swatch stale"></span>
+                <b>Last known</b> — seen earlier, now out of sight.</li>
+            <li><span class="swatch room-swatch unknown"></span>
+                <b>Unexplored</b> — this agent has never seen it.</li>
+            <li><span class="swatch ring-swatch vision"></span>
+                <b>Sight horizon</b> — rooms reachable within the agent's vision.</li>
+            <li><span class="swatch ring-swatch ghost"></span>
+                <b>Last-seen ghost</b> — faded rival memory labeled with its age.</li>
+            <li><span class="swatch" style="background:#16233f;border:1px solid #1e293b"></span>
+                <b>Occupancy badge</b> — <span class="mono">count</span> or <span class="mono">n/cap</span>.</li>
+            <li><span class="swatch line-swatch hot"></span>
+                <b>In transit</b> — dashed amber ring and a <span class="mono">crossing to … (t)</span> label.</li>
+          </ul>
+        </details>
+      </section>
+
       <div class="statusbar">
         <span class="source" id="source-label">no trajectory loaded</span>
         <span class="roster" id="roster-label"></span>
         <span class="terminal" id="terminal-label"></span>
       </div>
+
+      <section class="provenance" aria-label="Recording provenance">
+        <dl class="prov-grid" id="prov-grid"></dl>
+        <p class="prov-links" id="prov-open"></p>
+        <p class="prov-repro-label">Reproduce this experiment</p>
+        <pre class="cli" id="prov-repro"></pre>
+      </section>
 
       <div id="message" role="status"></div>
 
@@ -120,47 +177,108 @@
       </div>
     </section>
 
+    <section class="card" aria-labelledby="results-title">
+      <h2 id="results-title">What the committed results say</h2>
+      <p class="card-note">
+        Same 32-rollout MCTS policy, two map distributions, opposite conclusions.
+        The numbers below are read from the committed evaluation artifacts, pinned to a
+        specific commit — the browser does not recompute them.
+      </p>
+
+      <div class="result-grid">
+        <article class="result">
+          <h3>Standard generated maps</h3>
+          <p class="result-line" id="std-proto">MCTS (32 rollouts) vs Scout — dev suite</p>
+          <p class="result-stats">
+            mean paired Δ <strong id="std-delta">—</strong>
+            <span class="result-ci">95% CI <span id="std-ci">—</span></span>
+          </p>
+          <p class="result-seeds" id="std-seeds">—</p>
+          <p class="result-verdict" id="std-verdict">Loading…</p>
+          <p class="result-heldout" id="std-heldout"></p>
+          <a id="std-link" class="result-link" href="https://github.com/candavere/lattice/blob/6463e4865dd4831efe0952d64de0f8bfaf22f9a4/benchmarks/mcts_evaluation_results.json" target="_blank" rel="noopener">Open result JSON</a>
+          <p class="result-source" id="std-commit">benchmarks/mcts_evaluation_results.json</p>
+        </article>
+
+        <article class="result">
+          <h3>Procedural bottleneck maps</h3>
+          <p class="result-line" id="bot-proto">MCTS (32 rollouts) vs Scout — dev suite</p>
+          <p class="result-stats">
+            mean paired Δ <strong id="bot-delta">—</strong>
+            <span class="result-ci">95% CI <span id="bot-ci">—</span></span>
+          </p>
+          <p class="result-seeds" id="bot-seeds">—</p>
+          <p class="result-verdict" id="bot-verdict">Loading…</p>
+          <p class="result-heldout" id="bot-heldout"></p>
+          <a id="bot-link" class="result-link" href="https://github.com/candavere/lattice/blob/6463e4865dd4831efe0952d64de0f8bfaf22f9a4/benchmarks/bottleneck_evaluation_results.json" target="_blank" rel="noopener">Open result JSON</a>
+          <p class="result-source" id="bot-commit">benchmarks/bottleneck_evaluation_results.json</p>
+        </article>
+      </div>
+
+      <p class="result-explain">
+        Context changes the result: the same policy that loses on open generated maps wins when
+        both agents are funneled through capacity-1 chokepoints into one shared vault. The
+        standard-map loss stays part of the evidence — it is the baseline any future policy must
+        beat under the same protocol.
+      </p>
+      <p class="result-status" id="results-status" role="status">Loading committed results…</p>
+    </section>
+
     <section class="card">
-      <h2>Static render of the selected preset</h2>
+      <h2 id="static-title">Static render of demo.jsonl</h2>
       <p class="card-note" id="static-note">
-        The same run as a single dependency-free animated SVG, painted by the
-        CLI renderer with the recorded agent roles in every tooltip —
-        scroll-stable and printable, for when you want a shareable snapshot
-        rather than an interactive replay.
+        The same run as an animated SVG, painted by the CLI renderer. Tooltips show the room and
+        score and, when the recording records them, the agent role. Built-in recordings only — a
+        local file loaded above does not change this render.
       </p>
       <object class="demo" id="static-svg" type="image/svg+xml" data="./demo.svg" aria-label="Animated Lattice demo trajectory">
         <p class="fallback">
           Your browser could not render the animated SVG.
-          <a href="./demo.svg">Open it directly</a>.
+          <a href="./demo.svg" id="static-open">Open it directly</a>.
         </p>
       </object>
       <p class="card-note" id="static-caption">
-        Seed <code>42</code>, MCTS agent, 30 ticks. Recorded with
+        Seed 42, MCTS vs Random, 30 ticks. Recorded with
         <code>lattice simulate</code> and rendered as a dependency-free
         CSS-animated SVG with <code>lattice render --format svg</code>.
+      </p>
+      <p class="card-note">
+        <a href="./demo.svg" id="static-open-link">Open demo.svg</a> · recorded with the current
+        CLI renderer from the committed <code>site/demo.jsonl</code>.
       </p>
     </section>
 
     <section class="card">
-      <h2>Reproduce it yourself</h2>
+      <h2>Reproduce an experiment or verify a recording</h2>
       <ul class="plain">
         <li>
-          Record the infiltration scenario (Sentry vs Infiltrator)
+          Record the infiltration scenario (Sentry vs Infiltrator) — the fixed-content demo
           <pre class="cli"><code>dotnet run --project Cli -- simulate --seed 42 --scenario infiltration --steps 100 --out infiltration.jsonl</code></pre>
         </li>
         <li>
-          Or the classic sampling scenario
+          Or the classic sampling scenario (agent 0 = MCTS; see <code>--agent</code> in
+          <a href="https://github.com/candavere/lattice/blob/6463e4865dd4831efe0952d64de0f8bfaf22f9a4/docs/CLI.md">docs/CLI.md</a>)
           <pre class="cli"><code>dotnet run --project Cli -- simulate --seed 42 --agent mcts --steps 30 --out demo.jsonl</code></pre>
         </li>
         <li>
-          Render it as an animated SVG
+          Render any recorded trajectory as an animated SVG
           <pre class="cli"><code>dotnet run --project Cli -- render --trajectory infiltration.jsonl --format svg --out infiltration.svg</code></pre>
         </li>
         <li>
-          Replay it in a browser: drop the <code>.jsonl</code> file onto the
-          replay viewer above.
+          Prove a recording is honest: `--verify` re-feeds each recorded turn through the current
+          engine and compares every re-serialized result
+          <pre class="cli"><code>dotnet run -c Release --project Cli -- replay infiltration.jsonl --verify</code></pre>
+        </li>
+        <li>
+          Replay it in a browser: drop the <code>.jsonl</code> file onto the replay viewer above.
         </li>
       </ul>
+      <p class="card-note">
+        Every command is seeded and deterministic under the current engine: the same command and
+        engine re-create the same file. The committed recordings on this page were made with an
+        earlier engine revision (pre-v2 wire schema), so re-running today can record a different
+        tick-by-tick file. The viewer always shows the committed file exactly as it was recorded.
+      </p>
     </section>
   </main>
 

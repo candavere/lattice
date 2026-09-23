@@ -496,3 +496,5 @@ CHANGELOG.md
 
 # Local agent plan workspace (scratch)
 .superpowers/
+verify_site.py
+.planning/

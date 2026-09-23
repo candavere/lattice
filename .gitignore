@@ -498,3 +498,5 @@ CHANGELOG.md
 .superpowers/
 verify_site.py
 .planning/
+# ui_tests generated screenshots (visual artifacts for local/human review, not CI inputs)
+ui_tests/screenshots/

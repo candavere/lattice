@@ -13,6 +13,9 @@ Covers what the demo simplification stage asserts:
   * the vault-drift moment: page ticks 10-13 the vault is 'stale' on the
     Sentry view while ground truth still marks it 'observed',
   * door pills appear on hover (pointer cursor),
+  * legend renders as a compact aligned item grid (per-item height caps,
+    swatch top-aligned with its label, inline code chips never wrap, no
+    clipping),
   * no console/page errors.
 
 Run:  python3 -m unittest discover -s tests -p 'test_*.py' -v
@@ -219,6 +222,82 @@ async def run_viewport(browser, base, label, viewport, reduced):
             await page.wait_for_timeout(150)
             cursor = await page.evaluate("(document.querySelector('canvas').style.cursor === 'pointer')")
         results.append((f"[{label}] door pills hover", ndoors == 7 and cursor, f"doors={ndoors} cursor={cursor}"))
+
+        # -- legend: compact aligned item grid ------------------------------
+        # Each item is one unit [16px swatch][bold label + description flowing as
+        # one paragraph]; swatch top-aligned to the first text line; grid rows
+        # sized to content. Also opens the Agent-view details so its items are
+        # measured too.
+        legend_probe = """() => {
+          const section = document.querySelector('.legend');
+          const details = document.querySelector('.legend-details');
+          if (details && !details.open) details.open = true;
+          const containers = Array.from(section.querySelectorAll('.legend-grid, #legend-roles'));
+          const items = [];
+          for (const ul of containers) {
+            for (const li of ul.children) {
+              if (li.tagName !== 'LI') continue;
+              const r = li.getBoundingClientRect();
+              const sw = li.querySelector('.swatch');
+              let label = li.querySelector('b');
+              if (!label) {
+                label = Array.from(li.childNodes).reverse()
+                  .find((n) => n.nodeType === 3 && n.textContent.trim());
+              }
+              const gridR = ul.getBoundingClientRect();
+              let labelTop = label
+                ? (label.getBoundingClientRect
+                    ? label.getBoundingClientRect().top
+                    : (() => { const r = document.createRange(); r.selectNodeContents(label);
+                        return r.getBoundingClientRect().top; })())
+                : r.top;
+              items.push({
+                text: (li.textContent || '').trim().slice(0, 36),
+                h: Math.round(r.height * 100) / 100,
+                swatchTop: sw ? Math.round(sw.getBoundingClientRect().top * 100) / 100 : null,
+                labelTop: label ? Math.round(labelTop * 100) / 100 : null,
+                bottom: Math.round(r.bottom * 100) / 100,
+                gridBottom: Math.round(gridR.bottom * 100) / 100,
+                mono: Array.from(li.querySelectorAll('.mono')).map((m) => m.getClientRects().length),
+                visible: r.width > 0 && r.height > 0,
+              });
+            }
+          }
+          const secR = section.getBoundingClientRect();
+          return {
+            items,
+            gridBottoms: containers.map((u) => Math.round(u.getBoundingClientRect().bottom * 100) / 100),
+            sectionBottom: Math.round(secR.bottom * 100) / 100,
+            sectionHeight: Math.round(secR.height * 100) / 100,
+          };
+        }"""
+        legend = await page.evaluate(legend_probe)
+        cap = 110 if viewport["width"] >= 1280 else 160
+        bad_legend = []
+        if not legend["items"]:
+            bad_legend.append("no legend items found")
+        for it in legend["items"]:
+            if not it["visible"]:
+                continue
+            if it["h"] > cap:
+                bad_legend.append(f"{it['text']}: height {it['h']}>{cap}")
+            if it["swatchTop"] is not None and it["labelTop"] is not None and abs(it["swatchTop"] - it["labelTop"]) > 6:
+                bad_legend.append(f"{it['text']}: swatch-top {it['swatchTop']} vs label-top {it['labelTop']}")
+            if any(c != 1 for c in it["mono"]):
+                bad_legend.append(f"{it['text']}: mono rects {it['mono']}")
+            if it["bottom"] > it["gridBottom"] + 1:
+                bad_legend.append(f"{it['text']}: item bottom {it['bottom']} > grid bottom {it['gridBottom']}")
+        for gb in legend["gridBottoms"]:
+            if gb > legend["sectionBottom"] + 1:
+                bad_legend.append(f"grid bottom {gb} > legend section bottom {legend['sectionBottom']}")
+        results.append(
+            (f"[{label}] legend compact aligned grid (height<={cap}px, swatch~label, "
+             f"mono nowrap, nothing clipped)",
+             not bad_legend, "; ".join(bad_legend) or f"all {len(legend['items'])} items ok"))
+        legend_shots = ROOT / "ui_tests" / "screenshots"
+        legend_shots.mkdir(parents=True, exist_ok=True)
+        shot = legend_shots / f"legend_{viewport['width']}x{viewport['height']}.png"
+        await page.locator(".legend").screenshot(path=str(shot))
 
         # -- console/page errors ---------------------------------------------
         results.append((f"[{label}] no console/page errors", not errors, json.dumps(errors)))

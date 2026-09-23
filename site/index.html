@@ -149,48 +149,45 @@
         <h3>Map legend</h3>
         <ul class="legend-grid">
           <li><span class="swatch" style="background:#f7768e"></span>
-              <b>Agent token</b> — number = agent id; color = role when recorded.</li>
+              <p class="legend-text"><b>Agent token</b> — number = agent id; color = role when recorded.</p></li>
           <li><span class="swatch" style="background:#e0af68"></span>
-              <b>Unclaimed resource</b> (gold) inside its room.</li>
+              <p class="legend-text"><b>Unclaimed resource</b> (gold) inside its room.</p></li>
           <li><span class="swatch" style="background:#3da66b"></span>
-              <b>Claimed resource</b> (green).</li>
-          <li><span class="swatch line-swatch solid"></span><span class="swatch line-swatch hot"></span>
-              <b>Corridor</b> — grey is idle, amber is used by an agent this tick.</li>
+              <p class="legend-text"><b>Claimed resource</b> (green).</p></li>
+          <li><span class="swatch-col"><span class="swatch line-swatch solid"></span><span class="swatch line-swatch hot"></span></span>
+              <p class="legend-text"><b>Corridor</b> — grey is idle, amber is used by an agent this tick.</p></li>
           <li><span class="swatch line-swatch dashed"></span>
-              <b>Capacity gate</b> — a dashed corridor with a <span class="mono">CAP n</span> or
-              <span class="mono">LOCKED</span> pill. Pills stay hidden to keep the graph calm;
-              a pill appears while an agent crosses that door this tick or when you hover, focus
-              or tap the door.</li>
+              <p class="legend-text"><b>Capacity gate</b> — Dashed corridor. Its <span class="mono">CAP n</span> / <span class="mono">LOCKED</span> pill appears when an agent crosses it this tick, or on hover/tap.</p></li>
           <li><span class="swatch ring-swatch sight"></span>
-              <b>Patrol perimeter</b> (dashed) around a guard in ground truth.</li>
+              <p class="legend-text"><b>Patrol perimeter</b> (dashed) around a guard in ground truth.</p></li>
           <li><span class="swatch ring-swatch vision"></span>
-              <b>Reconstructed 2-hop sightline</b> (dashed ring) around the selected agent on an
+              <p class="legend-text"><b>Reconstructed 2-hop sightline</b> (dashed ring) around the selected agent on an
               agent view chip — the rooms this page judges reachable from recorded positions,
-              not a claim about recorded fog.</li>
+              not a claim about recorded fog.</p></li>
           <li><span class="swatch" style="background:#40c4ff"></span>
-              <b>Extraction marker</b> (cyan) above an infiltrator, when one is present.</li>
+              <p class="legend-text"><b>Extraction marker</b> (cyan) above an infiltrator, when one is present.</p></li>
         </ul>
 
         <p class="legend-heading" id="legend-roles-head">Roles in this recording</p>
-        <ul class="legend-roles" id="legend-roles"></ul>
+        <ul class="legend-grid" id="legend-roles"></ul>
 
         <details class="legend-details">
           <summary>Agent view details</summary>
           <ul class="legend-grid">
             <li><span class="swatch room-swatch observed"></span>
-                <b>Observed room</b> — inside the reconstructed 2-hop sightline horizon this tick.</li>
+                <p class="legend-text"><b>Observed room</b> — inside the reconstructed 2-hop sightline horizon this tick.</p></li>
             <li><span class="swatch room-swatch stale"></span>
-                <b>Last known</b> — seen earlier, now out of the reconstructed sightline.</li>
+                <p class="legend-text"><b>Last known</b> — seen earlier, now out of the reconstructed sightline.</p></li>
             <li><span class="swatch room-swatch unknown"></span>
-                <b>Unexplored</b> — this agent has never seen it.</li>
+                <p class="legend-text"><b>Unexplored</b> — this agent has never seen it.</p></li>
             <li><span class="swatch ring-swatch vision"></span>
-                <b>Reconstructed horizon</b> — where the dashed ring sits on an agent view chip.</li>
+                <p class="legend-text"><b>Reconstructed horizon</b> — where the dashed ring sits on an agent view chip.</p></li>
             <li><span class="swatch ring-swatch ghost"></span>
-                <b>Last-seen ghost</b> — faded rival memory labeled with its age.</li>
+                <p class="legend-text"><b>Last-seen ghost</b> — faded rival memory labeled with its age.</p></li>
             <li><span class="swatch" style="background:#16233f;border:1px solid #1e293b"></span>
-                <b>Occupancy badge</b> — <span class="mono">count</span> or <span class="mono">n/cap</span>.</li>
+                <p class="legend-text"><b>Occupancy badge</b> — <span class="mono">count</span> or <span class="mono">n/cap</span>.</p></li>
             <li><span class="swatch line-swatch hot"></span>
-                <b>In transit</b> — dashed amber ring and a <span class="mono">crossing to … (t)</span> label.</li>
+                <p class="legend-text"><b>In transit</b> — dashed amber ring and a <span class="mono">crossing to … (t)</span> label.</p></li>
           </ul>
         </details>
       </section>

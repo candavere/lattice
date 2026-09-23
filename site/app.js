@@ -19,25 +19,43 @@
   const PINNED_SHA = '6463e4865dd4831efe0952d64de0f8bfaf22f9a4';
 
   const PRESETS = {
-    demo: {
-      url: './demo.jsonl',
-      name: 'demo.jsonl',
-      repoPath: 'site/demo.jsonl',
-      staticSvg: './demo.svg',
-      staticName: 'demo.svg',
-      caption: 'Seed 42, MCTS (agent 0) vs Random (agent 1), 30 ticks. Recorded with lattice simulate --seed 42 --agent mcts --steps 30 and rendered as a dependency-free CSS-animated SVG with lattice render --format svg.',
-      reproduce: 'dotnet run --project Cli -- simulate --seed 42 --agent mcts --steps 30 --out demo.jsonl',
-    },
     infiltration: {
       url: './infiltration.jsonl',
       name: 'infiltration.jsonl',
       repoPath: 'site/infiltration.jsonl',
       staticSvg: './infiltration.svg',
       staticName: 'infiltration.svg',
+      chipLabel: 'Infiltration',
+      scenarioOrder: 0,
       caption: 'Seed 42, Dungeon Infiltration & Sentry Patrol: the Infiltrator raids the Treasure Vault under a patrolling Sentry. Recorded with lattice simulate --seed 42 --scenario infiltration --steps 100 and rendered as an animated SVG with lattice render --format svg.',
       reproduce: 'dotnet run --project Cli -- simulate --seed 42 --scenario infiltration --steps 100 --out infiltration.jsonl',
     },
+    demo: {
+      url: './demo.jsonl',
+      name: 'demo.jsonl',
+      repoPath: 'site/demo.jsonl',
+      staticSvg: './demo.svg',
+      staticName: 'demo.svg',
+      chipLabel: 'Benchmark',
+      scenarioOrder: 1,
+      caption: 'Seed 42, MCTS (agent 0) vs Random (agent 1), 30 ticks. Recorded with lattice simulate --seed 42 --agent mcts --steps 30 and rendered as a dependency-free CSS-animated SVG with lattice render --format svg.',
+      reproduce: 'dotnet run --project Cli -- simulate --seed 42 --agent mcts --steps 30 --out demo.jsonl',
+    },
   };
+
+  // Scenario chip labels are data-driven from the preset table above, never
+  // hard-coded in the strip builder.
+  const SCENARIO_CHIPS = Object.keys(PRESETS)
+    .map(function (key) { return { key: key, preset: PRESETS[key] }; })
+    .sort(function (a, b) { return a.preset.scenarioOrder - b.preset.scenarioOrder; });
+
+  // Playback speeds — the same values the old speed <select> carried.
+  const SPEEDS = [
+    { label: '0.5×', value: 800 },
+    { label: '1×', value: 420 },
+    { label: '2×', value: 200 },
+    { label: '4×', value: 90 },
+  ];
 
   const RESULT_ARTIFACTS = [
     {
@@ -93,6 +111,7 @@
     fogStaleStroke: '#44506e',
     fogText: '#5b6a8a',
     fogDivider: '#1e293b',
+    accentBar: '#3b82f6',
   };
 
   /* ---------------------------------------------------------------- DOM  */
@@ -122,44 +141,44 @@
     dom.playBtn = document.getElementById('play-btn');
     dom.stepBackBtn = document.getElementById('step-back-btn');
     dom.stepFwdBtn = document.getElementById('step-fwd-btn');
-    dom.speedSelect = document.getElementById('speed-select');
     dom.fileInput = document.getElementById('file-input');
-    dom.presetSelect = document.getElementById('preset-select');
     dom.staticSvg = document.getElementById('static-svg');
     dom.staticTitle = document.getElementById('static-title');
     dom.staticOpen = document.getElementById('static-open');
     dom.staticOpenLink = document.getElementById('static-open-link');
     dom.staticCaption = document.getElementById('static-caption');
-    dom.viewGround = document.getElementById('view-ground');
-    dom.viewAgent = document.getElementById('view-agent');
-    dom.viewSplit = document.getElementById('view-split');
-    dom.egoSelect = document.getElementById('ego-agent-select');
+    dom.scenarioChips = document.getElementById('scenario-chips');
+    dom.perspectiveChips = document.getElementById('perspective-chips');
+    dom.speedChips = document.getElementById('speed-chips');
+    dom.mapCaption = document.getElementById('map-caption');
     dom.sentence = document.getElementById('tick-sentence');
     dom.legendRoles = document.getElementById('legend-roles');
     dom.provGrid = document.getElementById('prov-grid');
     dom.provOpen = document.getElementById('prov-open');
     dom.provRepro = document.getElementById('prov-repro');
 
-    dom.viewGround.addEventListener('click', function () { setViewMode('ground'); });
-    dom.viewAgent.addEventListener('click', function () { setViewMode('agent'); });
-    dom.viewSplit.addEventListener('click', function () { setViewMode('split'); });
-    dom.egoSelect.addEventListener('change', function () {
-      const picked = parseInt(dom.egoSelect.value, 10);
-      if (Number.isInteger(picked)) {
-        state.egoId = picked;
-        scheduleDraw();
-      }
-    });
+    // Self-test geometry probe: with ?measure=1 the page records the exact
+    // bounds of every drawn room label, agent token and door pill each frame
+    // so the browser harness can assert "no token overlaps a room label" on
+    // the real rendering. Draws nothing; off by default.
+    measureProbe.on = /[?&]measure=1/.test(window.location.search);
+
+    buildScenarioChips();
+    buildSpeedChips();
+    buildPerspectiveChips();
 
     dom.playBtn.addEventListener('click', togglePlay);
     dom.stepBackBtn.addEventListener('click', function () { pause(); stepBy(-1); });
     dom.stepFwdBtn.addEventListener('click', function () { pause(); stepBy(+1); });
     dom.slider.addEventListener('input', function () { pause(); setIndex(Number(dom.slider.value)); });
-    dom.speedSelect.addEventListener('change', function () { applyCadence(); });
     dom.fileInput.addEventListener('change', handleFileChoice);
-    dom.presetSelect.addEventListener('change', handlePresetChoice);
     document.addEventListener('dragover', preventDefaultFileDrop);
     document.addEventListener('drop', handleDrop);
+    dom.canvas.addEventListener('pointermove', onCanvasPointerMove);
+    dom.canvas.addEventListener('pointerdown', function (e) { onCanvasPointerMove(e); });
+    dom.canvas.addEventListener('pointerleave', clearHoverDoor);
+    dom.canvas.addEventListener('focus', onCanvasFocus);
+    dom.canvas.addEventListener('blur', clearHoverDoor);
     window.addEventListener('resize', onViewportResize);
     if (typeof reducedMotionQuery.addEventListener === 'function') {
       reducedMotionQuery.addEventListener('change', function () {
@@ -169,14 +188,12 @@
       });
     }
 
-    refreshViewButtons();
     loadResults();
     loadDefault();
   });
 
   /* ------------------------------------------------------- viewer state  */
 
-  const narrowQuery = window.matchMedia('(max-width: 640px)');
   const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
 
   const state = {
@@ -188,11 +205,20 @@
     layouts: {},        // per-viewport-size layout cache: "WxH" -> layout
     canv: null,         // { cssW, cssH } of last fitted size
     needsDraw: false,
-    viewMode: narrowQuery.matches ? 'ground' : 'split', // 'ground' | 'agent' | 'split'
-    lastFocus: 'ground', // last single-view choice, preserved across breakpoints
-    egoId: 0,           // observed-agent slot for the Agent view
+    perspective: 'ground', // 'ground' | <agentId number> — one map, one perspective
+    egoId: 0,           // observed-agent slot used by the agent perspective
+    hoverDoorId: null,  // chokepoint whose capacity pill is hovered/focused
     pulseStart: 0,      // performance.now() origin of the ego radar pulse
     pulseTimer: null,   // interval driving the radar pulse while fog is shown
+  };
+
+  // Geometry probe backing the `?measure=1` browser harness (see DOM wiring).
+  const measureProbe = {
+    on: false,
+    labels: {},         // zoneId -> {x,y,w,h}
+    tokens: {},         // agentId -> {x,y,r}
+    doors: {},          // chokeId -> {x,y,w,h,edge}
+    statusByZone: {},   // zoneId -> 'observed' | 'stale' | 'unknown' (per this draw)
   };
 
   /* ------------------------------------------------------- trajectory IO  */
@@ -229,12 +255,6 @@
     const file = event.target.files && event.target.files[0];
     if (file) readTrajectoryFile(file);
     event.target.value = '';
-  }
-
-  function handlePresetChoice(event) {
-    const key = event.target.value;
-    if (key === 'custom') return;
-    loadPreset(key);
   }
 
   function loadPreset(key) {
@@ -278,18 +298,15 @@
     state.playing = false;
     state.layouts = {};
     stopTimer();
-    populateEgoSelect(traj);
+    populatePerspectiveChips(traj);
     dom.playBtn.textContent = 'Play';
     dom.slider.max = String(Math.max(0, traj.frames.length - 1));
     dom.slider.value = '0';
     dom.source.textContent = fileName;
     dom.fileInput.title = fileName;
     if (presetKey && PRESETS[presetKey]) {
-      dom.presetSelect.value = presetKey;
+      setScenarioChip(presetKey);
       setStaticPreset(presetKey);
-    } else {
-      dom.presetSelect.value = 'custom';
-      // A local file never changes the built-in static render.
     }
     const roster = traj.header.AgentRoles;
     dom.roster.textContent = traj.header.Scenario
@@ -298,36 +315,44 @@
     hideDom(dom.hint);
     renderProvenance(traj, fileName, presetKey);
     renderLegendRoles(traj);
-    if (state.viewMode !== 'ground') startPulse();
+    if (state.perspective !== 'ground') startPulse(); else stopPulse();
     scheduleDraw();
   }
 
-  // The observed-agent dropdown: "Agent 0 (Sentry)" style options, defaulting
-  // to the Infiltrator when the trajectory carries that roster.
-  function populateEgoSelect(traj) {
+  // The perspective strip: a mandatory "Ground truth" chip plus one chip per
+  // recorded agent, labelled by role. Default stays the current logic — the
+  // Sentry when one is recorded (its reconstructed 2-hop sightline is the
+  // hero's moment to watch); the choice is never locked.
+  function buildPerspectiveChips() {
+    // Startup state (no recording yet): only the "Ground truth" chip exists.
+    rebuildChips(dom.perspectiveChips, [{ value: 'ground', label: 'Ground truth' }], 'ground', function (value) {
+      if (!state.trajectory) return;
+      setPerspective(value);
+      scheduleDraw();
+    });
+  }
+
+  function populatePerspectiveChips(traj) {
     const roles = traj.header.AgentRoles || [];
     const agents = traj.frames.length ? traj.frames[0].agents : [];
-    dom.egoSelect.innerHTML = '';
-    agents.forEach(function (agent) {
-      const option = document.createElement('option');
+    const options = [{ value: 'ground', label: 'Ground truth' }];
+    agents.slice().sort(function (a, b) { return a.AgentId - b.AgentId; }).forEach(function (agent) {
       const role = roles[agent.AgentId];
-      option.value = String(agent.AgentId);
-      option.textContent = 'Agent ' + agent.AgentId + (role ? ' (' + role + ')' : '');
-      dom.egoSelect.appendChild(option);
+      options.push({
+        value: agent.AgentId,
+        label: role || 'Agent ' + agent.AgentId,
+      });
     });
-    // Guided hero: the sightline the page reconstructs belongs to the Sentry, so
-    // the observed-agent dropdown should open on the Sentry &mdash; where the
-    // Vault is seen to drift out of the dashed ring in the moment to watch.
     const sentryIndex = roles.indexOf('Sentry');
     const infiltratorIndex = roles.indexOf('Infiltrator');
-    // Ego default = the Sentry: the reconstructed 2-hop sightline this page draws
-    // is the Sentry's, so the vault drifting out of its dashed ring at ticks
-    // 9&ndash;13 is the moment to watch from exactly the agent page architecture
-    // reconstructs for the hero path. The Infiltrator stays selectable in the
-    // dropdown &mdash; the dropdown is never locked to one agent.
-    state.egoId = sentryIndex >= 0 ? sentryIndex : (infiltratorIndex >= 0 ? infiltratorIndex : 0);
-    dom.egoSelect.value = String(state.egoId);
-    dom.egoSelect.disabled = agents.length < 2;
+    const defaultPerspective = sentryIndex >= 0
+      ? sentryIndex
+      : (infiltratorIndex >= 0 ? infiltratorIndex : (agents.length ? agents[0].AgentId : 'ground'));
+    setPerspective(defaultPerspective, { silent: true });
+    rebuildChips(dom.perspectiveChips, options, defaultPerspective, function (value) {
+      setPerspective(value);
+      scheduleDraw();
+    });
   }
 
   function setStaticPreset(key) {
@@ -344,38 +369,215 @@
     dom.staticOpen.href = preset.staticSvg;
   }
 
-  /* ----------------------------------------------------------- view mode  */
+  /* ------------------------------------------------------------- chips  */
+
+  // Build a single-select chip group (roving tabindex, arrow keys, aria).
+  // Radiogroup semantics with expensive-explicit state: the selected chip is
+  // aria-pressed=true AND aria-checked=true; arrows move selection+focus.
+  function buildChipGroup(container, options, selectedValue, onSelect, dataAttr) {
+    container.innerHTML = '';
+    options.forEach(function (opt, idx) {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'chip' + (opt.value === selectedValue ? ' active' : '');
+      chip.textContent = String(opt.label);
+      chip.setAttribute('role', 'radio');
+      chip.setAttribute('aria-checked', opt.value === selectedValue ? 'true' : 'false');
+      chip.setAttribute('aria-pressed', opt.value === selectedValue ? 'true' : 'false');
+      if (dataAttr) chip.setAttribute('data-' + dataAttr, String(opt.value));
+      chip.tabIndex = opt.value === selectedValue ? 0 : -1;
+      if (opt.title) chip.title = opt.title;
+      container.appendChild(chip);
+    });
+    restoreChipAccess(container);
+  }
+
+  // The chips in a group get roving keyboard navigation: Left/Up and
+  // Right/Down step selection, Home/End jump to the ends. Selecting a chip
+  // fires its onChange, exactly like picking the old <select> option would.
+  function restoreChipAccess(container) {
+    const chips = Array.prototype.slice.call(container.querySelectorAll('.chip'));
+    chips.forEach(function (chip, idx) {
+      chip.addEventListener('click', function () {
+        selectChip(container, chip);
+      });
+      chip.addEventListener('keydown', function (event) {
+        let next = null;
+        if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') next = chips[idx - 1];
+        else if (event.key === 'ArrowRight' || event.key === 'ArrowDown') next = chips[idx + 1];
+        else if (event.key === 'Home') next = chips[0];
+        else if (event.key === 'End') next = chips[chips.length - 1];
+        if (!next) return;
+        event.preventDefault();
+        selectChip(container, next, true);
+      });
+    });
+  }
+
+  function selectChip(container, chip, focus) {
+    const prev = container.querySelector('.chip.active');
+    if (prev && prev !== chip) {
+      prev.classList.remove('active');
+      prev.setAttribute('aria-checked', 'false');
+      prev.setAttribute('aria-pressed', 'false');
+      prev.tabIndex = -1;
+    }
+    chip.classList.add('active');
+    chip.setAttribute('aria-checked', 'true');
+    chip.setAttribute('aria-pressed', 'true');
+    chip.tabIndex = 0;
+    if (focus) chip.focus();
+    if (container._onSelect) container._onSelect(chip.dataset.id);
+  }
+
+  function rebuildChips(container, options, selectedValue, onSelect) {
+    container._onSelect = onSelect;
+    buildChipGroup(container, options, selectedValue, null, 'id');
+  }
+
+  function buildScenarioChips() {
+    const options = SCENARIO_CHIPS.map(function (entry) {
+      return { value: entry.key, label: entry.preset.chipLabel };
+    });
+    rebuildChips(dom.scenarioChips, options, 'infiltration', function (key) {
+      if (state.perspective || state.trajectory) loadPreset(key);
+    });
+  }
+
+  function setScenarioChip(key) {
+    selectChipSync(dom.scenarioChips, key);
+  }
+
+  function buildSpeedChips() {
+    const options = SPEEDS.map(function (s) {
+      return { value: String(s.value), label: s.label };
+    });
+    rebuildChips(dom.speedChips, options, String(state.cadenceMs), function (value) {
+      state.cadenceMs = parseInt(value, 10) || state.cadenceMs;
+      if (state.playing) startTimer(); // keep autoplay cadence current
+    });
+  }
+
+  // select a chip by data-id value without firing its onSelect (used when the
+  // program, not the visitor, changes state — preset load, cadence default).
+  function selectChipSync(container, value) {
+    const chips = Array.prototype.slice.call(container.querySelectorAll('.chip'));
+    const target = chips.filter(function (c) { return c.dataset.id === String(value); })[0];
+    if (target) {
+      const prev = container.querySelector('.chip.active');
+      if (prev && prev !== target) prev.classList.remove('active');
+      if (!target.classList.contains('active')) {
+        target.classList.add('active');
+        target.setAttribute('aria-checked', 'true');
+        target.setAttribute('aria-pressed', 'true');
+      } else {
+        target.setAttribute('aria-checked', 'true');
+        target.setAttribute('aria-pressed', 'true');
+      }
+      if (prev && prev !== target) {
+        prev.setAttribute('aria-checked', 'false');
+        prev.setAttribute('aria-pressed', 'false');
+        prev.tabIndex = -1;
+      }
+      target.tabIndex = 0;
+    }
+  }
+
+  /* ----------------------------------------------------------- perspective  */
 
   function onViewportResize() {
-    refreshViewButtons();
     scheduleDraw();
   }
 
-  // The view actually rendered: on narrow screens a chosen 'split' mode
-  // degrades to the user's last single-view choice rather than trapping them.
-  function effectiveView() {
-    if (state.viewMode === 'split' && narrowQuery.matches) return state.lastFocus;
-    return state.viewMode;
+  // The single map's perspective: is the current chip a recorded agent?
+  function perspectiveIsAgent() {
+    return typeof state.perspective === 'number';
   }
 
-  function setViewMode(mode) {
-    if (mode === 'ground' || mode === 'agent') state.lastFocus = mode;
-    state.viewMode = mode;
-    refreshViewButtons();
-    if (effectiveView() === 'ground') stopPulse(); else startPulse();
-    scheduleDraw();
+  function setPerspective(value, opts) {
+    opts = opts || {};
+    const wasAgent = perspectiveIsAgent();
+    // Chips hand us dataset ids (strings); adopt the same shape as the old
+    // numeric ego id and keep 'ground' as the only sentinel.
+    let v = value;
+    if (v === 'ground') v = 'ground';
+    else if (typeof v === 'string' && /^-?\d+$/.test(v)) v = parseInt(v, 10);
+    if (v === 'ground' || (typeof v === 'number' && isFinite(v))) {
+      state.perspective = v;
+    }
+    if (perspectiveIsAgent()) state.egoId = state.perspective;
+    if (!opts.silent) {
+      refreshChipActive(dom.perspectiveChips, String(state.perspective));
+      updateMapCaption();
+      if (perspectiveIsAgent() !== wasAgent) {
+        if (perspectiveIsAgent()) startPulse(); else stopPulse();
+      }
+      scheduleDraw();
+      if (perspectiveIsAgent() && !opts.noFade) fadeCanvas();
+      updateCanvasLabel();
+    }
+  }
+
+  function groundChip() {
+    return dom.perspectiveChips.querySelector('.chip[data-id="ground"]');
+  }
+
+  function refreshChipActive(container, value) {
+    const chips = Array.prototype.slice.call(container.querySelectorAll('.chip'));
+    chips.forEach(function (chip) {
+      const on = chip.dataset.id === String(value);
+      chip.classList.toggle('active', on);
+      chip.setAttribute('aria-checked', on ? 'true' : 'false');
+      chip.setAttribute('aria-pressed', on ? 'true' : 'false');
+      chip.tabIndex = on ? 0 : -1;
+    });
+  }
+
+  // The one caption line under the map changes with the perspective chip.
+  function updateMapCaption() {
+    if (!dom.mapCaption) return;
+    const traj = state.trajectory;
+    let text;
+    if (!traj) {
+      text = 'Ground truth: everything in the world.';
+    } else if (!perspectiveIsAgent()) {
+      text = 'Ground truth: everything in the world.';
+    } else {
+      const role = traj.header.AgentRoles && traj.header.AgentRoles[state.egoId];
+      const name = role || 'Agent ' + state.egoId;
+      text = 'What the ' + name + ' could reach (reconstructed 2-hop sightline).';
+    }
+    if (dom.mapCaption.textContent !== text) dom.mapCaption.textContent = text;
+  }
+
+  // Short cross-fade when the visitor switches perspective (<=250ms; the
+  // global reduced-motion rule collapses it to 0.01ms).
+  function fadeCanvas() {
+    if (reducedMotionQuery.matches) return;
+    if (!dom.canvas || dom.canvas._fading) return;
+    dom.canvas._fading = true;
+    dom.canvas.classList.add('perspective-fade');
+    window.setTimeout(function () {
+      dom.canvas.classList.remove('perspective-fade');
+      dom.canvas._fading = false;
+    }, 240);
+  }
+
+  function updateCanvasLabel() {
+    const traj = state.trajectory;
+    const label = perspectiveIsAgent()
+      ? 'Replay view — ' + egoLabel(traj) + "'s reconstructed 2-hop sightline" +
+        ', tick ' + state.index + ' of ' + (traj ? traj.frames.length - 1 : 0)
+      : 'Replay view — Ground truth, tick ' + state.index +
+        ' of ' + (traj ? traj.frames.length - 1 : 0);
+    if (dom.canvas && dom.canvas.getAttribute('aria-label') !== label) {
+      dom.canvas.setAttribute('aria-label', label);
+    }
   }
 
   function setPressed(el, isPressed) {
     el.classList.toggle('active', isPressed);
     el.setAttribute('aria-pressed', isPressed ? 'true' : 'false');
-  }
-
-  function refreshViewButtons() {
-    const eff = effectiveView();
-    setPressed(dom.viewGround, eff === 'ground');
-    setPressed(dom.viewAgent, eff === 'agent');
-    setPressed(dom.viewSplit, state.viewMode === 'split');
   }
 
   function dropTrajectory() {
@@ -392,8 +594,7 @@
     dom.statSteps.textContent = '—';
     dom.statSeed.textContent = '—';
     dom.statAgents.textContent = '—';
-    dom.egoSelect.innerHTML = '';
-    dom.egoSelect.disabled = true;
+    resetPerspectiveChips();
     dom.legendRoles.innerHTML = '';
     dom.provGrid.innerHTML = '';
     dom.provOpen.innerHTML = '';
@@ -402,6 +603,14 @@
     updateTransportDisabled();
     clearCanvas();
     showDom(dom.hint);
+  }
+
+  // With no trajectory loaded the only honest perspective is "Ground truth".
+  function resetPerspectiveChips() {
+    state.perspective = 'ground';
+    refreshChipActive(dom.perspectiveChips, 'ground');
+    updateMapCaption();
+    updateCanvasLabel();
   }
 
   /* ------------------------------------------------- geometry + drawing  */
@@ -478,7 +687,14 @@
       return cached;
     }
 
-    const pad = 46;
+    // Rooms are label-sized in screen pixels while corridors scale with the
+    // fitted transform, so the margin must reserve the widest possible room
+    // half-width or the outermost rooms get clipped at the canvas edge.
+    const maxRoomHalf = zones.reduce(function (largest, z) {
+      const half = Math.max(ROOM_MIN_WIDTH, roomLabel(z).length * 7.4 + 26) / 2;
+      return Math.max(largest, half);
+    }, 0);
+    const pad = Math.max(46, Math.ceil(maxRoomHalf) + 24);
     const spanX = Math.max(1, maxX - minX);
     const spanY = Math.max(1, maxY - minY);
     const fitW = Math.max(1, w - 2 * pad);
@@ -508,37 +724,30 @@
     const traj = state.trajectory;
 
     clearCanvas();
+    measureProbe.labels = {};
+    measureProbe.tokens = {};
+    measureProbe.doors = {};
+    measureProbe.statusByZone = {};
     if (!traj || !traj.frames.length) return;
 
     const frame = traj.frames[state.index];
     const w = dom.canvas.clientWidth;
     const h = dom.canvas.clientHeight;
-    const view = effectiveView();
 
-    if (view === 'split') {
-      const split = Math.floor(w / 2);
-      drawViewport(ctx, traj, frame, { x: 0, y: 0, w: split - 5, h: h }, null, 'Ground truth');
-      ctx.strokeStyle = COLORS.fogDivider;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(split, 6);
-      ctx.lineTo(split, h - 6);
-      ctx.stroke();
-      drawViewport(ctx, traj, frame, { x: split + 5, y: 0, w: w - split - 5, h: h },
-        computePerception(traj, state.index, state.egoId),
-        'Agent view · ' + egoLabel(traj));
-    } else if (view === 'agent') {
-      drawViewport(ctx, traj, frame, { x: 0, y: 0, w: w, h: h },
-        computePerception(traj, state.index, state.egoId),
-        'Agent view · ' + egoLabel(traj));
-    } else {
-      drawViewport(ctx, traj, frame, { x: 0, y: 0, w: w, h: h }, null, 'Ground truth');
-    }
+    // One map. The perspective chip decides whether we draw the ground truth
+    // or the observed agent's fog-of-war over the same fitted layout.
+    const fog = perspectiveIsAgent()
+      ? computePerception(traj, state.index, state.egoId)
+      : null;
+    drawViewport(ctx, traj, frame, { x: 0, y: 0, w: w, h: h }, fog);
 
     renderStatus();
     renderMetrics();
     updateSentence();
+    updateMapCaption();
+    updateCanvasLabel();
     updateTransportDisabled();
+    publishMeasureProbe();
   }
 
   function egoLabel(traj) {
@@ -548,9 +757,10 @@
       : 'AGENT ' + state.egoId;
   }
 
-  // One rectangular viewport: its own layout, its own fog policy, and an
-  // optional header badge identifying what it shows.
-  function drawViewport(ctx, traj, frame, region, fog, badge) {
+  // One full-canvas viewport: a fitted layout and an optional fog policy.
+  // No in-canvas header badge — the "RECONSTRUCTED SIGHTLINE" label is the
+  // CSS chip on the viewer wrapper, and the caption below the map re-states it.
+  function drawViewport(ctx, traj, frame, region, fog) {
     const layout = ensureLayout(traj, region.w, region.h);
     if (!layout) return;
 
@@ -568,18 +778,76 @@
     if (fog) drawHorizonRing(ctx, map, frame, layout, fog);
 
     ctx.restore();
+  }
 
-    if (badge) {
-      ctx.font = 'bold 10px monospace';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'middle';
-      const tw = ctx.measureText(badge).width;
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-      ctx.fillRect(region.x + 8, region.y + 6, tw + 14, 18);
-      ctx.strokeStyle = COLORS.fogDivider;
-      ctx.strokeRect(region.x + 8, region.y + 6, tw + 14, 18);
-      ctx.fillStyle = fog ? COLORS.extraction : COLORS.gateText;
-      ctx.fillText(badge, region.x + 15, region.y + 15);
+  /* ------------------------------------------------- door hover / focus  */
+
+  // Doors reveal their capacity & type pill on hover/focus/tap of that edge.
+  // Hit-test against the pill rectangles stored by drawEdges for this tick.
+  function onCanvasPointerMove(event) {
+    if (!state.trajectory || !state.trajectory.header.Map) return;
+    const map = state.trajectory.header.Map;
+    const regions = map._doorRegions;
+    if (!regions) return;
+    const found = hitDoor(event.offsetX, event.offsetY, regions);
+    if (found !== state.hoverDoorId) {
+      state.hoverDoorId = found;
+      scheduleDraw();
+      if (found !== null) dom.canvas.style.cursor = 'pointer';
+      else dom.canvas.style.cursor = '';
+    }
+  }
+
+  function onCanvasFocus() {
+    if (!state.trajectory || !state.trajectory.header.Map) return;
+    const map = state.trajectory.header.Map;
+    const regions = map._doorRegions;
+    if (!regions) return;
+    // No pointer on the canvas during focus; reveal the door whose state
+    // just changed (a traversal this tick), if any — the one auto-shown.
+    const burst = transitEdges(state.trajectory.frames[state.index]);
+    let picked = null;
+    Object.keys(regions).forEach(function (chokeId) {
+      const choke = map.ChokePoints[chokeId];
+      if (choke && burst[edgeKey(choke.FromZoneId, choke.ToZoneId)]) picked = chokeId;
+    });
+    if (picked !== state.hoverDoorId) {
+      state.hoverDoorId = picked;
+      scheduleDraw();
+    }
+  }
+
+  function clearHoverDoor() {
+    if (state.hoverDoorId !== null) {
+      state.hoverDoorId = null;
+      dom.canvas.style.cursor = '';
+      scheduleDraw();
+    }
+  }
+
+  function hitDoor(pxx, pyy, regions) {
+    const ids = Object.keys(regions);
+    for (var j = 0; j < ids.length; j += 1) {
+      const r = regions[ids[j]];
+      if (pxx >= r.x && pxx <= r.x + r.w && pyy >= r.y && pyy <= r.y + r.h) return ids[j];
+    }
+    return null;
+  }
+
+  /* -------------------------------------------- measure probe (test hook)  */
+
+  // Present only when the page is opened with ?measure=1: exposes the exact
+  // on-canvas bounds of every room label, agent token and door pill that was
+  // just drawn. The browser harness uses this to prove tokens never overlap a
+  // room label, and no node clips at the canvas edge. No-op otherwise.
+  function publishMeasureProbe() {
+    measureProbe.frame = {
+      index: state.index,
+      perspective: state.perspective,
+      canvas: state.canv || null,
+    };
+    if (measureProbe.on) {
+      window.__latticeGeo = measureProbe;
     }
   }
 
@@ -766,6 +1034,7 @@
 
   function drawEdges(ctx, map, frame, layout, fog) {
     const burst = transitEdges(frame);
+    const leveledDoors = {}; // chokeId -> pill rect, for hover/focus hit tests
 
     map.ChokePoints.forEach(function (choke) {
       const zoneA = map.Zones[choke.FromZoneId];
@@ -796,34 +1065,59 @@
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Gate badge: a compact capsule on the corridor, never a circle that
-      // could be mistaken for a room. Hidden while either side is unexplored.
+      // Capacity gate pill: hidden by default to keep the graph calm. It
+      // auto-shows only when a door's state changes on the current tick (an
+      // agent crosses that edge now), and on hover/focus/tap of the edge.
+      // "Its state changes" here means traversal — the only per-tick change
+      // the recording carries for a door.
       if (limited && !anyUnknown) {
         const midX = (ends.ax + ends.bx) / 2;
         const midY = (ends.ay + ends.by) / 2;
         const label = choke.MaxOccupancy === 0 ? 'LOCKED' : 'CAP ' + choke.MaxOccupancy;
         const bw = label.length * 6.4 + 14;
-        roundedRect(ctx, midX - bw / 2, midY - 9, bw, 18, 9);
-        ctx.fillStyle = COLORS.gateBg;
-        ctx.fill();
-        ctx.strokeStyle = hot ? COLORS.corridorHot : anyStale ? COLORS.fogStaleStroke : COLORS.corridor;
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        ctx.fillStyle = hot ? COLORS.corridorHot : anyStale ? COLORS.fogText : COLORS.gateText;
-        ctx.font = 'bold 9px monospace';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(label, midX, midY + 0.5);
+        const pillRect = { x: midX - bw / 2, y: midY - 9, w: bw + 4, h: 26 };
+        leveledDoors[choke.Id] = pillRect;
+        if (measureProbe.on) {
+          measureProbe.doors[choke.Id] = {
+            x: pillRect.x, y: pillRect.y, w: pillRect.w, h: pillRect.h,
+            edge: choke.FromZoneId + ':' + choke.ToZoneId,
+          };
+        }
+        const showPill = hot || state.hoverDoorId === choke.Id;
+        if (showPill) {
+          roundedRect(ctx, midX - bw / 2, midY - 9, bw, 18, 9);
+          ctx.fillStyle = state.hoverDoorId === choke.Id ? COLORS.accentBar : COLORS.gateBg;
+          ctx.fill();
+          ctx.strokeStyle = hot ? COLORS.corridorHot : anyStale ? COLORS.fogStaleStroke : COLORS.corridor;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.fillStyle = hot ? COLORS.corridorHot : anyStale ? COLORS.fogText : COLORS.gateText;
+          ctx.font = 'bold 9px monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(label, midX, midY + 0.5);
 
-        if (choke.Role) {
-          ctx.font = '8px monospace';
-          ctx.fillStyle = COLORS.mutedText;
-          ctx.globalAlpha = anyStale ? 0.55 : 1;
-          ctx.fillText(spaceCamel(choke.Role), midX, midY + 17);
-          ctx.globalAlpha = 1;
+          if (choke.Role) {
+            ctx.font = '8px monospace';
+            ctx.fillStyle = COLORS.mutedText;
+            ctx.globalAlpha = anyStale ? 0.55 : 1;
+            ctx.fillText(spaceCamel(choke.Role), midX, midY + 17);
+            ctx.globalAlpha = 1;
+          }
         }
       }
     });
+
+    // Persist this tick's door hit regions so a pointer move/focus can reveal
+    // the pill for the edge under it without recomputing the whole graph.
+    const regions = {};
+    Object.keys(leveledDoors).forEach(function (id) { regions[id] = leveledDoors[id]; });
+    map._doorRegions = regions;
+
+    // Drop a hover that no longer targets a door (e.g. door left the view).
+    if (state.hoverDoorId !== null && !regions[state.hoverDoorId]) {
+      state.hoverDoorId = null;
+    }
   }
 
   // Loot sits inside its room; never floating in open canvas space. The
@@ -875,6 +1169,7 @@
       const rect = roomRect(zone, layout);
       const status = zoneStatus(fog, zone.Id);
       const borderRadius = 9;
+      if (measureProbe.on) measureProbe.statusByZone[zone.Id] = status;
 
       if (status === 'unknown') {
         // Shrouded silhouette: the observer has never reached this room.
@@ -901,29 +1196,44 @@
       ctx.lineWidth = status === 'stale' ? 1.3 : 1.6;
       ctx.stroke();
 
-      // Room title strip.
+      // Room title strip on a dedicated top band, so the labels below (agent
+      // tokens, occupancy) can never sit on top of the room name.
       ctx.fillStyle = status === 'stale' ? COLORS.fogText : COLORS.roomText;
       ctx.font = 'bold 11px monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(roomLabel(zone), rect.x, rect.y - 6);
+      const label = roomLabel(zone);
+      const labelY = rect.y - rect.hh + 13;
+      ctx.fillText(label, rect.x, labelY);
+      if (measureProbe.on) {
+        const lw = ctx.measureText(label).width;
+        measureProbe.labels[zone.Id] = { x: rect.x - lw / 2, y: labelY - 6, w: lw, h: 12 };
+      }
 
+      // Occupancy badge: a clear fraction when capped, a plain count when
+      // not. Top-right when it clears the room name; otherwise bottom-right,
+      // where the loot row (bottom-left) leaves it unimpeded.
       if (status === 'observed') {
-        // Occupancy badge: a clear fraction when capped, a plain count when not.
         const present = occupied[zone.Id] || 0;
         const capped = zone.MaxOccupancy !== UNLIMITED && zone.MaxOccupancy < UNLIMITED;
         const occ = capped ? present + '/' + zone.MaxOccupancy : String(present);
         ctx.font = '9px monospace';
         const bw = occ.length * 6.4 + 12;
-        roundedRect(ctx, rect.x + rect.hw - bw - 5, rect.y - rect.hh + 4, bw, 13, 6);
+        const lw = ctx.measureText(label).width;
+        const collide = rect.x + rect.hw - bw - 5 < rect.x + lw / 2 + 4;
+        const bx = rect.x + rect.hw - bw - 5;
+        const by = collide
+          ? rect.y + rect.hh - 8
+          : rect.y - rect.hh + 4;
+        roundedRect(ctx, bx, by, bw, 13, 6);
         ctx.fillStyle = present > 0 ? 'rgba(122, 162, 247, 0.25)' : 'rgba(148, 163, 184, 0.15)';
         ctx.fill();
         ctx.fillStyle = COLORS.mutedText;
-        ctx.fillText(occ, rect.x + rect.hw - bw / 2 - 5, rect.y - rect.hh + 10.5);
+        ctx.fillText(occ, bx + bw / 2, by + 6.5);
       } else {
         ctx.font = '8px monospace';
         ctx.fillStyle = COLORS.fogText;
-        ctx.fillText('last known', rect.x, rect.y + 8);
+        ctx.fillText('last known', rect.x, rect.y);
       }
     });
   }
@@ -994,8 +1304,16 @@
         const zoneB = map.Zones[agent.Transit.ToZoneId];
         const ends = corridorEndpoints(roomRect(zoneA, layout), roomRect(zoneB, layout));
         const total = transitTotalTicks(map, cfg, agent.Transit.FromZoneId, agent.Transit.ToZoneId);
-        const t = Math.min(1, Math.max(0, (total - agent.Transit.RemainingTicks + 1) / total));
+        let t = Math.min(1, Math.max(0, (total - agent.Transit.RemainingTicks + 1) / total));
         if (ends) {
+          // The token travels the corridor but stops a token's width short of
+          // the destination room, so its circle never intrudes on the room's
+          // title band mid-arrival. The next tick it is stationed inside.
+          const leg = Math.hypot(ends.bx - ends.ax, ends.by - ends.ay);
+          if (leg > 0) {
+            const maxT = Math.max(0, 1 - (layout.rAgent + 3) / leg);
+            t = Math.min(t, maxT);
+          }
           x = ends.ax + (ends.bx - ends.ax) * t;
           y = ends.ay + (ends.by - ends.ay) * t;
         } else {
@@ -1017,11 +1335,17 @@
         const slot = stationedSeen[agent.ZoneId] || 0;
         stationedSeen[agent.ZoneId] = slot + 1;
         x = rect.x + (slot - (mates - 1) / 2) * (layout.rAgent * 2.4);
-        y = rect.y + 2;
+        // Tokens live on a bottom band inside the room, clear of the room
+        // title strip at the top — a token never sits on a room label.
+        y = rect.y + rect.hh - 10 - layout.rAgent;
       }
 
       const color = agentColor(agent, roles);
       const role = roles && roles[agent.AgentId];
+
+      if (measureProbe.on) {
+        measureProbe.tokens[agent.AgentId] = { x: x, y: y, r: layout.rAgent };
+      }
 
       // The Sentry carries a faint dashed perception perimeter — in ground
       // truth only; the ego viewport replaces it with the horizon ring.
@@ -1054,10 +1378,14 @@
       ctx.textBaseline = 'middle';
       ctx.fillText(String(agent.AgentId), x, y);
 
+      // Role/score sits beside the token, never underneath it, so a small
+      // room still shows the room name above and loot below unobscured.
       ctx.font = '8.5px monospace';
       ctx.fillStyle = color;
+      ctx.textAlign = 'left';
       const label = (role ? role + ' ' : '') + '· ' + agent.Score;
-      ctx.fillText(label, x, y + layout.rAgent + 10);
+      ctx.fillText(label, x + layout.rAgent + 5, y);
+      ctx.textAlign = 'center';
 
       if (agent.Transit) {
         ctx.font = '8px monospace';
@@ -1075,8 +1403,10 @@
     const zone = map.Zones[ghost.state.ZoneId];
     if (!zone) return;
     const rect = roomRect(zone, layout);
+    // Ghost tokens sit on the same bottom band as live tokens, clear of the
+    // room title strip.
     const x = rect.x;
-    const y = rect.y + 2;
+    const y = rect.y + rect.hh - 10 - layout.rAgent;
 
     ctx.globalAlpha = 0.4;
     ctx.beginPath();
@@ -1091,10 +1421,11 @@
     ctx.setLineDash([]);
     ctx.font = '8px monospace';
     ctx.fillStyle = COLORS.fogText;
-    ctx.textAlign = 'center';
+    ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     const age = state.index - ghost.tick;
-    ctx.fillText('last seen ' + (age === 0 ? 'now' : age + 't ago'), x, y + layout.rAgent + 10);
+    ctx.fillText('last seen ' + (age === 0 ? 'now' : age + 't ago'), x + layout.rAgent + 5, y);
+    ctx.textAlign = 'center';
     ctx.globalAlpha = 1;
   }
 
@@ -1197,15 +1528,10 @@
     const last = traj.frames.length - 1;
     const index = state.index;
     const frame = traj.frames[index];
-    const view = effectiveView();
     const map = traj.header.Map;
     let sentence;
 
-    if (view === 'split') {
-      // A split is the comparison; describe the agent's side, the part that
-      // differs from the ground truth on the left.
-      sentence = describeFrameAgentSide(traj, index, last, frame, map);
-    } else if (view === 'ground') {
+    if (!perspectiveIsAgent()) {
       if (!frame.agents || !frame.agents.length) {
         sentence = 'This recorded frame carries no agent states.';
       } else {
@@ -1260,10 +1586,8 @@
     // Polite live region while the user drives; mute during autoplay so a
     // screen reader is not spammed on every tick.
     dom.sentence.setAttribute('aria-live', state.playing ? 'off' : 'polite');
-    const view = effectiveView();
     dom.canvas.setAttribute('aria-label', 'Replay view: ' +
-      (view === 'split' ? 'side-by-side comparison of ground truth and agent view' :
-        view === 'agent' ? 'Agent view — ' + egoLabel(traj) : 'Ground truth') +
+      (perspectiveIsAgent() ? 'Agent view — ' + egoLabel(traj) : 'Ground truth') +
       ', tick ' + state.index + ' of ' + (traj ? traj.frames.length - 1 : 0));
   }
 
@@ -1498,11 +1822,6 @@
     state.timer = setTimeout(tick, state.cadenceMs);
   }
 
-  function applyCadence() {
-    const value = parseInt(dom.speedSelect.value, 10);
-    if (isFinite(value) && value > 0) state.cadenceMs = value;
-  }
-
   // A control only looks active when its action is currently available.
   function updateTransportDisabled() {
     const has = state.trajectory && state.trajectory.frames.length > 0;
@@ -1523,7 +1842,7 @@
     if (reducedMotionQuery.matches) return;
     state.pulseStart = performance.now();
     state.pulseTimer = setInterval(function () {
-      if (state.trajectory && effectiveView() !== 'ground') scheduleDraw();
+      if (state.trajectory && perspectiveIsAgent()) scheduleDraw();
     }, 90);
   }
 

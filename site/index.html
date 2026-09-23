@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="A testing lab for multi-agent AI: replay recorded experiments, compare what each agent could see, and audit the committed evidence behind the result.">
-  <title>Lattice — a testing lab for AI decision-making</title>
+  <title>Lattice</title>
   <link rel="stylesheet" href="./style.css">
   <script src="./app.js" defer></script>
 </head>
@@ -39,11 +39,13 @@
     <aside class="moment-callout" aria-label="The moment to watch">
       <h3 class="moment-label">The moment to watch &mdash; ticks 9&ndash;13</h3>
       <p>
-        The <strong>Treasure Vault drifts out of the Sentry&rsquo;s reconstructed 2-hop
-        sightline</strong> while the Infiltrator is still inside it, looting. Step to tick 9 in
-        the Infiltrator recording, keep the view on <em>Agent view (Sentry)</em>, and watch the
-        Vault&rsquo;s room fall out of the dashed ring &mdash; even though ground truth still
-        shows it. Watch the explanation sentence for the vault change right there.
+        From <strong>tick 10 through tick 13 the Treasure Vault lies outside the Sentry&rsquo;s
+        reconstructed 2-hop sightline</strong>: on the Sentry view chip the room dims to
+        &ldquo;last known&rdquo; while ground truth keeps it fully lit. During the same stretch the
+        Infiltrator &mdash; who has already claimed the vault&rsquo;s first chest &mdash; slips out of the
+        Sentry Post and cuts across to the armory, unseen by the Sentry. Step to tick 11, select
+        the <em>Sentry</em> view chip above the map, and watch the room dim on one map while it
+        stays lit on ground truth. The explanation sentence follows the same line.
       </p>
       <p class="moment-honest" id="moment-arena">
         Honest framing: this is page-<em>reconstructed</em> sight from recorded positions. The
@@ -65,24 +67,36 @@
       <h2>Watch a recorded replay</h2>
 
       <ol class="tour">
-        <li><strong>Play the recording.</strong> Press <em>Play</em> below the map, or use
-            <em>+1 Tick</em> / <em>−1 Tick</em> to step through it.</li>
-        <li><strong>Compare Ground truth with the agent's view.</strong> Switch the view control
-            directly above the map.</li>
-        <li><strong>Watch the evidence and explanation change by tick.</strong> The sentence under
-            the map describes each recorded frame as you move.</li>
+        <li><strong>Play the recording.</strong> Press <em>Play</em> in the control strip above
+            the map, or use <em>+1 Tick</em> / <em>−1 Tick</em> to step through it.</li>
+        <li><strong>Compare Ground truth with an agent's view.</strong> Pick a view chip in the
+            control strip above the map — ground truth shows everything the recording carried;
+            an agent chip dims what that agent could not have reached.</li>
+        <li><strong>Watch the evidence and explanation change by tick.</strong> The caption under
+            the map and the sentence beside the transport describe each recorded frame as you
+            move.</li>
       </ol>
 
-      <div class="viewport-controls" role="group" aria-label="Replay view controls">
-        <div class="toggle-group" role="group" aria-label="View mode">
-          <button class="btn toggle" id="view-ground" type="button" aria-pressed="true">Ground truth</button>
-          <button class="btn toggle" id="view-agent" type="button" aria-pressed="false">Agent view</button>
-          <button class="btn toggle" id="view-split" type="button" aria-pressed="false">Side-by-side</button>
+      <div class="control-strip" aria-label="Replay controls">
+        <div class="chip-row">
+          <div class="chip-group" role="radiogroup" aria-label="Recording scenario" id="scenario-chips"></div>
+          <div class="chip-group" role="radiogroup" aria-label="Perspective" id="perspective-chips"></div>
+          <div class="chip-group" role="radiogroup" aria-label="Playback speed" id="speed-chips"></div>
+        </div>
+        <div class="transport">
+          <button class="btn primary" id="play-btn" type="button" disabled>Play</button>
+          <button class="btn" id="step-back-btn" type="button" disabled>−1 Tick</button>
+          <button class="btn" id="step-fwd-btn" type="button" disabled>+1 Tick</button>
+          <div class="scrub">
+            <input type="range" id="scrub-slider" min="0" max="0" value="0" step="1"
+                   aria-label="Scrub through recorded ticks" disabled>
+            <span class="tick-readout" id="tick-readout">—</span>
+          </div>
         </div>
       </div>
 
       <div class="viewer" id="viewer">
-        <canvas id="viewer-canvas" role="img" aria-label="Replay view">
+        <canvas id="viewer-canvas" role="img" tabindex="0" aria-label="Replay view">
           Your browser does not support the HTML5 canvas element. Read the metrics below, or
           open the recording directly: <a href="./demo.jsonl">demo.jsonl</a>.
         </canvas>
@@ -95,6 +109,8 @@
         </div>
       </div>
 
+      <p class="map-caption" id="map-caption">Ground truth: everything in the world.</p>
+
       <div class="sentence">
         <p class="sentence-label">About this recorded frame</p>
         <p id="tick-sentence" class="sentence-text" aria-live="polite">
@@ -103,38 +119,10 @@
         <p class="sentence-note">Described from fields in the loaded recording — not a new simulation.</p>
       </div>
 
-      <div class="transport">
-        <button class="btn primary" id="play-btn" type="button" disabled>Play</button>
-        <button class="btn" id="step-back-btn" type="button" disabled>−1 Tick</button>
-        <button class="btn" id="step-fwd-btn" type="button" disabled>+1 Tick</button>
-        <div class="scrub">
-          <input type="range" id="scrub-slider" min="0" max="0" value="0" step="1"
-                 aria-label="Scrub through recorded ticks" disabled>
-          <span class="tick-readout" id="tick-readout">—</span>
-        </div>
-      </div>
-
       <details class="explore">
         <summary>Explore the replay</summary>
         <div class="explore-row">
-          <label class="btn" for="preset-select">Preset</label>
-          <select id="preset-select" aria-label="Recording preset">
-            <option value="demo">Demo sampling (MCTS vs Random)</option>
-            <option value="infiltration">Infiltration (Sentry vs Infiltrator)</option>
-            <option value="custom" disabled>Custom… (local file)</option>
-          </select>
-
-          <label class="btn" for="speed-select">Speed</label>
-          <select id="speed-select" aria-label="Playback speed">
-            <option value="800">0.5×</option>
-            <option value="420" selected>1×</option>
-            <option value="200">2×</option>
-            <option value="90">4×</option>
-          </select>
-
-          <label class="btn" for="ego-agent-select">View as</label>
-          <select id="ego-agent-select" aria-label="Observed agent in Agent view"></select>
-
+          <span class="explore-note">Scenario, perspective and speed are the chips above the map.</span>
           <label class="btn file-btn" for="file-input">
             Load recording…
             <input type="file" id="file-input" accept=".jsonl,application/json,text/plain" class="file-input">
@@ -169,9 +157,16 @@
           <li><span class="swatch line-swatch solid"></span><span class="swatch line-swatch hot"></span>
               <b>Corridor</b> — grey is idle, amber is used by an agent this tick.</li>
           <li><span class="swatch line-swatch dashed"></span>
-              <b>Capacity gate</b> — <span class="mono">CAP n</span> or <span class="mono">LOCKED</span> along a corridor.</li>
+              <b>Capacity gate</b> — a dashed corridor with a <span class="mono">CAP n</span> or
+              <span class="mono">LOCKED</span> pill. Pills stay hidden to keep the graph calm;
+              a pill appears while an agent crosses that door this tick or when you hover, focus
+              or tap the door.</li>
           <li><span class="swatch ring-swatch sight"></span>
-              <b>Sentry sight ring</b> (dashed) around a patrolling guard.</li>
+              <b>Patrol perimeter</b> (dashed) around a guard in ground truth.</li>
+          <li><span class="swatch ring-swatch vision"></span>
+              <b>Reconstructed 2-hop sightline</b> (dashed ring) around the selected agent on an
+              agent view chip — the rooms this page judges reachable from recorded positions,
+              not a claim about recorded fog.</li>
           <li><span class="swatch" style="background:#40c4ff"></span>
               <b>Extraction marker</b> (cyan) above an infiltrator, when one is present.</li>
         </ul>
@@ -183,13 +178,13 @@
           <summary>Agent view details</summary>
           <ul class="legend-grid">
             <li><span class="swatch room-swatch observed"></span>
-                <b>Observed room</b> — inside the agent's sight horizon this tick.</li>
+                <b>Observed room</b> — inside the reconstructed 2-hop sightline horizon this tick.</li>
             <li><span class="swatch room-swatch stale"></span>
-                <b>Last known</b> — seen earlier, now out of sight.</li>
+                <b>Last known</b> — seen earlier, now out of the reconstructed sightline.</li>
             <li><span class="swatch room-swatch unknown"></span>
                 <b>Unexplored</b> — this agent has never seen it.</li>
             <li><span class="swatch ring-swatch vision"></span>
-                <b>Sight horizon</b> — rooms reachable within the agent's vision.</li>
+                <b>Reconstructed horizon</b> — where the dashed ring sits on an agent view chip.</li>
             <li><span class="swatch ring-swatch ghost"></span>
                 <b>Last-seen ghost</b> — faded rival memory labeled with its age.</li>
             <li><span class="swatch" style="background:#16233f;border:1px solid #1e293b"></span>

@@ -266,37 +266,58 @@ main {
 .tour li strong { color: var(--text); }
 .tour li em { color: var(--accent); font-style: normal; font-weight: 600; }
 
-/* ---- replay viewport ---- */
+/* ---- replay control strip ---- */
 
-.viewport-controls {
+.control-strip {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 10px;
   margin: 0 0 8px;
-  flex-wrap: wrap;
-}
-
-.toggle-group {
-  display: inline-flex;
+  padding: 10px 12px;
   border: 1px solid var(--border);
-  border-radius: 6px;
-  overflow: hidden;
+  border-radius: 8px;
+  background: var(--panel-2);
 }
 
-.toggle-group .toggle {
-  border: none;
-  border-radius: 0;
-  background: transparent;
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.chip-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.chip {
+  appearance: none;
+  font-family: var(--sans);
+  font-size: 0.86rem;
   color: var(--muted);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
+  min-height: 36px;
+  min-width: 44px;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
 }
 
-.toggle-group .toggle + .toggle {
-  border-left: 1px solid var(--border);
-}
+.chip:hover { border-color: var(--accent-dim); color: var(--text); }
 
-.toggle-group .toggle.active {
+.chip.active {
   background: var(--accent-dim);
+  border-color: var(--accent-dim);
   color: #ffffff;
+}
+
+.chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .viewer {
@@ -312,6 +333,11 @@ main {
   width: 100%;
   height: clamp(320px, 46vh, 460px);
   background: var(--bg);
+}
+
+#viewer-canvas:focus-visible {
+  outline: 2px dashed var(--accent-dim);
+  outline-offset: 2px;
 }
 
 #viewer-hint {
@@ -332,12 +358,30 @@ main {
 
 #viewer-hint[hidden] { display: none; }
 
-/* Reconstruction chip: shown only while an agent-view fog (or the
-   side-by-side comparison, whose right pane is the agent view) is on
-   screen. Purely presentational — never intercepts pointer events, and
-   never appears above the Ground truth pane where no fog is drawn. */
-.viewport-controls:has(#view-agent.active) ~ .viewer::after,
-.viewport-controls:has(#view-split.active) ~ .viewer::after {
+/* Short cross-fade when the visitor switches perspective. */
+#viewer-canvas.perspective-fade {
+  animation: perspective-fade 240ms ease;
+}
+
+@keyframes perspective-fade {
+  from { opacity: 0.35; }
+  to { opacity: 1; }
+}
+
+.map-caption {
+  margin: 8px 2px 0;
+  font-family: var(--mono);
+  font-size: 0.84rem;
+  color: var(--muted);
+}
+
+.map-caption strong { color: var(--text); }
+
+/* Reconstruction chip: shown only while an agent-view chip (not the ground
+   truth chip) is active in the perspective radiogroup. Purely presentational
+   — never intercepts pointer events, and never appears above ground truth
+   where no fog is drawn. */
+.control-strip:has(#perspective-chips .chip.active:not([data-id="ground"])) ~ .viewer::after {
   content: "Reconstructed sightline";
   position: absolute;
   top: 8px;
@@ -517,10 +561,7 @@ main {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  padding: 12px 14px;
-  border-top: 1px solid var(--border);
-  background: var(--panel-2);
-  margin-top: 12px;
+  padding: 2px 0 0;
 }
 
 .btn {
@@ -601,6 +642,11 @@ main {
   align-items: center;
   gap: 8px 10px;
   padding-bottom: 12px;
+}
+
+.explore-note {
+  font-size: 0.84rem;
+  color: var(--muted);
 }
 
 .explore .file-btn {
@@ -843,8 +889,6 @@ footer.app-footer {
 footer.app-footer .fine { margin-top: 6px; font-size: 0.78rem; opacity: 0.8; }
 
 @media (max-width: 640px) {
-  #view-split { display: none; }
-
   header.app-header {
     padding: 16px 16px 12px;
   }
@@ -869,22 +913,24 @@ footer.app-footer .fine { margin-top: 6px; font-size: 0.78rem; opacity: 0.8; }
     font-size: 0.84rem;
   }
 
+  /* Comfortable tap targets; the chip rows wrap instead of overflowing. */
+  .chip-row { gap: 8px; }
+  .chip-group { gap: 6px; }
+
+  .chip {
+    min-height: 44px;
+    padding: 8px 14px;
+    font-size: 0.88rem;
+  }
+
   .transport .btn {
     min-width: 0;
     flex: 1;
     min-height: 44px;
   }
 
-  .transport select {
-    min-height: 44px;
-  }
-
   .explore-row .btn,
   .explore-row select {
-    min-height: 44px;
-  }
-
-  .toggle-group .btn {
     min-height: 44px;
   }
 

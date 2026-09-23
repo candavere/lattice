@@ -33,3 +33,18 @@ jobs:
 
       - name: Test
         run: dotnet test Lattice.sln -c Release --no-build --verbosity normal
+
+      - name: UI regression (Playwright demo page)
+        shell: bash
+        run: |
+          set -e
+          BASE_PY="$(command -v python3 || command -v python)"
+          "$BASE_PY" -m venv "$RUNNER_TEMP/ui-venv"
+          case "$RUNNER_OS" in
+            Windows) PY="$RUNNER_TEMP/ui-venv/Scripts/python.exe" ;;
+            *)       PY="$RUNNER_TEMP/ui-venv/bin/python" ;;
+          esac
+          "$PY" -m pip install --quiet "playwright==1.60.0"
+          "$PY" -m playwright install chromium
+          if [ "$RUNNER_OS" = "Linux" ]; then sudo "$PY" -m playwright install-deps chromium; fi
+          "$PY" -m unittest discover -s ui_tests -p "test_*.py" -v

@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="640" viewBox="0 0 860 640" font-family="Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3b82f6"/>
+    </marker>
+    <style>
+      .box { fill:#f8fafc; stroke:#334155; stroke-width:1.5; rx:8; }
+      .boxblue { fill:#eff6ff; stroke:#3b82f6; stroke-width:1.5; rx:8; }
+      .title { font-size:15; font-weight:bold; fill:#0f172a; }
+      .sub { font-size:12; fill:#475569; }
+      .small { font-size:10.5; fill:#64748b; }
+      .edge { stroke:#3b82f6; stroke-width:1.6; fill:none; }
+    </style>
+  </defs>
+
+  <text x="12" y="26" class="title">Lattice data flow</text>
+  <text x="12" y="42" class="small">What the committed tools and workflows actually do (Cli/CliApp.cs, Trajectories/, site/app.js, .github/workflows).</text>
+
+  <!-- simulate -->
+  <rect x="60" y="80" width="220" height="58" class="boxblue"/>
+  <text x="75" y="104" class="title">lattice simulate</text>
+  <text x="75" y="121" class="sub">seeded run: header + per-tick</text>
+  <text x="75" y="134" class="sub">actions and StepResult</text>
+
+  <!-- recording -->
+  <line x1="280" y1="109" x2="356" y2="109" class="edge" marker-end="url(#arrow)"/>
+  <rect x="360" y="80" width="230" height="58" class="box"/>
+  <text x="375" y="100" class="title">recording (.jsonl)</text>
+  <text x="375" y="116" class="sub">header, one line per tick, final</text>
+  <text x="375" y="130" class="small">schema v2 (Trajectories/TrajectoryWriter.cs)</text>
+
+  <!-- benchmark / evaluate (independent of recordings) -->
+  <rect x="640" y="80" width="200" height="58" class="boxblue"/>
+  <text x="655" y="100" class="title">lattice benchmark</text>
+  <text x="655" y="116" class="sub">five-workload matrix, fresh sims</text>
+  <text x="655" y="130" class="small">.github/workflows/benchmarks.yml gate</text>
+
+  <!-- evaluate -->
+  <rect x="640" y="170" width="200" height="58" class="boxblue"/>
+  <text x="655" y="190" class="title">lattice evaluate</text>
+  <text x="655" y="206" class="sub">mirror-seated paired study</text>
+  <text x="655" y="220" class="small">Agents/PairedEvaluation.cs:144-145 verdict</text>
+
+  <!-- consumers of the recording -->
+  <line x1="475" y1="138" x2="475" y2="176" class="edge" marker-end="url(#arrow)"/>
+
+  <rect x="360" y="180" width="230" height="58" class="box"/>
+  <text x="375" y="200" class="title">lattice replay --verify</text>
+  <text x="375" y="216" class="sub">rebuild from header, compare every</text>
+  <text x="375" y="230" class="sub">re-serialized StepResult (TrajectoryReplay.cs:57)</text>
+  <text x="375" y="244" class="small">CI gate ci.yml:31-32 on golden_trajectory.jsonl</text>
+
+  <line x1="230" y1="138" x2="230" y2="300" class="edge" marker-end="url(#arrow)"/>
+
+  <rect x="60" y="304" width="230" height="58" class="box"/>
+  <text x="75" y="324" class="title">lattice render</text>
+  <text x="75" y="340" class="sub">recording to animated SVG or ASCII</text>
+  <text x="75" y="354" class="small">Visualization/</text>
+
+  <rect x="360" y="304" width="230" height="58" class="box"/>
+  <text x="375" y="324" class="title">lattice analyze</text>
+  <text x="375" y="340" class="sub">contention, pathing, heatmaps</text>
+  <text x="375" y="354" class="small">Analytics/</text>
+
+  <!-- site -->
+  <line x1="590" y1="333" x2="640" y2="333" class="edge" marker-end="url(#arrow)"/>
+  <rect x="644" y="304" width="196" height="58" class="boxblue"/>
+  <text x="659" y="324" class="title">site/ browser replay viewer</text>
+  <text x="659" y="340" class="sub">plays committed .jsonl in the</text>
+  <text x="659" y="354" class="sub">browser; sells nothing, replays</text>
+  <text x="659" y="368" class="small">site/app.js, deployed by pages.yml</text>
+
+  <!-- benchmark artifact -->
+  <line x1="740" y1="138" x2="740" y2="176" class="edge" marker-end="url(#arrow)"/>
+  <rect x="644" y="180" width="196" height="58" class="box"/>
+  <text x="659" y="200" class="title">throughput JSON</text>
+  <text x="659" y="216" class="sub">committed baseline; regression</text>
+  <text x="659" y="230" class="sub">gate when host fingerprint matches</text>
+  <text x="659" y="244" class="small">compare_benchmarks.py:151-172</text>
+
+  <!-- tests -->
+  <line x1="475" y1="238" x2="475" y2="304" class="edge" marker-end="url(#arrow)"/>
+  <rect x="460" y="388" width="360" height="58" class="box"/>
+  <text x="475" y="408" class="title">tests and fixtures</text>
+  <text x="475" y="424" class="sub">Tests/ suite plus golden_trajectory.jsonl pin replay</text>
+  <text x="475" y="438" class="sub">equivalence and determinism on the CI matrix</text>
+
+  <line x1="820" y1="362" x2="880" y2="362" class="edge" stroke-dasharray="4 3" stroke="#94a3b8"/>
+</svg>

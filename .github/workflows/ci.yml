@@ -34,6 +34,15 @@ jobs:
       - name: Test
         run: dotnet test Lattice.sln -c Release --no-build --verbosity normal
 
+      - name: One-command setup (setup.sh)
+        if: runner.os != 'Windows'
+        run: ./setup.sh
+
+      - name: One-command setup (setup.ps1)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: .\setup.ps1
+
       - name: UI regression (Playwright demo page)
         shell: bash
         run: |

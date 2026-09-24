@@ -113,6 +113,13 @@ independent third-party validation.
 - no other tooling is required; there is no formatter, linter, or
   code-generator step. Everything compiles and tests with the SDK alone.
 
+The fastest local path is the one-command setup: `./setup.sh` (macOS/Linux,
+`make setup` is equivalent) or `.\setup.ps1` (Windows). Each script reads the
+SDK requirement from `Cli/Lattice.Cli.csproj`, restores, builds, runs the full
+suite, and reproduces the committed golden-trajectory claim, printing
+`Reproduced: <claim> matches <artifact>`. CI runs both scripts on its matrix,
+so a working one-command setup is part of the merge bar.
+
 Build the solution (expect **0 warnings, 0 errors**):
 
 ```sh
@@ -168,6 +175,57 @@ results in the PR description.
    `StepResult` replay — asserted rather than eyeballed. See `/Tests` for the
    existing suite; new deterministic behavior without a pinning test will be
    sent back.
+
+## Commit and Checkpoint Style
+
+- **Conventional prefixes.** Use a conventional-commit-style subject:
+  `feat:`, `fix:`, `test:`, `docs:`, `build:`, `refactor:`, `chore:`. One
+  logical change per commit, in the imperative voice (`feat(site): add
+  perspective chips`, not `added stuff`).
+- **Every number links to its artifact.** A commit that carries a number (a
+  delta, a CI, a score, a throughput) names the committed artifact behind it,
+  in the subject or body. A number without a link is an unbacked claim and
+  will be sent back.
+- **Checkpoint commits for long changes.** When a change spans several
+  independent pieces, land it as a sequence of commits, each green on its own
+  (validated by the suite and any artifact it introduces) so a later commit
+  can be reverted without collateral. Example: a multi-part docs restructure
+  lands as one commit per section with its own validation, not as a single
+  pile-up.
+- **No silent rewrites.** History on `main` is fast-forward only. Once a
+  commit lands, it stays; corrections are new commits. Do not force-push the
+  shared branch.
+- **Determinism is a per-commit property.** If your commit changes resolution,
+  search, perception, or agent logic, it ships with the determinism evidence
+  from the checklist below in the same commit.
+
+## Adding a Scenario or Agent without Breaking Determinism
+
+A **scenario** is a seeded map family plus the rules and CLI wiring that run
+it. A new scenario must keep everything seeded through the existing generator
+and acceptance-gate path: callers pass a seed and a fairness gate, the
+generator produces a deterministic map, and no scenario may introduce global
+mutable state or a new source of order. Contention-bearing scenarios (capacity-1
+chokepoints, mirrored spawn arms) exist so topology can change a conclusion;
+keep the two spawn arms geometric mirror images per the mirrored-seat rule, or
+the paired evaluation loses its meaning.
+
+An **agent** is an evaluation subject, a pure function from observable state
+to an action: no static mutable fields, no singletons, no unseeded RNG, no
+ambient clock or culture-dependent behavior. Anything an agent needs across
+ticks is instance state bound to one episode. Agents are thin and
+demonstration-grade; the environment is the product, so a new agent is judged
+by the paired decision rule (mean paired delta > 0 with a CI lower bound > 0
+on dev and held-out seeds under the same budget), not by a narrative. Run
+`evaluate` with the shipped protocol, save the JSON artifact, and link it.
+
+Either way, the Determinism Testing Checklist above is mandatory: normalized
+JSONL byte identity on one identical host, per-step serialized `StepResult`
+replay equivalence on the CI matrix, integer-quantized (never IEEE-ordered)
+tie-breaks, and a pinning determinism regression test that fails before your
+change and passes after it. A scenario or agent that re-tilts an existing
+trajectory without updating the affected pins in the same commit, with a
+rationale, is not mergeable.
 
 ## Pull Request Guidelines
 

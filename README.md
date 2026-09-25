@@ -73,10 +73,12 @@ dotnet run --project Cli -- render --trajectory infiltration.jsonl --format svg 
 map and simulation config, and each line is that tick's recorded actions and
 `StepResult`. The SVG is a self-contained animated render. `replay --verify`
 rebuilds a fresh simulation from the trajectory header, feeds each recorded
-turn of actions back through the engine, and compares every re-serialized
-`StepResult` against the recorded one; exit code `0` means every tick
-reproduced. That is the replay contract, and it is the same check the CI
-pipeline runs on the golden trajectory on Ubuntu, macOS, and Windows.
+turn of actions back through the engine, compares every re-serialized
+`StepResult` against the recorded one, and re-computes the final summary
+line's aggregates field by field; exit code `0` means every tick and the
+final aggregates reproduced. That is the replay contract, and it is the same
+check the CI pipeline runs on the golden trajectory on Ubuntu, macOS, and
+Windows.
 
 `setup.sh` and `setup.ps1` also run a one-command reproduce: they run one
 existing benchmark or replay command and compare its output to the committed
@@ -334,7 +336,7 @@ argument or runtime error.
 | `simulate` | Record an episode as JSONL | `--seed`, `--steps`, `--agent`, `--scenario`, `--rules`, `--out` |
 | `render` | Replay a recording as ASCII or SVG | `--trajectory`, `--format`, `--out` |
 | `analyze` | Report on a recording (contention, pathing, heatmaps) | `--trajectory`, `--out` |
-| `replay` | Replay and optionally verify per-step serialized equivalence | `<file>`, `--verify`, `--out` |
+| `replay` | Replay and optionally verify per-step serialized equivalence and the final summary line | `<file>`, `--verify`, `--out` |
 | `benchmark` | Run the five-case workload matrix | `--runs`, `--warmup`, `--commit`, `--cpu`, `--out` |
 | `evaluate` | Mirror-seated paired MCTS study | `--seed-set`, `--rollouts`, `--seeds`, `--scenario`, `--out` |
 

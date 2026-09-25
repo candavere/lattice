@@ -26,8 +26,9 @@ interchangeable, and no document may upgrade one into another:
 2. **Per-step serialized `StepResult` replay equivalence.** Replaying a
    recording's actions from a fresh initial state reconstructs ticks whose
    serialized `StepResult`s equal the recorded ones. `TrajectoryReplay.Verify`
-   asserts exactly this on the tested CI platforms; the `replay --verify`
-   command below exercises it.
+   asserts exactly this — plus field-by-field authentication of the final
+   summary line's aggregates against the re-simulated run — on the tested CI
+   platforms; the `replay --verify` command below exercises it.
 
 The four guarantees above are formalized as an implementation-agnostic,
 clean-room contract in
@@ -283,7 +284,8 @@ dotnet run -c Release --project Cli -- replay Tests/fixtures/golden_trajectory.j
 ```
 
 A pass prints `replay verified` and exits `0`. This asserts per-step serialized
-`StepResult` equivalence (Section 3), not a state hash.
+`StepResult` equivalence (Section 3) plus field-by-field authentication of the
+final summary line's aggregates, not a state hash.
 
 ### Five-workload throughput benchmark
 

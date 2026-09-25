@@ -119,7 +119,14 @@ public static class TrajectoryWriter
         }
     }
 
-    private static TrajectoryFinal BuildFinal(SimulationState state, Info? info)
+    /// <summary>
+    /// Builds the final summary line from the terminal (or last recorded)
+    /// state: why the episode ended, who won, the tick count, per-agent
+    /// scores, claimed resources, and total resources. Shared with
+    /// <see cref="TrajectoryReplay"/> so verification recomputes the final
+    /// line through the exact builder the writer used.
+    /// </summary>
+    internal static TrajectoryFinal BuildFinal(SimulationState state, Info? info)
     {
         return new TrajectoryFinal(
             Reason: info?.Reason,

@@ -14,8 +14,6 @@
   --ok: #34d399;
   --warn: #fbbf24;
   --err: #f87171;
-  --edge: #8a8678;
-  --zone-stroke: #7aa2f7;
   --zone-text: #c0caf5;
   --unclaimed: #e0af68;
   --claimed: #3da66b;
@@ -24,18 +22,6 @@
 }
 
 * { box-sizing: border-box; }
-
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  border: 0;
-  clip: rect(0 0 0 0);
-  overflow: hidden;
-  white-space: nowrap;
-}
 
 .skip-link {
   position: absolute;
@@ -186,7 +172,6 @@ header.app-header .subtitle {
   color: var(--muted);
 }
 
-.moment-honest strong { color: var(--text); }
 .moment-honest em { font-style: normal; font-weight: 600; color: var(--accent-dim); }
 
 .recorded-note {
@@ -315,11 +300,6 @@ main {
   color: #ffffff;
 }
 
-.chip:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
 .viewer {
   position: relative;
   border: 1px solid var(--border);
@@ -374,8 +354,6 @@ main {
   font-size: 0.84rem;
   color: var(--muted);
 }
-
-.map-caption strong { color: var(--text); }
 
 /* Reconstruction chip: shown only while an agent-view chip (not the ground
    truth chip) is active in the perspective radiogroup. Purely presentational
@@ -675,8 +653,6 @@ main {
   outline-offset: 2px;
 }
 
-.explore select { min-height: 34px; }
-
 /* ---- status line ---- */
 
 .statusbar {
@@ -934,12 +910,9 @@ footer.app-footer .fine { margin-top: 6px; font-size: 0.78rem; opacity: 0.8; }
     min-height: 44px;
   }
 
-  .explore-row .btn,
-  .explore-row select {
+  .explore-row .btn {
     min-height: 44px;
   }
-
-  .transport .spacer { display: none; }
 
   .scrub {
     width: 100%;

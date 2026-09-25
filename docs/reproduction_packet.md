@@ -208,8 +208,8 @@ committed reference records mean paired deltas of −1.12 (dev suite) and −1.2
 
 **Procedural bottleneck topology — MCTS outperforms Scout.** Under capacity-1
 choke contention the same budget wins the paired comparison: committed mean
-paired deltas of +1.42 (dev) and +1.38 (held-out) with 95% CIs entirely above
-0 and non-zero mean contention saturation (22–27%).
+paired deltas of +2.03 (dev) and +2.60 (held-out) with 95% CIs entirely above
+0 and non-zero mean contention saturation (about 16%).
 
 Interpretation and grading:
 

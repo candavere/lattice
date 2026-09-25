@@ -110,7 +110,7 @@ policy–environment interaction: the 32-rollout MCTS subject loses the paired
 comparison on standard generated layouts (**Scout > MCTS**; committed mean
 paired deltas −1.12 dev / −1.25 held-out, 95% CIs below 0) and wins under
 capacity-1 choke contention (**MCTS > Scout**; committed mean paired deltas
-+1.42 dev / +1.38 held-out, 95% CIs above 0, 22–27% mean contention).
++2.03 dev / +2.60 held-out, 95% CIs above 0, about 16% mean contention).
 
 Criterion: the standard run reports a **negative** mean paired Δ and the
 bottleneck run a **positive** mean paired Δ, each with bounded per-seed

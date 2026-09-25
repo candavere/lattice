@@ -94,7 +94,7 @@ full raw numbers are in [Part 2](#part-2-for-reviewers).
 | Finding | Artifact |
 | :--- | :--- |
 | 32-rollout MCTS loses to the deterministic Scout heuristic on standard generated maps: mean paired delta -1.12, 95% CI [-1.37, -0.87] on the dev suite. This loss is the committed negative baseline. | [`benchmarks/mcts_evaluation_results.json`](benchmarks/mcts_evaluation_results.json) |
-| The same 32-rollout MCTS policy wins when both agents are funneled through capacity-1 chokepoints into one shared vault: +1.42, CI [+1.11, +1.73] on the dev suite. Topology changed the conclusion. | [`benchmarks/bottleneck_evaluation_results.json`](benchmarks/bottleneck_evaluation_results.json) |
+| The same 32-rollout MCTS policy wins when both agents are funneled through capacity-1 chokepoints into one shared vault: +2.03, CI [+1.66, +2.41] on the dev suite. Topology changed the conclusion. | [`benchmarks/bottleneck_evaluation_results.json`](benchmarks/bottleneck_evaluation_results.json) |
 | 99.61% scoped mutation score on `Simulation.cs` + `PerceptionFilter.cs` only (252 killed / 1 timed out / 1 survived / 0 no-coverage). Not whole-repository coverage. | [`benchmarks/mutation_stryker_summary.json`](benchmarks/mutation_stryker_summary.json) |
 | Five-workload throughput record on one host: median 9,145 to 653,736 steps/s depending on workload (the MCTS case reports decisions/s). Speed is measured, not advertised. | [`benchmarks/throughput_benchmark.json`](benchmarks/throughput_benchmark.json), [`benchmarks/throughput_summary.md`](benchmarks/throughput_summary.md) |
 
@@ -131,17 +131,21 @@ baseline, and every run records its own delta, CI, and verdict.
 
 The reference result for the bottleneck study is
 [`benchmarks/bottleneck_evaluation_results.json`](benchmarks/bottleneck_evaluation_results.json):
-source revision `1c6fa80`, identical policy budget and baseline, procedural
+source revision `28c89d3`, identical policy budget and baseline, procedural
 contention topology family, first 30 dev + 30 held-out seeds.
 
 | Suite | Seeds | Mean delta | 95% CI | Win | Draw | Loss | Timeout | Contention | Verdict |
 | :--- | ---: | ---: | :--- | ---: | ---: | ---: | ---: | ---: | :--- |
-| dev (1001-1030) | 30 | +1.42 | [+1.11, +1.73] | 55% | 8% | 37% | 0% | 22% | **PASS** |
-| held-out (2001-2030) | 30 | +1.38 | [+1.07, +1.69] | 53% | 23% | 23% | 0% | 27% | **PASS** |
+| dev (1001-1030) | 30 | +2.03 | [+1.66, +2.41] | 50% | 3% | 47% | 0% | 16% | **PASS** |
+| held-out (2001-2030) | 30 | +2.60 | [+2.20, +3.00] | 50% | 18% | 32% | 0% | 16% | **PASS** |
 
 Each seed draws a distinct topology, while both spawn arms stay geometric
 mirror images, so both agents reach the shared single-lane gate on the same
-tick and actively contend. Under that pressure the same MCTS budget wins. This
+tick and actively contend. Under that pressure the same MCTS budget wins.
+Relative to the pre-fix record (source revision `e6ba4bf`), the re-anchored
+run's mean delta rose while its match win rate fell: dev 0.55 → 0.50 (losses
+22 → 28) and held-out 0.533 → 0.50 (losses 14 → 19), of 60 matches each, read
+from the artifacts. This
 does **not** supersede the standard-suite negative baseline; the two are
 complementary evidence on different map distributions.
 

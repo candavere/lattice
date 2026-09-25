@@ -126,7 +126,7 @@ produced, and those recorded values are the only provenance a result carries.
   mean paired delta of −1.12 on the dev suite and −1.25 on the held-out suite
   for the standard scenario
   ([`../benchmarks/mcts_evaluation_results.json`](../benchmarks/mcts_evaluation_results.json)),
-  against +1.42 and +1.38 for the bottleneck scenario
+  against +2.03 and +2.60 for the bottleneck scenario
   ([`../benchmarks/bottleneck_evaluation_results.json`](../benchmarks/bottleneck_evaluation_results.json)).
   Policy quality is therefore topology-conditional and must not be described as
   uniformly better or worse.
@@ -351,8 +351,8 @@ A study passes only when both conditions hold: the mean paired delta is positive
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | standard | dev | MCTS | Scout | 50 | 32 | −1.12 | [−1.37, −0.87] | Fail |
 | standard | held-out | MCTS | Scout | 50 | 32 | −1.25 | [−1.54, −0.96] | Fail |
-| bottleneck | dev | MCTS | Scout | 30 | 32 | +1.42 | [+1.11, +1.73] | Pass |
-| bottleneck | held-out | MCTS | Scout | 30 | 32 | +1.38 | [+1.07, +1.69] | Pass |
+| bottleneck | dev | MCTS | Scout | 30 | 32 | +2.03 | [+1.66, +2.41] | Pass |
+| bottleneck | held-out | MCTS | Scout | 30 | 32 | +2.60 | [+2.20, +3.00] | Pass |
 
 A negative delta is not a defect in the harness. It is committed baseline
 empirical evidence that the evaluated policy lost to the Scout baseline under

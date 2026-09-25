@@ -158,6 +158,20 @@ schema is defined in [`reproduction_packet.md`](reproduction_packet.md)
 | **Resolution & Evidence Link** | Both raw artifacts are committed and cited: `benchmarks/mcts_evaluation_results.json` (source revision `5783ca1`) and `benchmarks/bottleneck_evaluation_results.json` (source revision `1c6fa80`). The procedural bottleneck generator and paired contention harness were added in `c568897` and `cb91bc3`/`f4af28d`; the empirical artifact was committed in `e6ba4bf`. Research-preview scoping and calibration of the surrounding claims are in `6e361af`, `67ad127`, and `abb78fa`. |
 | **Resolution & Release Status** | `RELEASED_IN_v2.3.1` (all closure commits predate the `c0e8342` tag commit). |
 
+## FINDING-008 — Bottleneck empirical evidence re-anchored after choke admission fix
+
+| Field | Value |
+| --- | --- |
+| **ID** | `FINDING-008` |
+| **Date** | 2026-09-26 |
+| **Source / Provenance** | `INTERNAL_AUDIT` |
+| **Target Surface** | `benchmarks/bottleneck_evaluation_results.json` and every doc quoting it (README "Results at a glance" / "Raw numbers", `docs/SUPPORT_AND_REPRODUCIBILITY.md` §3 and §5, `docs/VALIDATION_PLAN.md` experiment 3, `docs/reproduction_packet.md` experiment 3, `docs/CLAIM_CALIBRATION_MATRIX.md`); root cause in `Environment/Simulation.cs` choke admission |
+| **Observation** | Every choke crossing (instant, one-tick, and multi-tick) previously passed without the capacity-admission rule, so the committed bottleneck matches were played under a more permissive crossing rule than the spec describes. Commit `28c89d3` made all three crossing kinds pass one admission rule, changing no other engine or test logic; the committed artifact and every doc quoting it still carried the pre-fix numbers. The identical protocol (dev + heldout seed suites, seeds 1001–1030 / 2001–2030, 32 rollouts per action, 200-tick mirrored matches, bottleneck scenario) was re-run on the fixed tree and produced different numbers under an identical config. |
+| **Severity & Confidence** | Medium / Confirmed |
+| **Disposition** | `FIXED` — the bottleneck result was re-run under the identical config and the artifact regenerated; every doc quote was re-anchored to the new committed values. The engine correction itself is `28c89d3`. This is a correction of the evidence, recorded as a first-class result: the old values are preserved side by side below, in `FINDING-006`, and in git history (`e6ba4bf`). |
+| **Resolution & Evidence Link** | Regenerated artifact: `benchmarks/bottleneck_evaluation_results.json` (source revision `28c89d3`), mirrored byte-identically to `site/benchmarks/bottleneck_evaluation_results.json`. Old → new, dev suite: mean paired delta +1.417 → +2.033, 95% CI [1.106, 1.727] → [1.66, 2.407], mean contention saturation 0.22 → 0.159. Held-out suite: mean paired delta +1.383 → +2.6, 95% CI [1.074, 1.692] → [2.2, 3], mean contention saturation 0.272 → 0.165. Match win rate fell while the mean paired delta rose: dev 0.55 → 0.50 (losses 22 → 28 of 60) and held-out 0.533 → 0.50 (losses 14 → 19 of 60), read from the pre-fix and regenerated artifacts. The conclusion held on both suites: the direction stayed positive (further from zero than before) and the 95% CI still excludes zero — lower bounds 1.66 (dev) and 2.2 (held-out), read from the regenerated artifact. Contention saturation changed under the corrected gate and is recorded as measured. |
+| **Resolution & Release Status** | `MAIN_ONLY` (postdates `v2.3.2` tag commit `4f7816f`; not packaged into any published release). |
+
 ---
 
 ## Ledger index
@@ -171,6 +185,7 @@ schema is defined in [`reproduction_packet.md`](reproduction_packet.md)
 | `FINDING-005` | 2026-09-20 | Transition-surfaces mutation coverage | Medium | `FIXED` | `ce2620b` (+ `8eb86fc`) |
 | `FINDING-006` | 2026-09-19 | Policy-environment claims | High | `ACCEPTED_LIMITATION` | `e6ba4bf` (+ `abb78fa`) |
 | `FINDING-007` | 2026-09-22 | EdgeChoke not-found path + batch-state kill attribution | High | `FIXED` / `ACCEPTED_LIMITATION` | Stage-3 commit (`TransitTests`, `SimulationStepTests`, summary artifact) |
+| `FINDING-008` | 2026-09-26 | Bottleneck evidence re-anchor | Medium | `FIXED` | Evidence re-anchor commit (artifact + docs; engine fix `28c89d3`) |
 
 The ledger is maintained under the governing evidentiary standards of
 [`adr/0001-governing-product-thesis.md`](adr/0001-governing-product-thesis.md);

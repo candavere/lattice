@@ -110,7 +110,6 @@
     fogStaleFill: 'rgba(26, 31, 44, 0.45)',
     fogStaleStroke: '#44506e',
     fogText: '#5b6a8a',
-    fogDivider: '#1e293b',
     accentBar: '#3b82f6',
   };
 
@@ -197,7 +196,7 @@
   const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
 
   const state = {
-    trajectory: null,   // { header, steps, final, frames[], fileName, maxTicks }
+    trajectory: null,   // { header, final, frames[] }
     index: 0,
     playing: false,
     timer: null,
@@ -518,10 +517,6 @@
     }
   }
 
-  function groundChip() {
-    return dom.perspectiveChips.querySelector('.chip[data-id="ground"]');
-  }
-
   function refreshChipActive(container, value) {
     const chips = Array.prototype.slice.call(container.querySelectorAll('.chip'));
     chips.forEach(function (chip) {
@@ -573,11 +568,6 @@
     if (dom.canvas && dom.canvas.getAttribute('aria-label') !== label) {
       dom.canvas.setAttribute('aria-label', label);
     }
-  }
-
-  function setPressed(el, isPressed) {
-    el.classList.toggle('active', isPressed);
-    el.setAttribute('aria-pressed', isPressed ? 'true' : 'false');
   }
 
   function dropTrajectory() {
@@ -1578,7 +1568,6 @@
   }
 
   function updateSentence() {
-    const traj = state.trajectory;
     const text = describeFrame();
     if (dom.sentence.textContent !== text) {
       dom.sentence.textContent = text;
@@ -1586,9 +1575,6 @@
     // Polite live region while the user drives; mute during autoplay so a
     // screen reader is not spammed on every tick.
     dom.sentence.setAttribute('aria-live', state.playing ? 'off' : 'polite');
-    dom.canvas.setAttribute('aria-label', 'Replay view: ' +
-      (perspectiveIsAgent() ? 'Agent view — ' + egoLabel(traj) : 'Ground truth') +
-      ', tick ' + state.index + ' of ' + (traj ? traj.frames.length - 1 : 0));
   }
 
   /* ----------------------------------------------------------- provenance  */
@@ -1924,7 +1910,7 @@
       frames.push({ agents: agents, claims: claims, info: step.Result && step.Result.Info });
     });
 
-    return { header: header, steps: steps, final: final, frames: frames, maxTicks: cfg.MaxTicks || 0 };
+    return { header: header, final: final, frames: frames };
   }
 
   function decodeMap(m) {

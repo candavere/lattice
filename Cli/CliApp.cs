@@ -14,10 +14,10 @@ using Lattice.Visualization;
 namespace Lattice.Cli;
 
 /// <summary>
-/// The Lattice command-line driver: simulate, analyze, compare, render, and
-    /// benchmark subcommands over the seedable environment.
-/// Turns plain `args` into one of six subcommands — `generate`, `simulate`,
-/// `render`, `analyze`, `benchmark`, `evaluate` — and routes all
+/// The Lattice command-line driver: simulate, analyze, replay, render, and
+/// benchmark subcommands over the seedable environment.
+/// Turns plain `args` into one of seven subcommands — `generate`, `simulate`,
+/// `render`, `analyze`, `replay`, `benchmark`, `evaluate` — and routes all
 /// I/O through caller-supplied writers so it stays a pure function of its
 /// inputs (no hidden state, no ambient reading of Console). The real entry
 /// point (Program.cs) just forwards <see cref="Console.Out"/>/<see cref="Console.Error"/>;

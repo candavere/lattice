@@ -259,18 +259,23 @@ public static class Simulation
 
                     var travelOpen = true;
                     var transitTicks = 0;
+                    var chokeIndex = EdgeChoke(state.Map, current, destination);
                     if (config.TransitSpeed != SimulationConfig.InstantTransit)
                     {
                         transitTicks = TransitTicks(state.Map, current, destination, config.TransitSpeed);
-                        if (transitTicks > 1) // one-tick edges arrive instantly; only real crossings occupy the choke
-                        {
-                            var chokeIndex = EdgeChoke(state.Map, current, destination);
-                            var chokeCapacity = chokeIndex >= 0
-                                ? state.Dynamics.EffectiveChokeCapacity(state.Map, chokeIndex)
-                                : MapLimits.Unlimited;
-                            travelOpen = chokeCapacity > 0 && edgeLoad[chokeIndex] < chokeCapacity;
-                        }
                     }
+
+                    // Every crossing — instant, one-tick, multi-tick — is
+                    // admitted through the same choke gate (spec:
+                    // granted ⟺ C(e,t) > 0 ∧ L_pre(e,t) < C(e,t)). A granted
+                    // instant or one-tick crossing occupies the choke for the
+                    // tick it happens in, so same-tick resolvers cannot
+                    // double-book a slot; the hold does not survive the tick
+                    // (edgeLoad is reseeded from the immutable state).
+                    var chokeCapacity = chokeIndex >= 0
+                        ? state.Dynamics.EffectiveChokeCapacity(state.Map, chokeIndex)
+                        : MapLimits.Unlimited;
+                    travelOpen = chokeCapacity > 0 && (chokeIndex < 0 || edgeLoad[chokeIndex] < chokeCapacity);
 
                     grantsMove = nodeOpen && travelOpen;
                     if (grantsMove)
@@ -278,6 +283,10 @@ public static class Simulation
                         nodeLoad[destination]++; // reserves destination capacity for this tick
                         if (config.TransitSpeed == SimulationConfig.InstantTransit || transitTicks <= 1)
                         {
+                            if (chokeIndex >= 0)
+                            {
+                                edgeLoad[chokeIndex]++; // same-tick crossing occupies the choke for this tick
+                            }
                             nextZones[i] = destination; // arrives the same tick
                             nextTransit[i] = null;
                         }

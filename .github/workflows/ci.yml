@@ -57,3 +57,42 @@ jobs:
           "$PY" -m playwright install chromium
           if [ "$RUNNER_OS" = "Linux" ]; then sudo "$PY" -m playwright install-deps chromium; fi
           "$PY" -m unittest discover -s ui_tests -p "test_*.py" -v
+
+  # Every recording the site page can play must re-simulate on the current
+  # engine, per-step state hashes included. A recording that no longer replays
+  # is a broken demo, not a stale curiosity, so this is a gate: a new recording
+  # that any engine change invalidates fails here until it is re-recorded from
+  # its documented seed and config.
+  site-recordings:
+    name: Verify site recordings replay
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore Lattice.sln
+
+      - name: Build
+        run: dotnet build Lattice.sln -c Release --no-restore
+
+      - name: Verify site recordings replay equivalence
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          recordings=(site/*.jsonl)
+          if [ ${#recordings[@]} -eq 0 ]; then
+            echo "no site recording found under site/*.jsonl to verify" >&2
+            exit 1
+          fi
+          for recording in "${recordings[@]}"; do
+            echo "::group::replay --verify $recording"
+            dotnet run -c Release --project Cli --no-build -- replay "$recording" --verify
+            echo "::endgroup::"
+          done
+          echo "verified ${#recordings[@]} site recording(s)"

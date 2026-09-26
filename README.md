@@ -71,14 +71,16 @@ dotnet run --project Cli -- render --trajectory infiltration.jsonl --format svg 
 
 `infiltration.jsonl` is one JSONL line per tick: the header embeds the seeded
 map and simulation config, and each line is that tick's recorded actions and
-`StepResult`. The SVG is a self-contained animated render. `replay --verify`
+`StepResult`, plus the SHA-256 digest of the world state that tick produced. The
+SVG is a self-contained animated render. `replay --verify`
 rebuilds a fresh simulation from the trajectory header, feeds each recorded
 turn of actions back through the engine, compares every re-serialized
-`StepResult` against the recorded one, and re-computes the final summary
+`StepResult` against the recorded one, recomputes each step's state digest and
+compares that, and re-computes the final summary
 line's aggregates field by field; exit code `0` means every tick and the
 final aggregates reproduced. That is the replay contract, and it is the same
 check the CI pipeline runs on the golden trajectory on Ubuntu, macOS, and
-Windows.
+Windows, and on every recording under `site/` in one further job.
 
 `setup.sh` and `setup.ps1` also run a one-command reproduce: they run one
 existing benchmark or replay command and compare its output to the committed
@@ -226,7 +228,8 @@ disagree are called out below rather than resolved.
   `high: 80`, `low: 60`, `break: 0`. The only threshold the tool enforces is
   `break`, so the committed gate fails only at a 0% score; `high`/`low` are
   informational. There is no mutation step in CI (`.github/workflows/ci.yml`
-  runs restore, build, replay-verify, test, and the UI regression only). The
+  runs restore, build, replay-verify, test, the UI regression, and a second job
+  that replays every `site/` recording). The
   99.61% figure is a committed calibration record, not a CI gate.
 
 ## Negative results and known limits
@@ -244,8 +247,11 @@ Only claims the repository can back up are listed here.
   agent view draws is a reconstruction by the page, computed from recorded
   positions with a 2-hop rule ("which rooms could a 2-hop agent see?"). The
   vault therefore never "drops out of view"; it **drifts out of the
-  reconstructed sightline**. On the Infiltrator view that happens around ticks
-  9-10; on the Sentry view the site copy marks ticks 9-13
+  reconstructed sightline**. In the committed infiltration recording, on the
+  page's own tick numbering, the vault goes "last known" on the Infiltrator view
+  at ticks 9, 19 and 20, and on the Sentry view only at tick 20 — the
+  mid-episode Sentry window the page's guided callout points at is not in this
+  file
   ([`site/index.html`](site/index.html), [`site/infiltration.jsonl`](site/infiltration.jsonl)).
 - **Per-tick state hash.** `replay --verify` recomputes a SHA-256 digest of
   the full simulation state at every tick — zone and resource positions,
@@ -268,10 +274,17 @@ Only claims the repository can back up are listed here.
   allocated" claim is made.
 - **Policy quality is topology-conditional.** MCTS wins the bottleneck study
   and loses the standard one; neither verdict describes the policy uniformly.
-- **Demo recordings predate the current engine revision.** `site/demo.jsonl`
-  is recorded with an earlier engine revision, so re-running today can produce
-  a different tick-by-tick file; the viewer always shows the committed file
-  exactly as recorded.
+- **Site recordings are re-recorded, not historical.** `site/demo.jsonl` and
+  `site/infiltration.jsonl` were re-recorded on the current engine from the
+  seed and config their own headers and the page's reproduce commands name, so
+  `replay --verify` passes on both, state hashes included, and a CI job gates
+  every recording under `site/`. They are not the files the page first shipped:
+  engine changes since 2026-09-17 (the `Observation.StepNumber` field, the
+  tick-rotated choke arbitration, and the instant/one-tick crossing gate) moved
+  both episodes earlier — the demo now ends at tick 27 instead of hitting the
+  30-tick cap, and the infiltration run at tick 20 instead of 23. Re-running the
+  documented commands on any later engine revision can move them again, and the
+  CI job is what catches it.
 
 ## How to verify
 
@@ -281,6 +294,8 @@ SDK installed, and require no network access once dependencies are restored.
 ```sh
 dotnet test Lattice.sln -c Release                       # full suite
 dotnet run -c Release --project Cli -- replay Tests/fixtures/golden_trajectory.jsonl --verify
+dotnet run -c Release --project Cli -- replay site/demo.jsonl --verify
+dotnet run -c Release --project Cli -- replay site/infiltration.jsonl --verify
 dotnet run -c Release --project Cli -- evaluate --seed-set dev,heldout --scenario standard --seeds 50 --rollouts 32
 dotnet run -c Release --project Cli -- evaluate --seed-set dev,heldout --scenario bottleneck --seeds 30 --rollouts 32
 dotnet run -c Release --project Cli -- benchmark

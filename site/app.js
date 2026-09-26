@@ -9,9 +9,10 @@
   'use strict';
 
   // The guided hero is the infiltration recording (Sentry vs Infiltrator): its
-  // "moment to watch" (ticks 8-13, the Vault drifting out of the Sentry's
-  // reconstructed 2-hop sightline) is what the hero copy walks a visitor
-  // through. The demo.jsonl (MCTS card) stays reachable from the Preset menu.
+  // "moment to watch" (ticks 9, 19 and 20, the Vault drifting out of the
+  // Infiltrator's reconstructed 2-hop sightline) is what the hero copy walks a
+  // visitor through. The demo.jsonl (MCTS card) stays reachable from the Preset
+  // menu.
   const DEFAULT_TRAJECTORY = './infiltration.jsonl';
 
   // Pinned revision the page's evidence links and result fetches target.
@@ -38,7 +39,7 @@
       staticName: 'demo.svg',
       chipLabel: 'Benchmark',
       scenarioOrder: 1,
-      caption: 'Seed 42, MCTS (agent 0) vs Random (agent 1), 30 ticks. Recorded with lattice simulate --seed 42 --agent mcts --steps 30 and rendered as a dependency-free CSS-animated SVG with lattice render --format svg.',
+      caption: 'Seed 42, MCTS (agent 0) vs Random (agent 1), 27 ticks. Recorded with lattice simulate --seed 42 --agent mcts --steps 30 and rendered as a dependency-free CSS-animated SVG with lattice render --format svg.',
       reproduce: 'dotnet run --project Cli -- simulate --seed 42 --agent mcts --steps 30 --out demo.jsonl',
     },
   };

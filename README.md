@@ -410,6 +410,9 @@ lives in [`docs/CLI.md`](docs/CLI.md).
   criticisms, edge cases, and resolved issues;
   [`docs/CLAIM_CALIBRATION_MATRIX.md`](docs/CLAIM_CALIBRATION_MATRIX.md) maps
   every public claim to its proving artifact, tested matrix, and boundary.
+- **External agents.** [`docs/EXTERNAL_AGENT_PROTOCOL.md`](docs/EXTERNAL_AGENT_PROTOCOL.md)
+  is the normative contract for playing Lattice as an agent from an external
+  process over stdin/stdout.
 - **Design decisions.** Architecture decision records in
   [`docs/adr/`](docs/adr/) explain why the contracts are shaped as they are:
   product thesis and evidentiary standards, graph-over-grid maps, the

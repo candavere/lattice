@@ -1,0 +1,1 @@
+{"type":"hello","protocol":1,"scenario":"standard","seed":1001,"agent_slot":0,"max_ticks":500,"agent_count":2,"limits":{"step_timeout_ms":5000,"match_timeout_ms":1200000}}

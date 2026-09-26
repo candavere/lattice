@@ -1,0 +1,1 @@
+{"type":"observation","step":0,"agent_id":0,"map":{"zones":[{"id":0,"position":{"x":0,"y":0},"max_occupancy":7,"oops":1}],"resources":[],"choke_points":[]},"agent_states":[],"claims":[],"step_number":0}

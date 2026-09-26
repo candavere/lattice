@@ -27,6 +27,7 @@
     <ProjectReference Include="..\Trajectories\Lattice.Trajectories.csproj" />
     <ProjectReference Include="..\Analytics\Lattice.Analytics.csproj" />
     <ProjectReference Include="..\Cli\Lattice.Cli.csproj" />
+    <ProjectReference Include="..\Protocol\Lattice.Protocol.csproj" />
   </ItemGroup>
 
 </Project>

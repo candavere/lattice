@@ -160,10 +160,15 @@ Expected: the first command exits `0` and writes `reviewer_fixture.jsonl`;
 `--verify` prints to stderr
 
 ```
-replay verified: 40 step(s) serialized-equivalent (seed 42, schema v2).
+replay verified: 10 step(s) serialized-equivalent (seed 42, schema v2).
 ```
 
-and exits `0`.
+and exits `0`. Note the step count is `10`, not the requested `--steps 40`:
+this seed's episode terminates early at `resources-exhausted` (reported by
+`simulate` as `recorded 10 steps (resources-exhausted, winner: agent 0)`), and
+the recording stops there. A lower count than `--steps` is correct behaviour,
+not a divergence; the run is deterministic, so a repeat yields a byte-identical
+file and the same `10`.
 
 Source-pinned path (canonical golden trajectory, requires the pinned commit):
 
@@ -171,11 +176,27 @@ Source-pinned path (canonical golden trajectory, requires the pinned commit):
 git clone https://github.com/candavere/lattice.git lattice
 git -C lattice checkout v2.3.2
 cd lattice
+# The source tree ships no `lattice` executable — the only published binaries
+# are the release assets of section 1.2. Supply the checksum-verified asset
+# under that name before running the replay.
+cp ../lattice-osx-arm64 ./lattice && chmod +x ./lattice   # macOS; use your platform's asset
 ./lattice replay Tests/fixtures/golden_trajectory.jsonl --verify
 ```
 
-Expected: `replay verified: N step(s) serialized-equivalent (seed 2024, schema
-v2).` for `N` = the recorded step count, exit `0`.
+Run this path in its own directory: section 2 names the verified binary `./lattice`,
+which is also this path's clone target, so cloning into a directory that already
+holds that file fails with `fatal: destination path 'lattice' already exists and
+is not an empty directory.` The `cp` above lands inside the freshly cloned
+directory, so it is unaffected.
+
+Expected: `replay verified: 11 step(s) serialized-equivalent (seed 2024, schema
+v2).` for `N` = the recorded step count (`11` at this commit), exit `0`.
+
+Do not run this path against the current `main` branch: the golden trajectory
+on `main` is schema v3, and the `v2.3.2` binary rejects it with
+`error: Trajectory header schema version 3 is newer than the supported version
+2.` and a non-zero exit. The `checkout v2.3.2` above is what keeps the two in
+step.
 
 Pass if: the verify line appears with matching seed/schema and exit code `0`.
 Fail if: any step reports a serialized divergence (printed to stderr with a

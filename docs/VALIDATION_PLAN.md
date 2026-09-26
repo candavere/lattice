@@ -89,14 +89,17 @@ Source-pinned path:
 git clone https://github.com/candavere/lattice.git lattice
 git -C lattice checkout v2.3.2
 cd lattice
+# The source tree ships no `lattice` executable — supply the checksum-verified
+# release asset of reproduction_packet.md §1.2 under that name.
+cp ../lattice-osx-arm64 ./lattice && chmod +x ./lattice   # macOS; use your platform's asset
 ./lattice replay Tests/fixtures/golden_trajectory.jsonl --verify
 ```
 
-Criterion: `--verify` reports `replay verified: N step(s) serialized-equivalent
-(seed 2024, schema v2).` with the recorded step count, on stderr, and exits
-`0`. Any reported stage of serialized divergence is a fail. Asset-only
-round-trip verification of a freshly simulated episode may be run as a
-supplement but does not substitute for the golden-trajectory check.
+Criterion: `--verify` reports `replay verified: 11 step(s) serialized-equivalent
+(seed 2024, schema v2).` with the recorded step count (`11` at this commit), on
+stderr, and exits `0`. Any reported stage of serialized divergence is a fail.
+Asset-only round-trip verification of a freshly simulated episode may be run as
+a supplement but does not substitute for the golden-trajectory check.
 
 ### Experiment 3 — Context-dependent policy interaction
 

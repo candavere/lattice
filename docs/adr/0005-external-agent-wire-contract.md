@@ -209,14 +209,57 @@ agent did not cause it. That gap is recorded as an open point rather than
 patched here, because the reason-code set is closed and adding a code is a
 version change.
 
-## Consequences
+## Addendum — open points settled before the first release (2026-09-27)
+
+Protocol `1` had not shipped when this ADR was accepted, so the points the
+spec left open in its §14 could be settled by amending the spec rather than by
+cutting version `2`: `U-1` fixes the protocol project as `Lattice.Protocol` in
+`Protocol/`, a leaf with no `ProjectReference` to any project in this repository,
+with tests in `Tests/Protocol/` and fixtures in `Tests/fixtures/protocol/`,
+which is the same name ADR decision 3 left to chance; `U-3` adds the required
+integer fields `max_ticks` (from `SimulationConfig.MaxTicks`,
+`Environment/Simulation.cs:28`) and `agent_count` (from
+`SimulationConfig.AgentCount`, `Environment/Simulation.cs:25`) to `hello`,
+closing the largest usability gap in the contract and superseding the paragraph
+in §3.1 that read "`hello` carries no tick budget, agent count, or map" — the
+map is still absent, and still arrives with the first observation; `U-5` adds
+the thirteenth agent reason code `timeout_handshake`, bounded by
+`step_timeout_ms` from the same `hello`, and **supersedes decision 1's clause
+"a missing field, no reply — is refused with reason `protocol_mismatch`"**: a
+`hello_ack` that never arrives is `timeout_handshake`, while one that arrives
+and carries a wrong `protocol` value remains `protocol_mismatch`, and the new
+code is scored as an agent failure like any other; `U-6` adds a report-only
+`AgentFailures` count, incremented per agent-attributable failure and kept
+separate from `MatchOutcome.Timeout` and from `VoidRuns`, which changes no
+outcome, no delta, no confidence interval, and no decision rule, so the
+"separate report" this ADR rejected is still rejected — the count is a column
+in the existing report, not a parallel one; `U-7` adds the fourteenth code
+`host_limit` and **settles the fairness problem this ADR explicitly left
+unpatched** at the end of decision 4: when Lattice's own outbound `observation`
+would breach `max_line_bytes` or `max_json_depth`, Lattice refuses the match
+before sending, records it as a void run, reports the count, excludes it from
+the paired statistics, and does not score it as a loss — so decision 4's
+"every protocol failure is a loss" now holds for every fault the agent controls
+and stops at the first fault only Lattice controls, which is a narrowing chosen
+for fairness rather than a loosening of the anti-crash rule the ADR exists to
+defend; `U-8` settles process lifetime as **one agent process per match**,
+normative in §3 and matching the in-process fresh-agent-per-(pairing, seed)
+contract, with the launch mechanics left to stage 3 as U-9; and `U-10` settles
+that `simulate` does **not** accept external agents in v3.0, on commensurability
+grounds — a single episode has no mirror, no confidence interval, and no
+grading floor, so it could not be compared with anything published here — which
+leaves `simulate --agent greedy|random|mcts` exactly as it is and the external
+path on `evaluate --agent-cmd` only. `U-2`, `U-4`, and `U-9` remain open for
+stage 3. Because no conforming agent exists yet, none of this required a
+version bump; the discipline in spec §12.8 now binds, and the reason set is
+frozen at fourteen codes from the first release onward.
 
 - `docs/EXTERNAL_AGENT_PROTOCOL.md` is a committed, normative contract: a
   closed five-type message catalogue, a field-by-field projection of
   `Observation` and `AgentAction` with `file:line` provenance at `5fa9526`, a
-  twelve-code error table, and an explicit list of points that are *not*
-  settled. The last is deliberate — the spec says where it stops rather than
-  inventing an answer.
+  fourteen-code error table partitioned by fault, and an explicit list of points
+  that are *not* settled. The last is deliberate — the spec says where it stops
+  rather than inventing an answer.
 - No existing behaviour changes. `Lattice.Environment` and `Lattice.Generator`
   stay BCL-only. `ObservationView` stays `internal` and unchanged. The
   trajectory schema stays at version 3 with no new header or step field
@@ -238,7 +281,10 @@ version change.
 - A protocol failure is recorded as a loss and not in the `Timeout` bucket, so
   a study can report "how badly did it play" but not separately "how often did
   its plumbing break". Whether that reporting gap should be closed is an open
-  question in the spec, not a decision taken here.
+  question in the spec, not a decision taken here. **Closed by the addendum
+  above (U-6): an `AgentFailures` count, report-only, alongside the existing
+  statistics and not instead of them.**
 - The command-line launch contract for `--agent-cmd` (argv splitting,
-  environment, working directory) and the protocol project's own name are
-  deliberately left to stage 3 and recorded as open points.
+  environment, working directory) remains deliberately left to stage 3 and
+  recorded as an open point, alongside `U-2` and `U-4`. The protocol project's
+  own name is no longer open: it is `Lattice.Protocol` (§11.1, U-1).

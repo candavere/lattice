@@ -86,12 +86,13 @@ that `1` and `"1"` are distinguishable and a string form is a schema violation.
 - Any other **value** — a different integer, a string, a float, or a missing
   `protocol` field — MUST be **refused**. Lattice MUST terminate the match and
   record the reason `protocol_mismatch`.
-- A `hello_ack` that never arrives is a **timeout**, not a mismatch, and is
-  covered by `timeout_step` in §7. This is flagged as provisional in §14, U-5:
-  the closed reason set has no dedicated handshake-timeout code, and this
-  document's reading — that the handshake is the exchange preceding step 0 and
-  is therefore bounded by `step_timeout_ms` — is an interpretation, not a
-  decision that has been taken.
+- A `hello_ack` that **never arrives** is a **timeout**, not a mismatch, and
+  has its own reason code: `timeout_handshake`, raised when no valid `hello_ack`
+  is readable within `step_timeout_ms` of `hello` being written. It is scored as
+  an **agent failure** (§9), on the same footing as `timeout_step`. An *invalid*
+  `hello_ack` is not affected by this code: a `hello_ack` that arrives and
+  carries a wrong `protocol` value is `protocol_mismatch` (§2), and one that
+  violates the message schema is `schema_violation` (§8).
 - There is **no downgrade path**. Lattice MUST NOT fall back to an older
   protocol, MUST NOT offer a list of acceptable versions, and MUST NOT accept a
   version the agent chose unilaterally.
@@ -126,6 +127,19 @@ Lattice                                   Agent
 
 Requirements:
 
+- **Process lifetime is one process per match.** Lattice MUST launch a fresh
+  agent process for every match, send it `hello` exactly once, and terminate it
+  at the end of that match. A process MUST NOT be reused across matches, across
+  seed pairings, or across the mirrored seatings of one seed. This is what
+  guarantees that no state an agent accumulated — a cache, an RNG stream, a
+  learned table — can carry over from one experiment into the next, and it
+  mirrors the in-process factory contract, which already builds a fresh agent
+  per (pairing, seed) precisely so that RNG streams cannot leak between matches
+  (`Agents/IAgentFactory.cs:12-23`, `Agents/EvaluationHarness.cs:175`). It also
+  makes isolation unconditional: one agent's crash, hang, or memory growth can
+  never affect another match. A suite-scoped process would need a reset message,
+  and the five-type catalogue (§4) has no such type; that would be a protocol-2
+  change. See §14, U-8.
 - Lattice MUST send `hello` exactly once per process, before any `observation`.
 - The agent MUST send `hello_ack` exactly once, before any `action`, and MUST
   send nothing else until it receives its first `observation`.
@@ -148,6 +162,8 @@ Requirements:
 | `scenario` | string | yes | The evaluation scenario family that selected the map. In v3.0 the closed set is `"standard"` and `"bottleneck"` (`Cli/CliApp.cs:736-742`). |
 | `seed` | integer | yes | The run seed, an unsigned 64-bit value (`Agents/EvaluationHarness.cs:29`). MUST be a JSON number with no fraction, no exponent, no leading `+`, and no leading zeros. |
 | `agent_slot` | integer | yes | The agent slot this process plays, in `0..AgentCount-1` (`Environment/Simulation.cs:58-60`). In the `evaluate` path this is exactly `0` or `1`, because evaluation pairings are head-to-head (`Agents/EvaluationHarness.cs:112-117`). |
+| `max_ticks` | integer ≥ 1 | yes | The match's tick budget, from `SimulationConfig.MaxTicks` (`Environment/Simulation.cs:28`). It is the **same value** as `EvaluationSimulationConfig.MaxTicks`, which is the per-match `MaxSteps` the harness passes down (`Agents/EvaluationHarness.cs:147-148`). This is the horizon an agent plans against; §7's `match_timeout_ms ≥ step_timeout_ms × MaxTicks` constraint is computed from this number. |
+| `agent_count` | integer ≥ 2 | yes | The number of agents in the match, from `SimulationConfig.AgentCount` (`Environment/Simulation.cs:25`), which is bounded to 2..4 (`Environment/Simulation.cs:58-60`). It is always `2` on the `evaluate` path (`Agents/EvaluationHarness.cs:112-117`); the field is carried so an agent can size its model of the episode without inferring the count from `agent_states[]` length. |
 | `limits` | object | yes | The two named time limits for this match (§7). |
 
 `limits` has exactly two fields and no others:
@@ -166,8 +182,15 @@ reachable through the external-agent path in v3.0: it is a `simulate`-only
 roster and is explicitly separate from the `evaluate` path
 (`Cli/CliApp.cs:291-293`, `Cli/CliApp.cs:736-742`).
 
-`hello` carries **no** tick budget, agent count, or map. This is a deliberate
-consequence of the field list above, and it has a real cost — see §14, U-3.
+`hello` carries **no map**. The map arrives with the first `observation` (§5.3),
+which is re-sent in full on every step. What `hello` does carry beyond its
+identity fields is the two numbers an agent cannot otherwise learn:
+`max_ticks`, the horizon it is playing against, and `agent_count`, the size of
+the episode. Both are **required** — under the strictness rule in §8.3 a
+protocol-1 agent that omits either is refused with `schema_violation`, and one
+that sends either under a different name is refused with `unknown_field`. This
+closes the usability gap recorded as §14, U-3: an agent that plans a horizon now
+knows the horizon from the handshake rather than by running out of steps.
 
 ---
 
@@ -187,13 +210,15 @@ it is a schema violation (§8).
 ### 4.1 Example lines
 
 The numeric limit values in the `hello` example are **illustrative only**; the
-normative values are fixed in stage 3 (§14, U-2). Every other value in these
-examples is normative and matches the field tables that follow.
+normative values are fixed in stage 3 (§14, U-2). The same is true of
+`max_ticks` and `agent_count`, which are shown with a plausible but not
+normative pair. Every other value in these examples is normative and matches
+the field tables that follow.
 
 **`hello`**
 
 ```json
-{"type":"hello","protocol":1,"scenario":"standard","seed":1001,"agent_slot":0,"limits":{"step_timeout_ms":5000,"match_timeout_ms":1200000}}
+{"type":"hello","protocol":1,"scenario":"standard","seed":1001,"agent_slot":0,"max_ticks":500,"agent_count":2,"limits":{"step_timeout_ms":5000,"match_timeout_ms":1200000}}
 ```
 
 **`hello_ack`**
@@ -480,9 +505,9 @@ protocol**; the second two are **named, per-match values carried in
 
 | Limit | Value | Applies to | Enforced by | Reason on breach |
 | :--- | :--- | :--- | :--- | :--- |
-| `max_line_bytes` | `1048576` (1 MiB), **excluding** the terminating LF | every line, in both directions | Lattice | `line_too_long` |
+| `max_line_bytes` | `1048576` (1 MiB), **excluding** the terminating LF | every line, in both directions | Lattice | `line_too_long` (agent's line) / `host_limit` (Lattice's own line) |
 | `max_json_depth` | `32` | every JSON value Lattice parses | Lattice | `depth_exceeded` |
-| `step_timeout_ms` | stage-3 constant, carried in `hello.limits` | the wait for one `action` after one `observation` | Lattice | `timeout_step` |
+| `step_timeout_ms` | stage-3 constant, carried in `hello.limits` | the wait for one `action` after one `observation`, and the wait for one `hello_ack` after one `hello` | Lattice | `timeout_step` (after an `observation`) / `timeout_handshake` (after `hello`) |
 | `match_timeout_ms` | stage-3 constant, carried in `hello.limits` | the whole match, from `hello` written to termination | Lattice | `timeout_match` |
 
 Notes that are binding:
@@ -504,51 +529,84 @@ Notes that are binding:
   resource bounds are caller-configured with no upper ceiling
   (`Generator/MapGenerator.cs:13-25`), a sufficiently large generated map
   produces an `observation` line that exceeds 1 MiB. Lattice MUST refuse to
-  start such a match rather than emit a line it has itself violated.
+  start such a match rather than emit a line it has itself violated. That
+  refusal is `host_limit` (§8): a **host** fault, recorded as a **void** run,
+  and explicitly **not** a loss for the external agent. The reasoning is
+  fairness, and it is the whole point of the code: the agent had no opportunity
+  to influence how large Lattice's own map is, so charging it a loss would let a
+  map-size choice in the host decide the agent's measured score. See §9.1, §9.3,
+  and §14, U-7.
+- **Lattice MUST check before it sends.** The `host_limit` check runs over the
+  `observation` Lattice is about to write — specifically, over its encoded byte
+  length against `max_line_bytes` and its nesting against `max_json_depth` —
+  and it MUST run before any byte reaches the agent. Lattice MUST NOT write a
+  line it has already determined exceeds a limit and then report the breach: the
+  refusal exists precisely so that the agent's stream never sees a line Lattice
+  considers illegal. The check is the mirror of the inbound enforcement Lattice
+  applies to the agent's lines, and it uses the same two constants.
 - **`match_timeout_ms` MUST be at least `step_timeout_ms × MaxTicks`**, where
-  `MaxTicks` is the match's tick budget (`Environment/Simulation.cs:28`,
+  `MaxTicks` is the match's tick budget — the same number Lattice sends as
+  `hello.max_ticks` (`Environment/Simulation.cs:28`,
   `Agents/EvaluationHarness.cs:147-148`). Otherwise the whole-match limit is
   guaranteed to fire before a single match could complete, and every external
   agent would be scored a loss for a limit Lattice itself mis-set.
-- **An agent MUST honour `step_timeout_ms`.** An agent that needs longer MUST
-  fail; it MUST NOT hold the stream. Lattice MUST NOT extend a step timeout, and
-  MUST NOT retry a step (§9).
+- **An agent MUST honour `step_timeout_ms` in both directions.** An agent that
+  needs longer to answer an `observation` — or to answer `hello` with a
+  `hello_ack` — MUST fail; it MUST NOT hold the stream. Lattice MUST NOT extend
+  a step timeout, and MUST NOT retry a step or a handshake (§9).
 
 ---
 
 ## 8. Error codes
 
 The reason code set is **closed and machine-readable**. Lattice MUST use one of
-these twelve strings as `error.reason` and MUST NOT invent, extend, or
-re-purpose one:
+these strings as `error.reason` and MUST NOT invent, extend, or re-purpose one.
 
-| `reason` | Meaning |
-| :--- | :--- |
-| `protocol_mismatch` | The handshake version is not exactly `1` (§2). |
-| `malformed_json` | The line is not a single well-formed JSON value. |
-| `schema_violation` | The JSON is well formed but violates the message schema: a missing required field, a field present where the schema requires it absent, a wrong JSON type, an unknown `type` value, or an unknown `kind` value (§6.1). |
-| `unknown_field` | The object carries a member that is not in the schema for that type. |
-| `line_too_long` | A line exceeded `max_line_bytes` (§7). |
-| `depth_exceeded` | A JSON value exceeded `max_json_depth` (§7). |
-| `step_mismatch` | The action's `step` did not equal the `step` it answers (§6.2). |
-| `illegal_action` | The action is well formed but outside `ActionSpace` for this map (§6.3). |
-| `timeout_step` | Nothing arrived within `step_timeout_ms` — no `action` after an `observation`, or no `hello_ack` after `hello` (§2, and the open point in §14, U-5). |
-| `timeout_match` | The match exceeded `match_timeout_ms` (§7). |
-| `agent_exited` | The process closed its stdout, or exited with code `0`, before the exchange completed. |
-| `agent_crashed` | The process was terminated by a signal, or exited with a non-zero code, before the exchange completed. |
+The set is **fourteen** codes, and it is partitioned by **who is at fault**,
+because that partition determines scoring (§9.3) and it must not be inferred
+case by case. Thirteen are **agent-attributable** — the agent sent something
+wrong, sent nothing in time, or stopped existing — and every one of them is
+scored as a **loss** for the external agent. One is **host-attributable**:
+`host_limit`, which fires when Lattice's own outbound message would breach a
+limit and is recorded as a **void** run instead.
+
+| `reason` | Fault | Meaning |
+| :--- | :--- | :--- |
+| `protocol_mismatch` | agent | The handshake version is not exactly `1` (§2). |
+| `malformed_json` | agent | The line is not a single well-formed JSON value. |
+| `schema_violation` | agent | The JSON is well formed but violates the message schema: a missing required field, a field present where the schema requires it absent, a wrong JSON type, an unknown `type` value, or an unknown `kind` value (§6.1). |
+| `unknown_field` | agent | The object carries a member that is not in the schema for that type. |
+| `line_too_long` | agent | A line the agent sent exceeded `max_line_bytes` (§7). |
+| `depth_exceeded` | agent | A JSON value the agent sent exceeded `max_json_depth` (§7). |
+| `step_mismatch` | agent | The action's `step` did not equal the `step` it answers (§6.2). |
+| `illegal_action` | agent | The action is well formed but outside `ActionSpace` for this map (§6.3). |
+| `timeout_handshake` | agent | No valid `hello_ack` arrived within `step_timeout_ms` of `hello` (§2, §7). |
+| `timeout_step` | agent | No `action` arrived within `step_timeout_ms` of an `observation` (§7). |
+| `timeout_match` | agent | The match exceeded `match_timeout_ms` (§7). |
+| `agent_exited` | agent | The process closed its stdout, or exited with code `0`, before the exchange completed. |
+| `agent_crashed` | agent | The process was terminated by a signal, or exited with a non-zero code, before the exchange completed. |
+| `host_limit` | **host** | Lattice's own outbound message would have breached `max_line_bytes` or `max_json_depth`, so Lattice refused the match before sending (§7). **Void run; not a loss** (§9.1, §9.3). |
+
+A `reason` is never attributed to the agent for a fault the agent did not
+control, and the one place that could be argued — an outbound line that is too
+long — is settled by the explicit `host_limit` code rather than by argument. The
+`Fault` column is the normative statement; it is not a commentary.
 
 ### 8.1 The `error` message
 
 | Field | Type | Required | Meaning |
 | :--- | :--- | :--- | :--- |
 | `type` | string | yes | Exactly `"error"`. |
-| `reason` | string | yes | One of the twelve codes above. |
+| `reason` | string | yes | One of the fourteen codes above. |
 | `detail` | string | yes | Human-readable text. **Diagnostic only: an agent MUST NOT parse it and MUST NOT branch on it.** It exists so a human debugging an agent can see what happened. |
 
 Lattice MUST send `error` **before** terminating, whenever it has detected a
 failure, and MUST NOT send it on a normal termination (§3). Sending `error` is
 permitted, not required, on process-level failures where the stream is already
-gone.
+gone. It is likewise not required for `host_limit`: that refusal is detected
+before `hello` is written, so in the ordinary case there is no exchange to
+report into and the code appears in the run record and the reported void count
+(§9.3) rather than on the wire.
 
 ### 8.2 Which code, when
 
@@ -566,8 +624,15 @@ was made:
   validated, but it is the wrong message, or the wrong step.
 - **Semantics** — `illegal_action`. The document is a valid action that the map
   does not permit.
-- **Timing** — `timeout_step`, `timeout_match`. Nothing arrived in time.
+- **Timing** — `timeout_handshake`, `timeout_step`, `timeout_match`. Nothing
+  arrived in time. The handshake is separated from the step loop because they are
+  different exchanges with different causes, and a study that reports "how often
+  did the agent fail to start" should not have to subtract that out of "how often
+  did the agent stall mid-match".
 - **Process** — `agent_exited`, `agent_crashed`. The peer stopped existing.
+- **Host** — `host_limit`. Lattice refused its own message before sending. The
+  only code in this list that is not the agent's fault, and the only one that
+  does not become a loss (§9.3).
 
 ### 8.3 Strictness
 
@@ -596,12 +661,15 @@ Accordingly:
 Exactly one reason is reported per failed match. When more than one condition
 holds, the **first detected** is the one reported, in this precedence order:
 
-1. `protocol_mismatch` — detected during the handshake, before any step.
-2. Framing codes (`line_too_long`, `malformed_json`, `depth_exceeded`).
-3. Schema codes (`schema_violation`, `unknown_field`).
-4. `step_mismatch`, then `illegal_action`.
-5. `timeout_step`, then `timeout_match`.
-6. `agent_crashed`, then `agent_exited`.
+1. `host_limit` — detected by Lattice over its own outbound message, before any
+   byte is sent and therefore before the handshake exists.
+2. `protocol_mismatch` — detected during the handshake, before any step.
+3. `timeout_handshake` — the handshake's wait elapsed with no valid `hello_ack`.
+4. Framing codes (`line_too_long`, `malformed_json`, `depth_exceeded`).
+5. Schema codes (`schema_violation`, `unknown_field`).
+6. `step_mismatch`, then `illegal_action`.
+7. `timeout_step`, then `timeout_match`.
+8. `agent_crashed`, then `agent_exited`.
 
 A detected protocol violation therefore **outranks** the process-level
 consequence of that violation. When Lattice detects a violation, writes
@@ -611,14 +679,21 @@ protocol violation was detected, i.e. the process died on its own. Between
 those two, a signal or non-zero exit is `agent_crashed`; a clean exit or an EOF
 on stdout is `agent_exited`.
 
+`host_limit` is first because it is the only code for which the failing party
+is Lattice, and because a match refused on the host's own limits never reaches
+the wire — there is no agent behaviour for it to outrank. The three handshake
+codes sit together at the top of the agent-attributable list because they are
+the only ones that can fire before step 0.
+
 ---
 
 ## 9. Failure is a result, never a retry
 
 ### 9.1 The rule
 
-Every failure listed in §8 **MUST be recorded as a result and scored as a loss
-for the external agent.** Specifically:
+Every **agent-attributable** failure listed in §8 — that is, every code except
+`host_limit` — **MUST be recorded as a result and scored as a loss for the
+external agent.** Specifically:
 
 - Lattice MUST NOT silently retry a failed handshake, a failed step, or a
   crashed process. There is no second attempt, no backoff, and no
@@ -640,6 +715,21 @@ for the external agent.** Specifically:
 - The failure MUST appear in the reported statistics, not be filtered out
   (§9.3).
 
+**`host_limit` is the one exception, and it is a hard exception.** When Lattice
+would breach `max_line_bytes` or `max_json_depth` on its own outbound message
+(§7), it MUST refuse the match before sending anything, MUST record the run as
+**void / invalid**, and MUST NOT score it as a loss for the external agent. The
+agent did not choose the map size, cannot see the line Lattice declined to
+write, and had no action that would have changed the outcome; a loss here would
+be a host decision masquerading as agent behaviour. Void runs are still
+**counted and reported** — a run that silently disappeared would be worse — but
+they are **excluded from the paired statistics** (§9.3), because a seed with no
+completed match contributes no delta, no win, and no loss.
+
+The failure-is-a-loss rule therefore has a precise boundary: it covers every
+fault the agent could have avoided, and it stops at the first fault only Lattice
+could have avoided.
+
 ### 9.2 Why a failure is a loss and not an abort
 
 An external agent is a competitor in a scored study, not a dependency Lattice
@@ -651,22 +741,30 @@ a public benchmark must not have. It is also the reason there is no retry: a
 retry rule would make the reported numbers depend on Lattice's internal policy
 rather than on the agent's behaviour.
 
+The rule is deliberately one-sided, and `host_limit` (§9.1) is the single
+carve-out. The harshness is a feature for every fault the agent controls — a
+crash must never be a scoring strategy. It would be a defect for the one fault
+it does not, and a host-side refusal is recorded as a void run precisely so that
+Lattice can be strict about the agent without also being unfair to it.
+
 ### 9.3 Failure-to-score mapping
 
-| Reason | Recorded `TerminationReason` | Match classified as | External agent's policy outcome |
-| :--- | :--- | :--- | :--- |
-| `protocol_mismatch` | the reason code | win for the baseline side | loss |
-| `malformed_json` | the reason code | win for the baseline side | loss |
-| `schema_violation` | the reason code | win for the baseline side | loss |
-| `unknown_field` | the reason code | win for the baseline side | loss |
-| `line_too_long` | the reason code | win for the baseline side | loss |
-| `depth_exceeded` | the reason code | win for the baseline side | loss |
-| `step_mismatch` | the reason code | win for the baseline side | loss |
-| `illegal_action` | the reason code | win for the baseline side | loss |
-| `timeout_step` | the reason code | win for the baseline side | loss |
-| `timeout_match` | the reason code | win for the baseline side | loss |
-| `agent_exited` | the reason code | win for the baseline side | loss |
-| `agent_crashed` | the reason code | win for the baseline side | loss |
+| Reason | Fault | Recorded `TerminationReason` | Match classified as | External agent's policy outcome |
+| :--- | :--- | :--- | :--- | :--- |
+| `protocol_mismatch` | agent | the reason code | win for the baseline side | loss |
+| `malformed_json` | agent | the reason code | win for the baseline side | loss |
+| `schema_violation` | agent | the reason code | win for the baseline side | loss |
+| `unknown_field` | agent | the reason code | win for the baseline side | loss |
+| `line_too_long` | agent | the reason code | win for the baseline side | loss |
+| `depth_exceeded` | agent | the reason code | win for the baseline side | loss |
+| `step_mismatch` | agent | the reason code | win for the baseline side | loss |
+| `illegal_action` | agent | the reason code | win for the baseline side | loss |
+| `timeout_handshake` | agent | the reason code | win for the baseline side | loss |
+| `timeout_step` | agent | the reason code | win for the baseline side | loss |
+| `timeout_match` | agent | the reason code | win for the baseline side | loss |
+| `agent_exited` | agent | the reason code | win for the baseline side | loss |
+| `agent_crashed` | agent | the reason code | win for the baseline side | loss |
+| `host_limit` | **host** | the reason code | **void — not a match result** | **not scored** |
 
 "Win for the baseline side" resolves to `MatchOutcome.TeamAWin` or
 `MatchOutcome.TeamBWin` according to which seat the external agent occupied in
@@ -674,12 +772,36 @@ that match; the external agent's own policy outcome is always a **loss**
 (`Agents/PairedEvaluation.cs:181-195`,
 `Agents/EvaluationHarness.cs:200-213`).
 
-A protocol failure is **not** reported through the `Timeout` bucket
-(`Agents/EvaluationHarness.cs:12-18`). `Timeout` means the episode burned its
-step budget without a terminal tick (`Agents/EvaluationHarness.cs:200-205`) —
-a legitimate outcome. A protocol failure is a different event and MUST be
-counted separately, so that an agent cannot be timed out by the study and
-mislabelled as having merely run long. See §14, U-6.
+**Void runs.** A `host_limit` run produces no `MatchOutcome` at all: it is not a
+win, a loss, a draw, or a timeout. It MUST be reported as a **count** —
+`VoidRuns`, alongside the reason breakdown — so that a reader can see that a
+match did not happen, rather than inferring it from a total that is short. Void
+runs MUST be **excluded from the paired statistics**: they contribute to no
+delta, no per-outcome rate, and no seed in the grading denominator, because
+neither agent played. A seed whose only two mirror matchings were both void does
+not count toward the 30-seed floor in §9.4. This is the whole point of the
+carve-out — excluding the run is what makes "not a loss" true — and reporting the
+count is what stops the exclusion from being invisible.
+
+**`AgentFailures`.** A protocol failure is **not** reported through the
+`Timeout` bucket (`Agents/EvaluationHarness.cs:12-18`). `Timeout` means the
+episode burned its step budget without a terminal tick
+(`Agents/EvaluationHarness.cs:200-205`) — a legitimate outcome. A protocol
+failure is a different event and MUST be counted separately, so that an agent
+cannot be timed out by the study and mislabelled as having merely run long.
+
+The reported statistics therefore carry an **`AgentFailures`** count, separate
+from `MatchOutcome.Timeout` and separate from `VoidRuns`: it is incremented once
+per match whose `TerminationReason` is one of the thirteen agent-attributable
+codes in the table above. `AgentFailures` is a **report-only** field. It MUST
+NOT change scoring, MUST NOT change the outcome of any match, and MUST NOT
+enter the paired delta, the confidence interval, or the decision rule — those
+remain exactly as §9.4 specifies. It exists so that a study can answer two
+questions that one number cannot: *how badly did it play* (the paired
+statistics, in which every failure is a loss) and *how often did its plumbing
+break* (the `AgentFailures` count, in which a crash and a stall are visible as
+such and not laundered into a single loss). The two are reported side by side and
+are never merged. See §14, U-6.
 
 ### 9.4 Scoring is through the existing paired evaluation
 
@@ -795,7 +917,8 @@ agent's own action stream is reproducible.
 
 The protocol is split so that the wire format has no stake in the simulation:
 
-**The protocol project** holds, and only holds:
+**The protocol project** is `Lattice.Protocol`, in the repository directory
+`Protocol/`. It holds, and only holds:
 
 - plain wire types — records describing `hello`, `hello_ack`, `observation`,
   `action`, `error` as data, with no behaviour and no environment semantics;
@@ -810,6 +933,14 @@ the wire contract be unit-tested, fuzzed, and reasoned about without booting a
 simulation, and it is what keeps `Lattice.Environment` and `Lattice.Generator`
 BCL-only in the existing layering (`Environment/Lattice.Environment.csproj`,
 `Generator/Lattice.Generator.csproj`).
+
+The project's tests live in `Tests/Protocol/`, in the existing `Lattice.Tests`
+assembly, and its fixtures live in `Tests/fixtures/protocol/`. The test
+assembly is allowed to reference `Lattice.Protocol` — and already references
+`Lattice.Environment` — because the asymmetry is deliberate and one-directional:
+the tests need both vocabularies to assert that the wire projection is faithful,
+while the protocol project needs neither. `Lattice.Protocol` is a leaf: it
+references nothing in this repository at all.
 
 ### 11.2 Where the mapping lives
 
@@ -876,6 +1007,15 @@ the trajectory schema already uses
 7. **The closed reason set is versioned as a unit.** A new failure mode gets a
    new code in a new version, or is folded into an existing code with its
    meaning stated — never a new string within version `1`.
+8. **Rule 7 binds only from the first release.** Version `1` is not yet
+   released: the codes `timeout_handshake` and `host_limit` were added while the
+   version was still in draft, which is why this document is version `1` with
+   fourteen codes rather than a later version with two more. Once a
+   Lattice release has shipped protocol `1` with a given reason set, rule 7
+   applies without exception, and any further code is a version bump. The same
+   holds for the `hello` field list: `max_ticks` and `agent_count` (§3.1) were
+   added before the first release, so no agent has ever seen a `hello` without
+   them. See §14, U-3, U-5, U-7.
 
 ---
 
@@ -891,6 +1031,17 @@ protocol `1`:
 - **In-process plugins.** An `IAgent` loaded into the harness
   (`Agents/IAgent.cs:14-27`) is the existing path and is unchanged. The wire
   protocol is an addition, not a replacement.
+- **External agents through `simulate`.** `simulate` MUST NOT accept an
+  external agent in v3.0. It runs one episode, prints one result, and has no
+  paired-study machinery, no mirrored seatings, and no seed suite — the
+  apparatus §9.4 scores external agents with. Running an external process
+  through `simulate` would produce a number that looks like a measurement and is
+  not one: a single episode has no mirror, no confidence interval, and no
+  grading floor, so a result from it could not be compared with anything
+  published here. `simulate --agent greedy|random|mcts` keeps its exact
+  meaning — an in-process policy enum (`Cli/CliApp.cs:206-222`) — and MUST NOT
+  grow an external-agent spelling. The external path is `evaluate
+  --agent-cmd` only (§9.5). See §14, U-10.
 - **Network transports.** Loopback sockets, TCP, and shared memory are out.
   stdin/stdout is the transport.
 - **Sandboxing beyond process isolation plus limits.** See below.
@@ -922,31 +1073,39 @@ Concretely, and stated as a limitation rather than a warning to be skimmed:
 
 ## 14. Unsettled points
 
-These are **not settled** by the design report's decisions as given, and this
-document does **not** invent answers for them. Each is a real gap that stage 3
-must close, or that the orchestrator must settle before stage 3 can proceed.
-Where the spec body had to say something in order to be a spec, the
-corresponding row says so and marks the choice **provisional**.
+Points that stage 2 settled are recorded here with their resolution, so the
+reasoning survives the fact that the answer is now in the normative text above.
+Points that remain open are still open, and this document does **not** invent
+answers for them. Each is a real gap that stage 3 must close, or that the
+orchestrator must settle before stage 3 can proceed.
 
 | # | Unsettled | Why it matters | Status in this document |
 | :--- | :--- | :--- | :--- |
-| U-1 | The protocol project's assembly name and directory. | §11 requires a project with a hard no-`ProjectReference` rule; the name is a stage-3 mechanical choice. | Described only as "the protocol project". No name asserted. |
-| U-2 | The values of `step_timeout_ms` and `match_timeout_ms`. | Decision 5 defers these to stage 3 explicitly. | Fields and semantics defined (§3.1, §7); no value asserted. The §7 constraint `match_timeout_ms ≥ step_timeout_ms × MaxTicks` is derived, not assumed. |
-| U-3 | **`hello` carries no tick budget.** | A conforming v1 agent can learn its slot, its seed, and its map, but **not** `MaxTicks` and **not** the agent count up front. An agent that plans a horizon has no way to know the horizon except by running out of steps, and `MaxTicks` is the input to any time-aware plan. This is the largest usability gap in the contract. | `hello`'s field list is treated as closed per §3.1 and the strictness rule in §8.3. **Provisional** — if a `max_steps` field is added, it is a protocol-2 change, and it should probably happen before v3.0 ships. |
-| U-4 | The stderr ring-buffer capacity. | §1.1 requires a bounded ring but no bound is given. | Semantics fixed; no number asserted. |
-| U-5 | **There is no handshake-timeout reason code.** | The closed set has `timeout_step` and `timeout_match` but nothing for "the agent never sent `hello_ack`". Assigning it to `timeout_step` treats the handshake as step 0's exchange, which is defensible but is an interpretation, not a decision. An *invalid* `hello_ack` is not affected — a wrong `protocol` value is `protocol_mismatch` (§2). | **Provisional**: a `hello_ack` that never arrives is reported as `timeout_step`, bounded by `step_timeout_ms`. Needs confirmation. |
-| U-6 | **A protocol failure occupies neither `Timeout` nor a new bucket** — it is a loss. | §9.3 scores failures as losses per decision 6, which is right for the statistics but means a study cannot report "how often did the external agent's plumbing break" separately from "how badly did it play". | Normative as written, per decision 6. Whether the `Timeouts` column should also carry these is an open reporting question. |
-| U-7 | Whether an over-long **outbound** line is a loss for the external agent. | §7 requires Lattice to refuse a match whose `observation` would exceed 1 MiB. The reason code for that is not in the closed set, and under decision 6's literal wording ("every failure ... is scored as a loss for the external agent") the agent is blamed for a limit Lattice's own map generation caused. | §7 states the MUST refuse; §9.3 applies decision 6 literally. **Flagged as a fairness problem** for the orchestrator to settle, most likely by adding a host-side refusal that is not a loss. |
-| U-8 | Process lifetime scope: one process per match, or one long-lived process across a whole evaluation suite. | A per-match process is simpler and matches the in-process factory contract, which builds a fresh agent per (pairing, seed) so RNG streams cannot leak between matches (`Agents/IAgentFactory.cs:12-23`, `Agents/EvaluationHarness.cs:175`). A long-lived process would need a reset message that does not exist in the five-type catalogue. | Not settled. §3's handshake sequence implies per-match; a suite-scoped process would need a protocol-2 addition. |
-| U-9 | Process launch details: argv, environment, working directory, and how `--agent-cmd` is split into program and arguments. | §9.5 names the flag and its value shape; the launch contract is not written anywhere. | Not settled. Flag name and value type are fixed (§9.5); the launch contract is not. |
-| U-10 | Whether the external agent may also be run through `simulate`. | Decision 9 scopes external agents to `evaluate` and says `simulate --agent greedy\|random\|mcts` is unchanged. Whether a *separate* `simulate` flag for external agents is wanted is unaddressed. | Out of scope per decision 9; not specified. |
+| U-1 | The protocol project's assembly name and directory. | §11 requires a project with a hard no-`ProjectReference` rule; the name is a stage-3 mechanical choice. | **Resolved.** The project is `Lattice.Protocol`, in `Protocol/`, a leaf that references nothing in this repository. Tests are in `Tests/Protocol/`; fixtures are in `Tests/fixtures/protocol/`. §11.1 states the name, the directory, the leaf property, and the one-way test reference. |
+| U-2 | The values of `step_timeout_ms` and `match_timeout_ms`. | Decision 5 defers these to stage 3 explicitly. | **Open.** Fields and semantics defined (§3.1, §7); no value asserted. The §7 constraint `match_timeout_ms ≥ step_timeout_ms × MaxTicks` is derived, not assumed. Stage 3 sets the constants and records them here. |
+| U-3 | **`hello` carried no tick budget or agent count.** | A conforming v1 agent could learn its slot, its seed, and its map, but **not** `MaxTicks` and **not** the agent count up front. An agent that plans a horizon had no way to know the horizon except by running out of steps, and `MaxTicks` is the input to any time-aware plan. This was the largest usability gap in the contract. | **Resolved.** `hello` gains two **required** integer fields: `max_ticks` (from `SimulationConfig.MaxTicks`, `Environment/Simulation.cs:28`, the same value the harness passes as `MaxSteps`, `Agents/EvaluationHarness.cs:147-148`) and `agent_count` (from `SimulationConfig.AgentCount`, `Environment/Simulation.cs:25`, bounded 2..4 at `Environment/Simulation.cs:58-60`). Both are additions to a `hello` that no released agent has ever seen, so no version bump is due (§12.8). The `hello` field list, the §4.1 example line, the §12 versioning rules, and the §7 `match_timeout_ms` constraint (which is now computed from the number Lattice actually sends) are all updated to match. |
+| U-4 | The stderr ring-buffer capacity. | §1.1 requires a bounded ring but no bound is given. | **Open.** Semantics fixed; no number asserted. Stage 3 sets the capacity and records it here. |
+| U-5 | **There was no handshake-timeout reason code.** | The closed set had `timeout_step` and `timeout_match` but nothing for "the agent never sent `hello_ack`". Assigning it to `timeout_step` treated the handshake as step 0's exchange, which was defensible but an interpretation, not a decision. An *invalid* `hello_ack` was not affected — a wrong `protocol` value is `protocol_mismatch` (§2). | **Resolved.** A thirteenth agent code, `timeout_handshake`, is added: no valid `hello_ack` within `step_timeout_ms` of `hello`. It is scored as an **agent failure** like every other agent code (§9.1, §9.3). It is distinct from `protocol_mismatch` (a wrong `protocol` value, which arrived) and from `schema_violation` (a malformed `hello_ack`, which also arrived). It sits in the Timing group in §8.2 and second among the agent codes in the §8.4 precedence, immediately after `protocol_mismatch`. §2, §7, §8, §8.1, §8.2, §8.4, and §9.3 are updated. |
+| U-6 | **A protocol failure had no reported count of its own** — it was a loss and nothing more. | §9.3 scores failures as losses per decision 6, which is right for the statistics but means a study cannot report "how often did the external agent's plumbing break" separately from "how badly did it play". | **Resolved.** The reported statistics carry an **`AgentFailures`** count, incremented once per match whose `TerminationReason` is one of the thirteen agent-attributable codes, kept **separate** from `MatchOutcome.Timeout` (`Timeout` remains "budget burned without a terminal tick") and separate from `VoidRuns`. It is **report-only**: it MUST NOT change scoring, the paired delta, the confidence interval, or the decision rule, all of which stay exactly as §9.4 specifies. Agent failures still count as losses. §9.3 states the boundary. |
+| U-7 | Whether an over-long **outbound** line is a loss for the external agent. | §7 requires Lattice to refuse a match whose `observation` would exceed 1 MiB. No reason code covered that, and under decision 6's literal wording ("every failure ... is scored as a loss for the external agent") the agent was blamed for a limit Lattice's own map generation caused — a map-size choice the agent could neither see nor influence. | **Resolved.** A fourteenth code, `host_limit`, records the refusal. Lattice checks its own outbound `observation` against **both** `max_line_bytes` and `max_json_depth` **before writing any byte**, refuses the match if it would breach either, records the run as **void / invalid**, and does **NOT** score it as a loss. Void runs are **reported as a count** (`VoidRuns`) and **excluded from the paired statistics** — from the delta, the per-outcome rates, the confidence interval, the decision rule, and the 30-seed grading denominator — because neither agent played. The §8 and §9.3 tables carry an explicit **`Fault`** column (`agent` vs `host`) so the partition is normative rather than inferred. §8.4 puts `host_limit` first, since it is detected before any wire exchange exists. An *inbound* over-long line is unaffected and remains `line_too_long`, an agent loss. |
+| U-8 | Process lifetime scope: one process per match, or one long-lived process across a whole evaluation suite. | A per-match process is simpler and matches the in-process factory contract, which builds a fresh agent per (pairing, seed) so RNG streams cannot leak between matches (`Agents/IAgentFactory.cs:12-23`, `Agents/EvaluationHarness.cs:175`). A long-lived process would need a reset message that does not exist in the five-type catalogue. | **Resolved: one agent process per match.** Stated normatively in §3 as the first handshake requirement — Lattice MUST launch a fresh process per match, send `hello` exactly once, and MUST NOT reuse a process across matches, seed pairings, or the mirrored seatings of one seed. This buys unconditional isolation (one agent's crash, hang, or memory growth cannot affect another match) and makes state carryover between seeds impossible by construction. A suite-scoped process would need a reset message, and the closed five-type catalogue (§4) has none; that remains a protocol-2 change. **Semantics only here** — process launch, the stdin/stdout pumps, and the timeout enforcement are stage 3, not stage 2. |
+| U-9 | Process launch details: argv, environment, working directory, and how `--agent-cmd` is split into program and arguments. | §9.5 names the flag and its value shape; the launch contract is not written anywhere. | **Open.** Flag name and value type are fixed (§9.5); the launch contract is not. Stage 3 writes it. |
+| U-10 | Whether the external agent may also be run through `simulate`. | Decision 9 scopes external agents to `evaluate` and says `simulate --agent greedy|random|mcts` is unchanged. Whether a *separate* `simulate` flag for external agents is wanted was unaddressed. | **Resolved: no.** `simulate` MUST NOT accept an external agent in v3.0; it is listed as an explicit **non-goal** in §13. The reason is commensurability, not convenience: `simulate` runs one episode and has no mirror, no confidence interval, and no grading floor, so a number produced there could not be compared with any published result. `simulate --agent` keeps its exact in-process-enum meaning; the external path is `evaluate --agent-cmd` only (§9.5). |
+
+Points U-2, U-4, and U-9 remain open and are stage 3's to close. Nothing in the
+resolved rows above is provisional: each is normative in the body of this
+document, and where a row says a value is fixed in stage 3, the semantics it
+constrains are fixed here.
 
 ---
 
 ## Provenance of every citation in this document
 
 All `file:line` references were verified at commit
-`5fa952604b0fc108c6db83ccfc3d77d932717b34`.
+`5fa952604b0fc108c6db83ccfc3d77d932717b34`, which is the parent of the commit
+that added this document. No cited source line moved between that commit and the
+one that settled the §14 points, because none of those commits touched a cited
+file.
 
 | Source | What it fixes |
 | :--- | :--- |
@@ -963,7 +1122,8 @@ All `file:line` references were verified at commit
 | `Environment/MapData.cs:73-78` | `ChokePoint`. |
 | `Environment/MapData.cs:85-88` | `MapGraph`. |
 | `Environment/ActionSpace.cs:18-38` | Action validity: kind, `Move` zone range, `Collect` resource range. |
-| `Environment/Simulation.cs:28` | `SimulationConfig.MaxTicks` — the tick budget. |
+| `Environment/Simulation.cs:28` | `SimulationConfig.MaxTicks` — the tick budget, sent as `hello.max_ticks` (§3.1). |
+| `Environment/Simulation.cs:25` | `SimulationConfig.AgentCount` — the agent count, sent as `hello.agent_count` (§3.1). |
 | `Environment/Simulation.cs:58-60` | `AgentCount` is bounded to 2–4. |
 | `Environment/Simulation.cs:95-99` | `SimulationState`, including `int[] Claims` and `StepCount`. |
 | `Environment/Simulation.cs:342` | `StepCount` advances by one per `Step`. |

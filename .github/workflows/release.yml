@@ -279,7 +279,7 @@ jobs:
 
           ## Known limitations
           - Research Preview: behaviors, defaults, and output formats may change without deprecation notice.
-          - Determinism guarantees apply to serialized \`StepResult\` equivalence, not bit-identical replay across runtime/host.
+          - Determinism guarantees apply to serialized \`StepResult\` equivalence plus schema 3's per-tick simulation-state hash, not bit-identical replay across runtime/host.
           - Limited OS coverage: x64 Linux, arm64 macOS, x64 Windows only; no 32-bit or arm64 Linux builds in this release.
 
           ## Checksums

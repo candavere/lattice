@@ -153,7 +153,7 @@ produced, and those recorded values are the only provenance a result carries.
 
 ## 4. Trajectory Schema and Release Immutability Policy
 
-### Schema v2 header requirements
+### Schema v3 header requirements
 
 Trajectories are JSONL with a fixed line grammar: exactly one `header` line
 first, one `step` line per tick, and exactly one `final` line last. Every line
@@ -169,15 +169,42 @@ the generator:
 | `Map` | yes | The fully materialized map graph. |
 | `SimulationConfig` | yes | Configuration used to rebuild the environment. |
 | `DynamicRules` | no | The dynamic topology policy; omitted (null) for static maps. |
-| `SchemaVersion` | yes | Wire format stamp; `2` is the current version. |
+| `SchemaVersion` | yes | Wire format stamp; the current version is `TrajectorySchema.CurrentVersion` (currently `3`). |
 | `Scenario` | no | Demonstration-layer metadata; ignored by the replay core. |
 | `AgentRoles` | no | Demonstration-layer roster metadata; ignored by the replay core. |
 
-`SchemaVersion` is `2` for newly written files. Schema v2 records the episode's
-dynamic topology policy (`DynamicRules`, timed portcullises and event locks) so
-a replay recreates the exact choke-capacity schedule the recording was made
-under. The simulation config is the required second half of that contract: a
-replay with a different config is not a replay of the same episode.
+Newly written files carry `TrajectorySchema.CurrentVersion` (currently `3`);
+this document cites that constant rather than a bare literal, so it cannot
+drift out of step with the code. Schema 2 introduced the episode's dynamic
+topology policy (`DynamicRules`, timed portcullises and event locks), which the
+current schema still records, so a replay recreates the exact choke-capacity
+schedule the recording was made under. The simulation config is the required
+second half of that contract: a replay with a different config is not a replay
+of the same episode.
+
+#### What schema 3 adds
+
+Schema 3 does not change the header. It changes the step lines.
+
+- **`StateHash` is a step-line field, not a header field.** Each `step` line
+  carries the SHA-256 digest of the complete simulation state at the *end* of
+  that tick (`Trajectories/SimulationStateHash.cs`), computed from a canonical
+  fixed-field-order, invariant-culture serialization. The header is unchanged
+  apart from its `SchemaVersion` stamp.
+- **State hashes are required from schema 3 onward.** `StateHash` is mandatory
+  per `TrajectorySchema.StateHashRequiredVersion` (currently `3`). A recording
+  that declares schema 3 or later and carries no digest is reported as a
+  **discrepancy, not a notice**, so the hashes cannot be stripped to downgrade
+  the check; a recording that carries some but not all digests is likewise a
+  discrepancy.
+- **The notice path for older trajectories.** A recording written before
+  schema 3 legitimately has no `StateHash` field at all. It still verifies on
+  serialized `StepResult` equality and reports
+  `no state hash: step-level verification only`. The same string is published
+  as `TrajectoryReplay.NoStateHashNotice`.
+- **Rewrites do not relabel.** `TrajectoryWriter.Write` re-emits the
+  recording's own header version, so rewriting a pre-hash file cannot promote
+  it to schema 3 with no digests present (see the migration invariant below).
 
 ### Structural and migration invariants
 

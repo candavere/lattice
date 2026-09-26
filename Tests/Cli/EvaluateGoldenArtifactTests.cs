@@ -36,9 +36,13 @@ namespace Lattice.Tests.Cli;
 /// </para>
 ///
 /// <para>
-/// Equality is asserted field by field, by raw JSON text, so a change in a
-/// single digit of a single statistic fails the test. Exactly two categories of
-/// field are not compared, and neither carries evaluation content:
+/// Equality is asserted field by field, comparing each side after a compact
+/// canonical reserialization (<c>JsonSerializer.Serialize(element)</c>), so a
+/// change in a single digit of a single statistic fails the test while the
+/// comparison stays independent of the indentation and newline choices of the
+/// writer that produced either side — see <c>Canonical</c>. Exactly two
+/// categories of field are not compared, and neither carries evaluation
+/// content:
 /// <c>CreatedAtUtc</c> is <c>DateTime.UtcNow</c> and is the only field observed
 /// to differ between two consecutive identical runs; <c>Runtime</c>,
 /// <c>Os</c>, <c>Cores</c> and <c>Architecture</c> are host provenance read from
@@ -121,8 +125,8 @@ public class EvaluateGoldenArtifactTests
             foreach (var field in ExpectedFields.Where(field => !excluded.Contains(field)))
             {
                 Assert.Equal(
-                    golden.RootElement.GetProperty(field).GetRawText(),
-                    fresh.RootElement.GetProperty(field).GetRawText());
+                    Canonical(golden.RootElement.GetProperty(field)),
+                    Canonical(fresh.RootElement.GetProperty(field)));
             }
 
             // The excluded fields must still be there and must still carry a
@@ -150,4 +154,28 @@ public class EvaluateGoldenArtifactTests
 
     private static string[] FieldNames(JsonElement root) =>
         root.EnumerateObject().Select(property => property.Name).ToArray();
+
+    /// <summary>
+    /// Reserializes an element to compact canonical JSON for comparison.
+    /// </summary>
+    /// <remarks>
+    /// This deliberately replaces a raw-text comparison. <c>GetRawText()</c>
+    /// returns the element's original bytes including whatever whitespace the
+    /// writer produced, so comparing it made the golden hostage to the
+    /// serializer's choice of newline: <c>System.Text.Json</c> breaks indented
+    /// lines with <c>Environment.NewLine</c>, so the same artifact arrived as
+    /// CRLF on <c>windows-latest</c> and LF on Linux and macOS, and this test
+    /// failed on Windows over newlines while every number matched. Reserializing
+    /// collapses insignificant whitespace on both sides, so the comparison
+    /// depends only on tokens.
+    ///
+    /// <para>
+    /// It is not a weakening. Every token is still compared, in order, and
+    /// numbers are written from their original text rather than reparsed and
+    /// reformatted, so a single changed digit still fails — as does a changed
+    /// property name, a reordered or added property, or a changed string. The
+    /// dropped dimension is whitespace, which carries no evaluation content.
+    /// </para>
+    /// </remarks>
+    private static string Canonical(JsonElement element) => JsonSerializer.Serialize(element);
 }

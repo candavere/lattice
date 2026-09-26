@@ -63,8 +63,6 @@ public static class CliApp
     private static readonly SimulationConfig EvaluationSimulationConfig =
         new(AgentCount: 2, MaxTicks: 200, TransitSpeed: 4);
 
-    private static readonly JsonSerializerOptions ArtifactJsonOptions = new() { WriteIndented = true };
-
     /// <summary>
     /// The machine-readable evaluation artifact written by
     /// <c>evaluate --out</c>: the per-suite paired-study reports plus the
@@ -686,7 +684,7 @@ public static class CliApp
             var metadata = EnvironmentSample.Capture(commit, cpu);
             var result = BenchmarkHarness.RunAll(workloads, metadata, runs, warmupSteps);
 
-            var json = JsonSerializer.Serialize(result, ArtifactJsonOptions);
+            var json = JsonArtifact.SerializeIndented(result);
             return WriteOutput(flags, "--out", json, stdout, stderr);
         }
         catch (Exception ex)
@@ -783,7 +781,7 @@ public static class CliApp
                 System.Environment.ProcessorCount,
                 ArchitectureDescription(),
                 studies.ToArray());
-            var json = JsonSerializer.Serialize(artifact, ArtifactJsonOptions);
+            var json = JsonArtifact.SerializeIndented(artifact);
             return WriteOutput(flags, "--out", json, stdout, stderr);
         }
         catch (Exception ex)
@@ -886,6 +884,12 @@ public static class CliApp
         return builder.ToString();
     }
 
+    /// <summary>
+    /// The single funnel for <c>--out</c> artifact writes. Routing every one
+    /// through <see cref="JsonArtifact"/> is what makes the LF guarantee
+    /// unconditional rather than a property of each call site remembering to
+    /// normalize.
+    /// </summary>
     private static int WriteOutput(
         Dictionary<string, string> flags,
         string outFlag,
@@ -895,7 +899,7 @@ public static class CliApp
     {
         if (flags.TryGetValue(outFlag, out var path))
         {
-            File.WriteAllText(path, content + "\n");
+            JsonArtifact.Write(path, content);
             stderr.WriteLine($"wrote {path}");
             return Success;
         }

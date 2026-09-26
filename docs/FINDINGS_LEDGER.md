@@ -190,6 +190,22 @@ schema is defined in [`reproduction_packet.md`](reproduction_packet.md)
 
 ---
 
+## FINDING-010 — Throughput gate armed on an unlike host class after the re-anchor
+
+| Field | Value |
+| --- | --- |
+| **ID** | `FINDING-010` |
+| **Date** | 2026-09-26 |
+| **Source / Provenance** | `INTERNAL_AUDIT` — Benchmarks workflow run `36229846123` (red at `83456ad`) |
+| **Target Surface** | `.github/workflows/compare_benchmarks.py` fingerprint arming; `.github/workflows/benchmarks.yml`; no engine, config, or baseline-artifact files |
+| **Observation** | After the re-anchor (`FINDING-009`), the Benchmarks workflow failed at `83456ad`: setup, build, and the five-case benchmark passed, and the compare step exited 1 on both the first pass and its retry. Verbatim from the failed run — first pass (08:30:14Z): `baseline host: macOS 27.0.0 / Arm64 / .NET 10.0.12` vs `current host : macOS 14.8.9 / Arm64 / .NET 10.0.12` → `fingerprint match: True  (strict gate armed: True)`; per workload (current vs baseline median, ratio, allowed): `dynamic_contention_4agent` 238,057 vs 416,170 (57.2%, allowed 0.873481x); `facility_static_4agent` 468,384 vs 657,189 (71.3%, allowed 0.848851x); `micro_raw_2agent` 773,745 vs 899,075 (86.1%, above its 0.6 floor); `policy_lookahead_mcts_32` 630 vs 750 (84.0%, allowed 0.85x); `stress_topology_4agent` 12,233 vs 14,916 (82.0%, allowed 0.95x). Retry pass (08:31:59Z): identical fingerprints, strict gate armed again — `dynamic_contention_4agent` 303,545 vs 416,170 (72.9%); `facility_static_4agent` 514,407 vs 657,189 (78.3%); `micro_raw_2agent` 949,031 (1.056); `policy_lookahead_mcts_32` 643 (85.7% vs allowed 0.85); `stress_topology_4agent` 12,486 vs 14,916 (83.7%, allowed 0.95x) → `##[error]Process completed with exit code 1.` The cause: the committed baseline is a bare-metal Apple M1 (8 cores, 8 GiB, .NET 10.0.12) while the runner is GitHub macos-14 (3 vCPU M1, 7 GB, virtualized) — an unlike host class — but the comparator fingerprinted only OS family + architecture + .NET runtime major, so the strict gate armed on matching family/arch/runtime and adjudicated a host-speed shortfall as a workload regression. The runner's CPU model, core count, and RAM are not printed in the log; the baseline's `Cores: 8` and the artifact metadata made the class difference recoverable only from the artifact. |
+| **Severity & Confidence** | High / Confirmed (root cause read from the real failed-run log, not assumed) |
+| **Disposition** | `FIXED` — the strict fingerprint is now OS family + architecture + .NET runtime major + logical cores + CPU model string (trimmed, case-folded); every component must be present on BOTH sides and equal, so a missing or empty host field is a mismatch (cross-host, informational), never a silent strict pass. Both fingerprints and the classification are printed on every run. The gate keeps its retry and structural smoke and its thresholds; the CI result artifact is now uploaded with `if: always()` so future runner numbers are recoverable without log access. The bare-metal M1 record is unchanged and remains the research reference. Stated honestly: **CI no longer enforces throughput on GitHub-hosted runners until a runner-class baseline exists** — hosted runners get an informational cross-host comparison plus the structural checks. |
+| **Resolution & Evidence Link** | Six tests added in `.github/workflows/test_compare_benchmarks.py` (RED first: different core count and different CPU model each classified cross-host informational with exit 0 despite a 0.5x/0.9x dip; a fully matching host still strict-fails at exit 1 and still passes above floor; a missing `Cpu` field on either side is informational with the field named in the log). Local verification against the committed baseline: cores 3 + medians 0.5x → informational exit 0; host unchanged + stress 0.9x → strict FAIL exit 1; the baseline itself → PASS exit 0. Gate docs re-anchored in `docs/BENCHMARKING.md` and `benchmarks/throughput_summary.md`. |
+| **Resolution & Release Status** | `MAIN_ONLY` (postdates `v2.3.2` tag commit `4f7816f`; not packaged into any published release). |
+
+---
+
 ## Ledger index
 
 | ID | Date | Target | Severity | Disposition | Closure commit |
@@ -203,6 +219,7 @@ schema is defined in [`reproduction_packet.md`](reproduction_packet.md)
 | `FINDING-007` | 2026-09-22 | EdgeChoke not-found path + batch-state kill attribution | High | `FIXED` / `ACCEPTED_LIMITATION` | Stage-3 commit (`TransitTests`, `SimulationStepTests`, summary artifact) |
 | `FINDING-008` | 2026-09-26 | Bottleneck evidence re-anchor | Medium | `FIXED` | Evidence re-anchor commit (artifact + docs; engine fix `28c89d3`) |
 | `FINDING-009` | 2026-09-26 | Throughput baseline re-anchor (runtime 10.0.10 → 10.0.12) | Medium | `FIXED` | Evidence re-anchor commit (artifact + docs; no engine changes) |
+| `FINDING-010` | 2026-09-26 | Throughput gate armed on an unlike host class | High | `FIXED` | Gate host-class fix commit (comparator fingerprint + tests + workflow artifact upload + docs; no engine changes) |
 
 The ledger is maintained under the governing evidentiary standards of
 [`adr/0001-governing-product-thesis.md`](adr/0001-governing-product-thesis.md);

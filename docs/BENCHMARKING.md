@@ -78,14 +78,20 @@ by single heavy decisions, and its iteration budget is small by design.
 - Quick smoke:
   `dotnet run -c Release --project Cli -- benchmark --runs 2 --warmup 1000 --steps 20000`
 - CI gate (`.github/workflows/benchmarks.yml`): re-benchmarks the matrix and
-  fails on a **>20% regression** against this record when the host fingerprint
-  (OS family + architecture + .NET runtime major) matches. It installs the
-  same .NET 10 runtime the baseline was recorded under, so a cross-runtime
-  delta is never misread as a regression; on any mismatch it prints a
-  cross-host comparison table instead of failing. The cross-host smoke pass
-  (ubuntu x64, .NET 8) is classified structurally with `--smoke`: workloads
-  present and medians positive, never a throughput-ratio adjudication from a
-  shortened-budget run.
+  fails on a **>20% regression** against this record only when the host
+  fingerprint matches this record's host class: **OS family + architecture +
+  .NET runtime major + logical cores + CPU model** (trimmed, case-folded; a
+  missing or empty host field is also a mismatch). GitHub-hosted runners
+  (macos-14: 3 vCPU, virtualized) are a different class than this bare-metal
+  M1 record — same OS family and architecture, unlike core count — so they
+  get an informational cross-host comparison plus the structural checks, not
+  a throughput verdict. It installs the same .NET 10 runtime the baseline was
+  recorded under, so a cross-runtime delta is never misread as a regression;
+  on any mismatch it prints a cross-host comparison table instead of failing.
+  The cross-host smoke pass (ubuntu x64, .NET 8) is classified structurally
+  with `--smoke`: workloads present and medians positive, never a
+  throughput-ratio adjudication from a shortened-budget run. This bare-metal
+  M1 record remains the research reference.
 - The committed baseline was **re-anchored** after the CI regression gate
   proved unstable against the earlier one (noisy micro/policy medians), and
   re-anchored again on 2026-09-26 for the runtime patch .NET 10.0.10 →

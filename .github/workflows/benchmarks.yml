@@ -106,6 +106,16 @@ jobs:
           echo "$SECOND"
           exit "$rc"
 
+      # Uploaded with if: always() so the measured runner numbers survive a
+      # failed gate and stay recoverable without log access.
+      - name: Upload the measured comparison artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: throughput-macos-arm64
+          path: ${{ runner.temp }}/throughput.json
+          if-no-files-found: warn
+
   cross-host-structure:
     # Deliberately on .NET 8 / ubuntu x64: this job is a structural smoke. Its
     # runtime differs from the committed baseline, and it runs a bounded smoke

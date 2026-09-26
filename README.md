@@ -188,7 +188,7 @@ disagree are called out below rather than resolved.
   each recorded turn, and compares re-serialized `StepResult`s against the
   recorded ones (`TrajectoryReplay.cs:81-82`). This is per-step serialized
   equivalence, not byte identity and not a state hash.
-- **Benchmark regression gate.** `.github/workflows/benchmarks.yml:77-107`
+- **Benchmark regression gate.** `.github/workflows/benchmarks.yml:77-108`
   re-benchmarks the five-case matrix and compares it against the committed
   baseline with `compare_benchmarks.py`, failing when a current workload
   median falls below its threshold times the baseline median. The explicit
@@ -196,10 +196,18 @@ disagree are called out below rather than resolved.
   0.85 for `policy_lookahead_mcts_32` (`benchmarks.yml:88-90`); otherwise the
   threshold is derived statistically from the baseline's own dispersion
   (`.github/workflows/compare_benchmarks.py:96-112`), with the CLI default
-  floor at 0.8 (`compare_benchmarks.py:232`). The gate adjudicates only when
-  the host fingerprint (OS family + architecture + .NET runtime major)
-  matches (`compare_benchmarks.py:116-131`), and it re-measures once to rule
-  out shared-runner jitter (`benchmarks.yml:94-107`).
+  floor at 0.8 (`compare_benchmarks.py:313`). The gate adjudicates only when
+  the host fingerprint (OS family + architecture + .NET runtime major +
+  logical cores + CPU model, trimmed and case-folded; a missing or empty
+  host field is also a mismatch) matches
+  (`compare_benchmarks.py:150-213`), and it re-measures once to rule
+  out shared-runner jitter (`benchmarks.yml:94-108`). GitHub-hosted runners
+  (macos-14: 3 vCPU, virtualized) are a different host class than the
+  bare-metal M1 baseline record, so they get an informational cross-host
+  comparison plus the structural checks — the strict throughput verdict is
+  reserved for a matching host class. The measured artifact is uploaded with
+  `if: always()` (`benchmarks.yml:111-119`) so runner numbers survive a
+  failed gate without log access.
   **Doc-vs-code conflict:** this README and
   [`benchmarks/throughput_summary.md`](benchmarks/throughput_summary.md)
   previously described the gate as failing on "a >20% regression". The

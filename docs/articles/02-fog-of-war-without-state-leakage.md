@@ -15,7 +15,7 @@ filter that produced it, not on the raw state.
 
 ## The projection contract
 
-Lattice keeps the core vision-agnostic and immutable (adr-002). The simulator
+Lattice keeps the core vision-agnostic and immutable (adr-0003). The simulator
 always emits the complete state — `AgentState`, `Claims`, and the full
 `MapGraph`. What an observer actually learns is computed *outside* the core by
 `PerceptionFilter`, a pure projection with its own memory:

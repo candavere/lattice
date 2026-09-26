@@ -108,7 +108,7 @@ full raw numbers are in [Part 2](#part-2-for-reviewers).
 
 The reference result for the standard study is
 [`benchmarks/mcts_evaluation_results.json`](benchmarks/mcts_evaluation_results.json):
-source revision `5783ca1`, Apple M1 / 8 cores / .NET 10.0.10, MCTS 32 rollouts
+source revision `5783ca1`, .NET 10.0.10, MCTS 32 rollouts
 x depth 12, 2 agents / 200 ticks / transit speed 4, baseline
 `ScoutCollectorAgent` with unbounded vision, mirror-seated per seed. The
 protocol facts are reproduced by `Cli/CliApp.cs` (evaluation config) and
@@ -144,7 +144,7 @@ contention topology family, first 30 dev + 30 held-out seeds.
 Each seed draws a distinct topology, while both spawn arms stay geometric
 mirror images, so both agents reach the shared single-lane gate on the same
 tick and actively contend. Under that pressure the same MCTS budget wins.
-Relative to the pre-fix record (source revision `e6ba4bf`), the re-anchored
+Relative to the pre-fix record (measured at `1c6fa80`), the re-anchored
 run's mean delta rose while its match win rate fell: dev 0.55 → 0.50 (losses
 22 → 28) and held-out 0.533 → 0.50 (losses 14 → 19), of 60 matches each, read
 from the artifacts. This
@@ -154,10 +154,12 @@ complementary evidence on different map distributions.
 Performance, qualified. The committed
 [`benchmarks/throughput_benchmark.json`](benchmarks/throughput_benchmark.json)
 records five workloads, raw stepping, mixed static facility, dynamic
-contention, stress topology, and MCTS decisions, on one host (Apple M1 / 8
-cores / 8 GiB RAM, macOS 27.0.0, .NET 10.0.12 Release, Workstation GC, tree
+contention, stress topology, and MCTS decisions, on a single reference host
+(.NET 10.0.12 Release, Workstation GC, tree
 `41530ef`, baseline re-anchored to a conservative full-protocol session on
-the current runtime). Median throughput spans from 14,916 steps/s on the
+the current runtime). Numbers come from a single reference host; its full
+metadata (CPU, cores, OS, runtime) is recorded in the artifact. Median
+throughput spans from 14,916 steps/s on the
 30-zone stress case to 899,075 steps/s on the micro case; the MCTS case
 reports decisions/s.
 The per-workload latency and allocation breakdowns, the protocol, and the
@@ -212,8 +214,8 @@ disagree are called out below rather than resolved.
   host field is also a mismatch) matches
   (`compare_benchmarks.py:150-213`), and it re-measures once to rule
   out shared-runner jitter (`benchmarks.yml:94-108`). GitHub-hosted runners
-  (macos-14: 3 vCPU, virtualized) are a different host class than the
-  bare-metal M1 baseline record, so they get an informational cross-host
+  are a different host class than the
+  baseline record, so they get an informational cross-host
   comparison plus the structural checks — the strict throughput verdict is
   reserved for a matching host class. The measured artifact is uploaded with
   `if: always()` (`benchmarks.yml:111-119`) so runner numbers survive a

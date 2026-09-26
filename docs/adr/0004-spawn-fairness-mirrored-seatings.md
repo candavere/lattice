@@ -1,4 +1,4 @@
-# ADR-003 — Spawn fairness is measured with mirrored seatings, gate via delegate
+# ADR-0004 — Spawn fairness is measured with mirrored seatings, gate via delegate
 
 **Status:** accepted
 
@@ -8,7 +8,7 @@ The fairness profiler needs a deterministic, structurally meaningful
 quantity: does a map favor the agent that starts in spawn A or spawn B? The
 environment binds spawn
 to agent id — `Simulation.CreateInitial` round-robins agent `i` to zone
-`i % zoneCount` (adr-002) — so "the same two contestants seated once each way"
+`i % zoneCount` (adr-0003) — so "the same two contestants seated once each way"
 cannot be expressed by swapping agent slots: the environment would put agent 0
 in spawn A both times. Any fairness metric built on raw episodes would be
 contaminated exactly this way. Two options were available:
@@ -58,7 +58,7 @@ Mirror the **positions**, not the rules — option (b):
 
 ## Rationale
 
-Option (b) keeps the step contract unchanged (adr-002's `CreateInitial`
+Option (b) keeps the step contract unchanged (adr-0003's `CreateInitial`
 contract stays true), so the arena is purely an analytics artifact consuming
 only public step-contract types. Mirroring on the map is deterministic and
 cheap: the swap is a pure record rewrite, and the two episodes replay under

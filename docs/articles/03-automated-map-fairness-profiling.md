@@ -14,9 +14,9 @@ substrate can do better, because the same rules always produce the same game.
 ## The mirrored-seating arena
 
 The environment binds spawn to agent id: `Simulation.CreateInitial` round-robins
-agent `i` to zone `i % zoneCount` (adr-002). "The same two contestants seated
+agent `i` to zone `i % zoneCount` (adr-0003). "The same two contestants seated
 once each way" therefore cannot be expressed by swapping agent slots — the
-environment would put agent 0 in spawn A both times. The fix (adr-003) is to
+environment would put agent 0 in spawn A both times. The fix (adr-0004) is to
 mirror the *map*, not the rules:
 
 1. **Swap spawn territories.** Build a mirrored `MapGraph` exchanging zone 0
@@ -69,7 +69,7 @@ change, not a silent re-tilt.
 
 ## Closing the loop: fairness as a generation constraint
 
-The generator's discipline is "reject and retry, never patch" (adr-003).
+The generator's discipline is "reject and retry, never patch" (adr-0004).
 Fairness plugs into that as a caller-supplied acceptance gate: the generator
 itself stays BCL-only and has no idea agents exist. `MapGenerator.Generate`
 takes an optional `MapAcceptanceGate` (`MapGraph -> bool`); a candidate whose

@@ -18,10 +18,9 @@ Full flag reference: [CLI reference — benchmark](CLI.md#benchmark--measure-the
 | --- | --- |
 | Commit (measured tree) | `41530efb35ef620c8d0722e20bcd30970468785a` |
 | Runtime | .NET 10.0.12, Release |
-| OS | macOS 27.0.0 |
-| CPU | Apple M1, Arm64, 8 cores |
-| Addressable RAM | 8 GiB |
 | GC mode | Workstation |
+
+Numbers come from a single reference host; its full metadata (CPU, cores, OS, runtime) is recorded in the artifact.
 
 ## Harness protocol
 
@@ -73,6 +72,12 @@ by single heavy decisions, and its iteration budget is small by design.
 
 ## Reproducing and gating
 
+- **AC power is required on a laptop host.** Before any benchmark session on a
+  laptop, confirm the machine is plugged in and check the power state with
+  `pmset -g batt`; do not record a baseline on battery. This is not a
+  formality: in `FINDING-009` the same protocol, host and runtime measured
+  roughly 2x apart between battery and AC, and battery sessions erased most of
+  the re-anchor shift, so a battery run silently looks like a large regression.
 - Full reference run:
   `dotnet run -c Release --project Cli -- benchmark --out benchmarks/throughput_benchmark.json`
 - Quick smoke:
@@ -82,20 +87,19 @@ by single heavy decisions, and its iteration budget is small by design.
   fingerprint matches this record's host class: **OS family + architecture +
   .NET runtime major + logical cores + CPU model** (trimmed, case-folded; a
   missing or empty host field is also a mismatch). GitHub-hosted runners
-  (macos-14: 3 vCPU, virtualized) are a different class than this bare-metal
-  M1 record — same OS family and architecture, unlike core count — so they
+  are a different host class than the reference record, so they
   get an informational cross-host comparison plus the structural checks, not
   a throughput verdict. It installs the same .NET 10 runtime the baseline was
   recorded under, so a cross-runtime delta is never misread as a regression;
   on any mismatch it prints a cross-host comparison table instead of failing.
   The cross-host smoke pass (ubuntu x64, .NET 8) is classified structurally
   with `--smoke`: workloads present and medians positive, never a
-  throughput-ratio adjudication from a shortened-budget run. This bare-metal
-  M1 record remains the research reference.
+  throughput-ratio adjudication from a shortened-budget run. The reference
+  record remains the research reference.
 - The committed baseline was **re-anchored** after the CI regression gate
   proved unstable against the earlier one (noisy micro/policy medians), and
   re-anchored again on 2026-09-26 for the runtime patch .NET 10.0.10 →
-  10.0.12 (same Apple M1, AC power) using the same conservative method: three
+  10.0.12 (reference host, AC power) using the same conservative method: three
   consecutive full-protocol sessions, committing the session that is low for
   the noisy workloads, near-typical elsewhere. The speedup against the
   previous record is environmental, not an engine change — identical configs

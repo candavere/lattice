@@ -10,12 +10,9 @@ Machine-readable data: [`throughput_benchmark.json`](./throughput_benchmark.json
 | Timestamp (UTC) | 2026-09-26T06:56:05Z |
 | Runtime | .NET 10.0.12 |
 | Configuration | Release |
-| OS | macOS 27.0.0 |
-| CPU | Apple M1 |
-| Architecture | Arm64 |
-| Cores | 8 |
-| Addressable RAM | 8 GiB (`GC.GetGCMemoryInfo().TotalAvailableMemoryBytes`) |
 | GC mode | Workstation |
+
+Numbers come from a single reference host; its full metadata (CPU, cores, OS, runtime) is recorded in the artifact.
 
 > This record was **re-anchored** twice. First, after the CI regression gate
 > proved unstable against the earlier baseline: that record's `micro_raw` and
@@ -23,7 +20,7 @@ Machine-readable data: [`throughput_benchmark.json`](./throughput_benchmark.json
 > runs on the same machine + runtime spread ~30% and ~17% for those
 > workloads), so the baseline became a **conservative** full-protocol session.
 > Second, on 2026-09-26, for the runtime patch .NET 10.0.10 → 10.0.12 (same
-> Apple M1, AC power): the same conservative method — three consecutive
+> reference host, AC power): the same conservative method — three consecutive
 > full-protocol sessions, committing the session that is low for the noisy
 > workloads, near-typical elsewhere. The speedup against the previous record
 > is **environmental**, not an engine change: identical configs and protocol,
@@ -36,7 +33,14 @@ Machine-readable data: [`throughput_benchmark.json`](./throughput_benchmark.json
 
 ## Protocol
 
-`dotnet run --project Cli -- benchmark --runs 10 --warmup 50000 --commit <sha> --cpu "Apple M1"`
+**AC power is required on a laptop host.** Before any session, confirm the
+machine is plugged in and check the power state with `pmset -g batt`; do not
+record a baseline on battery. Per `FINDING-009`, the same protocol, host and
+runtime measured roughly 2x apart between battery and AC, and battery sessions
+erased most of the re-anchor shift — so a battery run silently reads as a large
+regression.
+
+`dotnet run --project Cli -- benchmark --runs 10 --warmup 50000 --commit <sha> --cpu "<cpu model>"`
 
 Every case runs the same harness protocol (`Analytics/Benchmarking/BenchmarkHarness`):
 
@@ -106,8 +110,8 @@ Full per-run dispersion (std-dev of per-iteration throughput) is in the JSON.
   fingerprint matches this record's host class: **OS family + architecture +
   .NET runtime major + logical cores + CPU model** (trimmed, case-folded; a
   missing or empty host field is also a mismatch). GitHub-hosted runners
-  (macos-14: 3 vCPU, virtualized) are a different class than this bare-metal
-  Apple M1 record, so they get an informational cross-host comparison plus
+  are a different host class than the reference record, so they get an
+  informational cross-host comparison plus
   the structural checks — CI does not enforce throughput on them until a
   runner-class baseline exists. The gate installs the same .NET 10 runtime
   the baseline was recorded under, so a cross-runtime delta is never misread
@@ -115,5 +119,5 @@ Full per-run dispersion (std-dev of per-iteration throughput) is in the JSON.
   instead of failing. The bounded cross-host smoke pass (ubuntu x64, .NET 8)
   is classified structurally with `--smoke`: the comparator checks workloads
   present and medians positive and never adjudicates throughput ratios from a
-  shortened-budget run. This bare-metal M1 record remains the research
+  shortened-budget run. The reference record remains the research
   reference.

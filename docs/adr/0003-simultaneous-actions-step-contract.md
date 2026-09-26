@@ -1,4 +1,4 @@
-# ADR-002 — Simultaneous actions, ordered conflict resolution; full-observer step contract
+# ADR-0003 — Simultaneous actions, ordered conflict resolution; full-observer step contract
 
 **Status:** accepted
 
@@ -174,7 +174,7 @@ spawn A regardless. The mirror is spelled on the map instead: the two spawn
 territories (zones 0 and 1, their resident resources, and every incident choke
 endpoint) are exchanged, and the same two-slot roster replays the swapped map.
 The bias index is then territory-attributed across both seats — see
-`docs/adr-003.md`.
+`docs/adr/0004-spawn-fairness-mirrored-seatings.md`.
 
 ## Addendum — Replay verification is serialized StepResult equivalence plus a per-tick state digest
 

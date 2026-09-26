@@ -67,7 +67,7 @@ graph-native:
   connectivity.
 - A grid's implicit neighbor rules are replaced by explicit edges, so replay
   cannot drift between machines that enumerate neighbors differently.
-- Fairness (`SpawnBiasIndex`, adr-003) attributes node, resident-resource, and
+- Fairness (`SpawnBiasIndex`, adr-0004) attributes node, resident-resource, and
   incident-edge sets to a spawn — a purely graph reading of "territory."
 
 The footprint cost is real and acknowledged: positions are optional, and the
@@ -78,7 +78,7 @@ $$\max(1, \lceil d/s \rceil)$$
 
 for a choke of length `d` at `TransitSpeed s`, in integer arithmetic). It is
 never allowed to smuggle in rules that connectivity should be carrying
-(adr-001).
+(adr-0002).
 
 ## Takeaway
 

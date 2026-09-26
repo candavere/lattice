@@ -1,4 +1,4 @@
-# ADR-001 — MapGraph is a graph over zones, not a grid
+# ADR-0002 — MapGraph is a graph over zones, not a grid
 
 **Status:** accepted
 
@@ -42,4 +42,4 @@ checkers alone define validity.
   computes an edge crossing's duration from the Manhattan distance between the
   two zones' positions, in pure integer arithmetic (`ceil` via integer math,
   no floating point), while connectivity and capacity reasoning still operate
-  purely on the graph. See adr-002.
+  purely on the graph. See adr-0003.

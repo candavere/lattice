@@ -18,7 +18,7 @@ array yields a valid next state.
 ## Topological graph space
 
 `MapGraph` holds zones, chokes, and resources; connectivity and degree are
-first-class (adr-001). Zones and chokes carry a `MaxOccupancy` (default
+first-class (adr-0002). Zones and chokes carry a `MaxOccupancy` (default
 unlimited; `0` = impassable), enforced as same-tick entry gates in the same
 tick-dependent order as collection. Coordinates are an optional embedding.
 
@@ -70,4 +70,4 @@ only way to invert the fixed spawn-to-id binding) and reports a normalized
 `SpawnBiasIndex = |meanScore[spawnA] − meanScore[spawnB]| / totalResources`
 (0 = balanced, 1 = one-sided). It can gate generation via `--min-fairness`.
 See [`docs/adr/0001-governing-product-thesis.md`](adr/0001-governing-product-thesis.md)
-and `docs/adr-002.md` for the design record.
+and `docs/adr/0003-simultaneous-actions-step-contract.md` for the design record.

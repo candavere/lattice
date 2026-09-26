@@ -500,3 +500,16 @@ verify_site.py
 .planning/
 # ui_tests generated screenshots (visual artifacts for local/human review, not CI inputs)
 ui_tests/screenshots/
+
+# Local tooling and ad-hoc output
+StrykerOutput/
+playwright-report/
+.pytest_cache/
+.venv/
+venv/
+/*.jsonl
+/runs/
+/out/
+.opencode/
+.claude/
+.codex/

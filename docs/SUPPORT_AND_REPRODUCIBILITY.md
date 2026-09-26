@@ -22,7 +22,7 @@ interchangeable, and no document may upgrade one into another:
 1. **Engine transition determinism.** Under the stated runtime contract, the
    same `SimulationState` plus the same `AgentAction[]` produces the same next
    state. This is a property of the pure step contract
-   ([`adr-002.md`](adr-002.md)).
+   ([`adr-0003`](adr/0003-simultaneous-actions-step-contract.md)).
 2. **Per-step serialized `StepResult` replay equivalence.** Replaying a
    recording's actions from a fresh initial state reconstructs ticks whose
    serialized `StepResult`s equal the recorded ones. `TrajectoryReplay.Verify`
@@ -385,6 +385,6 @@ protocol on the same seed suites — not re-describing the result.
 - [`../CONTRIBUTING.md`](../CONTRIBUTING.md) — contribution and evidence rules.
 - [`../SECURITY.md`](../SECURITY.md) — supported versions and disclosure.
 - [`adr/0001-governing-product-thesis.md`](adr/0001-governing-product-thesis.md) — governing thesis and evidentiary principles.
-- [`adr-002.md`](adr-002.md) — step contract and runtime targets.
-- [`adr-003.md`](adr-003.md) — evaluation and analytics decisions.
+- [`adr-0003`](adr/0003-simultaneous-actions-step-contract.md) — step contract and runtime targets.
+- [`adr-0004`](adr/0004-spawn-fairness-mirrored-seatings.md) — evaluation and analytics decisions.
 - [`ECOSYSTEM.md`](ECOSYSTEM.md) — assembly and data-flow map.

@@ -243,18 +243,42 @@ public class ProtocolLimitTests
     }
 
     /// <summary>
-    /// The spec's own example is illustrative, and this states that as an
-    /// assertion so the divergence reads as deliberate rather than as an oversight
-    /// a future reader has to rediscover.
+    /// §7's derived constraint, asserted against the §4.1 <c>hello</c> example
+    /// itself. The example's limit values are the <b>normative defaults</b> — the
+    /// stage-2 spec declared them "illustrative only" and shipped a line that
+    /// violated this very constraint, and a test existed to pin that divergence
+    /// as deliberate. U-2 closed the point by computing <c>match_timeout_ms</c>
+    /// from <c>step_timeout_ms</c> and <c>max_ticks</c>, so the constraint now
+    /// holds by construction and the exception is gone.
     /// </summary>
+    /// <remarks>
+    /// This asserts the <em>relationship</em> the spec fixes, not a coincidence:
+    /// the fixture's <c>match_timeout_ms</c> must be <em>exactly</em>
+    /// <c>step_timeout_ms × max_ticks</c> plus the slack, so a future edit that
+    /// merely happens to stay above the line still fails, and an edit that drops
+    /// <c>max_ticks</c> or <c>step_timeout_ms</c> out of the formula fails too.
+    /// </remarks>
     [Fact]
-    public void The_Spec_Example_Limits_Are_Illustrative_Not_Normative()
+    public void The_Spec_Example_Limits_Satisfy_The_Section_7_Constraint()
     {
         var hello = ProtocolParser.ParseHello(ProtocolFixtures.Line("hello.jsonl"));
 
+        // Spec §7 (U-2): step_timeout_ms defaults to 5000, and match_timeout_ms is
+        // step_timeout_ms x max_ticks + 30000. The slack covers the per-step
+        // bookkeeping and the final exchange so a match that uses its whole step
+        // budget does not trip the match limit on the way out.
+        const int slackMs = 30_000;
+        Assert.Equal(5_000, hello.Limits.StepTimeoutMs);
+
+        var required = ((long)hello.Limits.StepTimeoutMs * hello.MaxTicks) + slackMs;
+
+        Assert.Equal(
+            required,
+            hello.Limits.MatchTimeoutMs);
         Assert.True(
-            hello.Limits.MatchTimeoutMs < (long)hello.Limits.StepTimeoutMs * hello.MaxTicks,
-            "the §4.1 example is documented as illustrative; if it ever starts " +
-            "satisfying the §7 constraint, that note needs revisiting — not this test.");
+            hello.Limits.MatchTimeoutMs >= (long)hello.Limits.StepTimeoutMs * hello.MaxTicks,
+            $"match_timeout_ms {hello.Limits.MatchTimeoutMs} cannot cover " +
+            $"step_timeout_ms {hello.Limits.StepTimeoutMs} x max_ticks {hello.MaxTicks} = " +
+            $"{(long)hello.Limits.StepTimeoutMs * hello.MaxTicks}.");
     }
 }

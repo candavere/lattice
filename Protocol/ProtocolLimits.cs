@@ -6,10 +6,14 @@ namespace Lattice.Protocol;
 /// version of §2.
 /// </summary>
 /// <remarks>
-/// Only the two <em>protocol constants</em> live here. The two named
-/// per-match time limits (<c>step_timeout_ms</c>, <c>match_timeout_ms</c>) are
-/// carried in <c>hello.limits</c> and are not fixed by the protocol; stage 3
-/// chooses their values (spec §14, U-2), so this type asserts none.
+/// Only the two <em>protocol constants</em> live here. The two named per-match
+/// time limits (<c>step_timeout_ms</c>, <c>match_timeout_ms</c>) are carried in
+/// <c>hello.limits</c> and their defaults are fixed by spec §7 (§14, U-2):
+/// <c>step_timeout_ms</c> defaults to <c>5000</c> and <c>match_timeout_ms</c> is
+/// computed as <c>step_timeout_ms × max_ticks + 30000</c>. Those defaults live in
+/// the spec and are applied by the stage-3 runner, and <b>this type still asserts
+/// no time value</b> — the leaf protocol project deliberately holds no timeout
+/// policy it would then have to keep in step with §3.1 and §7.
 /// </remarks>
 public static class ProtocolLimits
 {

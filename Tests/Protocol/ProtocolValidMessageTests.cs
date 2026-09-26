@@ -76,7 +76,7 @@ public class ProtocolValidMessageTests
         Assert.Equal(500, hello.MaxTicks);
         Assert.Equal(2, hello.AgentCount);
         Assert.Equal(5000, hello.Limits.StepTimeoutMs);
-        Assert.Equal(1200000, hello.Limits.MatchTimeoutMs);
+        Assert.Equal(2530000, hello.Limits.MatchTimeoutMs);
     }
 
     [Fact]

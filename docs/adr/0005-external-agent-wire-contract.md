@@ -250,7 +250,7 @@ grounds — a single episode has no mirror, no confidence interval, and no
 grading floor, so it could not be compared with anything published here — which
 leaves `simulate --agent greedy|random|mcts` exactly as it is and the external
 path on `evaluate --agent-cmd` only. `U-2`, `U-4`, and `U-9` remain open for
-stage 3. Because no conforming agent exists yet, none of this required a
+stage 3 — **since settled; see the addendum below.** Because no conforming agent exists yet, none of this required a
 version bump; the discipline in spec §12.8 now binds, and the reason set is
 frozen at fourteen codes from the first release onward.
 
@@ -284,7 +284,74 @@ frozen at fourteen codes from the first release onward.
   question in the spec, not a decision taken here. **Closed by the addendum
   above (U-6): an `AgentFailures` count, report-only, alongside the existing
   statistics and not instead of them.**
-- The command-line launch contract for `--agent-cmd` (argv splitting,
-  environment, working directory) remains deliberately left to stage 3 and
-  recorded as an open point, alongside `U-2` and `U-4`. The protocol project's
-  own name is no longer open: it is `Lattice.Protocol` (§11.1, U-1).
+## Addendum — stage 3 closed the last three open points (2026-09-27)
+
+The first addendum left `U-2`, `U-4` and `U-9` open for stage 3, having
+deliberately declined to invent answers to them. Stage 3 closed all three by
+amending the spec rather than cutting version `2`, which the spec's own §12.8
+permits precisely because no conforming agent has ever existed. **With these
+three, every point in spec §14 is settled and none remains open.**
+
+- **`U-2` — the time-limit values.** The default `step_timeout_ms` is `5000`, and
+  `match_timeout_ms` is **computed** as `step_timeout_ms × max_ticks + 30000`.
+  The choice worth recording is *why it is computed rather than a second
+  constant*: spec §7 requires `match_timeout_ms ≥ step_timeout_ms × MaxTicks`, and
+  two independently chosen numbers make that constraint something a future
+  editor can silently break by changing only one of them. Deriving the match
+  budget from the step budget and the tick budget makes the constraint hold **by
+  construction**, which is the same move this ADR has made everywhere else — a
+  rule enforced by structure rather than by vigilance. The `+ 30000` slack covers
+  per-step bookkeeping and the final exchange so a match that legitimately uses
+  its whole step budget does not trip the match limit on the way out. The
+  handshake uses `step_timeout_ms`, so "never started" and "stalled once" are the
+  same knob, and both values are recorded in the run's output metadata rather
+  than inferred from a version number. All three timeouts are measured on a
+  **monotonic** clock: a system clock adjustment must not be able to manufacture
+  or suppress a timeout mid-match.
+- **`U-4` — the stderr ring capacity.** `65536` bytes (64 KiB), per match,
+  discarding oldest-first so it always holds the *last* 64 KiB. The load-bearing
+  part is not the number but the **continuous drain on its own reader for the
+  whole life of the process**. An undrained pipe is a deadlock, not a slow path:
+  an agent that writes more than the OS pipe buffer holds blocks forever, and
+  Lattice would then record `timeout_step` for a stall the *host* caused. So the
+  drain runs while Lattice is blocked reading stdout and MUST NOT be deferred
+  until a failure is detected, which is also why a >1 MiB stderr flood is a
+  required test rather than a theoretical one. The tail is attached to the
+  failure record on `agent_crashed`, `agent_exited` and the three `timeout_*`
+  codes, and — consistent with §1.1's standing rule that stderr is diagnostic
+  only — is never parsed and never enters a statistic.
+- **`U-9` — the launch contract: an argv, never a shell.** Lattice receives a
+  **program plus an argument list**, already split, and starts the child with
+  `ProcessStartInfo.ArgumentList` one argument at a time with
+  `UseShellExecute = false`. No command string, no `cmd /c`, and no
+  concatenate-quote-reparse round trip. This continues the ADR's existing
+  posture rather than introducing a new one: `--agent-cmd` is arbitrary
+  user-supplied text, and the one place a shell would help is the one place an
+  argument becomes a command. Deriving the argv means a space in a path stays one
+  argument and a shell metacharacter is just bytes, so Lattice's injection
+  surface is empty by construction. The working directory is the **caller's**
+  current directory and the environment is **inherited**, with exactly one
+  variable added: **`LATTICE_PROTOCOL=1`**, which is explicitly *informational* —
+  it can never make an incompatible agent compatible, because negotiation remains
+  the exact-match handshake of decision 1. Deliberately left to **stage 4** is
+  how a CLI *string* becomes a program and an argv: that is a CLI-surface
+  question, the contract here begins at the argv, and everything above holds
+  unchanged whichever splitter stage 4 picks.
+
+Because the reason set, the field list, and both protocol constants are untouched
+by this addendum, and because the two time limits are per-match rather than
+protocol constants (§12.6), **no version bump is due**: protocol `1` ships with
+fourteen codes, a `hello` carrying `max_ticks` and `agent_count`, and the limits
+above. The `LATTICE_PROTOCOL` variable is the one genuinely new observable in
+this addendum, and it is additive to the *process environment* rather than to the
+wire, so it is not the kind of change §12.4 governs.
+
+- The launch contract, the timeouts, and the stderr drain are now normative in
+  spec §3.2, §3.1/§7, and §1.1 respectively, and are implemented by the
+  stage-3 runner in `Agents/External/`. §11.2's placement holds: the wire
+  vocabulary stayed in the leaf `Lattice.Protocol` and the wire ↔
+  `Observation`/`AgentAction` mapping sits in the runner, which is the only
+  place that sees both.
+- `Protocol/ProtocolLimits.cs` still asserts **no** time value, deliberately. The
+  defaults are the spec's and the runner's; the protocol project is a leaf that
+  must not grow a policy it would then have to keep in step with §3.1.

@@ -50,12 +50,26 @@ action stream in any way. Lattice MUST capture stderr into a **bounded ring
 buffer** so that the tail of an agent's diagnostics survives into the failure
 report.
 
-The ring capacity is a constant fixed in stage 3 and is **not settled by this
-document** (see §14, U-4). No number is asserted here.
+**The ring capacity is `65536` bytes (64 KiB).** When the ring is full, the
+oldest bytes MUST be discarded so that the buffer holds the **last** 64 KiB the
+agent wrote. The capacity is a byte count, not a character or line count.
+
+**The last 64 KiB is attached to the failure record** on every process-level
+and timing failure: `agent_crashed`, `agent_exited`, `timeout_handshake`,
+`timeout_step`, and `timeout_match`. The attached text is what the ring holds
+at the moment the failure is recorded. It MUST NOT be parsed, MUST NOT be
+interpreted, and MUST NOT be counted as protocol input; it exists so that a
+human reading a failed run can see what the agent was doing when it stopped.
 
 An agent that writes to stderr MUST NOT block as a result: Lattice MUST drain
 stderr continuously for the life of the process, and MUST terminate the process
-if draining it is the only thing keeping it alive.
+if draining it is the only thing keeping it alive. "Continuously" is load-bearing
+rather than aspirational: a pipe whose reader stops is a pipe whose writer
+deadlocks, so the drain MUST run on its own reader for the whole life of the
+process — including while Lattice is blocked waiting on **stdout** — and it MUST
+NOT be deferred until the match has failed. An agent that writes more stderr
+than the ring holds, or more than the operating system's pipe buffer can hold,
+MUST still be able to play to completion. See §14, U-4.
 
 ### 1.2 Direction of flow
 
@@ -153,6 +167,71 @@ Requirements:
 - The agent has no `error` message of its own. The `error` type is
   Lattice-to-agent only.
 
+### 3.2 Process launch contract
+
+The launch contract is an **argv, never a shell**. This is the whole of U-9,
+settled here; §9.5's `--agent-cmd` is a CLI-surface concern and stage 4's.
+
+Lattice MUST receive the agent as a **program plus an argument list** — two
+separate values, already split — and MUST start it with an explicit
+`ProcessStartInfo` whose arguments are added one at a time through
+`ArgumentList`. Lattice MUST NOT:
+
+- build a single command **string** and hand it to a shell, `cmd.exe`, or
+  `cmd /c`;
+- set `UseShellExecute` to `true`;
+- concatenate, quote, escape, or re-parse an argument list into a string and
+  back.
+
+The consequences are normative:
+
+- **A space in an argument is a space in an argument.** Splitting into an argv
+  is a *caller* responsibility, performed before Lattice sees the value, so no
+  quoting rule exists here for Lattice to get wrong. An agent path containing
+  spaces is one argv element, not two.
+- **There is no shell metacharacter.** `>`, `|`, `&`, `;`, `*`, `~`, `$`, and
+  backticks have no meaning to Lattice and MUST NOT be interpreted, expanded,
+  or removed. They are ordinary bytes inside whatever single argument contains
+  them, and expansion of any kind is the caller's business.
+- **Injected input cannot become execution.** Because nothing is re-parsed by a
+  shell, a value that reaches Lattice as one argument cannot be split, globbed,
+  or chained by Lattice. The injection surface of the launch contract is
+  therefore empty, which is the reason for the rule rather than a tidy-up.
+
+**Working directory.** The child MUST be started in **the caller's current
+working directory** — the directory Lattice itself was running in. Lattice MUST
+NOT start the agent anywhere else, MUST NOT resolve a working directory out of
+the agent's path, and MUST NOT walk up from it.
+
+**Environment.** The child MUST **inherit** Lattice's environment. Lattice MUST
+NOT clear it, MUST NOT replace it with a minimal one, and MUST NOT remove
+anything the caller had set. On top of the inherited set Lattice MUST add
+exactly one variable:
+
+| Variable | Value | Meaning |
+| :--- | :--- | :--- |
+| `LATTICE_PROTOCOL` | `1` | The wire version Lattice is speaking, so an agent can read it without waiting for `hello`. |
+
+`LATTICE_PROTOCOL` is **informational, not authoritative.** An agent MUST NOT
+branch its protocol behaviour on it, and MUST NOT treat its absence or a
+different value as licence to do anything: negotiation is still the exact-match
+handshake of §2, and `LATTICE_PROTOCOL` can never make an incompatible agent
+compatible. Its value is the same integer Lattice sends in `hello.protocol`
+and in `hello_ack`'s counterpart, `ProtocolLimits.Version`; Lattice MUST NOT
+write a value that disagrees with the `protocol` it puts on the wire, and MUST
+NOT use this variable as the source of that integer — the constant in the
+protocol library is. Lattice MUST add it as the **only** variable it introduces,
+so that an agent's environment is a caller environment plus one known key.
+
+**What this does not settle.** How a CLI string such as
+`--agent-cmd "python3 my_agent.py"` becomes a program and an argument list is
+**not** a property of the protocol, and is explicitly **stage 4's** concern. The
+contract here begins at the argv. Whichever splitter stage 4 chooses, its output
+arrives here as a program string plus a list of argument strings, and everything
+above holds unchanged — including that Lattice itself never re-parses them.
+
+See §14, U-9.
+
 ### 3.1 `hello`
 
 | Field | Type | Required | Meaning |
@@ -170,12 +249,32 @@ Requirements:
 
 | Field | Type | Meaning |
 | :--- | :--- | :--- |
-| `step_timeout_ms` | integer ≥ 1 | Wall-clock milliseconds Lattice will wait for one `action` line after writing an `observation`. |
-| `match_timeout_ms` | integer ≥ 1 | Wall-clock milliseconds Lattice will allow for the whole match, measured from the moment `hello` is written. |
+| `step_timeout_ms` | integer ≥ 1 | Monotonic milliseconds Lattice will wait for one `action` line after writing an `observation`, and for one `hello_ack` after writing a `hello`. The **default is `5000`**. |
+| `match_timeout_ms` | integer ≥ 1 | Monotonic milliseconds Lattice will allow for the whole match, measured from the moment `hello` is written. It is **computed as `step_timeout_ms × max_ticks + 30000`**. |
 
-The **values** of `step_timeout_ms` and `match_timeout_ms` are chosen in stage 3
-and recorded there. This document fixes the field names, types, and semantics
-and asserts no number. See §14, U-2.
+**The default `step_timeout_ms` is `5000`, and the default `match_timeout_ms` is
+computed from it as `step_timeout_ms × max_ticks + 30000`.** `match_timeout_ms`
+is not an independent constant: deriving it is what makes §7's
+`match_timeout_ms ≥ step_timeout_ms × MaxTicks` constraint **hold by
+construction** rather than be a number someone has to remember to keep
+consistent. The `+ 30000` slack covers the per-step bookkeeping and the final
+exchange, so a match that uses its entire step budget legitimately does not trip
+the whole-match limit on the way out.
+
+**The handshake uses `step_timeout_ms`.** `timeout_handshake` is bounded by the
+same value as `timeout_step` (§2), so an agent that never starts is not given a
+longer grace period than an agent that stalls once, and the two are the same
+knob an agent author has to reason about.
+
+**Both values travel in `hello.limits` and MUST be recorded in the run's output
+metadata**, so that a reported run states the time limits it was played under
+rather than leaving them to be inferred from a version number. The values are
+**per-match, not protocol constants**: changing either is not a breaking wire
+change (§12.6).
+
+Note that all three timeouts are measured on a **monotonic clock** and never on
+the wall clock, so a system time adjustment mid-match cannot manufacture or
+suppress a timeout. See §7, §14, U-2.
 
 `scenario` is the closed v3.0 set. The `infiltration` scenario is **not**
 reachable through the external-agent path in v3.0: it is a `simulate`-only
@@ -209,16 +308,17 @@ it is a schema violation (§8).
 
 ### 4.1 Example lines
 
-The numeric limit values in the `hello` example are **illustrative only**; the
-normative values are fixed in stage 3 (§14, U-2). The same is true of
-`max_ticks` and `agent_count`, which are shown with a plausible but not
-normative pair. Every other value in these examples is normative and matches
-the field tables that follow.
+The `limits` numbers in the `hello` example are the **normative defaults** and
+MUST satisfy §7's constraint; here they are the defaults for the
+`max_ticks` the example shows, so `match_timeout_ms` is
+`5000 × 500 + 30000 = 2530000`. `max_ticks` and `agent_count` remain
+per-match values shown with a plausible but not normative pair. Every other
+value in these examples is normative and matches the field tables that follow.
 
 **`hello`**
 
 ```json
-{"type":"hello","protocol":1,"scenario":"standard","seed":1001,"agent_slot":0,"max_ticks":500,"agent_count":2,"limits":{"step_timeout_ms":5000,"match_timeout_ms":1200000}}
+{"type":"hello","protocol":1,"scenario":"standard","seed":1001,"agent_slot":0,"max_ticks":500,"agent_count":2,"limits":{"step_timeout_ms":5000,"match_timeout_ms":2530000}}
 ```
 
 **`hello_ack`**
@@ -501,14 +601,15 @@ is rejected rather than replayed.
 
 Four limits are normative in protocol v1. The first two are **constants of the
 protocol**; the second two are **named, per-match values carried in
-`hello.limits`** (§3.1).
+`hello.limits`** (§3.1), whose defaults are fixed here and whose
+`match_timeout_ms` is computed from the other.
 
 | Limit | Value | Applies to | Enforced by | Reason on breach |
 | :--- | :--- | :--- | :--- | :--- |
 | `max_line_bytes` | `1048576` (1 MiB), **excluding** the terminating LF | every line, in both directions | Lattice | `line_too_long` (agent's line) / `host_limit` (Lattice's own line) |
 | `max_json_depth` | `32` | every JSON value Lattice parses | Lattice | `depth_exceeded` |
-| `step_timeout_ms` | stage-3 constant, carried in `hello.limits` | the wait for one `action` after one `observation`, and the wait for one `hello_ack` after one `hello` | Lattice | `timeout_step` (after an `observation`) / `timeout_handshake` (after `hello`) |
-| `match_timeout_ms` | stage-3 constant, carried in `hello.limits` | the whole match, from `hello` written to termination | Lattice | `timeout_match` |
+| `step_timeout_ms` | **`5000`** by default, carried in `hello.limits` | the wait for one `action` after one `observation`, and the wait for one `hello_ack` after one `hello` | Lattice | `timeout_step` (after an `observation`) / `timeout_handshake` (after `hello`) |
+| `match_timeout_ms` | **`step_timeout_ms × max_ticks + 30000`**, carried in `hello.limits` | the whole match, from `hello` written to termination | Lattice | `timeout_match` |
 
 Notes that are binding:
 
@@ -549,7 +650,20 @@ Notes that are binding:
   `hello.max_ticks` (`Environment/Simulation.cs:28`,
   `Agents/EvaluationHarness.cs:147-148`). Otherwise the whole-match limit is
   guaranteed to fire before a single match could complete, and every external
-  agent would be scored a loss for a limit Lattice itself mis-set.
+  agent would be scored a loss for a limit Lattice itself mis-set. **The default
+  satisfies this by construction** rather than by assertion: `match_timeout_ms` is
+  *defined* as `step_timeout_ms × max_ticks + 30000`, so the constraint cannot be
+  violated by choosing a `step_timeout_ms` and then forgetting to scale the
+  match budget with it. A caller that overrides `match_timeout_ms` with a value
+  below `step_timeout_ms × MaxTicks` has mis-set it and MUST be refused before
+  the match starts, exactly as Lattice refusing its own over-long outbound line
+  (§7, `host_limit`).
+- **All three timeouts are measured on a monotonic clock**, never on the wall
+  clock. A system clock adjustment — an NTP correction, a manual change, a
+  daylight-saving boundary — MUST NOT be able to manufacture a timeout or
+  suppress one mid-match. The whole-match limit is likewise measured from the
+  moment `hello` is written, and MUST NOT be measured from process start or from
+  the first `observation`.
 - **An agent MUST honour `step_timeout_ms` in both directions.** An agent that
   needs longer to answer an `observation` — or to answer `hello` with a
   `hello_ack` — MUST fail; it MUST NOT hold the stream. Lattice MUST NOT extend
@@ -801,7 +915,12 @@ questions that one number cannot: *how badly did it play* (the paired
 statistics, in which every failure is a loss) and *how often did its plumbing
 break* (the `AgentFailures` count, in which a crash and a stall are visible as
 such and not laundered into a single loss). The two are reported side by side and
-are never merged. See §14, U-6.
+are never merged. The breakdown is **by reason code**, so a run in which every
+failure is `timeout_handshake` is visibly distinguishable from one in which every
+failure is `agent_crashed`. For the process-level and timing codes the record also
+carries **the last 64 KiB of the agent's stderr** (§1.1): diagnostic text
+attached to the failure, never parsed, and never entering any statistic, rate, or
+decision rule. See §14, U-6.
 
 ### 9.4 Scoring is through the existing paired evaluation
 
@@ -1071,31 +1190,35 @@ Concretely, and stated as a limitation rather than a warning to be skimmed:
 
 ---
 
-## 14. Unsettled points
+## 14. Settled points
 
 Points that stage 2 settled are recorded here with their resolution, so the
-reasoning survives the fact that the answer is now in the normative text above.
-Points that remain open are still open, and this document does **not** invent
-answers for them. Each is a real gap that stage 3 must close, or that the
-orchestrator must settle before stage 3 can proceed.
+reasoning survives the fact that the answer is now in the normative text above;
+points stage 3 settled are recorded the same way. A point listed here is a
+decision, not a gap, and this document does **not** invent answers for anything
+it has not decided: where a row says a value or a contract is fixed, that text
+lives in the sections the row cites, and if the two ever disagree the row is not
+what governs.
 
-| # | Unsettled | Why it matters | Status in this document |
+| # | Settled point | Why it mattered | Resolution |
 | :--- | :--- | :--- | :--- |
 | U-1 | The protocol project's assembly name and directory. | §11 requires a project with a hard no-`ProjectReference` rule; the name is a stage-3 mechanical choice. | **Resolved.** The project is `Lattice.Protocol`, in `Protocol/`, a leaf that references nothing in this repository. Tests are in `Tests/Protocol/`; fixtures are in `Tests/fixtures/protocol/`. §11.1 states the name, the directory, the leaf property, and the one-way test reference. |
-| U-2 | The values of `step_timeout_ms` and `match_timeout_ms`. | Decision 5 defers these to stage 3 explicitly. | **Open.** Fields and semantics defined (§3.1, §7); no value asserted. The §7 constraint `match_timeout_ms ≥ step_timeout_ms × MaxTicks` is derived, not assumed. Stage 3 sets the constants and records them here. |
+| U-2 | The values of `step_timeout_ms` and `match_timeout_ms`. | Decision 5 defers these to stage 3 explicitly. | **Resolved.** The default `step_timeout_ms` is **`5000`**, and `match_timeout_ms` is **computed as `step_timeout_ms × max_ticks + 30000`**. The handshake uses `step_timeout_ms`, so `timeout_handshake` and `timeout_step` are the same knob. Both values are carried in `hello.limits` and MUST be recorded in the run's output metadata. Because `match_timeout_ms` is *defined* in terms of `step_timeout_ms` and `max_ticks`, §7's `match_timeout_ms ≥ step_timeout_ms × MaxTicks` constraint now **holds by construction** instead of being a relationship a reader has to verify; the §4.1 `hello` example has been corrected to `5000 × 500 + 30000 = 2530000` to satisfy it, and the test that existed only to excuse the previous divergence is gone. All three timeouts are measured on a **monotonic** clock, never the wall clock. The values are per-match, not protocol constants, so fixing them is not a version change (§12.6). Normative in §3.1, §4.1, and §7. |
 | U-3 | **`hello` carried no tick budget or agent count.** | A conforming v1 agent could learn its slot, its seed, and its map, but **not** `MaxTicks` and **not** the agent count up front. An agent that plans a horizon had no way to know the horizon except by running out of steps, and `MaxTicks` is the input to any time-aware plan. This was the largest usability gap in the contract. | **Resolved.** `hello` gains two **required** integer fields: `max_ticks` (from `SimulationConfig.MaxTicks`, `Environment/Simulation.cs:28`, the same value the harness passes as `MaxSteps`, `Agents/EvaluationHarness.cs:147-148`) and `agent_count` (from `SimulationConfig.AgentCount`, `Environment/Simulation.cs:25`, bounded 2..4 at `Environment/Simulation.cs:58-60`). Both are additions to a `hello` that no released agent has ever seen, so no version bump is due (§12.8). The `hello` field list, the §4.1 example line, the §12 versioning rules, and the §7 `match_timeout_ms` constraint (which is now computed from the number Lattice actually sends) are all updated to match. |
-| U-4 | The stderr ring-buffer capacity. | §1.1 requires a bounded ring but no bound is given. | **Open.** Semantics fixed; no number asserted. Stage 3 sets the capacity and records it here. |
+| U-4 | The stderr ring-buffer capacity. | §1.1 requires a bounded ring but no bound is given. | **Resolved.** The capacity is **`65536` bytes (64 KiB)** per match, discarding oldest-first so the buffer always holds the **last** 64 KiB written. The drain is **continuous, on its own reader, for the whole life of the process** — including while Lattice is blocked reading stdout — so a chatty agent can never fill the pipe and deadlock; the drain MUST NOT be deferred until a failure has been detected. The last 64 KiB is **attached to the failure record** on `agent_crashed`, `agent_exited`, `timeout_handshake`, `timeout_step`, and `timeout_match`, and is **never parsed**, never interpreted as protocol, and never allowed to influence the action stream or any statistic. Normative in §1.1, cross-referenced from §9.3. |
 | U-5 | **There was no handshake-timeout reason code.** | The closed set had `timeout_step` and `timeout_match` but nothing for "the agent never sent `hello_ack`". Assigning it to `timeout_step` treated the handshake as step 0's exchange, which was defensible but an interpretation, not a decision. An *invalid* `hello_ack` was not affected — a wrong `protocol` value is `protocol_mismatch` (§2). | **Resolved.** A thirteenth agent code, `timeout_handshake`, is added: no valid `hello_ack` within `step_timeout_ms` of `hello`. It is scored as an **agent failure** like every other agent code (§9.1, §9.3). It is distinct from `protocol_mismatch` (a wrong `protocol` value, which arrived) and from `schema_violation` (a malformed `hello_ack`, which also arrived). It sits in the Timing group in §8.2 and second among the agent codes in the §8.4 precedence, immediately after `protocol_mismatch`. §2, §7, §8, §8.1, §8.2, §8.4, and §9.3 are updated. |
 | U-6 | **A protocol failure had no reported count of its own** — it was a loss and nothing more. | §9.3 scores failures as losses per decision 6, which is right for the statistics but means a study cannot report "how often did the external agent's plumbing break" separately from "how badly did it play". | **Resolved.** The reported statistics carry an **`AgentFailures`** count, incremented once per match whose `TerminationReason` is one of the thirteen agent-attributable codes, kept **separate** from `MatchOutcome.Timeout` (`Timeout` remains "budget burned without a terminal tick") and separate from `VoidRuns`. It is **report-only**: it MUST NOT change scoring, the paired delta, the confidence interval, or the decision rule, all of which stay exactly as §9.4 specifies. Agent failures still count as losses. §9.3 states the boundary. |
 | U-7 | Whether an over-long **outbound** line is a loss for the external agent. | §7 requires Lattice to refuse a match whose `observation` would exceed 1 MiB. No reason code covered that, and under decision 6's literal wording ("every failure ... is scored as a loss for the external agent") the agent was blamed for a limit Lattice's own map generation caused — a map-size choice the agent could neither see nor influence. | **Resolved.** A fourteenth code, `host_limit`, records the refusal. Lattice checks its own outbound `observation` against **both** `max_line_bytes` and `max_json_depth` **before writing any byte**, refuses the match if it would breach either, records the run as **void / invalid**, and does **NOT** score it as a loss. Void runs are **reported as a count** (`VoidRuns`) and **excluded from the paired statistics** — from the delta, the per-outcome rates, the confidence interval, the decision rule, and the 30-seed grading denominator — because neither agent played. The §8 and §9.3 tables carry an explicit **`Fault`** column (`agent` vs `host`) so the partition is normative rather than inferred. §8.4 puts `host_limit` first, since it is detected before any wire exchange exists. An *inbound* over-long line is unaffected and remains `line_too_long`, an agent loss. |
 | U-8 | Process lifetime scope: one process per match, or one long-lived process across a whole evaluation suite. | A per-match process is simpler and matches the in-process factory contract, which builds a fresh agent per (pairing, seed) so RNG streams cannot leak between matches (`Agents/IAgentFactory.cs:12-23`, `Agents/EvaluationHarness.cs:175`). A long-lived process would need a reset message that does not exist in the five-type catalogue. | **Resolved: one agent process per match.** Stated normatively in §3 as the first handshake requirement — Lattice MUST launch a fresh process per match, send `hello` exactly once, and MUST NOT reuse a process across matches, seed pairings, or the mirrored seatings of one seed. This buys unconditional isolation (one agent's crash, hang, or memory growth cannot affect another match) and makes state carryover between seeds impossible by construction. A suite-scoped process would need a reset message, and the closed five-type catalogue (§4) has none; that remains a protocol-2 change. **Semantics only here** — process launch, the stdin/stdout pumps, and the timeout enforcement are stage 3, not stage 2. |
-| U-9 | Process launch details: argv, environment, working directory, and how `--agent-cmd` is split into program and arguments. | §9.5 names the flag and its value shape; the launch contract is not written anywhere. | **Open.** Flag name and value type are fixed (§9.5); the launch contract is not. Stage 3 writes it. |
+| U-9 | Process launch details: argv, environment, working directory, and how `--agent-cmd` is split into program and arguments. | §9.5 names the flag and its value shape; the launch contract is not written anywhere. | **Resolved: an argv, never a shell.** Normative in the new **§3.2**, alongside §3's existing one-process-per-match lifetime rule. Lattice receives a **program plus an argument list**, already split, and starts it with `ProcessStartInfo.ArgumentList` — one argument at a time — with `UseShellExecute = false`. Lattice MUST NOT build a command string, MUST NOT involve a shell or `cmd /c`, and MUST NOT concatenate, quote, escape, or re-parse an argv into a string and back, so a space in an argument stays one argument and a shell metacharacter has no meaning. The **working directory is the caller's current directory**, with no resolution from the agent's own path. The **environment is inherited**, and Lattice adds exactly one variable, **`LATTICE_PROTOCOL=1`**, which is informational only: it can never make an incompatible agent compatible, because negotiation remains the exact-match handshake of §2. **How a CLI string such as `--agent-cmd "python3 my_agent.py"` becomes a program and an argv is explicitly stage 4's concern, not this document's** — the contract here begins at the argv, and holds unchanged whichever splitter stage 4 picks. |
 | U-10 | Whether the external agent may also be run through `simulate`. | Decision 9 scopes external agents to `evaluate` and says `simulate --agent greedy|random|mcts` is unchanged. Whether a *separate* `simulate` flag for external agents is wanted was unaddressed. | **Resolved: no.** `simulate` MUST NOT accept an external agent in v3.0; it is listed as an explicit **non-goal** in §13. The reason is commensurability, not convenience: `simulate` runs one episode and has no mirror, no confidence interval, and no grading floor, so a number produced there could not be compared with any published result. `simulate --agent` keeps its exact in-process-enum meaning; the external path is `evaluate --agent-cmd` only (§9.5). |
 
-Points U-2, U-4, and U-9 remain open and are stage 3's to close. Nothing in the
-resolved rows above is provisional: each is normative in the body of this
-document, and where a row says a value is fixed in stage 3, the semantics it
-constrains are fixed here.
+**All ten points are now resolved.** U-1, U-3, U-5, U-6, U-7, U-8 and U-10 were
+settled in stage 2; U-2, U-4 and U-9 are settled here, in the body of this
+document. Nothing in the table above is provisional: each row is normative in the
+sections it cites. Because no conforming agent has ever existed, none of this
+required a version bump — the discipline in §12.8 binds from the first release
+onward, and the reason set is frozen at fourteen codes.
 
 ---
 

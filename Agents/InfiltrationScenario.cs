@@ -73,7 +73,7 @@ public static class InfiltrationScenario
     /// transit at speed 4 so a capacity-1 portcullis crossing actually occupies
     /// the gate for several ticks (the contention the scenario is about), and
     /// no core-side vision masking — the core stays full-observation per
-    /// adr-002, and fog-of-war is applied by the agents' own perception
+    /// docs/adr/0003-simultaneous-actions-step-contract.md, and fog-of-war is applied by the agents' own perception
     /// filters.
     /// </summary>
     public static SimulationConfig DefaultConfig(int maxSteps) =>

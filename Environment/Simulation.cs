@@ -88,7 +88,7 @@ public sealed class SimulationConfig
 /// agent's zone and score, which resource ids are claimed, the tick counter,
 /// and the per-tick dynamic topology overrides. No hidden mutable state —
 /// this record plus the next tick's actions fully determine the following
-/// state (see docs/adr-002.md). <see cref="Dynamics"/> is the way the map's
+/// state (see docs/adr/0003-simultaneous-actions-step-contract.md). <see cref="Dynamics"/> is the way the map's
 /// choke capacities may vary across an episode (timed portcullises, event
 /// locks); when empty, the base <see cref="MapGraph"/> topology is used.
 /// </summary>
@@ -164,7 +164,7 @@ public static class Simulation
     /// Advances <paramref name="state"/> by one tick under the agents'
     /// actions. Pure and total: the input state is never mutated and any
     /// action array yields the next state (invalid/missing actions degrade to
-    /// Wait). Resolution is two-phase (docs/adr-002.md): movement and transit
+    /// Wait). Resolution is two-phase (docs/adr/0003-simultaneous-actions-step-contract.md): movement and transit
     /// resolve first in tick-interleaved priority order, respecting edge
     /// transit and zone/choke capacity, then collects resolve in the same
     /// tick-interleaved order against post-move zones, one claim per resource

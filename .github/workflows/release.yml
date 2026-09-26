@@ -258,7 +258,7 @@ jobs:
           ## Compatibility & schema
           - Pure .NET 8 (net8.0) BCL runtime; no external native dependencies.
           - Trajectory schema version \`3\` — \`golden_trajectory.jsonl\` (header \`SchemaVersion: 3\`).
-          - Determinism is scoped to serialized \`StepResult\` equivalence; see docs/SUPPORT_AND_REPRODUCIBILITY.md.
+          - Determinism is scoped to serialized \`StepResult\` equivalence plus schema 3's per-tick state hash: \`replay --verify\` re-serializes each \`StepResult\` and recomputes the SHA-256 digest of each tick's end-of-tick simulation state; see docs/SUPPORT_AND_REPRODUCIBILITY.md.
 
           ## Supported matrix
           | Asset | OS | Architecture | Runtime |

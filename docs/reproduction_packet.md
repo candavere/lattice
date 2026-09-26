@@ -84,6 +84,20 @@ published assets — **do not execute them**. Independently, `sbom.json` may be
 checked against its digest above; it enumerates the .NET dependency graph and
 must contain only BCL/runtime components.
 
+A verified download is still not runnable: the POSIX assets arrive without their
+executable bit. Once the checksums above pass, set it on the checksum-verified
+files in this directory:
+
+```sh
+chmod +x lattice-linux-x64
+chmod +x lattice-osx-arm64
+```
+
+`lattice-win-x64.exe` needs no `chmod` on Windows. Section 2 refers to the
+verified binary as `./lattice`; renaming or symlinking the platform's asset
+under that name (`cp` or `ln -s`) carries the executable bit across, so the
+`chmod` is not repeated there.
+
 ### 1.3 The source commit is part of the record
 
 `v2.3.2` was built from commit `4f7816fa5594f7097d6b2978c6c626553d075326`. A
@@ -173,21 +187,22 @@ file and the same `10`.
 Source-pinned path (canonical golden trajectory, requires the pinned commit):
 
 ```sh
-git clone https://github.com/candavere/lattice.git lattice
-git -C lattice checkout v2.3.2
-cd lattice
+git clone https://github.com/candavere/lattice.git lattice-src
+git -C lattice-src checkout v2.3.2
+cd lattice-src
 # The source tree ships no `lattice` executable — the only published binaries
 # are the release assets of section 1.2. Supply the checksum-verified asset
 # under that name before running the replay.
-cp ../lattice-osx-arm64 ./lattice && chmod +x ./lattice   # macOS; use your platform's asset
+cp ../lattice-osx-arm64 ./lattice   # macOS; use your platform's asset
 ./lattice replay Tests/fixtures/golden_trajectory.jsonl --verify
 ```
 
-Run this path in its own directory: section 2 names the verified binary `./lattice`,
-which is also this path's clone target, so cloning into a directory that already
+The clone target above is deliberately `lattice-src`, not `lattice`: section 2
+names the verified binary `./lattice`, and cloning into a directory that already
 holds that file fails with `fatal: destination path 'lattice' already exists and
-is not an empty directory.` The `cp` above lands inside the freshly cloned
-directory, so it is unaffected.
+is not an empty directory.` Keeping the two names distinct lets the source
+checkout and the verified binary sit side by side, and the `cp` above lands
+inside the freshly cloned `lattice-src` directory.
 
 Expected: `replay verified: 11 step(s) serialized-equivalent (seed 2024, schema
 v2).` for `N` = the recorded step count (`11` at this commit), exit `0`.

@@ -390,7 +390,7 @@ public class TrajectoryTests
         var readBack = TrajectoryReader.Read(new StringReader(SerializeViaWriter(recording)));
 
         // The header round-trips the episode's policy and schema version.
-        Assert.Equal(2, readBack.Header.SchemaVersion);
+        Assert.Equal(TrajectorySchema.CurrentVersion, readBack.Header.SchemaVersion);
         Assert.Equal(Serialize(rules), Serialize(readBack.Header.DynamicRules));
 
         // The recording genuinely captured the dynamic topology: replaying the
@@ -418,7 +418,10 @@ public class TrajectoryTests
     {
         var config = new SimulationConfig(2, 3);
         var recording = TrajectoryWriter.Record(TriangleMap, config, 0x3333UL, FullCollectorEpisode(), new StringWriter());
-        var forged = SerializeViaWriter(recording).Replace("\"SchemaVersion\":2", "\"SchemaVersion\":99", StringComparison.Ordinal);
+        var forged = SerializeViaWriter(recording).Replace(
+            $"\"SchemaVersion\":{TrajectorySchema.CurrentVersion}",
+            "\"SchemaVersion\":99",
+            StringComparison.Ordinal);
 
         Assert.Throws<InvalidDataException>(() => TrajectoryReader.Read(new StringReader(forged)));
     }
@@ -429,7 +432,10 @@ public class TrajectoryTests
         var config = new SimulationConfig(2, 3);
         var recording = TrajectoryWriter.Record(TriangleMap, config, 0x4444UL, FullCollectorEpisode(), new StringWriter());
         var lines = SerializeViaWriter(recording).Split('\n', StringSplitOptions.RemoveEmptyEntries);
-        var legacyHeader = lines[0].Replace(",\"SchemaVersion\":2", "", StringComparison.Ordinal);
+        var legacyHeader = lines[0].Replace(
+            $",\"SchemaVersion\":{TrajectorySchema.CurrentVersion}",
+            "",
+            StringComparison.Ordinal);
         var legacy = string.Join('\n', new[] { legacyHeader }.Concat(lines.Skip(1)));
 
         var readBack = TrajectoryReader.Read(new StringReader(legacy));

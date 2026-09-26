@@ -86,16 +86,22 @@ timeline. Analysis is a pure function of the trajectory.
 # Replay a trajectory interactively or headless
 dotnet run -c Release --project Cli -- replay <path-to-trajectory.jsonl>
 
-# Replay with strict per-step serialized StepResult verification
+# Replay with strict per-step serialized StepResult and state-digest verification
 dotnet run -c Release --project Cli -- replay <path-to-trajectory.jsonl> --verify
 ```
 
 `--verify` rebuilds the simulation state and dynamic topology rules from the
-header, steps the engine identically, and asserts tick-by-tick serialized
-`StepResult` equality — not raw file-byte identity. The exit code is `0` only
-when every recorded tick reproduces its serialized `StepResult`. The same
-check runs against the canonical golden trajectory on the Ubuntu, macOS, and
-Windows CI matrix.
+header, steps the engine identically, asserts tick-by-tick serialized
+`StepResult` equality, and — for schema-3 recordings — recomputes the SHA-256
+digest of the simulation state at every tick and compares it to the digest
+recorded on each step line, naming the first mismatched tick. It is not raw
+file-byte identity. A recording made before schema 3 carries no per-tick digest,
+still verifies, and prints `no state hash: step-level verification only`; a
+recording that declares schema 3 or later but carries no digest is a
+discrepancy, not a notice. The exit code is `0` only when every recorded tick
+reproduces its serialized `StepResult` **and** every recorded digest matches.
+The same check runs against the canonical golden trajectory on the Ubuntu,
+macOS, and Windows CI matrix.
 
 ## benchmark — measure the work-load matrix
 

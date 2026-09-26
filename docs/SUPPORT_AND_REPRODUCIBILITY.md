@@ -29,13 +29,6 @@ interchangeable, and no document may upgrade one into another:
    asserts exactly this — plus field-by-field authentication of the final
    summary line's aggregates against the re-simulated run — on the tested CI
    platforms; the `replay --verify` command below exercises it.
-
-The four guarantees above are formalized as an implementation-agnostic,
-clean-room contract in
-[`INVARIANT_SPECIFICATION.md`](INVARIANT_SPECIFICATION.md) — the transition
-laws an independent oracle or checker in any language must reproduce, plus
-three falsifiable external challenge questions and the submission contract for
-oracle verification reports.
 3. **Same-host normalized JSONL byte identity.** Two fresh episodes recorded
    from the same seed and the same actions produce byte-identical JSONL only
    where line-ending and formatting normalization is verified on identical host
@@ -43,12 +36,31 @@ oracle verification reports.
    This guarantee is deliberately narrow: newlines are written as a bare `\n`
    on every platform, but a raw byte identity claim is still scoped to
    identical environments and is not a cross-host guarantee.
-4. **Canonical simulation-state hash tree.** **Not currently implemented.**
-   Replay verifies serialized `StepResult` equality, not a state digest, so
-   there is no canonical hash tree to compare against. The benchmark harness's
-   FNV-1a step digest is an internal repeatability check — it anchors one
-   warm-up iteration and proves later iterations did not go off-script — not a
-   canonical simulation-state hash.
+4. **Per-tick canonical simulation-state hash.** **Implemented (trajectory
+   schema 3 and later).** Each step line records a SHA-256 digest of the
+   complete simulation state at the end of that tick, computed from a canonical
+   fixed-field-order, invariant-culture serialization
+   (`Trajectories/SimulationStateHash.cs`), and `replay --verify` recomputes and
+   compares it, naming the first mismatched tick. The serialization covers the
+   zone and resource positions, per-zone occupancy, the per-tick choke capacities
+   and the derived per-choke edge load, scores, claims, the episode seed and the
+   tick. It does **not** cover the header's `SimulationConfig` or
+   `DynamicMapRuleSet`, so it attests to the state each tick produced rather
+   than to the whole episode configuration. A recording that predates the field
+   still verifies on serialized `StepResult` equality and reports
+   `no state hash: step-level verification only`; a recording that declares
+   schema 3 or later but carries no digest is reported as a discrepancy, not a
+   notice, so the hashes cannot be stripped to downgrade the check. The
+   benchmark harness's FNV-1a step digest is an unrelated internal repeatability
+   check — it anchors one warm-up iteration and proves later iterations did not
+   go off-script.
+
+The four guarantees above are formalized as an implementation-agnostic,
+clean-room contract in
+[`INVARIANT_SPECIFICATION.md`](INVARIANT_SPECIFICATION.md) — the transition
+laws an independent oracle or checker in any language must reproduce, plus
+three falsifiable external challenge questions and the submission contract for
+oracle verification reports.
 
 ## 1. Target Support Matrix
 
@@ -115,10 +127,11 @@ produced, and those recorded values are the only provenance a result carries.
 
 ## 3. Known Limitations
 
-- **Replay validation, not state-hash validation.** Replay validation operates
-  on tick-by-tick serialized `StepResult` equality. A canonical
-  simulation-state hash tree is not yet implemented, so a replay cannot be
-  summarized by a single state digest.
+- **Per-tick digests, not a single episode digest.** Replay validation operates
+  on tick-by-tick serialized `StepResult` equality and, for schema-3
+  recordings, on a per-tick state digest. An episode is still not reducible to
+  one state digest: the digests are per tick, and a recording made before the
+  field existed carries none and verifies on step results alone.
 - **Scenario-dependent policy behavior.** With 32 rollouts per action, the MCTS
   evaluation subject underperforms the `ScoutCollectorAgent` baseline on open
   collection topologies while outperforming it under capacity-1 procedural
@@ -191,13 +204,16 @@ replay with a different config is not a replay of the same episode.
   wrong contract.
 - **Migration invariant.** Any new optional field must be nullable and omitted
   when absent (`JsonIgnoreCondition.WhenWritingNull`) so older recordings remain
-  readable, and a writer always stamps `TrajectorySchema.CurrentVersion`. When
-  the wire contract changes, the version is incremented and the reader's
-  accepted-version rule is updated in the same change.
+  readable. `TrajectoryWriter.Record` stamps
+  `TrajectorySchema.CurrentVersion` on the recordings it mints, while
+  `TrajectoryWriter.Write` re-emits the recording's *own* header version: a
+  rewrite of a pre-hash file must not relabel it as schema 3 with no digests
+  present. When the wire contract changes, the version is incremented and the
+  reader's accepted-version rule is updated in the same change.
 
 The golden fixtures used to pin these invariants are
 [`../Tests/fixtures/golden_trajectory.jsonl`](../Tests/fixtures/golden_trajectory.jsonl)
-(schema v2, seed 2024) and
+(schema v3, seed 2024) and
 [`../Tests/fixtures/golden_dynamic_rules.json`](../Tests/fixtures/golden_dynamic_rules.json).
 
 ### Release immutability policy
@@ -284,8 +300,9 @@ dotnet run -c Release --project Cli -- replay Tests/fixtures/golden_trajectory.j
 ```
 
 A pass prints `replay verified` and exits `0`. This asserts per-step serialized
-`StepResult` equivalence (Section 3) plus field-by-field authentication of the
-final summary line's aggregates, not a state hash.
+`StepResult` equivalence (Section 3), per-tick state-digest equality where the
+recording carries one, and field-by-field authentication of the final summary
+line's aggregates.
 
 ### Five-workload throughput benchmark
 

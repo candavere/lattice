@@ -89,6 +89,14 @@ public sealed class TrajectoryReaderFuzzTests
         yield return new object[] { "trajectory_short_final_scores.jsonl" };
         yield return new object[] { "trajectory_missing_map_resources.jsonl" };
         yield return new object[] { "trajectory_null_simulation_config.jsonl" };
+
+        // A map whose arrays are present but whose elements or positions are
+        // not. Seeded fuzzing reached the null position through a bit flip: the
+        // simulation never reads Zone.Position under InstantTransit, so the
+        // defect survived replay and faulted inside the per-step state digest.
+        yield return new object[] { "trajectory_null_zone_position.jsonl" };
+        yield return new object[] { "trajectory_null_resource_position.jsonl" };
+        yield return new object[] { "trajectory_null_zone_entry.jsonl" };
     }
 
     [Theory]

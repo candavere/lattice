@@ -183,11 +183,19 @@ disagree are called out below rather than resolved.
   section 5), so doc and code agree here.
 - **Replay equivalence gate.** `.github/workflows/ci.yml:31-32` runs
   `dotnet run -c Release --project Cli -- replay Tests/fixtures/golden_trajectory.jsonl --verify`
-  on Ubuntu, macOS, and Windows. `Trajectories/TrajectoryReplay.cs:57`
-  (`Verify`) rebuilds a fresh simulation from the trajectory header, re-feeds
-  each recorded turn, and compares re-serialized `StepResult`s against the
-  recorded ones (`TrajectoryReplay.cs:81-82`). This is per-step serialized
-  equivalence, not byte identity and not a state hash.
+  on Ubuntu, macOS, and Windows. `Trajectories/TrajectoryReplay.cs`
+  (`VerifyDetailed`) rebuilds a fresh simulation from the trajectory header,
+  re-feeds each recorded turn, compares re-serialized `StepResult`s against the
+  recorded ones, **and** recomputes the SHA-256 digest of the complete
+  simulation state at every tick (`Trajectories/SimulationStateHash.cs`) and
+  compares it to the digest the step line records, naming the first mismatched
+  tick. This is per-step serialized equivalence plus per-tick state-digest
+  equality, not raw byte identity, and the digest covers the state rather than
+  the header's configuration. A recording made before schema 3 carries no
+  per-tick digest, verifies on step results alone, and prints
+  `no state hash: step-level verification only`; a recording that *claims*
+  schema 3 but has no digest is reported as a discrepancy, so stripping the
+  hashes is not a way to downgrade the check.
 - **Benchmark regression gate.** `.github/workflows/benchmarks.yml:77-108`
   re-benchmarks the five-case matrix and compares it against the committed
   baseline with `compare_benchmarks.py`, failing when a current workload
@@ -239,10 +247,20 @@ Only claims the repository can back up are listed here.
   reconstructed sightline**. On the Infiltrator view that happens around ticks
   9-10; on the Sentry view the site copy marks ticks 9-13
   ([`site/index.html`](site/index.html), [`site/infiltration.jsonl`](site/infiltration.jsonl)).
-- **No canonical simulation-state hash tree exists.** Replay verifies
-  per-step serialized `StepResult` equivalence, not a state digest. The
-  benchmark harness's FNV-1a step digest is an internal warm-up anchor, not a
-  canonical hash.
+- **Per-tick state hash.** `replay --verify` recomputes a SHA-256 digest of
+  the full simulation state at every tick — zone and resource positions,
+  occupancy, the per-tick choke capacities and derived edge load, scores,
+  claims, the episode seed and the tick — from a canonical, fixed-field-order,
+  invariant-culture serialization (`Trajectories/SimulationStateHash.cs`), and
+  compares it to the digest recorded on each step line. Positions are included
+  because they are state, not rendering: `Simulation.TransitTicks` reads
+  `Zone.Position` for a crossing's kinematic length, and the perception filter
+  reads both positions to build the observations a step line carries. Only the
+  demonstration-layer `Role` labels are excluded, since the step contract never
+  reads them. The digest does not cover the header's simulation config or
+  dynamic-rule set, so it attests to the state each tick produced rather than
+  to the whole episode configuration. The benchmark harness's FNV-1a step digest
+  remains an internal warm-up anchor, unrelated to this canonical hash.
 - **Stepping is not zero-allocation.** Managed step allocations range from
   roughly 3.2 KB to 7.1 KB per tick on the raw, facility, and dynamic
   workloads, and substantially more on the stress and MCTS workloads;
@@ -282,7 +300,8 @@ repository makes four distinct guarantees, documented in
 [`docs/SUPPORT_AND_REPRODUCIBILITY.md`](docs/SUPPORT_AND_REPRODUCIBILITY.md):
 engine transition determinism, per-step serialized `StepResult` replay
 equivalence, same-host normalized JSONL byte identity (narrow and explicit),
-and the explicit absence of a canonical state-hash tier. Raw file-byte
+and the per-tick canonical state digest — the last covering the state each tick
+produced, not a whole-episode hash tree. Raw file-byte
 identity across heterogeneous hosts is not asserted. The formal,
 implementation-agnostic transition and perception laws, plus falsifiable
 challenge questions, are in

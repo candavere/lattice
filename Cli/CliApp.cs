@@ -627,15 +627,20 @@ public static class CliApp
                 recording = TrajectoryReader.Read(reader);
             }
 
-            var problems = TrajectoryReplay.Verify(recording);
-            if (problems.Count > 0)
+            var report = TrajectoryReplay.VerifyDetailed(recording);
+            if (report.Problems.Count > 0)
             {
-                foreach (var problem in problems)
+                foreach (var problem in report.Problems)
                 {
                     stderr.WriteLine($"replay error: {problem}");
                 }
 
                 return Failure;
+            }
+
+            foreach (var notice in report.Notices)
+            {
+                stderr.WriteLine($"replay notice: {notice}");
             }
 
             if (!verify)
@@ -644,8 +649,12 @@ public static class CliApp
                 return Success;
             }
 
+            var hashed = recording.Steps.Count(step => step.StateHash is not null);
+            var stateCoverage = hashed == recording.Steps.Length && hashed > 0
+                ? $", {hashed} state hash(es) matched"
+                : string.Empty;
             stderr.WriteLine(
-                $"replay verified: {recording.Steps.Length} step(s) serialized-equivalent " +
+                $"replay verified: {recording.Steps.Length} step(s) serialized-equivalent{stateCoverage} " +
                 $"(seed {recording.Header.Seed}, schema v{recording.Header.SchemaVersion}).");
             return Success;
         }

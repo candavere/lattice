@@ -54,9 +54,14 @@ public static class TrajectoryWriter
             ValidateTurn(map, steps.Count + 1, turn);
 
             var outcome = Simulation.Step(state, turn, simulationConfig);
-            var step = new TrajectoryStep(outcome.Result.Info.StepNumber, turn, outcome.Result);
+            // The digest covers the POST-step state: it is the world the step's
+            // own Observation describes, so the last step's hash pins the final
+            // state the summary line aggregates come from, and hash[N] is the
+            // pre-state of step N+1 — one field chain-pins the whole episode.
+            var stateHash = SimulationStateHash.Compute(outcome.NextState, seed);
+            var step = new TrajectoryStep(outcome.Result.Info.StepNumber, turn, outcome.Result, stateHash);
             steps.Add(step);
-            sink.Write(Serialize(new StepLine("step", step.StepNumber, turn, outcome.Result)) + "\n");
+            sink.Write(Serialize(new StepLine("step", step.StepNumber, turn, outcome.Result, stateHash)) + "\n");
             state = outcome.NextState;
             lastInfo = outcome.Result.Info;
 
@@ -79,7 +84,13 @@ public static class TrajectoryWriter
     /// Writes an already-built <paramref name="recording"/> to
     /// <paramref name="sink"/> using the same line format as
     /// <see cref="Record"/>. Byte-identical to the original recording's own
-    /// output, which is how a read-back is verified.
+    /// output, which is how a read-back is verified. The header is stamped
+    /// with the recording's OWN <see cref="TrajectoryHeader.SchemaVersion"/>,
+    /// never <see cref="TrajectorySchema.CurrentVersion"/>: rewriting a
+    /// hash-less schema-2 recording must not silently relabel it as schema 3
+    /// with zero state hashes present. <see cref="Record"/> is the only place
+    /// that mints a new-schema recording, and it stamps
+    /// <see cref="TrajectorySchema.CurrentVersion"/> there.
     /// </summary>
     public static void Write(
         TrajectoryRecording recording,
@@ -93,13 +104,14 @@ public static class TrajectoryWriter
             recording.Header.Map,
             recording.Header.SimulationConfig,
             recording.Header.DynamicRules,
-            TrajectorySchema.CurrentVersion,
+            recording.Header.SchemaVersion,
             Scenario: scenario ?? recording.Header.Scenario,
             AgentRoles: agentRoles ?? recording.Header.AgentRoles)) + "\n");
 
         foreach (var step in recording.Steps)
         {
-            sink.Write(Serialize(new StepLine("step", step.StepNumber, step.Actions, step.Result)) + "\n");
+            sink.Write(Serialize(new StepLine(
+                "step", step.StepNumber, step.Actions, step.Result, step.StateHash)) + "\n");
         }
 
         sink.Write(Serialize(new FinalLine("final", recording.Final)) + "\n");
@@ -152,9 +164,14 @@ public static class TrajectoryWriter
         public TrajectoryHeader ToModel() => new(Seed, Map, SimulationConfig, DynamicRules, SchemaVersion, Scenario, AgentRoles);
     }
 
-    internal sealed record StepLine(string Kind, int StepNumber, AgentAction[] Actions, StepResult Result)
+    internal sealed record StepLine(
+        string Kind,
+        int StepNumber,
+        AgentAction[] Actions,
+        StepResult Result,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? StateHash = null)
     {
-        public TrajectoryStep ToModel() => new(StepNumber, Actions, Result);
+        public TrajectoryStep ToModel() => new(StepNumber, Actions, Result, StateHash);
     }
 
     internal sealed record FinalLine(string Kind, TrajectoryFinal Metrics);

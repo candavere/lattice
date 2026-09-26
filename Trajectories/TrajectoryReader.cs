@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Lattice.Environment;
 
 namespace Lattice.Trajectories;
 
@@ -71,6 +72,8 @@ public static class TrajectoryReader
                 "The header line's 'Map' is missing its 'Zones', 'Resources', or 'ChokePoints' topology.");
         }
 
+        ValidateMapElements(header.Map);
+
         if (header.SchemaVersion > TrajectorySchema.CurrentVersion)
         {
             throw new InvalidDataException(
@@ -123,6 +126,12 @@ public static class TrajectoryReader
                         throw new InvalidDataException($"Line {lineNumber} has no 'Result'.");
                     }
 
+                    if (step.StateHash is { } stateHash && !IsSha256Hex(stateHash))
+                    {
+                        throw new InvalidDataException(
+                            $"Line {lineNumber} has a 'StateHash' that is not 64 lowercase hex characters: '{stateHash}'.");
+                    }
+
                     if (step.StepNumber != stepCount + 1)
                     {
                         throw new InvalidDataException(
@@ -160,6 +169,78 @@ public static class TrajectoryReader
         }
 
         onFinal?.Invoke(final);
+    }
+
+    /// <summary>
+    /// Rejects a map whose array elements are null or whose zone/resource
+    /// positions are absent. The arrays themselves being present is not enough:
+    /// a hand-edited file can carry <c>"Zones":[null, ...]</c> or
+    /// <c>"Position":null</c>, and those reach far past this reader —
+    /// <c>Simulation.TransitTicks</c> reads <c>Zone.Position</c> for the
+    /// kinematic edge length and the perception filter reads both positions to
+    /// build observations, and the per-step state digest reads all of them. A
+    /// null position is not caught by the simulation itself, because
+    /// <see cref="SimulationConfig.InstantTransit"/> returns before any
+    /// distance is computed, so an episode that never leaves a zone can carry a
+    /// null position all the way to a fault inside verification. Rejecting it
+    /// here names the offending field instead.
+    /// </summary>
+    private static void ValidateMapElements(MapGraph map)
+    {
+        for (var i = 0; i < map.Zones.Length; i++)
+        {
+            var zone = map.Zones[i];
+            if (zone is null)
+            {
+                throw new InvalidDataException($"The header line's 'Map' has a null entry at 'Zones[{i}]'.");
+            }
+
+            if (zone.Position is null)
+            {
+                throw new InvalidDataException($"The header line's 'Map' zone {zone.Id} at 'Zones[{i}]' has no 'Position'.");
+            }
+        }
+
+        for (var i = 0; i < map.Resources.Length; i++)
+        {
+            var resource = map.Resources[i];
+            if (resource is null)
+            {
+                throw new InvalidDataException($"The header line's 'Map' has a null entry at 'Resources[{i}]'.");
+            }
+
+            if (resource.Position is null)
+            {
+                throw new InvalidDataException(
+                    $"The header line's 'Map' resource {resource.Id} at 'Resources[{i}]' has no 'Position'.");
+            }
+        }
+
+        for (var i = 0; i < map.ChokePoints.Length; i++)
+        {
+            if (map.ChokePoints[i] is null)
+            {
+                throw new InvalidDataException($"The header line's 'Map' has a null entry at 'ChokePoints[{i}]'.");
+            }
+        }
+    }
+
+    private static bool IsSha256Hex(string value)    {
+        if (value.Length != 64)
+        {
+            return false;
+        }
+
+        foreach (var c in value)
+        {
+            var isHex = c is >= '0' and <= '9' or >= 'a' and <= 'f';
+            if (!isHex)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static string ReadKind(string line, int lineNumber)

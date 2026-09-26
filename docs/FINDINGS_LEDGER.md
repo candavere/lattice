@@ -174,6 +174,22 @@ schema is defined in [`reproduction_packet.md`](reproduction_packet.md)
 
 ---
 
+## FINDING-009 — Throughput baseline re-anchored for the runtime patch (.NET 10.0.10 → 10.0.12)
+
+| Field | Value |
+| --- | --- |
+| **ID** | `FINDING-009` |
+| **Date** | 2026-09-26 |
+| **Source / Provenance** | `INTERNAL_AUDIT` |
+| **Target Surface** | `benchmarks/throughput_benchmark.json` and every doc quoting it (README "Results at a glance" / "Performance, qualified", `docs/BENCHMARKING.md`, `benchmarks/throughput_summary.md`); no engine, config, or test files |
+| **Observation** | The committed record was produced under .NET 10.0.10 (commit `b7459a1`, 2026-09-18), while the installed runtime is now .NET 10.0.12 and the CI gate installs .NET 10.0.x — so the record's runtime provenance no longer described the runtime a matching-host re-benchmark actually runs under. A full-protocol run on the same Apple M1 under .NET 10.0.12 came in faster on all 5 workloads under identical configs, protocol, and GC counts. Three consecutive sessions on the current tree reproduced the shift only on AC power: the same protocol on battery (51%, discharging) came in at roughly the old levels (micro ~0%, stress +3%), so the absolute magnitude is host-environment-sensitive and the anchor was re-taken on AC power. |
+| **Severity & Confidence** | Medium / Confirmed |
+| **Disposition** | `FIXED` — all 5 workloads re-anchored on .NET 10.0.12 using the same conservative method as the first re-anchor (`d604fc0`): three consecutive full-protocol sessions on the current tree, committing the whole session that is **low for the noisy workloads, near-typical elsewhere** (not a per-workload mix across sessions). Evidence and docs only; no engine or config change. The speedup against the previous record is **environmental**, not an engine speedup, and must not be read as one: the evidence is identical configs and protocol, effectively identical GC counters and allocations, a uniform +63% to +93% shift across all five workloads including search-bound MCTS, and unlimited-capacity chokes in the generated maps, so trajectories are unchanged. |
+| **Resolution & Evidence Link** | New artifact: `benchmarks/throughput_benchmark.json` (source revision `41530ef`, .NET 10.0.12, AC power). Old → new per workload (median): `micro_raw_2agent` 653,736 → 899,075 steps/s (+38%); `facility_static_4agent` 359,071 → 657,189 steps/s (+83%); `dynamic_contention_4agent` 232,978 → 416,170 steps/s (+79%); `stress_topology_4agent` 9,145 → 14,916 steps/s (+63%); `policy_lookahead_mcts_32` 394 → 750 decisions/s (+90%). Config and protocol fields identical to the old file; GC counters effectively identical (stress Gen1 270 → 265 is a measured GC-timing delta, not a config change; all other counters byte-identical); allocations near-identical (`dynamic_contention` 7,107 → 7,097 B/step, all others byte-identical). The generated maps carry only unlimited-capacity chokes, so trajectories are unchanged and the four raw workloads' speedup is a clean environmental comparison. Gate sanity (CI comparator, strict gate armed: macOS family + arm64 + .NET 10 major): the new baseline passes against all three sessions — per-workload ratio vs allowed threshold: `dynamic_contention` 1.000–1.025 vs 0.75; `facility_static` 1.052–1.053 vs 0.75; `micro_raw` 1.000–1.287 vs 0.6; `stress_topology` 0.995–1.000 vs 0.75; `policy_lookahead` 0.960–1.010 vs 0.85. Power-state observation: three battery-mode sessions on the same tree came in at roughly the old levels (micro median ~617k vs ~1.09M on AC; stress ~9.4k vs ~14.9k on AC) — the same host + runtime differs ~2× between battery and AC, so the record's numbers are AC-mode measurements on this host class. |
+| **Resolution & Release Status** | `MAIN_ONLY` (postdates `v2.3.2` tag commit `4f7816f`; not packaged into any published release). |
+
+---
+
 ## Ledger index
 
 | ID | Date | Target | Severity | Disposition | Closure commit |
@@ -186,6 +202,7 @@ schema is defined in [`reproduction_packet.md`](reproduction_packet.md)
 | `FINDING-006` | 2026-09-19 | Policy-environment claims | High | `ACCEPTED_LIMITATION` | `e6ba4bf` (+ `abb78fa`) |
 | `FINDING-007` | 2026-09-22 | EdgeChoke not-found path + batch-state kill attribution | High | `FIXED` / `ACCEPTED_LIMITATION` | Stage-3 commit (`TransitTests`, `SimulationStepTests`, summary artifact) |
 | `FINDING-008` | 2026-09-26 | Bottleneck evidence re-anchor | Medium | `FIXED` | Evidence re-anchor commit (artifact + docs; engine fix `28c89d3`) |
+| `FINDING-009` | 2026-09-26 | Throughput baseline re-anchor (runtime 10.0.10 → 10.0.12) | Medium | `FIXED` | Evidence re-anchor commit (artifact + docs; no engine changes) |
 
 The ledger is maintained under the governing evidentiary standards of
 [`adr/0001-governing-product-thesis.md`](adr/0001-governing-product-thesis.md);

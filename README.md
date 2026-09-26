@@ -96,7 +96,7 @@ full raw numbers are in [Part 2](#part-2-for-reviewers).
 | 32-rollout MCTS loses to the deterministic Scout heuristic on standard generated maps: mean paired delta -1.12, 95% CI [-1.37, -0.87] on the dev suite. This loss is the committed negative baseline. | [`benchmarks/mcts_evaluation_results.json`](benchmarks/mcts_evaluation_results.json) |
 | The same 32-rollout MCTS policy wins when both agents are funneled through capacity-1 chokepoints into one shared vault: +2.03, CI [+1.66, +2.41] on the dev suite. Topology changed the conclusion. | [`benchmarks/bottleneck_evaluation_results.json`](benchmarks/bottleneck_evaluation_results.json) |
 | 99.61% scoped mutation score on `Simulation.cs` + `PerceptionFilter.cs` only (252 killed / 1 timed out / 1 survived / 0 no-coverage). Not whole-repository coverage. | [`benchmarks/mutation_stryker_summary.json`](benchmarks/mutation_stryker_summary.json) |
-| Five-workload throughput record on one host: median 9,145 to 653,736 steps/s depending on workload (the MCTS case reports decisions/s). Speed is measured, not advertised. | [`benchmarks/throughput_benchmark.json`](benchmarks/throughput_benchmark.json), [`benchmarks/throughput_summary.md`](benchmarks/throughput_summary.md) |
+| Five-workload throughput record on one host: median 14,916 to 899,075 steps/s depending on workload (the MCTS case reports decisions/s). Speed is measured, not advertised. | [`benchmarks/throughput_benchmark.json`](benchmarks/throughput_benchmark.json), [`benchmarks/throughput_summary.md`](benchmarks/throughput_summary.md) |
 
 ---
 
@@ -153,9 +153,11 @@ Performance, qualified. The committed
 [`benchmarks/throughput_benchmark.json`](benchmarks/throughput_benchmark.json)
 records five workloads, raw stepping, mixed static facility, dynamic
 contention, stress topology, and MCTS decisions, on one host (Apple M1 / 8
-cores / 8 GiB RAM, macOS 27.0.0, .NET 10.0.10 Release, Workstation GC, tree
-`b7459a1`). Median throughput spans from 9,145 steps/s on the 30-zone stress
-case to 653,736 steps/s on the micro case; the MCTS case reports decisions/s.
+cores / 8 GiB RAM, macOS 27.0.0, .NET 10.0.12 Release, Workstation GC, tree
+`41530ef`, baseline re-anchored to a conservative full-protocol session on
+the current runtime). Median throughput spans from 14,916 steps/s on the
+30-zone stress case to 899,075 steps/s on the micro case; the MCTS case
+reports decisions/s.
 The per-workload latency and allocation breakdowns, the protocol, and the
 honest-reading notes are in
 [`benchmarks/throughput_summary.md`](benchmarks/throughput_summary.md) and

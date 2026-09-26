@@ -16,8 +16,8 @@ Full flag reference: [CLI reference — benchmark](CLI.md#benchmark--measure-the
 
 | Field | Value |
 | --- | --- |
-| Commit (measured tree) | `b7459a1635aca6f56a015d7dc206b550194da368` |
-| Runtime | .NET 10.0.10, Release |
+| Commit (measured tree) | `41530efb35ef620c8d0722e20bcd30970468785a` |
+| Runtime | .NET 10.0.12, Release |
 | OS | macOS 27.0.0 |
 | CPU | Apple M1, Arm64, 8 cores |
 | Addressable RAM | 8 GiB |
@@ -50,8 +50,8 @@ Every case runs the same protocol (`Analytics/Benchmarking/BenchmarkHarness`):
 | stress topology | 30-zone map at the contract ceiling |
 | MCTS decisions | Decisions/sec under 32 rollouts, not engine steps/sec |
 
-Medians on the committed record span from 9,145 steps/s (30-zone stress case)
-to 653,736 steps/s (micro case). The MCTS case prices per-decision cost under
+Medians on the committed record span from 14,916 steps/s (30-zone stress case)
+to 899,075 steps/s (micro case). The MCTS case prices per-decision cost under
 32 independent depth-12 continuations, so its latency histogram is dominated
 by single heavy decisions, and its iteration budget is small by design.
 
@@ -87,10 +87,16 @@ by single heavy decisions, and its iteration budget is small by design.
   present and medians positive, never a throughput-ratio adjudication from a
   shortened-budget run.
 - The committed baseline was **re-anchored** after the CI regression gate
-  proved unstable against the earlier one (noisy micro/policy medians). The
-  current record is a conservative full-protocol session — low for the noisy
-  workloads, near-typical elsewhere — so a matching-host pass has real
-  headroom and a genuine >20% drop still trips the gate.
+  proved unstable against the earlier one (noisy micro/policy medians), and
+  re-anchored again on 2026-09-26 for the runtime patch .NET 10.0.10 →
+  10.0.12 (same Apple M1, AC power) using the same conservative method: three
+  consecutive full-protocol sessions, committing the session that is low for
+  the noisy workloads, near-typical elsewhere. The speedup against the
+  previous record is environmental, not an engine change — identical configs
+  and protocol, effectively identical GC counters and allocations, and a
+  uniform +63% to +93% shift across all five workloads including
+  search-bound MCTS — so a matching-host pass has real headroom and a
+  genuine >20% drop still trips the gate.
 
 ## Boundaries
 

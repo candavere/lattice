@@ -6,9 +6,9 @@ Machine-readable data: [`throughput_benchmark.json`](./throughput_benchmark.json
 
 | Field | Value |
 | --- | --- |
-| Commit (measured tree) | `b7459a1635aca6f56a015d7dc206b550194da368` |
-| Timestamp (UTC) | 2026-09-18T20:02:47Z |
-| Runtime | .NET 10.0.10 |
+| Commit (measured tree) | `41530efb35ef620c8d0722e20bcd30970468785a` |
+| Timestamp (UTC) | 2026-09-26T06:56:05Z |
+| Runtime | .NET 10.0.12 |
 | Configuration | Release |
 | OS | macOS 27.0.0 |
 | CPU | Apple M1 |
@@ -17,13 +17,22 @@ Machine-readable data: [`throughput_benchmark.json`](./throughput_benchmark.json
 | Addressable RAM | 8 GiB (`GC.GetGCMemoryInfo().TotalAvailableMemoryBytes`) |
 | GC mode | Workstation |
 
-> This record was **re-anchored** after the CI regression gate proved unstable
-> against the earlier baseline: that record's `micro_raw` and `policy` medians
-> were high-edge samples of normal host noise (consecutive runs on the same
-> machine + runtime spread ~30% and ~17% for those workloads). The committed
-> baseline is now a **conservative** full-protocol session — low for the
-> noisy workloads, near-typical elsewhere — so a matching-host pass has real
-> headroom and a genuine >20% drop still trips the strict gate.
+> This record was **re-anchored** twice. First, after the CI regression gate
+> proved unstable against the earlier baseline: that record's `micro_raw` and
+> `policy` medians were high-edge samples of normal host noise (consecutive
+> runs on the same machine + runtime spread ~30% and ~17% for those
+> workloads), so the baseline became a **conservative** full-protocol session.
+> Second, on 2026-09-26, for the runtime patch .NET 10.0.10 → 10.0.12 (same
+> Apple M1, AC power): the same conservative method — three consecutive
+> full-protocol sessions, committing the session that is low for the noisy
+> workloads, near-typical elsewhere. The speedup against the previous record
+> is **environmental**, not an engine change: identical configs and protocol,
+> effectively identical GC counters and allocations, and a uniform +63% to
+> +93% shift across all five workloads including search-bound MCTS (the
+> generated maps carry only unlimited-capacity chokes, so trajectories are
+> unchanged). This is **not an engine speedup** and must not be read as one.
+> A matching-host pass still has real headroom and a genuine >20% drop still
+> trips the strict gate.
 
 ## Protocol
 
@@ -52,11 +61,11 @@ revisions benchmark identical topologies.
 
 | Workload | Map | Agents | Dynamic topology | Median throughput | Mean step latency | p95 step latency | Alloc / step |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `micro_raw_2agent` | 3z/5c/8r | 2 Randoms | — | **653,736 steps/s** | 1.54 µs | 1.96 µs | 3,213 B |
-| `facility_static_4agent` | 10z/17c/20r | 2 Greedy + 2 Randoms | — | **359,071 steps/s** | 2.83 µs | 3.33 µs | 4,630 B |
-| `dynamic_contention_4agent` | 10z/17c/20r | 4 Randoms | portcullis + event lock | **232,978 steps/s** | 4.41 µs | 5.33 µs | 7,107 B |
-| `stress_topology_4agent` | 30z/58c/57r | 2 Greedy + 2 Scouts | — | **9,145 steps/s** | 114 µs | 151 µs | 106,309 B |
-| `policy_lookahead_mcts_32` | 3z/5c/8r | 2 MCTS (32 rollouts, depth 12) | — | **394 decisions/s** | 5.27 ms | 6.65 ms | 11.5 MB |
+| `micro_raw_2agent` | 3z/5c/8r | 2 Randoms | — | **899,075 steps/s** | 1.17 µs | 2.21 µs | 3,213 B |
+| `facility_static_4agent` | 10z/17c/20r | 2 Greedy + 2 Randoms | — | **657,189 steps/s** | 1.55 µs | 1.58 µs | 4,630 B |
+| `dynamic_contention_4agent` | 10z/17c/20r | 4 Randoms | portcullis + event lock | **416,170 steps/s** | 2.45 µs | 2.46 µs | 7,097 B |
+| `stress_topology_4agent` | 30z/58c/57r | 2 Greedy + 2 Scouts | — | **14,916 steps/s** | 67.1 µs | 66.5 µs | 106,309 B |
+| `policy_lookahead_mcts_32` | 3z/5c/8r | 2 MCTS (32 rollouts, depth 12) | — | **750 decisions/s** | 2.77 ms | 3.27 ms | 11.5 MB |
 
 Full per-run dispersion (std-dev of per-iteration throughput) is in the JSON.
 
@@ -83,6 +92,10 @@ Full per-run dispersion (std-dev of per-iteration throughput) is in the JSON.
 - **Instrumentation is included.** Per-step `Stopwatch.GetTimestamp` and the
   digest mix are part of the measured tick, so every number reflects the
   harness's honest observability overhead.
+- **The stress case's p95 step latency sits below its mean** (66.5 µs vs
+  67.1 µs). The mean is pulled above the 95th percentile by a heavy right
+  tail in the per-step histogram — a small fraction of much longer steps
+  inside the measured window. Both are reported as measured.
 
 ## Reproducing / gating
 

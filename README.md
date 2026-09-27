@@ -432,6 +432,11 @@ Only claims the repository can back up are listed here.
 
 ## Known limitations
 
+- At a 390px viewport the replay viewer's room titles render at roughly 6.5px.
+  The infiltration map is three columns of rooms, and a phone canvas is about
+  318px wide, so the cards are scaled to fit rather than overlapped: every
+  title and agent name is complete, inside its room, and legible, but small.
+  Wider viewports render the same map at the full 11px.
 - A seed with one completed match and one void refuses the study: there is no
   drop-and-count yet. `Agents/PairedEvaluation.cs:100-105` throws when a seed is
   missing one side of the mirrored pair, and a void run produces no match row

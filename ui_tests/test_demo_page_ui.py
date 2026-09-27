@@ -202,8 +202,67 @@ def stale_moments(recording, agent_ids):
 # cores land on the exact colour while only the antialiased edges blend.
 ROOM_TEXT_RGB = (0xC0, 0xCA, 0xF5)  # COLORS.roomText
 FOG_TEXT_RGB = (0x5B, 0x6A, 0x8A)  # COLORS.fogText
-LABEL_CORE_PIXELS = 20  # glyph cores seen for every label in the sweep
 COLOUR_TOLERANCE = 6
+
+# How many pixels of the *painted* title colour a room label must contribute
+# before the census above believes it. A flat constant cannot serve every size,
+# because what the census counts is fully-covered pixels, and a stroke only
+# paints one once it is at least a pixel wide. The design face is 11px, where a
+# monospace stem is ~1.1px and the measured census is 20; at the 390px viewport
+# the layout fits a 3-column map into a 318px canvas and the same title renders
+# at 8.3px, where that stem is 0.83px. Measured on this one 14-glyph title at
+# those two sizes: 149/148/150 cores at 11px (1024/1280/1440) and 68 at 8.3px
+# (390) on the reference rasteriser, against 16 on the Windows one.
+#
+# The rule below has two terms and neither is fitted to a platform:
+#
+#   * a per-glyph floor. A glyph that is visible at all has painted at least one
+#     pixel of the colour it was drawn in, so an n-glyph title can never
+#     legitimately census fewer than n, and a title painted in the wrong colour
+#     — or not painted — censuses zero. The Windows run above lands at 1.1 cores
+#     per glyph, which is this bound very nearly exactly.
+#   * a size term anchored so the rule reproduces the incumbent constant at the
+#     design face: CORE_DENSITY * 11**2 == LABEL_CORE_PIXELS. Above the design
+#     size it scales with the square of the font, the area of the painted
+#     material; below it the rule interpolates down to the per-glyph floor.
+#
+# So the effective minimum is exactly the old constant at 11px and above, and
+# falls only where the raster is demonstrably less reliable.
+LABEL_CORE_PIXELS = 20  # glyph cores at the 11px design face (the incumbent)
+CORE_DENSITY = float(LABEL_CORE_PIXELS) / (11.0 ** 2)
+MONO_ADVANCE = 0.6  # a monospace glyph's advance width, in em
+
+
+def min_title_cores(box, label):
+    """Cores the title `label`, painted in a box `box` wide, must census.
+
+    The box width the probe reports is the label's measured advance width, so
+    the font size it was actually painted at follows from the glyph count:
+    advance == MONO_ADVANCE * font_px * glyphs. Reading the size off the box
+    rather than off a constant keeps the threshold tracking the real face at
+    every viewport.
+    """
+    glyphs = max(1, len(label or ""))
+    font_px = box["w"] / (MONO_ADVANCE * glyphs)
+    return max(glyphs, int(round(CORE_DENSITY * font_px * font_px)))
+
+
+def title_painted(px, own_rgb, other_rgb):
+    """Is this room title painted in `own_rgb` and not at all in `other_rgb`?
+
+    The two halves are deliberately separate claims: enough pixels of the
+    colour it should be, judged against the font it was painted at, and not one
+    pixel of the colour it should not be, which is absolute. Returns
+    (held, detail) so a failure says which half and by how much.
+    """
+    if px["box"] is None:
+        return False, "the room title was not painted on this view"
+    minimum = min_title_cores(px["box"], px["label"])
+    own = count_near(px["counts"], own_rgb)
+    other = count_near(px["counts"], other_rgb)
+    held = own >= minimum and other == 0
+    return held, "%d of %s, %d of %s, needs %d of %s and none of %s" % (
+        own, own_rgb, other, other_rgb, minimum, own_rgb, other_rgb)
 
 ROOM_LABEL_PIXELS = """(zoneId) => {
   const g = window.__latticeGeo;
@@ -220,12 +279,43 @@ ROOM_LABEL_PIXELS = """(zoneId) => {
     const key = img[i] + ',' + img[i + 1] + ',' + img[i + 2];
     counts[key] = (counts[key] || 0) + 1;
   }
-  return { zoneId: zoneId, box: box, counts: counts };
+  const room = g.rooms[zoneId] || {};
+  return { zoneId: zoneId, box: box, label: room.label || '', counts: counts };
 }"""
 
 
+# Negative control for the core census: damage the painted title band in place,
+# so the check can be asked whether it would still notice. `wrong-colour` lays
+# the *lit* title colour (COLORS.roomText) over the whole band, leaving no fog
+# cores and a full band of lit ones; `erase` clears it to the page behind the
+# canvas, leaving neither. Both are drawn after the frame the page painted, and
+# nothing repaints it until the next interaction, so the census reads exactly
+# what this left there.
+MISPAINT_TITLE = """(job) => {
+  const g = window.__latticeGeo;
+  const box = g.labels[job.zoneId];
+  if (!box) return null;
+  const canvas = document.querySelector('#viewer-canvas');
+  const dpr = canvas.width / canvas.getBoundingClientRect().width;
+  const ctx = canvas.getContext('2d');
+  const x = Math.round(box.x * dpr), y = Math.round(box.y * dpr);
+  const w = Math.max(1, Math.round(box.w * dpr)), h = Math.max(1, Math.round(box.h * dpr));
+  ctx.fillStyle = 'rgb(%d, %d, %d)';
+  if (job.mode === 'erase') {
+    ctx.clearRect(x, y, w, h);
+  } else if (job.mode === 'lit-edge') {
+    // One device pixel of lit colour along the top of the box. The box carries
+    // slack above the glyphs, so this adds lit cores without touching a single
+    // fog core: only the "none of the other colour" half can catch it.
+    ctx.fillRect(x, y, w, 1);
+  } else {
+    ctx.fillRect(x, y, w, h);
+  }
+  return { x: x, y: y, w: w, h: h };
+}""" % ROOM_TEXT_RGB
+
+
 def count_near(counts, rgb):
-    """Pixels in the census within COLOUR_TOLERANCE of `rgb` on every channel."""
     total = 0
     for key, count in counts.items():
         pixel = tuple(int(channel) for channel in key.split(","))
@@ -413,19 +503,17 @@ async def run_viewport(browser, base, label, viewport, reduced):
             await page.locator('#perspective-chips .chip[data-id="ground"]').click()
             await page.wait_for_function(wait_frame(tick, "ground"))
             ground_px = await page.evaluate(ROOM_LABEL_PIXELS, room)
-            agent_dim = count_near(agent_px["counts"], FOG_TEXT_RGB)
-            agent_bright = count_near(agent_px["counts"], ROOM_TEXT_RGB)
-            ground_dim = count_near(ground_px["counts"], FOG_TEXT_RGB)
-            ground_bright = count_near(ground_px["counts"], ROOM_TEXT_RGB)
-            ok_paint = (agent_px["box"] is not None and ground_px["box"] is not None
-                        and agent_dim >= LABEL_CORE_PIXELS and agent_bright == 0
-                        and ground_bright >= LABEL_CORE_PIXELS and ground_dim == 0)
+            # The paint, judged by the shared predicate the negative control
+            # also drives: a stale room shows the fog colour and none of the lit
+            # one here, and the reverse on ground truth.
+            agent_held, agent_detail = title_painted(agent_px, FOG_TEXT_RGB, ROOM_TEXT_RGB)
+            ground_held, ground_detail = title_painted(ground_px, ROOM_TEXT_RGB, FOG_TEXT_RGB)
+            ok_paint = agent_held and ground_held
             results.append((
                 f"[{label}] stale room painted dim on view {view} and lit on ground "
                 f"truth at frame {tick}",
                 ok_paint,
-                f"view {view}: dim {agent_dim} bright {agent_bright} | "
-                f"ground: dim {ground_dim} bright {ground_bright}"))
+                f"view {view}: {agent_detail} | ground: {ground_detail}"))
 
         # -- no horizontal overflow ------------------------------------------
         ov = await page.evaluate(
@@ -576,6 +664,120 @@ class TestDemoPageUI(unittest.TestCase):
 
     def test_mobile_390x844_reduced_motion(self):
         self._check({"width": 390, "height": 844}, reduced=True)
+
+    def test_glyph_census_rejects_a_mispainted_title(self):
+        """The font-scaled core minimum must not make the census lenient.
+
+        The stale-room check trusts a room title to be painted fog-dim on the
+        agent's view and lit on ground truth by counting pixels of each colour in
+        the title's box. Its minimum is font-scaled, so this pins the other half
+        of that bargain: at a viewport where the scaled minimum is smallest, a
+        title painted in the *wrong* colour, and a title painted in nothing at
+        all, must both still be rejected — the first by the exact "none of the
+        other colour" half, the second by the scaled minimum itself. Without
+        this, dropping the minimum to reach a small face would also drop the
+        check's ability to see a mis-render.
+        """
+        httpd, port = start_server()
+        base = f"http://127.0.0.1:{port}/"
+
+        async def run():
+            async with async_playwright() as p:
+                browser = await p.chromium.launch()
+                try:
+                    context = await browser.new_context(
+                        viewport={"width": 390, "height": 844})
+                    page = await context.new_page()
+                    await page.goto(base + MEASURE_PARAMS, wait_until="networkidle")
+                    await page.wait_for_function(
+                        "window.__latticeGeo && window.__latticeGeo.frame")
+                    recording = fetch_recording(base)
+                    agents = list(range(recording[0]["SimulationConfig"]["AgentCount"]))
+                    zone = vault_zone(recording)
+                    self.assertIsNotNone(zone, "no zone carries the TreasureVault role")
+                    moments = stale_moments(recording, agents)
+                    self.assertTrue(moments, "the recording has no 'last known' moment")
+                    view, tick = moments[0]
+                    room = str(zone)
+
+                    async def census():
+                        px = await page.evaluate(ROOM_LABEL_PIXELS, room)
+                        return px
+
+                    async def judged():
+                        """The live verdict, from the predicate the sweep uses."""
+                        px = await census()
+                        held, detail = title_painted(px, FOG_TEXT_RGB, ROOM_TEXT_RGB)
+                        return held, detail, px
+
+                    async def repaint():
+                        # Each mis-paint is destructive, so every case starts
+                        # from a frame the page has drawn itself. Stepping off
+                        # the tick and back forces that repaint: a draw already
+                        # sitting on this tick may be a no-op.
+                        await page.evaluate(SLIDE, 0)
+                        await page.wait_for_function(wait_frame(0, str(view)))
+                        await page.evaluate(SLIDE, tick)
+                        await page.wait_for_function(wait_frame(tick, str(view)))
+
+                    # A correctly painted stale title is held, and the reason
+                    # has to be the cores: the fog cores clear the minimum and
+                    # there is not one lit core.
+                    await page.locator(f'#perspective-chips .chip[data-id="{view}"]').click()
+                    await page.evaluate(SLIDE, tick)
+                    await page.wait_for_function(wait_frame(tick, str(view)))
+                    held, detail, px = await judged()
+                    minimum = min_title_cores(px["box"], px["label"])
+                    self.assertTrue(held, f"control: a correct paint must be held: {detail}")
+                    self.assertGreaterEqual(count_near(px["counts"], FOG_TEXT_RGB), minimum)
+                    self.assertEqual(count_near(px["counts"], ROOM_TEXT_RGB), 0)
+
+                    # The same title repainted in the lit colour. Rejected, and
+                    # for the right reason: the band is solid lit, so the
+                    # "none of the other colour" half is what rejects it.
+                    await repaint()
+                    await page.evaluate(MISPAINT_TITLE, {"zoneId": room, "mode": "wrong-colour"})
+                    held, detail, px = await judged()
+                    self.assertGreater(
+                        count_near(px["counts"], ROOM_TEXT_RGB), 0,
+                        "a title repainted lit must census lit cores")
+                    self.assertFalse(held, f"a title repainted lit must be rejected: {detail}")
+
+                    # A band that keeps every fog core it had and gains a single
+                    # row of lit ones. The scaled minimum is satisfied, so the
+                    # "none of the other colour" half is the only thing that can
+                    # reject it — which is what keeps that half load-bearing
+                    # rather than redundant.
+                    await repaint()
+                    await page.evaluate(MISPAINT_TITLE, {"zoneId": room, "mode": "lit-edge"})
+                    held, detail, px = await judged()
+                    self.assertGreaterEqual(
+                        count_near(px["counts"], FOG_TEXT_RGB), minimum,
+                        f"the lit edge must not disturb the fog cores: {detail}")
+                    self.assertGreater(
+                        count_near(px["counts"], ROOM_TEXT_RGB), 0,
+                        "the lit edge must census lit cores")
+                    self.assertFalse(
+                        held, f"one lit row must be rejected: {detail}")
+
+                    # And a title painted in nothing at all: there is no other
+                    # colour to catch it, so the scaled minimum is the only
+                    # thing between a blank band and a pass.
+                    await repaint()
+                    await page.evaluate(MISPAINT_TITLE, {"zoneId": room, "mode": "erase"})
+                    held, detail, px = await judged()
+                    self.assertEqual(
+                        (count_near(px["counts"], FOG_TEXT_RGB),
+                         count_near(px["counts"], ROOM_TEXT_RGB)), (0, 0),
+                        f"erased band: {detail}")
+                    self.assertFalse(
+                        held,
+                        f"an unpainted title must be rejected: {detail}")
+                    await context.close()
+                finally:
+                    await browser.close()
+
+        asyncio.run(run())
 
 
 if __name__ == "__main__":

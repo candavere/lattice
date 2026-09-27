@@ -107,6 +107,86 @@ public class PythonExampleAgentTests
     }
 
     /// <summary>
+    /// The example must emit bare LF whatever the host's text-mode newline
+    /// default happens to be.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The study test above only proves this on a host whose default translates to
+    /// <c>CRLF</c>, which is Windows alone. On Linux and macOS the same defect is
+    /// invisible, so a change that reintroduced it would pass every green run
+    /// everywhere except the one platform that notices — which is exactly how the
+    /// Windows CI failure got there.
+    /// </para>
+    /// <para>
+    /// So this test manufactures the condition instead of waiting for it. A
+    /// generated wrapper sets the host default to <c>CRLF</c> — exactly what
+    /// Windows does — and then runs the shipped script unmodified. On any host,
+    /// an agent that pins its own newline overrides the wrapper and plays cleanly;
+    /// an agent that inherits the default writes <c>CRLF</c> and every match fails
+    /// as <c>malformed_json</c>, which is the failure this test exists to catch.
+    /// The wrapper is generated rather than committed so the assertion is always
+    /// about the shipped script, never about a fixture that can drift from it.
+    /// </para>
+    /// </remarks>
+    [Fact(Timeout = TestTimeoutMs)]
+    public async Task The_Example_Emits_Bare_LF_Even_When_The_Host_Defaults_To_Crlf()
+    {
+        var python = ResolvePython();
+        if (python is null)
+        {
+            _output.WriteLine(
+                "SKIPPED: no Python interpreter on PATH on this machine, so the newline contract cannot be " +
+                "exercised here. The example agent's own reconfigure is what this test is about.");
+            return;
+        }
+
+        var script = ExampleScript();
+        var wrapper = Path.Combine(
+            Path.GetTempPath(), $"lattice-crlf-wrapper-{Guid.NewGuid():N}.py");
+        var path = Path.Combine(Path.GetTempPath(), $"lattice-crlf-{Guid.NewGuid():N}.json");
+
+        // The Windows default, stated explicitly so the test means the same thing
+        // on every host. newline=None would translate to os.linesep, which is "\n"
+        // here and "\r\n" there, so it cannot express the condition portably.
+        File.WriteAllText(
+            wrapper,
+            "import runpy, sys\n"
+            + "sys.stdout.reconfigure(encoding='utf-8', newline='\\r\\n')\n"
+            + "sys.stdin.reconfigure(encoding='utf-8', newline=None)\n"
+            + "sys.argv = [sys.argv[1]]\n"
+            + "runpy.run_path(sys.argv[0], run_name='__main__')\n");
+
+        try
+        {
+            var (exit, stdout, stderr) = await Task.Run(() => Run(
+                "evaluate",
+                "--scenario", "standard",
+                "--seed-set", "dev",
+                "--seeds", "1",
+                "--agent-step-timeout-ms", "5000",
+                "--agent-cmd", $"\"{python}\" \"{wrapper}\" \"{script}\"",
+                "--out", path));
+
+            Assert.Equal(0, exit);
+            Assert.Equal(string.Empty, stdout);
+
+            // The whole point: a CR anywhere in a line is malformed_json (spec
+            // section 1), so inheriting the host's CRLF default fails every match
+            // before the first observation is ever answered.
+            Assert.Contains("agent_failures=none", stderr, StringComparison.Ordinal);
+
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            Assert.Empty(document.RootElement.GetProperty("AgentFailures").EnumerateObject());
+        }
+        finally
+        {
+            File.Delete(path);
+            File.Delete(wrapper);
+        }
+    }
+
+    /// <summary>
     /// The example script, resolved from the test assembly's output directory up
     /// to the repository root. Not from the current directory: the child process
     /// inherits whatever directory the test host happens to be in, and the test

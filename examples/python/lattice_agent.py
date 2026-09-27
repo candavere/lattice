@@ -106,8 +106,19 @@ def decide(observation):
 
 def main():
     # The wire is UTF-8 whatever the caller's locale happens to be (spec section 1).
+    #
+    # newline="\n" is load-bearing on Windows, not decoration. A text stream left
+    # at the default newline=None translates every "\n" written to it into
+    # os.linesep, which is "\r\n" on Windows. Lattice reads one LF-terminated line
+    # per message and rejects a CR anywhere in a line as malformed_json
+    # (spec section 1), so on Windows that translation fails the very first
+    # hello_ack and every match ends as a wire failure. Naming the newline pins
+    # the terminator to LF on every host.
+    #
+    # stdin keeps the default: Lattice writes bare LF, and universal newlines
+    # turns a CRLF into a single LF, so there is nothing to strip here.
     sys.stdin.reconfigure(encoding="utf-8")
-    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stdout.reconfigure(encoding="utf-8", newline="\n")
 
     while True:
         # readline rather than iteration: one line in, one line out, with nothing

@@ -62,28 +62,40 @@ public class AgentProgramResolverTests
     [Fact]
     public void A_Bare_Name_Is_Searched_On_Path_In_Order()
     {
+        // Two host-dependent details have to be spelled the host's way, and both
+        // come from the same place: the resolver splits PATH on
+        // Path.PathSeparator (';' on Windows) and joins each entry to the program
+        // with Path.Combine ('\' on Windows). Hard-coding ':' would make the whole
+        // string one directory entry on Windows; hard-coding '/' in the expected
+        // candidates would compare a combined path against an uncombined one.
+        // The rule under test is the search *order*, which is neither.
         var asked = new List<string>();
+        var first = Path.Combine("/usr/bin", "python3");
+        var second = Path.Combine("/usr/local/bin", "python3");
         var resolved = Resolve(
             "python3",
-            exists: candidate => candidate == "/usr/local/bin/python3",
+            exists: candidate => candidate == second,
             asked,
-            path: "/usr/bin:/usr/local/bin:/bin");
+            path: string.Join(Path.PathSeparator, ["/usr/bin", "/usr/local/bin", "/bin"]));
 
-        Assert.Equal("/usr/local/bin/python3", resolved);
+        Assert.Equal(second, resolved);
 
         // First match wins, and the search really walked the entries in order.
-        Assert.Equal(["/usr/bin/python3", "/usr/local/bin/python3"], asked);
+        Assert.Equal([first, second], asked);
     }
 
     [Fact]
     public void The_First_Path_Entry_Wins_When_Two_Entries_Have_The_Program()
     {
+        var first = Path.Combine("/first", "agent");
+        var second = Path.Combine("/second", "agent");
+
         var resolved = Resolve(
             "agent",
-            exists: candidate => candidate is "/first/agent" or "/second/agent",
-            path: "/first:/second");
+            exists: candidate => candidate == first || candidate == second,
+            path: string.Join(Path.PathSeparator, ["/first", "/second"]));
 
-        Assert.Equal("/first/agent", resolved);
+        Assert.Equal(first, resolved);
     }
 
     [Fact]

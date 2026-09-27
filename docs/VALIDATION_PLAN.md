@@ -91,6 +91,8 @@ when the source-pinned path is used. It is explicitly **not** canonical
 simulation-state hash-tree equivalence: no canonical state digest exists, and
 the experiment never uses one to summarize an episode.
 
+Lattice 3.0.0 does add per-tick state authentication (`Trajectories/SimulationStateHash.cs:83`, mandatory from schema 3 per `Trajectories/TrajectoryModel.cs:30`, compared at `Trajectories/TrajectoryReplay.cs:176-183`), which this v2.3.2-scoped experiment does not exercise.
+
 Source-pinned path:
 
 ```sh

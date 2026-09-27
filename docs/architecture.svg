@@ -1,89 +1,234 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="860" height="640" viewBox="0 0 860 640" font-family="Helvetica, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 830" width="1080" height="830"
+     font-family="Helvetica, Arial, 'Liberation Sans', sans-serif" role="img"
+     aria-labelledby="archTitle archDesc">
+  <title id="archTitle">Lattice: recording, verification, and measurement</title>
+  <desc id="archDesc">A seeded lattice simulate run writes a schema 3 JSONL recording. Four readers
+  consume that recording: lattice replay --verify, lattice render, lattice analyze, and the site
+  replay viewer. Independently, lattice benchmark writes a host-scoped throughput JSON and lattice
+  evaluate writes an evaluation JSON. Seated instead of the in-process MCTS candidate,
+  lattice evaluate --agent-cmd runs an external agent process of any language that speaks protocol 1
+  over stdin and stdout, and produces the same evaluation artifact. The test suite and the
+  three-operating-system CI gates block a merge on the recording.</desc>
+
   <defs>
-    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0,0 L10,5 L0,10 z" fill="#3b82f6"/>
+    <marker id="arrowhead" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path class="head" d="M0,0 L10,5 L0,10 z"/>
     </marker>
-    <style>
-      .box { fill:#f8fafc; stroke:#334155; stroke-width:1.5; rx:8; }
-      .boxblue { fill:#eff6ff; stroke:#3b82f6; stroke-width:1.5; rx:8; }
-      .title { font-size:15; font-weight:bold; fill:#0f172a; }
-      .sub { font-size:12; fill:#475569; }
-      .small { font-size:10.5; fill:#64748b; }
-      .edge { stroke:#3b82f6; stroke-width:1.6; fill:none; }
-    </style>
+    <marker id="arrowhead-gate" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path class="head-gate" d="M0,0 L10,5 L0,10 z"/>
+    </marker>
+    <style><![CDATA[
+      /* Every colour lives here so one prefers-color-scheme block swaps the
+         whole drawing to the dark palette. The explicit light card below
+         already makes the file readable on a dark page without it.
+         Each family's ink is >= 4.5:1 against that family's own fill in BOTH
+         palettes, so no text is ever near-invisible. */
+      :root {
+        --page:      #ffffff;
+        --frame:     #d0d7de;
+        --ink:       #0f172a;
+        --muted:     #475569;
+        --legend:    #334155;
+        --edge:      #334155;
+        --edge-gate: #b45309;
+        --cmd-bg:    #eff6ff;  --cmd-line:  #1d4ed8;  --cmd-ink:  #1e3a8a;
+        --art-bg:    #f8fafc;  --art-line:  #475569;  --art-ink:  #0f172a;
+        --gate-bg:   #fefce8;  --gate-line: #b45309;  --gate-ink: #78350f;
+        --ext-bg:    #f5f3ff;  --ext-line:  #6d28d9;  --ext-ink:  #4c1d95;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --page:      #0d1117;
+          --frame:     #30363d;
+          --ink:       #e6edf3;
+          --muted:     #b9c2cc;
+          --legend:    #e6edf3;
+          --edge:      #8b949e;
+          --edge-gate: #fbbf24;
+          --cmd-bg:    #0b1a33;  --cmd-line:  #60a5fa;  --cmd-ink:  #bfdbfe;
+          --art-bg:    #161b22;  --art-line:  #8b949e;  --art-ink:  #e6edf3;
+          --gate-bg:   #241a05;  --gate-line: #fbbf24;  --gate-ink: #fcd34d;
+          --ext-bg:    #1a1233;  --ext-line:  #a78bfa;  --ext-ink:  #ddd6fe;
+        }
+      }
+      .page  { fill: var(--page); }
+      .frame { fill: none; stroke: var(--frame); stroke-width: 1.5; }
+      .h1    { font-size: 20px; font-weight: 700; fill: var(--ink); }
+      .sub   { font-size: 13px; fill: var(--muted); }
+      .name  { font-size: 15px; font-weight: 700; fill: var(--ink); }
+      .body  { font-size: 13px; fill: var(--ink); }
+      .key   { font-size: 12.5px; fill: var(--legend); }
+      .wire      { fill: none; stroke: var(--edge);      stroke-width: 1.8; }
+      .edge      { fill: none; stroke: var(--edge);      stroke-width: 1.8; marker-end: url(#arrowhead); }
+      .edge-gate { fill: none; stroke: var(--edge-gate); stroke-width: 1.8; stroke-dasharray: 5 4;
+                   marker-end: url(#arrowhead-gate); }
+      .head      { fill: var(--edge); }
+      .head-gate { fill: var(--edge-gate); }
+      .cmd  rect { fill: var(--cmd-bg);   stroke: var(--cmd-line);  }
+      .cmd  text { fill: var(--cmd-ink);  }
+      .art  rect { fill: var(--art-bg);   stroke: var(--art-line);  }
+      .art  text { fill: var(--art-ink);  }
+      .gate rect { fill: var(--gate-bg);  stroke: var(--gate-line); }
+      .gate text { fill: var(--gate-ink); }
+      .ext  rect { fill: var(--ext-bg);   stroke: var(--ext-line);  }
+      .ext  text { fill: var(--ext-ink);  }
+      .box  rect { stroke-width: 1.6; rx: 9; }
+      .swatch    { stroke-width: 1.6; rx: 4; }
+    ]]></style>
   </defs>
 
-  <text x="12" y="26" class="title">Lattice data flow</text>
-  <text x="12" y="42" class="small">What the committed tools and workflows actually do (Cli/CliApp.cs, Trajectories/, site/app.js, .github/workflows).</text>
+  <!-- explicit background card: readable on any page background, in either theme -->
+  <rect class="page"  x="0.75" y="0.75" width="1078.5" height="828.5" rx="12"/>
+  <rect class="frame" x="0.75" y="0.75" width="1078.5" height="828.5" rx="12"/>
 
-  <!-- simulate -->
-  <rect x="60" y="80" width="220" height="58" class="boxblue"/>
-  <text x="75" y="104" class="title">lattice simulate</text>
-  <text x="75" y="121" class="sub">seeded run: header + per-tick</text>
-  <text x="75" y="134" class="sub">actions and StepResult</text>
+  <text class="h1"  x="30" y="42">Lattice: recording, verification, and measurement</text>
+  <text class="sub" x="30" y="66">Every command and artifact below exists at this commit. The file:line citations live in the caption under the diagram,</text>
+  <text class="sub" x="30" y="84">not inside the boxes, so nothing here has to be shrunk to make room for them.</text>
 
-  <!-- recording -->
-  <line x1="280" y1="109" x2="356" y2="109" class="edge" marker-end="url(#arrow)"/>
-  <rect x="360" y="80" width="230" height="58" class="box"/>
-  <text x="375" y="100" class="title">recording (.jsonl)</text>
-  <text x="375" y="116" class="sub">header, one line per tick, final</text>
-  <text x="375" y="130" class="small">schema v2 (Trajectories/TrajectoryWriter.cs)</text>
+  <!-- ── column 1: the recording spine, and the gates that block a merge ──── -->
 
-  <!-- benchmark / evaluate (independent of recordings) -->
-  <rect x="640" y="80" width="200" height="58" class="boxblue"/>
-  <text x="655" y="100" class="title">lattice benchmark</text>
-  <text x="655" y="116" class="sub">five-workload matrix, fresh sims</text>
-  <text x="655" y="130" class="small">.github/workflows/benchmarks.yml gate</text>
+  <g class="box cmd">
+    <rect x="30" y="110" width="290" height="84"/>
+    <text class="name" x="46" y="138">lattice simulate</text>
+    <text class="body" x="46" y="160">seeded episode: greedy vs random,</text>
+    <text class="body" x="46" y="178">or a fixed infiltration roster</text>
+  </g>
 
-  <!-- evaluate -->
-  <rect x="640" y="170" width="200" height="58" class="boxblue"/>
-  <text x="655" y="190" class="title">lattice evaluate</text>
-  <text x="655" y="206" class="sub">mirror-seated paired study</text>
-  <text x="655" y="220" class="small">Agents/PairedEvaluation.cs:144-145 verdict</text>
+  <g class="box art">
+    <rect x="30" y="230" width="290" height="84"/>
+    <text class="name" x="46" y="258">recording .jsonl</text>
+    <text class="body" x="46" y="280">schema 3 header, one line per</text>
+    <text class="body" x="46" y="298">tick, then a final line</text>
+  </g>
 
-  <!-- consumers of the recording -->
-  <line x1="475" y1="138" x2="475" y2="176" class="edge" marker-end="url(#arrow)"/>
+  <g class="box art">
+    <rect x="30" y="350" width="290" height="84"/>
+    <text class="name" x="46" y="378">tests + fixtures</text>
+    <text class="body" x="46" y="400">the suite pins replay equivalence</text>
+    <text class="body" x="46" y="418">tick by tick</text>
+  </g>
 
-  <rect x="360" y="180" width="230" height="58" class="box"/>
-  <text x="375" y="200" class="title">lattice replay --verify</text>
-  <text x="375" y="216" class="sub">rebuild from header, compare every</text>
-  <text x="375" y="230" class="sub">re-serialized StepResult (TrajectoryReplay.cs:169-170)</text>
-  <text x="375" y="244" class="small">CI gate ci.yml:31-32 on golden_trajectory.jsonl</text>
+  <g class="box gate">
+    <rect x="30" y="470" width="290" height="84"/>
+    <text class="name" x="46" y="498">CI on 3 operating systems</text>
+    <text class="body" x="46" y="520">build, test, replay and site</text>
+    <text class="body" x="46" y="538">drift gates</text>
+  </g>
 
-  <line x1="230" y1="138" x2="230" y2="300" class="edge" marker-end="url(#arrow)"/>
+  <line class="edge"      x1="175" y1="194" x2="175" y2="230"/>
+  <line class="edge-gate" x1="175" y1="314" x2="175" y2="350"/>
+  <line class="edge-gate" x1="175" y1="434" x2="175" y2="470"/>
 
-  <rect x="60" y="304" width="230" height="58" class="box"/>
-  <text x="75" y="324" class="title">lattice render</text>
-  <text x="75" y="340" class="sub">recording to animated SVG or ASCII</text>
-  <text x="75" y="354" class="small">Visualization/</text>
+  <!-- the recording fans out to every reader along one orthogonal bus -->
+  <line class="wire" x1="320" y1="272" x2="340" y2="272"/>
+  <line class="wire" x1="340" y1="152" x2="340" y2="512"/>
+  <line class="edge" x1="340" y1="152" x2="360" y2="152"/>
+  <line class="edge" x1="340" y1="272" x2="360" y2="272"/>
+  <line class="edge" x1="340" y1="392" x2="360" y2="392"/>
+  <line class="edge" x1="340" y1="512" x2="360" y2="512"/>
 
-  <rect x="360" y="304" width="230" height="58" class="box"/>
-  <text x="375" y="324" class="title">lattice analyze</text>
-  <text x="375" y="340" class="sub">contention, pathing, heatmaps</text>
-  <text x="375" y="354" class="small">Analytics/</text>
+  <!-- ── column 2: the four readers of a recording ────────────────────────── -->
 
-  <!-- site -->
-  <line x1="590" y1="333" x2="640" y2="333" class="edge" marker-end="url(#arrow)"/>
-  <rect x="644" y="304" width="196" height="58" class="boxblue"/>
-  <text x="659" y="324" class="title">site/ browser replay viewer</text>
-  <text x="659" y="340" class="sub">plays committed .jsonl in the</text>
-  <text x="659" y="354" class="sub">browser; sells nothing, replays</text>
-  <text x="659" y="368" class="small">site/app.js, deployed by pages.yml</text>
+  <g class="box cmd">
+    <rect x="360" y="110" width="350" height="84"/>
+    <text class="name" x="376" y="138">lattice replay --verify</text>
+    <text class="body" x="376" y="160">re-serializes every tick's result</text>
+    <text class="body" x="376" y="178">and its per-tick state digest</text>
+  </g>
 
-  <!-- benchmark artifact -->
-  <line x1="740" y1="138" x2="740" y2="176" class="edge" marker-end="url(#arrow)"/>
-  <rect x="644" y="180" width="196" height="58" class="box"/>
-  <text x="659" y="200" class="title">throughput JSON</text>
-  <text x="659" y="216" class="sub">committed baseline; regression</text>
-  <text x="659" y="230" class="sub">gate when host fingerprint matches</text>
-  <text x="659" y="244" class="small">compare_benchmarks.py:150-213</text>
+  <g class="box cmd">
+    <rect x="360" y="230" width="350" height="84"/>
+    <text class="name" x="376" y="258">lattice render</text>
+    <text class="body" x="376" y="280">recording to an animated SVG</text>
+    <text class="body" x="376" y="298">or an ASCII trace</text>
+  </g>
 
-  <!-- tests -->
-  <line x1="475" y1="238" x2="475" y2="304" class="edge" marker-end="url(#arrow)"/>
-  <rect x="460" y="388" width="360" height="58" class="box"/>
-  <text x="475" y="408" class="title">tests and fixtures</text>
-  <text x="475" y="424" class="sub">Tests/ suite plus golden_trajectory.jsonl pin replay</text>
-  <text x="475" y="438" class="sub">equivalence and determinism on the CI matrix</text>
+  <g class="box cmd">
+    <rect x="360" y="350" width="350" height="84"/>
+    <text class="name" x="376" y="378">lattice analyze</text>
+    <text class="body" x="376" y="400">contention, pathing efficiency,</text>
+    <text class="body" x="376" y="418">turning points, heatmaps</text>
+  </g>
 
-  <line x1="820" y1="362" x2="880" y2="362" class="edge" stroke-dasharray="4 3" stroke="#94a3b8"/>
+  <g class="box cmd">
+    <rect x="360" y="470" width="350" height="84"/>
+    <text class="name" x="376" y="498">site/ replay viewer</text>
+    <text class="body" x="376" y="520">plays the committed .jsonl</text>
+    <text class="body" x="376" y="538">and recomputes nothing</text>
+  </g>
+
+  <!-- ── column 3: measurement, which never reads a recording ────────────── -->
+
+  <g class="box cmd">
+    <rect x="740" y="110" width="310" height="84"/>
+    <text class="name" x="756" y="138">lattice benchmark</text>
+    <text class="body" x="756" y="160">five workloads on fresh sims,</text>
+    <text class="body" x="756" y="178">never on a recording</text>
+  </g>
+
+  <g class="box art">
+    <rect x="740" y="230" width="310" height="84"/>
+    <text class="name" x="756" y="258">throughput JSON</text>
+    <text class="body" x="756" y="280">host-scoped baseline, gated</text>
+    <text class="body" x="756" y="298">only on a host match</text>
+  </g>
+
+  <g class="box cmd">
+    <rect x="740" y="350" width="310" height="84"/>
+    <text class="name" x="756" y="378">lattice evaluate</text>
+    <text class="body" x="756" y="400">mirrored-seat paired study:</text>
+    <text class="body" x="756" y="418">MCTS against Scout</text>
+  </g>
+
+  <g class="box art">
+    <rect x="740" y="470" width="310" height="84"/>
+    <text class="name" x="756" y="498">evaluation JSON</text>
+    <text class="body" x="756" y="520">per-seed rows, statistics,</text>
+    <text class="body" x="756" y="538">and the pass/fail verdict</text>
+  </g>
+
+  <g class="box cmd">
+    <rect x="740" y="590" width="310" height="84"/>
+    <text class="name" x="756" y="618">lattice evaluate --agent-cmd</text>
+    <text class="body" x="756" y="640">the external agent takes the</text>
+    <text class="body" x="756" y="658">candidate seat, same statistics</text>
+  </g>
+
+  <g class="box ext">
+    <rect x="740" y="710" width="310" height="84"/>
+    <text class="name" x="756" y="738">your agent, any language</text>
+    <text class="body" x="756" y="760">protocol 1 over stdin/stdout,</text>
+    <text class="body" x="756" y="778">one JSON value per line</text>
+  </g>
+
+  <line class="edge" x1="895" y1="194" x2="895" y2="230"/>
+  <line class="edge" x1="895" y1="434" x2="895" y2="470"/>
+  <!-- both candidates feed the same artifact: the in-process one from above,
+       the external one around the left, in the gap between the columns -->
+  <path class="edge" d="M740,632 H722 V512 H738"/>
+  <line class="edge" x1="895" y1="674" x2="895" y2="710" marker-start="url(#arrowhead)"/>
+
+  <!-- ── legend ────────────────────────────────────────────────────────────── -->
+
+  <rect class="frame" x="30" y="600" width="680" height="170" rx="12"/>
+  <text class="name" x="50" y="630">How to read this</text>
+  <text class="body" x="50" y="652">Column 1 produces the recording and the gates that pin it. Column 2 reads it.</text>
+  <text class="body" x="50" y="670">Column 3 measures fresh simulations and never reads a recording at all.</text>
+
+  <g class="cmd"><rect class="swatch" x="50" y="692" width="22" height="14"/></g>
+  <text class="key" x="82" y="704">a command you run</text>
+
+  <g class="art"><rect class="swatch" x="380" y="692" width="22" height="14"/></g>
+  <text class="key" x="412" y="704">a file or artifact on disk</text>
+
+  <g class="gate"><rect class="swatch" x="50" y="726" width="22" height="14"/></g>
+  <text class="key" x="82" y="738">a gate that blocks a merge</text>
+
+  <line class="edge" x1="380" y1="733" x2="402" y2="733"/>
+  <text class="key" x="412" y="738">reads or writes</text>
+
+  <line class="edge-gate" x1="50" y1="760" x2="72" y2="760"/>
+  <text class="key" x="82" y="765">gated by</text>
 </svg>

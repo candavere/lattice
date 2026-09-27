@@ -277,9 +277,9 @@ The golden fixtures used to pin these invariants are
 ### External reproduction challenge packet
 
 Independent external evaluators should begin with the self-contained, turnkey
-guide in [`reproduction_packet.md`](reproduction_packet.md). It anchors to
-`v2.3.2` (commit `4f7816fa5594f7097d6b2978c6c626553d075326`), the current
-published immutable release; `v2.3.1` remains historical under
+guide in [`reproduction_packet.md`](reproduction_packet.md). Its `v2.3.2`
+section anchors to `v2.3.2` (commit `4f7816fa5594f7097d6b2978c6c626553d075326`),
+published and immutable; `v2.3.1` remains historical under
 corrections-by-supersession. It lists the exact published SHA-256
 checksums and download URLs for the three platform binaries, `SHA256SUMS.txt`,
 and `sbom.json`, gives the pre-execution verification command, defines four

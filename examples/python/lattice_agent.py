@@ -14,7 +14,7 @@ import json
 import sys
 from collections import deque
 
-PROTOCOL = 1  # the only version Lattice speaks in v3.0 (spec section 2)
+PROTOCOL = 1  # the only version Lattice speaks; see the spec's section 2
 
 
 def log(message):

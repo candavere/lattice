@@ -39,14 +39,31 @@ interval. See [Results](#results).
 The data flow, drawn from the committed tools:
 
 ```
-simulate -> recording (.jsonl) -> replay / benchmark -> site
+simulate -> recording (.jsonl) -> replay --verify / render / analyze / site
+benchmark -> throughput JSON          evaluate -> evaluation JSON
 ```
 
 The full diagram is [`docs/architecture.svg`](docs/architecture.svg):
 
 <p align="center">
-  <img src="docs/architecture.svg" alt="Lattice architecture: simulate writes a JSONL recording; replay, benchmark, and the site all read that recording back. The environment is the pure step contract, and agents, trajectories, analytics, and visualization are layers over it." />
+  <img src="docs/architecture.svg" alt="Lattice architecture. A seeded lattice simulate run writes one schema 3 JSONL recording, and four readers consume it: replay --verify, render, analyze, and the site replay viewer. Independently of any recording, lattice benchmark writes a host-scoped throughput JSON and lattice evaluate writes an evaluation JSON; seated instead of the in-process MCTS candidate, evaluate --agent-cmd runs an external agent process that speaks protocol 1 over stdin and stdout. The test suite and the three-operating-system CI gates block a merge on the recording." />
 </p>
+
+Where each box in that diagram is implemented, at this commit:
+
+| Box | Implementation |
+| --- | --- |
+| `lattice simulate` | `Cli/CliApp.cs:218`; the header is stamped with the current schema at `Trajectories/TrajectoryWriter.cs:47` |
+| `recording .jsonl` (schema 3) | `Trajectories/TrajectoryModel.cs:21`; one header line, one line per tick, one final line |
+| `lattice replay --verify` | `Cli/CliApp.cs:221`; per-tick result and state-digest comparison at `Trajectories/TrajectoryReplay.cs:169-183` |
+| `lattice render` | `Cli/CliApp.cs:219`, over `Visualization/` |
+| `lattice analyze` | `Cli/CliApp.cs:220`, over `Analytics/` |
+| `site/ replay viewer` | `site/app.js`, deployed by `.github/workflows/pages.yml` |
+| `lattice benchmark` | `Cli/CliApp.cs:222`; five workloads on fresh simulations, never on a recording |
+| `throughput JSON` | the regression gate arms only on a full host match, at `.github/workflows/compare_benchmarks.py:163-165` |
+| `lattice evaluate` | `Cli/CliApp.cs:223`; the pass/fail verdict is composed at `Agents/PairedEvaluation.cs:145-150` |
+| `lattice evaluate --agent-cmd` | the candidate seat, with the command line split without a shell at `Cli/CliApp.cs:808`; the child process is launched from `Agents/External/ExternalAgentLaunch.cs:84` |
+| `tests + fixtures` → `CI on 3 operating systems` | the golden-trajectory replay gate runs on every matrix OS at `.github/workflows/ci.yml:32` |
 
 [Replay the infiltration recording in your browser](https://candavere.github.io/lattice/).
 The page replays committed recordings only: ground truth shows everything a

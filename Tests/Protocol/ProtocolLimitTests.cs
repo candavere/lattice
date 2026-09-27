@@ -212,10 +212,14 @@ public class ProtocolLimitTests
     /// multiplier — actually travels on the wire.
     /// </summary>
     /// <remarks>
-    /// The §4.1 <c>hello</c> example deliberately does <b>not</b> satisfy the
-    /// constraint: its numbers are declared illustrative, and stage 3 sets the real
-    /// ones. Asserting the constraint against the example would assert that the
-    /// spec is wrong.
+    /// The limits used here are a concrete pair, not the spec example: this test
+    /// pins the <em>relationship</em> §7 requires for an arbitrary
+    /// <c>max_ticks</c>, and it is the sibling of
+    /// <see cref="The_Spec_Example_Limits_Satisfy_The_Section_7_Constraint"/>,
+    /// which pins the same relationship against the §4.1 example itself. Since
+    /// U-2 computed <c>match_timeout_ms</c> from <c>step_timeout_ms</c> and
+    /// <c>max_ticks</c>, the example <b>does</b> satisfy the constraint now, and
+    /// there is no divergence left to excuse.
     /// </remarks>
     [Fact]
     public void MatchTimeout_Must_Cover_StepTimeout_Times_MaxTicks()

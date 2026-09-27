@@ -355,3 +355,42 @@ wire, so it is not the kind of change §12.4 governs.
 - `Protocol/ProtocolLimits.cs` still asserts **no** time value, deliberately. The
   defaults are the spec's and the runner's; the protocol project is a leaf that
   must not grow a policy it would then have to keep in step with §3.1.
+
+## Addendum — stage 4 settled the splitter (2026-09-27)
+
+U-9's second half — how a CLI **string** becomes a program and an argv — was
+left open by the addendum above, and is now fixed in spec **§3.3**:
+unquoted whitespace separates, a double quote groups, a backslash escapes only
+`"` and `\` inside a group and is an ordinary character everywhere else (so
+`C:\agents\python.exe` survives unquoted), and there is no globbing, no variable
+expansion, and no single-quote semantics. Two conditions are usage errors that
+exit **2** before any match runs: an unterminated quote, and an empty command.
+The program is resolved **once, up front** — a value containing a directory
+separator is a path, otherwise `PATH` (plus `PATHEXT` on Windows) is searched —
+and a program that does not resolve is a **usage error naming it**, not a match
+result and not a §8 code, because no agent ever spoke.
+
+The reasoning is the ADR's own, applied to the one place it had not reached. A
+shell would be the only thing that could turn an argument into a command, and
+§3.2 exists to keep that from happening; a fixed splitter keeps the launch
+surface identical on all three operating systems instead of inheriting three
+different shells' rules. Resolving the program *before* the first match is the
+same choice as §9.1's no-retry rule seen from the other side: a launch failure
+discovered mid-suite could only be scored as a loss — blaming the agent for
+Lattice's own `PATH` — or retried, and refusing to start is the only option that
+invents no score and consumes no seed. The two new usage-error conditions are
+deliberately narrow: they are the two inputs from which no argv can be derived
+honestly, and every other input is bytes in an argument.
+
+The external agent is scored by the **existing** `PairedStudy.Analyze`, with no
+change to the delta, the confidence interval, the per-outcome rates, the 30-seed
+floor, or the decision rule: an external run is converted into the same
+`MatchResult` rows an in-process run produces and handed to the same analyzer,
+so "identical statistics" (§9.4) is a property of the code path rather than a
+promise. The study artifact gains `AgentFailures`, `VoidRuns`, the agent argv,
+and the effective limits **only** on the external path; an in-process artifact
+carries exactly the seven fields it carried before this protocol existed, in the
+same order, and the golden fixture that pins that field set is the check. It
+compares canonicalized tokens rather than raw bytes, and excludes the timestamp
+and the host provenance, so "unchanged" here means every field name, every field
+order, and every evaluation value — which is the claim worth making.

@@ -169,8 +169,9 @@ Requirements:
 
 ### 3.2 Process launch contract
 
-The launch contract is an **argv, never a shell**. This is the whole of U-9,
-settled here; §9.5's `--agent-cmd` is a CLI-surface concern and stage 4's.
+The launch contract is an **argv, never a shell**. This is U-9, settled here;
+§9.5's `--agent-cmd` is a CLI-surface concern, and the rule that turns its string
+into that argv is **§3.3**.
 
 Lattice MUST receive the agent as a **program plus an argument list** — two
 separate values, already split — and MUST start it with an explicit
@@ -223,12 +224,12 @@ NOT use this variable as the source of that integer — the constant in the
 protocol library is. Lattice MUST add it as the **only** variable it introduces,
 so that an agent's environment is a caller environment plus one known key.
 
-**What this does not settle.** How a CLI string such as
-`--agent-cmd "python3 my_agent.py"` becomes a program and an argument list is
-**not** a property of the protocol, and is explicitly **stage 4's** concern. The
-contract here begins at the argv. Whichever splitter stage 4 chooses, its output
-arrives here as a program string plus a list of argument strings, and everything
-above holds unchanged — including that Lattice itself never re-parses them.
+**What this section does not settle, and where it is settled instead.** How a
+CLI string such as `--agent-cmd "python3 my_agent.py"` becomes a program and an
+argument list is **not** a property of the transport: the contract here begins at
+the argv, and it holds unchanged whichever splitter produced it. The splitter
+itself — the rule, the program resolution, and the exit status for a command that
+cannot be run — is fixed in **§3.3**, which is where a CLI author should look.
 
 See §14, U-9.
 
@@ -290,6 +291,69 @@ protocol-1 agent that omits either is refused with `schema_violation`, and one
 that sends either under a different name is refused with `unknown_field`. This
 closes the usability gap recorded as §14, U-3: an agent that plans a horizon now
 knows the horizon from the handshake rather than by running out of steps.
+
+### 3.3 The `--agent-cmd` string, split without a shell
+
+`evaluate --agent-cmd "<command line>"` (§9.5) takes a **string**; §3.2 above
+takes a **program plus an argv**. The conversion between them is Lattice's, and
+it is fixed here so that it is the same on every operating system and involves no
+shell at any point.
+
+**The splitter.** Lattice MUST split the string by exactly this rule, and by no
+other:
+
+- **Unquoted whitespace separates.** Spaces and tabs are separators; runs of them
+  collapse, and leading and trailing whitespace is not an argument.
+- **A double quote groups.** `"` opens a group and the next unescaped `"`
+  closes it. The quotes themselves are removed, and everything between them —
+  whitespace included — is one argument. `""` is therefore a legal empty
+  argument, and `""` as a whole command is not (§ below).
+- **Inside a group, backslash escapes only a double quote or a backslash.** `\"`
+  is a double quote in the argument and `\\` is a backslash. A backslash before
+  any other character is that character.
+- **Everywhere else a backslash is an ordinary character.** Outside a group there
+  is no escape sequence at all, so `C:\agents\python.exe` is one argument,
+  unquoted and unmangled. This is the rule that makes an unquoted Windows path
+  work, and it is why a path survives the trip in one piece.
+- **A group extends the argument it opens inside.** `"` is about whitespace, not
+  about starting a new argument, so `a\"b c"` is the single argument `a\b c` and
+  not two.
+- **Only the space and the tab separate.** A line feed, a carriage return, or any
+  other whitespace is a byte inside an argument, so the rule cannot be changed
+  underneath a caller by a platform's idea of what whitespace is.
+- **There is no globbing, no variable expansion, and no single quote.** `*`, `?`,
+  `$`, `` ` ``, `~`, `|`, `&`, and `;` are bytes inside whatever argument
+  contains them, and `'` has no quoting meaning at all — it is a character like
+  any other. A caller who wants a shell has one; this is deliberately not it, for
+  the injection reason §3.2 gives.
+- **Two conditions are usage errors**, and both are reported before anything
+  runs: an **unterminated quote** (a group that reaches the end of the string),
+  and an **empty command** (nothing but whitespace, or a program that is empty
+  once split — which `""` produces).
+
+**Resolution of the program.** The first element is resolved **once, before any
+match is played**:
+
+- if it contains a directory separator — and **either** `/` or `\` counts, on
+  every platform — it is used as a **path**, relative to the caller's current
+  directory (§3.2). A Windows-shaped value is a path even on a host that has no
+  such path, where the honest answer is "does not exist" rather than a search for
+  a file whose name happens to contain backslashes;
+- otherwise it is a **bare name**, and Lattice MUST search `PATH` for it, trying
+  each `PATHEXT` extension on Windows.
+
+A program that resolves to nothing, or that is found but cannot be started, is
+**not a match result and not a §8 reason code**: no agent ever spoke, so there is
+no agent behaviour to attribute anything to. Lattice MUST report it as a
+**usage error naming the program**, write it to stderr, and exit **2** — before
+any match runs, so that no seed is consumed, no statistic is computed, and **no
+artifact is written**. The resolution is deliberately up front rather than left
+to the first `Process.Start`: a launch failure discovered mid-suite would have to
+be either scored as a loss, which blames the agent for Lattice's own `PATH`, or
+retried, which §9.1 forbids. Refusing to start is the third option, and it is the
+only one that invents no score.
+
+See §14, U-9.
 
 ---
 
@@ -717,10 +781,22 @@ long — is settled by the explicit `host_limit` code rather than by argument. T
 Lattice MUST send `error` **before** terminating, whenever it has detected a
 failure, and MUST NOT send it on a normal termination (§3). Sending `error` is
 permitted, not required, on process-level failures where the stream is already
-gone. It is likewise not required for `host_limit`: that refusal is detected
-before `hello` is written, so in the ordinary case there is no exchange to
-report into and the code appears in the run record and the reported void count
-(§9.3) rather than on the wire.
+gone.
+
+**`host_limit` is the stronger case, and it is not a matter of permission.**
+Lattice MUST NOT write an `error` line for `host_limit`. The rule covers both
+places the code can fire: a refusal **before the agent process is started**, where
+there is no peer and no stream to write to, and a refusal at a later step, where
+the exchange has been going on and the line would be a second, contradictory
+report of a match Lattice has already decided not to finish. In both cases the
+code appears in the run record and the reported void count (§9.3) rather than on
+the wire.
+
+§8.4's precedence rests on the first of those two orderings specifically: the
+step-0 gate runs before a process exists and therefore before the handshake, so a
+match refused there has no agent behaviour behind it for a violation to outrank.
+A mid-match refusal is already inside the exchange, and it is still the last thing
+reported — Lattice detected its own limit, not an agent fault.
 
 ### 8.2 Which code, when
 
@@ -922,6 +998,53 @@ carries **the last 64 KiB of the agent's stderr** (§1.1): diagnostic text
 attached to the failure, never parsed, and never entering any statistic, rate, or
 decision rule. See §14, U-6.
 
+**What the study artifact carries.** The counts above live in the run's output,
+and which of them the `evaluate` artifact records depends on which path produced
+it:
+
+- An **in-process** candidate's artifact is **unchanged**: the same fields, in
+  the same order, byte for byte, as before this protocol existed. The external
+  reporting below is additive and MUST NOT alter it.
+- An **external** candidate's artifact carries, in addition: **`AgentFailures`**,
+  an object keyed by §8 reason code whose value is the number of matches that
+  failed with that code — a code that never fired is absent, and an empty object
+  means a clean run; **`VoidRuns`**, the void count above; **`AgentCommand`**, the
+  argv the §3.3 splitter produced, with the program as its first element, so the
+  exact command that was scored is part of the result rather than part of the
+  reader's shell history; and **`AgentLimits`**, the two effective §7 limits the
+  matches were actually played under — `step_timeout_ms` and the
+  `match_timeout_ms` computed from it — as §3.1 requires a reported run to state.
+
+`AgentFailures` is **report-only** here exactly as it is above: it enters no
+rate, no delta, no confidence interval, and no decision rule, and it MUST NOT be
+added to `Wins`, `Draws`, `Losses`, or `Timeouts`. Every failure is already a
+loss in those four, by §9.1; this field says how many of the losses had a cause.
+
+**A failed match's scores.** A recorded row carries the scores the match had
+reached when it failed, not `0-0`: a match that ran twelve steps and then stalled
+reports what it was worth at step twelve, because a fabricated zero tells a reader
+nothing they can act on. The outcome on that row is still a win for the baseline
+side — a failure cannot be won, whatever the numbers say. The paired delta of
+§9.4 is computed from **scores**, so those partial scores do enter it, and this is
+stated rather than left to be discovered: an agent that plays well for a while and
+then crashes can therefore contribute a positive delta while still being counted a
+loss. The costs of that are bounded by two things that are already true — the
+outcome rates cannot be improved by crashing, and `AgentFailures` reports every
+such match next to the delta rather than inside it — and the alternative, a delta
+computed over completed matches only, would be a **different statistic from the
+in-process one**, which §9.4 forbids. A study that wants the stricter rule has to
+change the analyzer for both paths at once, not the external row.
+
+**Voids and the grading floor.** Void runs are excluded from the denominator
+above, so they reduce the number of **valid seeds** — the seeds for which *both*
+mirrored seatings produced a match, which is what §9.4's analyzer requires and
+counts. A run whose voids leave fewer than 30 valid seeds is reported as
+**"Not graded"**, and the report MUST say so **explicitly**, naming the void
+count. This is the only respect in which a void can change a verdict, and it
+changes it by removing evidence rather than by adding any: a study that quietly
+fell below the floor would be indistinguishable from one that was never large
+enough to grade.
+
 ### 9.4 Scoring is through the existing paired evaluation
 
 An external agent is scored with **identical** statistics and identical floors
@@ -966,6 +1089,21 @@ with `simulate --agent mcts` because the flag names differ and because
 words. `simulate --agent` keeps its exact current spelling, values, and
 validation. The rationale is recorded in
 [`adr/0005-external-agent-wire-contract.md`](adr/0005-external-agent-wire-contract.md).
+
+**What `--agent-cmd` is mutually exclusive with.** The external agent *is* the
+candidate side: it takes the seat the in-process candidate takes, against the
+same baseline, on the same maps, under the same mirrored pairings, and its rows
+go through the same statistics (§9.4). It therefore **MUST NOT be combined with
+any in-process candidate selector** — two candidate selectors on one run is
+ambiguous, and which one won would be a property of flag order rather than of
+the study. Such a combination is a **usage error** and exits **2**, like every
+other `--agent-cmd` usage error (§3.3), before any match runs. In v3.0
+`evaluate` exposes no in-process candidate selector at all — the target policy is
+fixed — so the rule holds by construction and is recorded here so that adding a
+selector later cannot quietly make the two combinable. The other `evaluate` flags
+(`--scenario`, `--seed-set`, `--seeds`, `--rollouts`, `--out`, `--commit`) are
+**not** candidate selectors and mean exactly what they mean for an in-process
+run.
 
 ---
 
@@ -1210,15 +1348,18 @@ what governs.
 | U-6 | **A protocol failure had no reported count of its own** — it was a loss and nothing more. | §9.3 scores failures as losses per decision 6, which is right for the statistics but means a study cannot report "how often did the external agent's plumbing break" separately from "how badly did it play". | **Resolved.** The reported statistics carry an **`AgentFailures`** count, incremented once per match whose `TerminationReason` is one of the thirteen agent-attributable codes, kept **separate** from `MatchOutcome.Timeout` (`Timeout` remains "budget burned without a terminal tick") and separate from `VoidRuns`. It is **report-only**: it MUST NOT change scoring, the paired delta, the confidence interval, or the decision rule, all of which stay exactly as §9.4 specifies. Agent failures still count as losses. §9.3 states the boundary. |
 | U-7 | Whether an over-long **outbound** line is a loss for the external agent. | §7 requires Lattice to refuse a match whose `observation` would exceed 1 MiB. No reason code covered that, and under decision 6's literal wording ("every failure ... is scored as a loss for the external agent") the agent was blamed for a limit Lattice's own map generation caused — a map-size choice the agent could neither see nor influence. | **Resolved.** A fourteenth code, `host_limit`, records the refusal. Lattice checks its own outbound `observation` against **both** `max_line_bytes` and `max_json_depth` **before writing any byte**, refuses the match if it would breach either, records the run as **void / invalid**, and does **NOT** score it as a loss. Void runs are **reported as a count** (`VoidRuns`) and **excluded from the paired statistics** — from the delta, the per-outcome rates, the confidence interval, the decision rule, and the 30-seed grading denominator — because neither agent played. The §8 and §9.3 tables carry an explicit **`Fault`** column (`agent` vs `host`) so the partition is normative rather than inferred. §8.4 puts `host_limit` first, since it is detected before any wire exchange exists. An *inbound* over-long line is unaffected and remains `line_too_long`, an agent loss. |
 | U-8 | Process lifetime scope: one process per match, or one long-lived process across a whole evaluation suite. | A per-match process is simpler and matches the in-process factory contract, which builds a fresh agent per (pairing, seed) so RNG streams cannot leak between matches (`Agents/IAgentFactory.cs:12-23`, `Agents/EvaluationHarness.cs:175`). A long-lived process would need a reset message that does not exist in the five-type catalogue. | **Resolved: one agent process per match.** Stated normatively in §3 as the first handshake requirement — Lattice MUST launch a fresh process per match, send `hello` exactly once, and MUST NOT reuse a process across matches, seed pairings, or the mirrored seatings of one seed. This buys unconditional isolation (one agent's crash, hang, or memory growth cannot affect another match) and makes state carryover between seeds impossible by construction. A suite-scoped process would need a reset message, and the closed five-type catalogue (§4) has none; that remains a protocol-2 change. **Semantics only here** — process launch, the stdin/stdout pumps, and the timeout enforcement are stage 3, not stage 2. |
-| U-9 | Process launch details: argv, environment, working directory, and how `--agent-cmd` is split into program and arguments. | §9.5 names the flag and its value shape; the launch contract is not written anywhere. | **Resolved: an argv, never a shell.** Normative in the new **§3.2**, alongside §3's existing one-process-per-match lifetime rule. Lattice receives a **program plus an argument list**, already split, and starts it with `ProcessStartInfo.ArgumentList` — one argument at a time — with `UseShellExecute = false`. Lattice MUST NOT build a command string, MUST NOT involve a shell or `cmd /c`, and MUST NOT concatenate, quote, escape, or re-parse an argv into a string and back, so a space in an argument stays one argument and a shell metacharacter has no meaning. The **working directory is the caller's current directory**, with no resolution from the agent's own path. The **environment is inherited**, and Lattice adds exactly one variable, **`LATTICE_PROTOCOL=1`**, which is informational only: it can never make an incompatible agent compatible, because negotiation remains the exact-match handshake of §2. **How a CLI string such as `--agent-cmd "python3 my_agent.py"` becomes a program and an argv is explicitly stage 4's concern, not this document's** — the contract here begins at the argv, and holds unchanged whichever splitter stage 4 picks. |
+| U-9 | Process launch details: argv, environment, working directory, and how `--agent-cmd` is split into program and arguments. | §9.5 names the flag and its value shape; the launch contract is not written anywhere. | **Resolved: an argv, never a shell.** Normative in the new **§3.2**, alongside §3's existing one-process-per-match lifetime rule. Lattice receives a **program plus an argument list**, already split, and starts it with `ProcessStartInfo.ArgumentList` — one argument at a time — with `UseShellExecute = false`. Lattice MUST NOT build a command string, MUST NOT involve a shell or `cmd /c`, and MUST NOT concatenate, quote, escape, or re-parse an argv into a string and back, so a space in an argument stays one argument and a shell metacharacter has no meaning. The **working directory is the caller's current directory**, with no resolution from the agent's own path. The **environment is inherited**, and Lattice adds exactly one variable, **`LATTICE_PROTOCOL=1`**, which is informational only: it can never make an incompatible agent compatible, because negotiation remains the exact-match handshake of §2. **How a CLI string such as `--agent-cmd "python3 my_agent.py"` becomes a program and an argv was explicitly stage 4's concern, not this document's** — the contract here begins at the argv, and holds unchanged whichever splitter produces it. **That follow-up is now settled as well, in §3.3**: unquoted whitespace separates, a double quote groups, a backslash escapes only `"` and `\` inside a group and is an ordinary character everywhere else (so `C:\agents\python.exe` survives unquoted), there is no globbing, no variable expansion, and no single-quote semantics, and an unterminated quote or an empty command is a usage error exiting **2** before any match runs. The program is resolved **once, up front** — a value containing a directory separator (`/` or `\`, on any platform) is a path, otherwise `PATH` (plus `PATHEXT` on Windows) is searched — and a program that does not resolve is a **usage error naming it**: not a match result, not a §8 code, and no artifact. Resolving up front is the same discipline as §9.1's no-retry rule: a launch failure found mid-suite could only be scored as a loss, which blames the agent for Lattice's own `PATH`, or retried; refusing to start invents no score. |
 | U-10 | Whether the external agent may also be run through `simulate`. | Decision 9 scopes external agents to `evaluate` and says `simulate --agent greedy|random|mcts` is unchanged. Whether a *separate* `simulate` flag for external agents is wanted was unaddressed. | **Resolved: no.** `simulate` MUST NOT accept an external agent in v3.0; it is listed as an explicit **non-goal** in §13. The reason is commensurability, not convenience: `simulate` runs one episode and has no mirror, no confidence interval, and no grading floor, so a number produced there could not be compared with any published result. `simulate --agent` keeps its exact in-process-enum meaning; the external path is `evaluate --agent-cmd` only (§9.5). |
 
 **All ten points are now resolved.** U-1, U-3, U-5, U-6, U-7, U-8 and U-10 were
 settled in stage 2; U-2, U-4 and U-9 are settled here, in the body of this
-document. Nothing in the table above is provisional: each row is normative in the
-sections it cites. Because no conforming agent has ever existed, none of this
-required a version bump — the discipline in §12.8 binds from the first release
-onward, and the reason set is frozen at fourteen codes.
+document. The one half of U-9 that stage 3 deliberately left to the CLI surface —
+how a command-line **string** becomes a program and an argv — is settled in
+**§3.3**, so the launch contract is now specified end to end rather than from
+the argv onwards. Nothing in the table above is provisional: each row is
+normative in the sections it cites. Because no conforming agent has ever existed,
+none of this required a version bump — the discipline in §12.8 binds from the
+first release onward, and the reason set is frozen at fourteen codes.
 
 ---
 

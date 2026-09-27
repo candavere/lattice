@@ -27,7 +27,7 @@
       staticName: 'infiltration.svg',
       chipLabel: 'Infiltration',
       scenarioOrder: 0,
-      caption: 'Seed 42, Dungeon Infiltration & Sentry Patrol: the Infiltrator raids the Treasure Vault under a patrolling Sentry. Recorded with lattice simulate --seed 42 --scenario infiltration --steps 100 and rendered as an animated SVG with lattice render --format svg.',
+      caption: 'Seed 42, Dungeon Infiltration & Sentry Patrol: the Infiltrator raids the Treasure Vault under a patrolling Sentry. Recorded with decision-time Perceptions (AgentVision [2,2]) via lattice simulate --seed 42 --scenario infiltration --steps 100 and rendered as an animated SVG with lattice render --format svg.',
       reproduce: 'dotnet run --project Cli -- simulate --seed 42 --scenario infiltration --steps 100 --out infiltration.jsonl',
     },
     demo: {
@@ -152,6 +152,7 @@
     dom.mapCaption = document.getElementById('map-caption');
     dom.sentence = document.getElementById('tick-sentence');
     dom.legendRoles = document.getElementById('legend-roles');
+    dom.viewer = document.getElementById('viewer');
     dom.provGrid = document.getElementById('prov-grid');
     dom.provOpen = document.getElementById('prov-open');
     dom.provRepro = document.getElementById('prov-repro');
@@ -314,6 +315,9 @@
     hideDom(dom.hint);
     renderProvenance(traj, fileName, presetKey);
     renderLegendRoles(traj);
+    if (dom.viewer) {
+      dom.viewer.classList.toggle('has-recorded-fog', hasRecordedPerceptions(traj));
+    }
     if (state.perspective !== 'ground') startPulse(); else stopPulse();
     scheduleDraw();
   }
@@ -540,7 +544,9 @@
     } else {
       const role = traj.header.AgentRoles && traj.header.AgentRoles[state.egoId];
       const name = role || 'Agent ' + state.egoId;
-      text = 'What the ' + name + ' could reach (reconstructed 2-hop sightline).';
+      text = hasRecordedPerceptions(traj)
+        ? 'What the ' + name + ' knew at decision time (recorded perception).'
+        : 'What the ' + name + ' could reach (reconstructed 2-hop sightline).';
     }
     if (dom.mapCaption.textContent !== text) dom.mapCaption.textContent = text;
   }
@@ -561,7 +567,8 @@
   function updateCanvasLabel() {
     const traj = state.trajectory;
     const label = perspectiveIsAgent()
-      ? 'Replay view — ' + egoLabel(traj) + "'s reconstructed 2-hop sightline" +
+      ? 'Replay view — ' + egoLabel(traj) + "'s " +
+        (hasRecordedPerceptions(traj) ? 'recorded perception' : 'reconstructed 2-hop sightline') +
         ', tick ' + state.index + ' of ' + (traj ? traj.frames.length - 1 : 0)
       : 'Replay view — Ground truth, tick ' + state.index +
         ' of ' + (traj ? traj.frames.length - 1 : 0);
@@ -586,6 +593,7 @@
     dom.statAgents.textContent = '—';
     resetPerspectiveChips();
     dom.legendRoles.innerHTML = '';
+    if (dom.viewer) dom.viewer.classList.remove('has-recorded-fog');
     dom.provGrid.innerHTML = '';
     dom.provOpen.innerHTML = '';
     dom.provRepro.innerHTML = '';
@@ -885,7 +893,13 @@
   // Cumulative discovery up to the scrubbed tick: what the observer sees now
   // (Observed), what it remembers (Stale), and what it has never reached
   // (Unknown) — plus ghost memories of rival agents last spotted.
+  // Prefer decision-time Perceptions from the recording when present (aligned
+  // to the pre-step frame: frame i ↔ step i+1 / steps[i]); otherwise fall
+  // back to the page's 2-hop reconstruction for legacy files.
   function computePerception(traj, index, egoId) {
+    const recorded = perceptionFromRecording(traj, index, egoId);
+    if (recorded) return recorded;
+
     const map = traj.header.Map;
     const vision = visionHops(traj);
     const egoZone = function (frame) {
@@ -915,7 +929,48 @@
         : lastSeenAt[zone.Id] !== undefined ? 'stale' : 'unknown';
     });
 
-    return { vision: vision, egoId: egoId, zones: zones, ghosts: ghosts };
+    return { vision: vision, egoId: egoId, zones: zones, ghosts: ghosts, source: 'reconstructed' };
+  }
+
+  function hasRecordedPerceptions(traj) {
+    return !!(traj && traj.steps && traj.steps.some(function (s) { return s.Perceptions && s.Perceptions.length; }));
+  }
+
+  function knowledgeStatusName(status) {
+    if (status === 0 || status === 'Observed') return 'observed';
+    if (status === 1 || status === 'Stale') return 'stale';
+    return 'unknown';
+  }
+
+  // Frame index i is the world before step i+1 (steps[i]). On the final
+  // post-terminal frame, reuse the last step's decision-time perceptions.
+  function perceptionFromRecording(traj, index, egoId) {
+    if (!hasRecordedPerceptions(traj)) return null;
+    let stepIndex = index;
+    if (stepIndex >= traj.steps.length) stepIndex = traj.steps.length - 1;
+    if (stepIndex < 0) return null;
+    const step = traj.steps[stepIndex];
+    if (!step || !step.Perceptions || !step.Perceptions.length) return null;
+
+    const partial = step.Perceptions.find(function (p) { return p.AgentId === egoId; })
+      || step.Perceptions[egoId];
+    if (!partial || !partial.Zones) return null;
+
+    const zones = {};
+    partial.Zones.forEach(function (z) {
+      zones[z.ZoneId] = knowledgeStatusName(z.Status);
+    });
+
+    const ghosts = {};
+    (partial.Agents || []).forEach(function (sight) {
+      if (sight.AgentId === egoId) return;
+      if (knowledgeStatusName(sight.Status) === 'unknown') return;
+      if (!sight.LastKnownState) return;
+      ghosts[sight.AgentId] = { state: sight.LastKnownState, tick: sight.LastSeenTick };
+    });
+
+    const vision = typeof partial.Vision === 'number' ? partial.Vision : visionHops(traj);
+    return { vision: vision, egoId: egoId, zones: zones, ghosts: ghosts, source: 'recorded' };
   }
 
   function zoneStatus(fog, zoneId) {
@@ -1880,6 +1935,7 @@
       SimulationConfig: decoded[0].SimulationConfig || {},
       Scenario: decoded[0].Scenario || null,
       AgentRoles: decoded[0].AgentRoles || null,
+      AgentVision: decoded[0].AgentVision || null,
       SchemaVersion: decoded[0].SchemaVersion,
       DynamicRules: decoded[0].DynamicRules || null,
     };
@@ -1910,7 +1966,7 @@
       frames.push({ agents: agents, claims: claims, info: step.Result && step.Result.Info });
     });
 
-    return { header: header, final: final, frames: frames };
+    return { header: header, final: final, frames: frames, steps: steps };
   }
 
   function decodeMap(m) {

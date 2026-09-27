@@ -378,6 +378,10 @@ main {
   user-select: none;
 }
 
+.control-strip:has(#perspective-chips .chip.active:not([data-id="ground"])) ~ .viewer.has-recorded-fog::after {
+  content: "Recorded perception";
+}
+
 /* ---- legend ---- */
 
 .legend {

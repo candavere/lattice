@@ -9,7 +9,11 @@ namespace Lattice.Trajectories;
 /// null for static maps) so a replay can recreate the exact choke-capacity
 /// schedule the recording was made under. Files written before this field
 /// existed read back as schema version 0 — the static-map contract — and are
-/// still accepted by <see cref="TrajectoryReader"/>.
+/// still accepted by <see cref="TrajectoryReader"/>. Optional decision-time
+/// fog fields (<see cref="TrajectoryHeader.AgentVision"/>,
+/// <see cref="TrajectoryStep.Perceptions"/>) are additive on the same schema
+/// version: absent on legacy files, present on infiltration recordings that
+/// carry the fog side-channel.
 /// </summary>
 public static class TrajectorySchema
 {
@@ -29,6 +33,9 @@ public static class TrajectorySchema
 /// demonstration-layer metadata (e.g. the "infiltration" scenario and its
 /// "Sentry"/"Infiltrator" roster) that viewer tooling reads to render tactical
 /// roles; the replay core ignores them.
+/// <see cref="AgentVision"/> is optional per-agent hop horizons used when the
+/// recording carries decision-time <see cref="TrajectoryStep.Perceptions"/>;
+/// null means the file has no recorded fog side-channel (legacy fixtures).
 /// </summary>
 public sealed record TrajectoryHeader(
     ulong Seed,
@@ -37,18 +44,24 @@ public sealed record TrajectoryHeader(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] DynamicMapRuleSet? DynamicRules = null,
     int SchemaVersion = 0,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Scenario = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string[]? AgentRoles = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string[]? AgentRoles = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int[]? AgentVision = null);
 
 /// <summary>
 /// One recorded tick: the exact <see cref="AgentAction"/>s submitted, the
 /// tick number, and the full <see cref="StepResult"/> (observations, rewards,
 /// terminal info). The result embeds its own observations, so nothing else is
-/// needed to replay the tick.
+/// needed to replay the tick. Optional <see cref="Perceptions"/> holds the
+/// decision-time <see cref="PartialObservation"/> each agent projected
+/// <em>before</em> this step's actions were applied (tick-aligned with
+/// <see cref="StepNumber"/>) — never a post-step re-projection of
+/// <see cref="Result"/>.
 /// </summary>
 public sealed record TrajectoryStep(
     int StepNumber,
     AgentAction[] Actions,
-    StepResult Result);
+    StepResult Result,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] PartialObservation[]? Perceptions = null);
 
 /// <summary>
 /// Terminal bookkeeping: why the episode ended, who won, and final aggregate

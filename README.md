@@ -215,16 +215,12 @@ Only claims the repository can back up are listed here.
   policy loses to the deterministic Scout heuristic on standard generated maps
   (`benchmarks/mcts_evaluation_results.json`). It is the baseline any future
   policy must beat under the identical protocol.
-- **What the site calls "fog" was never recorded.** The committed recordings,
-  including `site/demo.jsonl` and `site/infiltration.jsonl`, were captured by
-  the study suite with unbounded vision (`Vision = -1` in the recording
-  header), so the engine never recorded a fog field. The dashed sightline the
-  agent view draws is a reconstruction by the page, computed from recorded
-  positions with a 2-hop rule ("which rooms could a 2-hop agent see?"). The
-  vault therefore never "drops out of view"; it **drifts out of the
-  reconstructed sightline**. On the Infiltrator view that happens around ticks
-  9-10; on the Sentry view the site copy marks ticks 9-13
-  ([`site/index.html`](site/index.html), [`site/infiltration.jsonl`](site/infiltration.jsonl)).
+- **Demo fog is recording-dependent.** Infiltration recordings now carry
+  decision-time `Perceptions` (header `AgentVision`) so the site agent view can
+  draw recorded fog. Older files such as `site/demo.jsonl` still lack that
+  side-channel; for those the page reconstructs a 2-hop sightline from
+  positions. `SimulationConfig.Vision` remains `-1` (omniscient StepResult) per
+  adr-002.
 - **No canonical simulation-state hash tree exists.** Replay verifies
   per-step serialized `StepResult` equivalence, not a state digest. The
   benchmark harness's FNV-1a step digest is an internal warm-up anchor, not a

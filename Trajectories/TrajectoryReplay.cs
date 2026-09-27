@@ -15,6 +15,11 @@ namespace Lattice.Trajectories;
 /// simulation-state hash tree currently exists. The replay gate
 /// catches any future rule change that breaks determinism or format
 /// compatibility.
+/// When the recording carries decision-time <see cref="TrajectoryStep.Perceptions"/>
+/// (and header <see cref="TrajectoryHeader.AgentVision"/>), those are
+/// re-projected on the pre-step state and compared as well — so a tampered
+/// fog side-channel fails verification even if StepResults still match.
+/// Legacy recordings without perceptions keep the StepResult-only contract.
 /// </summary>
 public static class TrajectoryReplay
 {
@@ -72,9 +77,10 @@ public static class TrajectoryReplay
     /// the final summary line: every aggregate field (Reason, WinnerAgentId,
     /// TotalSteps, FinalScores, ResourcesClaimed, TotalResources) is
     /// recomputed from the re-simulated run and compared field by field, so a
-    /// same-length tampered final line fails. Equivalence is serialized-result
-    /// equality, never a state digest — no canonical simulation-state hash
-    /// tree currently exists.
+    /// same-length tampered final line fails. When decision-time perceptions
+    /// are present, they are re-projected and compared too. Equivalence is
+    /// serialized-result equality, never a state digest — no canonical
+    /// simulation-state hash tree currently exists.
     /// </summary>
     public static IReadOnlyList<string> Verify(TrajectoryRecording recording)
     {
@@ -109,8 +115,88 @@ public static class TrajectoryReplay
         }
 
         AppendFinalProblems(problems, recording.Final, TrajectoryWriter.BuildFinal(finalState, lastInfo));
+        AppendPerceptionProblems(problems, recording);
 
         return problems;
+    }
+
+    /// <summary>
+    /// When any step carries <see cref="TrajectoryStep.Perceptions"/> (or the
+    /// header carries <see cref="TrajectoryHeader.AgentVision"/>), require a
+    /// complete side-channel and compare re-projected decision-time fog to the
+    /// recorded arrays. Absent both fields: no-op (legacy fixtures).
+    /// </summary>
+    private static void AppendPerceptionProblems(List<string> problems, TrajectoryRecording recording)
+    {
+        var hasAnyPerceptions = recording.Steps.Any(step => step.Perceptions is not null);
+        var hasVision = recording.Header.AgentVision is not null;
+
+        if (!hasAnyPerceptions && !hasVision)
+        {
+            return;
+        }
+
+        if (!hasVision)
+        {
+            problems.Add("Recording has step Perceptions but header AgentVision is missing.");
+            return;
+        }
+
+        if (!hasAnyPerceptions)
+        {
+            problems.Add("Recording has header AgentVision but no step Perceptions.");
+            return;
+        }
+
+        var vision = recording.Header.AgentVision!;
+        if (vision.Length != recording.Header.SimulationConfig.AgentCount)
+        {
+            problems.Add(
+                $"Header AgentVision length ({vision.Length}) must equal AgentCount ({recording.Header.SimulationConfig.AgentCount}).");
+            return;
+        }
+
+        PartialObservation[][] projected;
+        try
+        {
+            projected = DecisionPerceptionRecording.ReplayFromActions(recording);
+        }
+        catch (Exception ex)
+        {
+            problems.Add($"Decision-time perception replay failed: {ex.Message}");
+            return;
+        }
+
+        var compareCount = Math.Min(projected.Length, recording.Steps.Length);
+        if (projected.Length != recording.Steps.Length)
+        {
+            problems.Add(
+                $"Decision-time perception replay produced {projected.Length} turn(s), but the recording has {recording.Steps.Length}.");
+        }
+
+        for (var i = 0; i < compareCount; i++)
+        {
+            var step = recording.Steps[i];
+            if (step.Perceptions is null)
+            {
+                problems.Add($"Step {step.StepNumber} is missing Perceptions while other steps carry them.");
+                continue;
+            }
+
+            if (step.Perceptions.Length != vision.Length)
+            {
+                problems.Add(
+                    $"Step {step.StepNumber} Perceptions length ({step.Perceptions.Length}) must equal AgentVision length ({vision.Length}).");
+                continue;
+            }
+
+            var recordedJson = JsonSerializer.Serialize(step.Perceptions, Options);
+            var projectedJson = JsonSerializer.Serialize(projected[i], Options);
+            if (recordedJson != projectedJson)
+            {
+                problems.Add($"Step {step.StepNumber} perceptions diverge from decision-time replay.");
+            }
+        }
     }
 
     /// <summary>

@@ -314,7 +314,9 @@ public static class CliApp
                 run.Base.Turns,
                 sink,
                 scenario: InfiltrationScenario.ScenarioName,
-                agentRoles: new[] { InfiltrationScenario.SentryRole, InfiltrationScenario.InfiltratorRole });
+                agentRoles: new[] { InfiltrationScenario.SentryRole, InfiltrationScenario.InfiltratorRole },
+                decisionPerceptions: run.Base.DecisionPerceptions,
+                agentVision: run.AgentVision);
         }
 
         var lastInfo = run.Base.Results[^1].Info;

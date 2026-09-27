@@ -7,7 +7,8 @@ and door pill just drawn, plus per-frame index/perspective).
 
 Covers what the demo simplification stage asserts:
   * one-click perspective chips (ground aside, agent views) + keyboard roving,
-  * single-map viewer with the "Reconstructed sightline" badge + moving caption,
+  * single-map viewer with a fog badge ("Recorded perception" or
+    "Reconstructed sightline") + moving caption,
   * no token ever overlaps a room label (every tick, both perspectives),
   * no horizontal overflow of the page or the graph canvas,
   * the vault-drift moment: page ticks 10-13 the vault is 'stale' on the
@@ -114,7 +115,9 @@ async def run_viewport(browser, base, label, viewport, reduced):
         # -- default perspective + badge ------------------------------------
         active = await page.locator("#perspective-chips .chip.active").all_text_contents()
         badge = await page.evaluate(BADGE)
-        ok_default = active == ["Sentry"] and "Reconstructed sightline" in badge
+        ok_default = active == ["Sentry"] and (
+            "Reconstructed sightline" in badge or "Recorded perception" in badge
+        )
         results.append((f"[{label}] default Sentry chip + badge", ok_default, f"active={active} badge={badge}"))
 
         # -- one-click chips: ground aside, then back to Sentry --------------
@@ -129,7 +132,10 @@ async def run_viewport(browser, base, label, viewport, reduced):
         await page.wait_for_function(wait_frame(0, "0"))
         caption = await page.locator("#map-caption").text_content()
         badge = await page.evaluate(BADGE)
-        ok_sentry = str(caption).startswith("What the Sentry could reach") and "Reconstructed sightline" in badge
+        ok_sentry = (
+            str(caption).startswith("What the Sentry")
+            and ("Reconstructed sightline" in badge or "Recorded perception" in badge)
+        )
         results.append((f"[{label}] one-click Sentry chip (caption+badge)", ok_sentry, caption))
 
         # -- keyboard roving: focus Infiltrator chip, ArrowLeft -> Sentry ----

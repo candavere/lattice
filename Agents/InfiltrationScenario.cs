@@ -32,7 +32,8 @@ public sealed record InfiltrationScenarioResult(
     MapGraph Map,
     SimulationConfig Config,
     ulong Seed,
-    ScenarioResult Base)
+    ScenarioResult Base,
+    int[] AgentVision)
 {
     /// <summary>The infiltrator's aggregate metrics.</summary>
     public AgentMetrics Infiltrator => Base.Metrics.Agents[InfiltrationScenario.InfiltratorAgentId];
@@ -102,20 +103,33 @@ public static class InfiltrationScenario
         var config = DefaultConfig(maxSteps);
         var sentry = new SentryPatrolAgent(SentryAgentId, InfiltratorAgentId, vision: sentryVision);
         var infiltrator = new InfiltratorAgent(InfiltratorAgentId, SentryAgentId, vision: infiltratorVision);
+        // Slot order matches AgentId: Sentry=0, Infiltrator=1.
+        var agentVision = new[] { sentryVision, infiltratorVision };
 
         var result = ScenarioRunner.Run(
             map,
             config,
             new IAgent[] { sentry, infiltrator },
-            maxSteps: maxSteps);
+            maxSteps: maxSteps,
+            agentVision: agentVision);
 
         return new InfiltrationScenarioResult(
             DetectOutcome(map, result),
             map,
             config,
             seed,
-            result);
+            result,
+            agentVision);
     }
+
+    /// <summary>
+    /// Per-agent hop horizons for infiltration recordings (Sentry then
+    /// Infiltrator), matching each agent's <c>DefaultVision</c>.
+    /// </summary>
+    public static int[] DefaultAgentVision(
+        int sentryVision = SentryPatrolAgent.DefaultVision,
+        int infiltratorVision = InfiltratorAgent.DefaultVision) =>
+        new[] { sentryVision, infiltratorVision };
 
     /// <summary>
     /// Scans the recorded step results for the two victory conditions:

@@ -20,39 +20,36 @@
     </p>
     <p class="guiding-question">What can one agent know, and why does the result change?</p>
     <details class="honest-fog" open>
-      <summary>About the &ldquo;fog&rdquo; on this page</summary>
+      <summary>About fog on this page</summary>
       <p>
-        The treasure recordings were captured with <strong>unbounded</strong> vision (the study
-        suite used <code>Vision = -1</code>), so the engine never recorded &ldquo;fog&rdquo; &mdash;
-        there is no fog field in the recording. The dashed sightline the agent view draws is a
-        <strong>reconstruction by this page</strong>, computed from recorded positions using a
-        2-hop rule (&ldquo;which rooms could a 2-hop agent see?&rdquo;). It is the page&rsquo;s
-        honest answer to an &ldquo;audit it yourself&rdquo; prompt &mdash; not a claim about what
-        the engine knew, and never &ldquo;the Vault was unseen&rdquo;. On the Agent view it is
-        labelled &ldquo;reconstructed sightline&rdquo;, not &ldquo;recorded fog&rdquo;.
+        When the loaded recording carries decision-time <code>Perceptions</code>
+        (infiltration demo), the agent view draws that <strong>recorded</strong>
+        fog — what each agent projected before choosing its action that tick.
+        Older recordings without <code>Perceptions</code> still use a
+        <strong>page reconstruction</strong>: a 2-hop sightline from recorded
+        positions (the engine never stored fog in those files). The badge on the
+        map says <em>Recorded perception</em> or <em>Reconstructed sightline</em>
+        accordingly.
       </p>
     </details>
     <p class="recorded-note">
       This page <strong>replays recorded evidence</strong>. Every frame below is read from a
       committed recording; your browser does not run a new simulation.
     </p>
-    <aside class="moment-callout" aria-label="The moment to watch">
+      <aside class="moment-callout" aria-label="The moment to watch">
       <h3 class="moment-label">The moment to watch &mdash; ticks 9&ndash;13</h3>
       <p>
         From <strong>tick 10 through tick 13 the Treasure Vault lies outside the Sentry&rsquo;s
-        reconstructed 2-hop sightline</strong>: on the Sentry view chip the room dims to
+        recorded (or reconstructed) sightline</strong>: on the Sentry view chip the room dims to
         &ldquo;last known&rdquo; while ground truth keeps it fully lit. During the same stretch the
         Infiltrator &mdash; who has already claimed the vault&rsquo;s first chest &mdash; slips out of the
         Sentry Post and cuts across to the armory, unseen by the Sentry. Step to tick 11, select
         the <em>Sentry</em> view chip above the map, and watch the room dim on one map while it
-        stays lit on ground truth. The explanation sentence follows the same line.
+        stays lit on ground truth.
       </p>
       <p class="moment-honest" id="moment-arena">
-        Honest framing: this is page-<em>reconstructed</em> sight from recorded positions. The
-        engine recorded <strong>no fog</strong> (unbounded vision); the dashed 2-hop ring is
-        this page&rsquo;s reconstruction, so &ldquo;drops out of sight&rdquo; here always means
-        &ldquo;out of the reconstructed 2-hop sightline&rdquo; &mdash; never &ldquo;the engine
-        could not see it&rdquo;.
+        Prefer the badge on the map: <em>Recorded perception</em> means the fog came from the
+        file; <em>Reconstructed sightline</em> means this page inferred it from positions.
       </p>
     </aside>
     <div class="badges" aria-label="Repository information">
@@ -161,9 +158,9 @@
           <li><span class="swatch ring-swatch sight"></span>
               <p class="legend-text"><b>Patrol perimeter</b> (dashed) around a guard in ground truth.</p></li>
           <li><span class="swatch ring-swatch vision"></span>
-              <p class="legend-text"><b>Reconstructed 2-hop sightline</b> (dashed ring) around the selected agent on an
-              agent view chip — the rooms this page judges reachable from recorded positions,
-              not a claim about recorded fog.</p></li>
+              <p class="legend-text"><b>Sightline ring</b> (dashed) around the selected agent —
+              recorded decision-time perception when the file carries <code>Perceptions</code>,
+              otherwise a page-reconstructed 2-hop horizon from positions.</p></li>
           <li><span class="swatch" style="background:#40c4ff"></span>
               <p class="legend-text"><b>Extraction marker</b> (cyan) above an infiltrator, when one is present.</p></li>
         </ul>

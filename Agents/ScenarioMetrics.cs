@@ -41,9 +41,13 @@ public sealed record ScenarioMetrics(
 /// <see cref="ScenarioMetrics"/> plus the raw turns and results, kept so
 /// callers can replay, verify, or re-render the exact episode that produced
 /// the numbers. All three views describe the same events, so they can never
-/// drift apart.
+/// drift apart. Optional <see cref="DecisionPerceptions"/> holds, for each
+/// turn, the decision-time <see cref="PartialObservation"/> each agent
+/// projected before that turn's actions were applied (null when the run did
+/// not record a fog side-channel).
 /// </summary>
 public sealed record ScenarioResult(
     ScenarioMetrics Metrics,
     AgentAction[][] Turns,
-    StepResult[] Results);
+    StepResult[] Results,
+    PartialObservation[][]? DecisionPerceptions = null);

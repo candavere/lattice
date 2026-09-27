@@ -13,6 +13,10 @@ namespace Lattice.Trajectories;
 /// recordings of the same episode are byte-identical once line endings are
 /// normalized and the comparison is made on identical host environments; a
 /// raw cross-host file-byte claim is not asserted here.
+/// Optional decision-time <see cref="PartialObservation"/> fog
+/// (<see cref="TrajectoryHeader.AgentVision"/> + per-step
+/// <see cref="TrajectoryStep.Perceptions"/>) is preserved on write and
+/// round-trip; legacy recordings omit those fields.
 /// </summary>
 public static class TrajectoryWriter
 {
@@ -26,6 +30,10 @@ public static class TrajectoryWriter
     /// <see cref="ActionSpace"/> first so a malformed episode never lands on
     /// disk; stepping stops at the first terminal tick (extra turns are
     /// ignored, mirroring <see cref="SimulationDriver"/>).
+    /// When <paramref name="decisionPerceptions"/> is supplied it must align
+    /// 1:1 with the recorded turns (decision-time projections, not post-step
+    /// views); <paramref name="agentVision"/> is written on the header so
+    /// replay can re-project and verify that side-channel.
     /// </summary>
     public static TrajectoryRecording Record(
         MapGraph map,
@@ -35,8 +43,12 @@ public static class TrajectoryWriter
         TextWriter sink,
         string? scenario = null,
         string[]? agentRoles = null,
-        DynamicMapRuleSet? rules = null)
+        DynamicMapRuleSet? rules = null,
+        PartialObservation[][]? decisionPerceptions = null,
+        int[]? agentVision = null)
     {
+        ValidatePerceptionSideChannel(simulationConfig, actions, decisionPerceptions, agentVision);
+
         var effectiveRules = rules ?? DynamicMapRuleSet.None;
         // A static-map episode writes no rules at all: the header field is
         // only present when a non-empty policy governs the recording.
@@ -45,7 +57,7 @@ public static class TrajectoryWriter
 
         sink.Write(Serialize(new HeaderLine(
             "header", seed, map, simulationConfig, serializedRules, TrajectorySchema.CurrentVersion,
-            Scenario: scenario, AgentRoles: agentRoles)) + "\n");
+            Scenario: scenario, AgentRoles: agentRoles, AgentVision: agentVision)) + "\n");
 
         var steps = new List<TrajectoryStep>();
         Info? lastInfo = null;
@@ -54,9 +66,10 @@ public static class TrajectoryWriter
             ValidateTurn(map, steps.Count + 1, turn);
 
             var outcome = Simulation.Step(state, turn, simulationConfig);
-            var step = new TrajectoryStep(outcome.Result.Info.StepNumber, turn, outcome.Result);
+            var perceptions = decisionPerceptions?[steps.Count];
+            var step = new TrajectoryStep(outcome.Result.Info.StepNumber, turn, outcome.Result, perceptions);
             steps.Add(step);
-            sink.Write(Serialize(new StepLine("step", step.StepNumber, turn, outcome.Result)) + "\n");
+            sink.Write(Serialize(new StepLine("step", step.StepNumber, turn, outcome.Result, perceptions)) + "\n");
             state = outcome.NextState;
             lastInfo = outcome.Result.Info;
 
@@ -70,7 +83,9 @@ public static class TrajectoryWriter
         sink.Write(Serialize(new FinalLine("final", final)) + "\n");
 
         return new TrajectoryRecording(
-            new TrajectoryHeader(seed, map, simulationConfig, serializedRules, TrajectorySchema.CurrentVersion, scenario, agentRoles),
+            new TrajectoryHeader(
+                seed, map, simulationConfig, serializedRules, TrajectorySchema.CurrentVersion,
+                scenario, agentRoles, agentVision),
             steps.ToArray(),
             final);
     }
@@ -79,7 +94,9 @@ public static class TrajectoryWriter
     /// Writes an already-built <paramref name="recording"/> to
     /// <paramref name="sink"/> using the same line format as
     /// <see cref="Record"/>. Byte-identical to the original recording's own
-    /// output, which is how a read-back is verified.
+    /// output, which is how a read-back is verified. Preserves optional
+    /// <see cref="TrajectoryHeader.AgentVision"/> and per-step
+    /// <see cref="TrajectoryStep.Perceptions"/> when present.
     /// </summary>
     public static void Write(
         TrajectoryRecording recording,
@@ -95,14 +112,60 @@ public static class TrajectoryWriter
             recording.Header.DynamicRules,
             TrajectorySchema.CurrentVersion,
             Scenario: scenario ?? recording.Header.Scenario,
-            AgentRoles: agentRoles ?? recording.Header.AgentRoles)) + "\n");
+            AgentRoles: agentRoles ?? recording.Header.AgentRoles,
+            AgentVision: recording.Header.AgentVision)) + "\n");
 
         foreach (var step in recording.Steps)
         {
-            sink.Write(Serialize(new StepLine("step", step.StepNumber, step.Actions, step.Result)) + "\n");
+            sink.Write(Serialize(new StepLine(
+                "step", step.StepNumber, step.Actions, step.Result, step.Perceptions)) + "\n");
         }
 
         sink.Write(Serialize(new FinalLine("final", recording.Final)) + "\n");
+    }
+
+    private static void ValidatePerceptionSideChannel(
+        SimulationConfig simulationConfig,
+        AgentAction[][] actions,
+        PartialObservation[][]? decisionPerceptions,
+        int[]? agentVision)
+    {
+        if (decisionPerceptions is null && agentVision is null)
+        {
+            return;
+        }
+
+        if (decisionPerceptions is null || agentVision is null)
+        {
+            throw new ArgumentException(
+                "DecisionPerceptions and AgentVision must be supplied together (or both omitted).");
+        }
+
+        if (agentVision.Length != simulationConfig.AgentCount)
+        {
+            throw new ArgumentException(
+                $"AgentVision length ({agentVision.Length}) must equal AgentCount ({simulationConfig.AgentCount}).",
+                nameof(agentVision));
+        }
+
+        if (decisionPerceptions.Length != actions.Length)
+        {
+            throw new ArgumentException(
+                $"DecisionPerceptions length ({decisionPerceptions.Length}) must equal actions length ({actions.Length}).",
+                nameof(decisionPerceptions));
+        }
+
+        for (var i = 0; i < decisionPerceptions.Length; i++)
+        {
+            var turnPerceptions = decisionPerceptions[i]
+                ?? throw new ArgumentException($"DecisionPerceptions[{i}] is null.", nameof(decisionPerceptions));
+            if (turnPerceptions.Length != simulationConfig.AgentCount)
+            {
+                throw new ArgumentException(
+                    $"DecisionPerceptions[{i}] length ({turnPerceptions.Length}) must equal AgentCount ({simulationConfig.AgentCount}).",
+                    nameof(decisionPerceptions));
+            }
+        }
     }
 
     private static void ValidateTurn(MapGraph map, int stepNumber, AgentAction[] turn)
@@ -147,14 +210,21 @@ public static class TrajectoryWriter
         [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] DynamicMapRuleSet? DynamicRules = null,
         int SchemaVersion = 0,
         string? Scenario = null,
-        string[]? AgentRoles = null)
+        string[]? AgentRoles = null,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int[]? AgentVision = null)
     {
-        public TrajectoryHeader ToModel() => new(Seed, Map, SimulationConfig, DynamicRules, SchemaVersion, Scenario, AgentRoles);
+        public TrajectoryHeader ToModel() =>
+            new(Seed, Map, SimulationConfig, DynamicRules, SchemaVersion, Scenario, AgentRoles, AgentVision);
     }
 
-    internal sealed record StepLine(string Kind, int StepNumber, AgentAction[] Actions, StepResult Result)
+    internal sealed record StepLine(
+        string Kind,
+        int StepNumber,
+        AgentAction[] Actions,
+        StepResult Result,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] PartialObservation[]? Perceptions = null)
     {
-        public TrajectoryStep ToModel() => new(StepNumber, Actions, Result);
+        public TrajectoryStep ToModel() => new(StepNumber, Actions, Result, Perceptions);
     }
 
     internal sealed record FinalLine(string Kind, TrajectoryFinal Metrics);

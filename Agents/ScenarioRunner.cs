@@ -32,7 +32,8 @@ public static class ScenarioRunner
         SimulationConfig config,
         IAgent[] agents,
         int maxSteps,
-        DynamicMapRuleSet? rules = null)
+        DynamicMapRuleSet? rules = null,
+        int[]? agentVision = null)
     {
         if (maxSteps < 1)
         {
@@ -40,15 +41,37 @@ public static class ScenarioRunner
         }
 
         ValidateAgents(config, agents);
+        ValidateAgentVision(config, agentVision);
 
         var state = Simulation.CreateInitial(map, config, rules ?? DynamicMapRuleSet.None);
         var observations = BuildObservations(state);
         var turns = new List<AgentAction[]>();
         var results = new List<StepResult>();
+        var decisionPerceptions = agentVision is null ? null : new List<PartialObservation[]>();
+        var perceptionFilters = agentVision is null
+            ? null
+            : agentVision.Select((vision, agentId) => new PerceptionFilter(map, agentId, vision)).ToArray();
         var contendedTicks = 0;
 
         for (var step = 0; step < maxSteps && (results.Count == 0 || !results[^1].Info.IsTerminal); step++)
         {
+            // Decision tick is 1-based and equals the forthcoming StepNumber —
+            // the same ++tick agents pass into PerceptionFilter.Project before
+            // choosing an action. Project on the pre-step observation here so
+            // recorded fog matches what Decide consumed, not a post-step view.
+            var decisionTick = results.Count + 1;
+            if (perceptionFilters is not null && decisionPerceptions is not null)
+            {
+                var turnPerceptions = new PartialObservation[config.AgentCount];
+                foreach (var agent in agents.OrderBy(a => a.AgentId))
+                {
+                    turnPerceptions[agent.AgentId] = perceptionFilters[agent.AgentId]
+                        .Project(decisionTick, observations[agent.AgentId]);
+                }
+
+                decisionPerceptions.Add(turnPerceptions);
+            }
+
             var turn = new AgentAction[config.AgentCount];
             foreach (var agent in agents.OrderBy(a => a.AgentId))
             {
@@ -77,7 +100,26 @@ public static class ScenarioRunner
             ContentionRate: results.Count == 0 ? 0.0 : contendedTicks / (double)results.Count,
             Agents: BuildAgentMetrics(state, turns));
 
-        return new ScenarioResult(metrics, turns.ToArray(), results.ToArray());
+        return new ScenarioResult(
+            metrics,
+            turns.ToArray(),
+            results.ToArray(),
+            decisionPerceptions?.ToArray());
+    }
+
+    private static void ValidateAgentVision(SimulationConfig config, int[]? agentVision)
+    {
+        if (agentVision is null)
+        {
+            return;
+        }
+
+        if (agentVision.Length != config.AgentCount)
+        {
+            throw new ArgumentException(
+                $"AgentVision length ({agentVision.Length}) must equal AgentCount ({config.AgentCount}).",
+                nameof(agentVision));
+        }
     }
 
     private static void ValidateAgents(SimulationConfig config, IAgent[] agents)

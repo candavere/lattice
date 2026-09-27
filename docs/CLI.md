@@ -135,6 +135,8 @@ off-script runs fail loudly instead of reporting timings.
 | `--scenario <standard\|bottleneck>` | `standard` = generated maps; `bottleneck` = capacity-1 choke contention family |
 | `--commit <sha>` | Source revision recorded in the artifact |
 | `--out <file>` | Write the JSON artifact to a file instead of stdout |
+| `--agent-cmd "<command line>"` | Score an external agent process as the candidate (see below) |
+| `--agent-step-timeout-ms <n>` | External agents only: the per-step budget; default 5000. Accepted but unused without `--agent-cmd` |
 
 ```sh
 dotnet run --project Cli -- evaluate --seed-set dev,heldout --rollouts 32 --out benchmarks/mcts_evaluation_results.json
@@ -147,3 +149,52 @@ seat 1) cancels positional spawn bias. The report covers Δ statistics, a 95%
 confidence interval on the mean, win/draw/loss/timeout rates, contention
 saturation, and a verdict: **pass** only if mean Δ > 0 and the CI lower bound
 > 0.
+
+### Scoring an external agent
+
+`--agent-cmd` names a process to launch instead of an in-process policy. The
+external agent takes the seat MCTS would have taken, against the same Scout
+baseline, on the same maps, under the same mirrored pairings, and is scored by
+the same analyzer — same Δ, same confidence interval, same per-outcome rates,
+same 30-seed floor, same verdict. It is not a fourth mode, and it cannot be
+combined with an in-process candidate selector. `simulate` does not accept it at
+all: a single episode has no mirror and no grading floor, so a number from there
+could not be compared with a published study.
+
+```sh
+dotnet run --project Cli -- evaluate --scenario standard --seed-set dev --seeds 30 --agent-cmd "python3 examples/python/lattice_agent.py"
+```
+
+The value is a command line, split **without a shell**: unquoted whitespace
+separates, a double quote groups, and a backslash escapes only `"` and `\` inside
+a group and is an ordinary character everywhere else. There is no globbing, no
+variable expansion, and no single-quote meaning. So a path containing a space
+has to be quoted (`"C:\Program Files\agent.exe"`), and an unquoted Windows path
+needs no escaping at all.
+
+The program is resolved once, before any match is played: a value containing a
+directory separator is used as a path, otherwise `PATH` is searched (`PATHEXT`
+too, on Windows). A program that cannot be resolved or cannot be started is
+**not a match result and not a scored failure** — no agent ever spoke — so the
+CLI names it on stderr, exits **2**, and writes no artifact. So do an
+unterminated quote, an empty command, and `--agent-step-timeout-ms` below 1.
+Argument errors in the other commands keep their existing exit status of 1.
+
+| Artifact field | Meaning |
+| :--- | :--- |
+| `AgentFailures` | Object keyed by protocol reason code (`timeout_step`, `agent_crashed`, …), each mapped to the number of matches that failed that way. Report-only: every failure is already a loss in the statistics above, and this says how many of the losses had a cause |
+| `VoidRuns` | Matches Lattice refused on its own limits. Not a loss, and excluded from every statistic and from the grading denominator |
+| `AgentCommand` | The argv that was launched, program first |
+| `AgentLimits` | The `StepTimeoutMs` and `MatchTimeoutMs` the matches were played under; the match budget is computed from the step budget, never chosen separately |
+
+All four appear only when `--agent-cmd` is used: an in-process artifact carries
+exactly the seven fields it carried before external agents existed, in the same
+order. The golden fixture pins that field set and every evaluation value in it,
+though it compares tokens rather than raw bytes and excludes the clock and the
+host provenance. The terminal
+summary adds one line per suite reporting `valid_seeds` (the seeds that count
+toward the grading floor), `void_runs`, and `agent_failures` broken down by code,
+followed by a `decision` line carrying the same verdict string the in-process
+study records under `Decision` in its artifact — the same analyzer's words, not a
+second phrasing of them. If voids leave fewer than 30 valid seeds the run is "Not
+graded", and the summary says that the exclusion is why.

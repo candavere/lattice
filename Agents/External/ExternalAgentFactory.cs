@@ -25,6 +25,18 @@ namespace Lattice.Agents.External;
 /// itself and cannot be forgotten.
 /// </para>
 /// <para>
+/// <b>The `evaluate` path does not use this factory, and that is deliberate.</b>
+/// The CLI drives every external match through <see cref="ExternalMatchRunner"/>,
+/// which starts, uses and disposes one process per match inside a single call and
+/// cannot leave one behind on any path. This type remains for a caller that wants
+/// the <see cref="IAgentFactory"/> seam — a custom harness of its own — and it is
+/// <b>not</b> the CLI's, and there is deliberately no non-disposing variant of it:
+/// adding one would put a process-leaking path into the type whose entire reason
+/// for existing is the seam. A caller that cannot dispose what it creates cannot
+/// use this factory, which is the correct constraint rather than a missing
+/// convenience.
+/// </para>
+/// <para>
 /// A protocol failure surfaces out of <see cref="IAgent.Decide"/> as an
 /// <see cref="ExternalAgentFaultException"/>. <see cref="EvaluationHarness"/> does
 /// not catch it, so this factory is for callers that already have a failure path

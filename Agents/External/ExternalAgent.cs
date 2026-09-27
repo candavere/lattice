@@ -209,6 +209,27 @@ public sealed class ExternalAgent : IAgent, IDisposable
     public string StderrTail() => _stderr.Tail();
 
     /// <summary>
+    /// Both agents' scores as they stood at the start of the most recent step
+    /// Lattice drove, or <see langword="null"/> before the first one.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is the partial state of a match that failed, and it comes from the
+    /// observation itself rather than from a second copy of the step loop: a wire
+    /// observation carries every agent's score (§5.3), and the last one this
+    /// process was handed is the state the failing step started from. A match that
+    /// died on step 12 therefore reports the scores as of step 12, which is the
+    /// only number that means anything to somebody reading the row.
+    /// </para>
+    /// <para>
+    /// It stays <see langword="null"/> for a handshake failure, correctly: no
+    /// observation was ever written, so no step ever began and the match's scores
+    /// really are 0-0 rather than unrecorded.
+    /// </para>
+    /// </remarks>
+    public (int Slot0Score, int Slot1Score)? LastKnownScores { get; private set; }
+
+    /// <summary>
     /// Writes one <c>observation</c> and reads back exactly one <c>action</c> —
     /// one exchange, in the direction Lattice drives (§1.2).
     /// </summary>
@@ -227,6 +248,11 @@ public sealed class ExternalAgent : IAgent, IDisposable
         {
             throw new ExternalAgentFaultException(_pendingFault);
         }
+
+        // The state this step starts from, kept so a failure here can report the
+        // scores as they stood rather than as nothing. Taken before anything can
+        // throw, so every failure below it has the number.
+        LastKnownScores = (observation.AgentStates[0].Score, observation.AgentStates[1].Score);
 
         var step = _step;
         var message = ExternalWire.ToWire(step, observation);
@@ -438,7 +464,7 @@ public sealed class ExternalAgent : IAgent, IDisposable
         {
             _pendingFault = new ExternalAgentFault(
                 timeout!.Value,
-                $"no hello_ack within step_timeout_ms {_limits.StepTimeoutMs}.",
+                DescribeTimeout(timeout.Value, "no hello_ack"),
                 Step: -1,
                 StderrTail: StderrTail());
             return;
@@ -479,9 +505,11 @@ public sealed class ExternalAgent : IAgent, IDisposable
         {
             throw Fail(
                 timeout!.Value,
-                timeout == ProtocolReason.TimeoutMatch
-                    ? $"the match exceeded match_timeout_ms {_limits.MatchTimeoutMs} before step {step} was answered."
-                    : $"no action within step_timeout_ms {_limits.StepTimeoutMs} for step {step}.",
+                DescribeTimeout(
+                    timeout.Value,
+                    timeout == ProtocolReason.TimeoutMatch
+                        ? $"the match budget expired before step {step} was answered"
+                        : $"no action for step {step}"),
                 step);
         }
 
@@ -649,6 +677,38 @@ public sealed class ExternalAgent : IAgent, IDisposable
         // as 128 + signal, so the same comparison covers both.
         return ExitCode == 0 ? ProtocolReason.AgentExited : ProtocolReason.AgentCrashed;
     }
+
+    /// <summary>
+    /// The diagnostic for a wait that ran out, naming <b>the budget that actually
+    /// expired</b> and its value.
+    /// </summary>
+    /// <param name="reason">
+    /// The code <see cref="ReadWithin"/> settled on: <c>timeout_step</c> when the
+    /// per-exchange budget bound, <c>timeout_match</c> when the whole-match budget
+    /// did.
+    /// </param>
+    /// <param name="subject">What the agent had not done yet, e.g. "no hello_ack".</param>
+    /// <remarks>
+    /// <para>
+    /// The text is derived from the reason rather than written per call site,
+    /// because a diagnostic that names the wrong budget sends the reader to tune
+    /// the wrong number: "no action within step_timeout_ms" on a match that ran out
+    /// of <c>match_timeout_ms</c> invites a reader to raise a limit that was never
+    /// the binding one, and the failure repeats unchanged.
+    /// </para>
+    /// <para>
+    /// In the handshake the match budget cannot in fact be the smaller of the two
+    /// — §7 requires <c>match_timeout_ms ≥ step_timeout_ms × max_ticks</c>, and
+    /// the clock starts when <c>hello</c> is written — so the
+    /// <c>timeout_match</c> branch there is defensive. It is still routed through
+    /// this one formatter rather than a second string, so the two exchanges
+    /// cannot drift apart if that ever stops being true.
+    /// </para>
+    /// </remarks>
+    private string DescribeTimeout(ProtocolReason reason, string subject) =>
+        reason == ProtocolReason.TimeoutMatch
+            ? $"{subject}: the match exceeded match_timeout_ms {_limits.MatchTimeoutMs}."
+            : $"{subject} within step_timeout_ms {_limits.StepTimeoutMs}.";
 
     private ExternalAgentFaultException Fail(
         ProtocolReason reason,

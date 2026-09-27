@@ -215,7 +215,7 @@ public static class ExternalMatchRunner
         }
         catch (ExternalAgentFaultException faulted)
         {
-            result = Failed(seed, externalSlot, faulted.Fault, agent?.ProcessId);
+            result = Failed(seed, externalSlot, faulted.Fault, agent?.ProcessId, agent?.LastKnownScores);
         }
         finally
         {
@@ -311,26 +311,71 @@ public static class ExternalMatchRunner
             seed,
             externalSlot,
             row,
-            PolicyOutcome(outcome, policyAtSeat: 0),
+            PolicyOutcome(outcome, policyAtSeat: externalSlot),
             Fault: null,
             episode,
             childId);
     }
 
-    private static ExternalMatchResult Failed(ulong seed, int externalSlot, ExternalAgentFault fault, int? childId)
+    /// <summary>
+    /// The row for a match the external agent lost, carrying the reason code and
+    /// the scores as they stood when it stopped.
+    /// </summary>
+    /// <param name="seed">The run seed.</param>
+    /// <param name="externalSlot">The seat the external process played.</param>
+    /// <param name="fault">The failure, which is agent-attributable by construction here.</param>
+    /// <param name="childId">The child's process id, when one was started.</param>
+    /// <param name="scoresAtFailure">
+    /// Both slots' scores at the start of the step that failed, or
+    /// <see langword="null"/> when no step ever began — a handshake failure, where
+    /// 0-0 is the true score rather than a missing one.
+    /// </param>
+    /// <remarks>
+    /// The scores on the row are the ones the match had reached, not 0-0. They come
+    /// from the last observation the exchange was driven with, so they are the state
+    /// the failing step started from, and a reader comparing two seeds can see that
+    /// one agent got further than the other before its plumbing broke. They are
+    /// indexed by slot, like every other row this runner writes, so the seat is
+    /// never guessed from the numbers.
+    /// <para>
+    /// <b>What they do to the score.</b> They are a report of how far the match
+    /// got, and the paired delta is computed from scores, so a failed match's
+    /// partial scores do enter the delta even though its outcome counts as a loss.
+    /// That is deliberate and it is the price of reporting a real number instead of
+    /// a fabricated 0-0: an agent that plays well for a while and then crashes can
+    /// therefore contribute a positive delta. The outcome accounting is what stops
+    /// a crash from buying a <em>win</em>, and §9.3's <c>AgentFailures</c> count is
+    /// what makes the crashes visible next to the delta rather than inside it. A
+    /// study that wants the delta to exclude failed matches has to say so in the
+    /// analyzer, not here.
+    /// </para>
+    /// </remarks>
+    private static ExternalMatchResult Failed(
+        ulong seed,
+        int externalSlot,
+        ExternalAgentFault fault,
+        int? childId,
+        (int Slot0Score, int Slot1Score)? scoresAtFailure)
     {
         if (fault.IsHostFault)
         {
             return VoidResult(seed, externalSlot, fault, childId);
         }
 
+        var (scoreA, scoreB) = scoresAtFailure ?? (0, 0);
+
         // Every agent-attributable code is a win for the baseline side, which is
         // the same shape as any other loss for the external agent, and the reason
         // code travels in the same nullable TerminationReason an environment
-        // termination uses (section 9.1). The scores are 0/0 because the step
-        // loop's state is not recoverable from the throw without changing
-        // ScenarioRunner; what this row exists to carry is the code, and the code
-        // is on it.
+        // termination uses (section 9.1).
+        //
+        // The row's outcome is in SLOT terms, and so it is not what the external
+        // agent's own outcome is derived from: at seat 1 a slot-relative "seat 0
+        // won" is a win for the baseline, and routing it through
+        // PolicyOutcome would report the external agent as the winner of a match
+        // it lost. A protocol failure is a loss for the external side whatever the
+        // seat and whatever the scores (§9.1), so it is stated rather than
+        // computed.
         var outcome = MatchOutcome.TeamBWin;
         var row = new MatchResult(
             seed,
@@ -339,13 +384,20 @@ public static class ExternalMatchRunner
             "external",
             "baseline",
             outcome,
-            ScoreA: 0,
-            ScoreB: 0,
+            ScoreA: scoreA,
+            ScoreB: scoreB,
             TotalSteps: Math.Max(0, fault.Step),
             TerminationReason: fault.TerminationReason,
             ContentionRate: 0.0);
 
-        return new ExternalMatchResult(seed, externalSlot, row, PolicyOutcome(outcome, policyAtSeat: 0), fault, Episode: null, childId);
+        return new ExternalMatchResult(
+            seed,
+            externalSlot,
+            row,
+            MatchOutcome.TeamBWin,
+            fault,
+            Episode: null,
+            childId);
     }
 
     private static ExternalMatchResult VoidResult(ulong seed, int externalSlot, ExternalAgentFault fault, int? childId = null) =>

@@ -12,6 +12,14 @@ ingestion contract for the permanent record in
 Its purpose is to make independent replication a first-class, auditable
 activity: a reviewer who follows it produces, in one artifact directory, the
 environment capture, raw transcripts, pass/fail judgments for the four
+
+> **Scope: the v2.3.2 release.** Every judged target, expected `--version`
+> string, and checksum in this plan belongs to the published **v2.3.2** assets
+> and is left unchanged. The source tree is now at **3.0.0**, where
+> `--version` prints `3.0.0`; a 3.0.0-scoped plan and packet will be published
+> from the v3.0.0 release assets. Experiment 2's wording below describes what
+> `replay --verify` checked in v2.3.2 and is not a statement about 3.0.0,
+> which additionally compares a canonical per-tick state digest.
 experiments, and any discrepancies — all of which a second reviewer can
 re-check without trusting the first.
 

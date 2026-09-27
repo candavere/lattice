@@ -246,7 +246,7 @@ for fairness rather than a loosening of the anti-crash rule the ADR exists to
 defend; `U-8` settles process lifetime as **one agent process per match**,
 normative in §3 and matching the in-process fresh-agent-per-(pairing, seed)
 contract, with the launch mechanics left to stage 3 as U-9; and `U-10` settles
-that `simulate` does **not** accept external agents in v3.0, on commensurability
+that `simulate` does **not** accept external agents in 3.0.0, on commensurability
 grounds — a single episode has no mirror, no confidence interval, and no
 grading floor, so it could not be compared with anything published here — which
 leaves `simulate --agent greedy|random|mcts` exactly as it is and the external

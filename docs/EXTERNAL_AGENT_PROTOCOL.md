@@ -239,7 +239,7 @@ See §14, U-9.
 | :--- | :--- | :--- | :--- |
 | `type` | string | yes | Exactly `"hello"`. |
 | `protocol` | integer | yes | Exactly `1`. |
-| `scenario` | string | yes | The evaluation scenario family that selected the map. In v3.0 the closed set is `"standard"` and `"bottleneck"` (`Cli/CliApp.cs:845-851`). |
+| `scenario` | string | yes | The evaluation scenario family that selected the map. In 3.0.0 the closed set is `"standard"` and `"bottleneck"` (`Cli/CliApp.cs:845-851`). |
 | `seed` | integer | yes | The run seed, an unsigned 64-bit value (`Agents/EvaluationHarness.cs:27`). MUST be a JSON number with no fraction, no exponent, no leading `+`, and no leading zeros. |
 | `agent_slot` | integer | yes | The agent slot this process plays, in `0..AgentCount-1` (`Environment/Simulation.cs:58-60`). In the `evaluate` path this is exactly `0` or `1`, because evaluation pairings are head-to-head (`Agents/EvaluationHarness.cs:112-117`). |
 | `max_ticks` | integer ≥ 1 | yes | The match's tick budget, from `SimulationConfig.MaxTicks` (`Environment/Simulation.cs:28`). It is the **same value** as `EvaluationSimulationConfig.MaxTicks`, which is the per-match `MaxSteps` the harness passes down (`Agents/EvaluationHarness.cs:147-148`). This is the horizon an agent plans against; §7's `match_timeout_ms ≥ step_timeout_ms × MaxTicks` constraint is computed from this number. |
@@ -277,8 +277,8 @@ Note that all three timeouts are measured on a **monotonic clock** and never on
 the wall clock, so a system time adjustment mid-match cannot manufacture or
 suppress a timeout. See §7, §14, U-2.
 
-`scenario` is the closed v3.0 set. The `infiltration` scenario is **not**
-reachable through the external-agent path in v3.0: it is a `simulate`-only
+`scenario` is the closed 3.0.0 set. The `infiltration` scenario is **not**
+reachable through the external-agent path in 3.0.0: it is a `simulate`-only
 roster and is explicitly separate from the `evaluate` path
 (`Cli/CliApp.cs:391-393`, `Cli/CliApp.cs:845-851`).
 
@@ -1163,7 +1163,7 @@ go through the same statistics (§9.4). It therefore **MUST NOT be combined with
 any in-process candidate selector** — two candidate selectors on one run is
 ambiguous, and which one won would be a property of flag order rather than of
 the study. Such a combination is a **usage error** and exits **2**, like every
-other `--agent-cmd` usage error (§3.3), before any match runs. In v3.0
+other `--agent-cmd` usage error (§3.3), before any match runs. In 3.0.0
 `evaluate` exposes no in-process candidate selector at all — the target policy is
 fixed — so the rule holds by construction and is recorded here so that adding a
 selector later cannot quietly make the two combinable. The other `evaluate` flags
@@ -1342,12 +1342,12 @@ the trajectory schema already uses
 
 ---
 
-## 13. Non-goals for v3.0
+## 13. Non-goals for 3.0.0
 
 The following are explicitly **out of scope** and MUST NOT be added under
 protocol `1`:
 
-- **Custom scenario files.** Scenario selection in v3.0 is the existing
+- **Custom scenario files.** Scenario selection in 3.0.0 is the existing
   `evaluate --scenario standard|bottleneck` switch
   (`Cli/CliApp.cs:845-851`). A user-authored scenario file is a later
   protocol.
@@ -1355,7 +1355,7 @@ protocol `1`:
   (`Agents/IAgent.cs:14-27`) is the existing path and is unchanged. The wire
   protocol is an addition, not a replacement.
 - **External agents through `simulate`.** `simulate` MUST NOT accept an
-  external agent in v3.0. It runs one episode, prints one result, and has no
+  external agent in 3.0.0. It runs one episode, prints one result, and has no
   paired-study machinery, no mirrored seatings, and no seed suite — the
   apparatus §9.4 scores external agents with. Running an external process
   through `simulate` would produce a number that looks like a measurement and is
@@ -1390,7 +1390,7 @@ Concretely, and stated as a limitation rather than a warning to be skimmed:
   and this document exists partly to make the decision informed.
 - Additional confinement — containers, seccomp, job objects, resource limits,
   a restricted environment — is a separate piece of work with a separate
-  threat model, and is not in v3.0.
+  threat model, and is not in 3.0.0.
 
 ---
 
@@ -1415,7 +1415,7 @@ what governs.
 | U-7 | Whether an over-long **outbound** line is a loss for the external agent. | §7 requires Lattice to refuse a match whose `observation` would exceed 1 MiB. No reason code covered that, and under decision 6's literal wording ("every failure ... is scored as a loss for the external agent") the agent was blamed for a limit Lattice's own map generation caused — a map-size choice the agent could neither see nor influence. | **Resolved.** A fourteenth code, `host_limit`, records the refusal. Lattice checks its own outbound `observation` against **both** `max_line_bytes` and `max_json_depth` **before writing any byte**, refuses the match if it would breach either, records the run as **void / invalid**, and does **NOT** score it as a loss. Void runs are **reported as a count** (`VoidRuns`) and **excluded from the paired statistics** — from the delta, the per-outcome rates, the confidence interval, the decision rule, and the 30-seed grading denominator — because neither agent played. The §8 and §9.3 tables carry an explicit **`Fault`** column (`agent` vs `host`) so the partition is normative rather than inferred. §8.4 puts `host_limit` first, since it is detected before any wire exchange exists. An *inbound* over-long line is unaffected and remains `line_too_long`, an agent loss. |
 | U-8 | Process lifetime scope: one process per match, or one long-lived process across a whole evaluation suite. | A per-match process is simpler and matches the in-process factory contract, which builds a fresh agent per (pairing, seed) so RNG streams cannot leak between matches (`Agents/IAgentFactory.cs:12-23`, `Agents/EvaluationHarness.cs:175`). A long-lived process would need a reset message that does not exist in the five-type catalogue. | **Resolved: one agent process per match.** Stated normatively in §3 as the first handshake requirement — Lattice MUST launch a fresh process per match, send `hello` exactly once, and MUST NOT reuse a process across matches, seed pairings, or the mirrored seatings of one seed. This buys unconditional isolation (one agent's crash, hang, or memory growth cannot affect another match) and makes state carryover between seeds impossible by construction. A suite-scoped process would need a reset message, and the closed five-type catalogue (§4) has none; that remains a protocol-2 change. **Semantics only here** — process launch, the stdin/stdout pumps, and the timeout enforcement are stage 3, not stage 2. |
 | U-9 | Process launch details: argv, environment, working directory, and how `--agent-cmd` is split into program and arguments. | §9.5 names the flag and its value shape; the launch contract is not written anywhere. | **Resolved: an argv, never a shell.** Normative in the new **§3.2**, alongside §3's existing one-process-per-match lifetime rule. Lattice receives a **program plus an argument list**, already split, and starts it with `ProcessStartInfo.ArgumentList` — one argument at a time — with `UseShellExecute = false`. Lattice MUST NOT build a command string, MUST NOT involve a shell or `cmd /c`, and MUST NOT concatenate, quote, escape, or re-parse an argv into a string and back, so a space in an argument stays one argument and a shell metacharacter has no meaning. The **working directory is the caller's current directory**, with no resolution from the agent's own path. The **environment is inherited**, and Lattice adds exactly one variable, **`LATTICE_PROTOCOL=1`**, which is informational only: it can never make an incompatible agent compatible, because negotiation remains the exact-match handshake of §2. **How a CLI string such as `--agent-cmd "python3 my_agent.py"` becomes a program and an argv was explicitly stage 4's concern, not this document's** — the contract here begins at the argv, and holds unchanged whichever splitter produces it. **That follow-up is now settled as well, in §3.3**: unquoted whitespace separates, a double quote groups, a backslash escapes only `"` and `\` inside a group and is an ordinary character everywhere else (so `C:\agents\python.exe` survives unquoted), there is no globbing, no variable expansion, and no single-quote semantics, and an unterminated quote or an empty command is a usage error exiting **2** before any match runs. The program is resolved **once, up front** — a value containing a directory separator (`/` or `\`, on any platform) is a path, otherwise `PATH` (plus `PATHEXT` on Windows) is searched — and a program that does not resolve is a **usage error naming it**: not a match result, not a §8 code, and no artifact. Resolving up front is the same discipline as §9.1's no-retry rule: a launch failure found mid-suite could only be scored as a loss, which blames the agent for Lattice's own `PATH`, or retried; refusing to start invents no score. |
-| U-10 | Whether the external agent may also be run through `simulate`. | Decision 9 scopes external agents to `evaluate` and says `simulate --agent greedy|random|mcts` is unchanged. Whether a *separate* `simulate` flag for external agents is wanted was unaddressed. | **Resolved: no.** `simulate` MUST NOT accept an external agent in v3.0; it is listed as an explicit **non-goal** in §13. The reason is commensurability, not convenience: `simulate` runs one episode and has no mirror, no confidence interval, and no grading floor, so a number produced there could not be compared with any published result. `simulate --agent` keeps its exact in-process-enum meaning; the external path is `evaluate --agent-cmd` only (§9.5). |
+| U-10 | Whether the external agent may also be run through `simulate`. | Decision 9 scopes external agents to `evaluate` and says `simulate --agent greedy|random|mcts` is unchanged. Whether a *separate* `simulate` flag for external agents is wanted was unaddressed. | **Resolved: no.** `simulate` MUST NOT accept an external agent in 3.0.0; it is listed as an explicit **non-goal** in §13. The reason is commensurability, not convenience: `simulate` runs one episode and has no mirror, no confidence interval, and no grading floor, so a number produced there could not be compared with any published result. `simulate --agent` keeps its exact in-process-enum meaning; the external path is `evaluate --agent-cmd` only (§9.5). |
 
 **All ten points are now resolved.** U-1, U-3, U-5, U-6, U-7, U-8 and U-10 were
 settled in stage 2; U-2, U-4 and U-9 are settled here, in the body of this

@@ -10,7 +10,7 @@ reference record and honest-reading notes:
 
 `dotnet run -c Release --project Cli -- benchmark --out benchmarks/throughput_benchmark.json`
 
-Full flag reference: [CLI reference — benchmark](CLI.md#benchmark--measure-the-work-load-matrix).
+Full flag reference: [CLI reference — benchmark](CLI.md#benchmark-measure-the-work-load-matrix).
 
 ## Host and provenance of the committed record
 

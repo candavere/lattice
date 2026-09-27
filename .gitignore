@@ -488,8 +488,8 @@ AGENTS.md
 *.scratchpad
 /tmp/
 
-## Release diary (deliberately kept out of version control)
-CHANGELOG.md
+## Release diary: published from 3.0.0 onward, so it is tracked like every
+## other doc in this repository.
 
 ## Prior-work lineage (read-only inspiration, own repo — not part of the release)
 /reference/

@@ -18,6 +18,15 @@ it by publishing a higher version, never by rewriting this one. `v2.3.1`
 remains published and immutable alongside it; `v2.3.0` is historical and
 untouched.
 
+> **Scope of this packet: the v2.3.2 release only.** Every tag, commit, size, and
+> SHA-256 below is a property of the published **v2.3.2** assets and is
+> deliberately left unchanged. The repository is now at source version
+> **3.0.0**, so `git describe`-style expectations and the `v2.3.2` checksums do
+> **not** describe the current source tree. A **v3.0.0 packet will be produced
+> from the v3.0.0 release assets** once that release is tagged and published;
+> until then this document verifies 2.3.2, and no v3.0.0 label in this repository
+> attaches to the v2.3.2 checksums.
+
 ---
 
 ## 1. Target Release Integrity & Provenance

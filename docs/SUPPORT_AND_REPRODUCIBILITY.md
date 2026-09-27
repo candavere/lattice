@@ -9,7 +9,11 @@ companion to the governing thesis in
 [`adr/0001-governing-product-thesis.md`](adr/0001-governing-product-thesis.md).
 
 > **Release status: Research Preview — evaluation by maintainers and
-> collaborators.** The support contract in this document targets `v2.3.2`.
+> collaborators.** The support contract in this document targets the published
+> **v2.3.2** release and its assets. The source tree is now at **3.0.0**; a
+> 3.0.0-scoped contract will be published from the v3.0.0 release assets, and
+> until then every `v2.3.2` reference below describes that release rather than
+> the current source.
 > Publishing that release does not by itself qualify Lattice for production
 > use; it remains a research instrument until independent security review,
 > soak testing, and formal fuzzing are complete (see Section 2).

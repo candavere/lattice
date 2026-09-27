@@ -1,0 +1,131 @@
+# Changelog
+
+All notable changes to Lattice are recorded here. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
+adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [3.0.0] - 2026-09-27
+
+Source version 3.0.0. No release tag is created by this commit; the owner
+publishes the release after audit.
+
+### Added
+
+- **External-agent protocol.** A normative, language-neutral wire contract for
+  playing Lattice as an agent from an external process over stdin/stdout, in
+  [`docs/EXTERNAL_AGENT_PROTOCOL.md`](docs/EXTERNAL_AGENT_PROTOCOL.md), with the
+  governing decisions in
+  [`docs/adr/0005-external-agent-wire-contract.md`](docs/adr/0005-external-agent-wire-contract.md).
+  Protocol version `1` is independent of the product version. The wire types
+  live in a new leaf project, `Protocol/`, which references nothing else in the
+  repository.
+- **`evaluate --agent-cmd` and `evaluate --agent-step-timeout-ms`.** An external
+  agent process is scored in the candidate seat, under the same seeds, mirror,
+  budget, statistics, and grading floor as the in-process study, so its rows are
+  commensurable with published results. `--agent-step-timeout-ms` (default 5000)
+  sets the per-step budget; the whole-match budget is computed from it as
+  `step_timeout_ms × max_ticks + 30000` and is not caller-settable.
+- **A conformant example agent.**
+  [`examples/python/lattice_agent.py`](examples/python/lattice_agent.py) is a
+  complete external agent in about 150 lines of standard-library Python, scored
+  in [`examples/python/README.md`](examples/python/README.md). At commit
+  `c8417f0` it **fails** the standard suite (mean paired delta −0.383, 95% CI
+  [−0.672, −0.095], 30 seeds) and **passes** the bottleneck suite (+1.733, CI
+  [+1.424, +2.042]), reproducing the same topology-conditional inversion the
+  in-process MCTS study shows.
+- **Failure accounting.** A closed, machine-readable set of **fourteen** reason
+  codes partitioned by fault ([`docs/EXTERNAL_AGENT_PROTOCOL.md` §8](docs/EXTERNAL_AGENT_PROTOCOL.md),
+  enumerated in [`Protocol/ProtocolReasons.cs:17-30`](Protocol/ProtocolReasons.cs)):
+  thirteen are agent-attributable and one, `host_limit`, is host-attributable.
+  The `evaluate` artifact gained `AgentFailures` (a count per reason code),
+  `VoidRuns`, and `AgentForfeits`. Every agent-attributable failure is scored as
+  a loss for the external agent; there is no retry.
+- **Exit code 2 for `--agent-cmd` usage errors**, including a program that cannot
+  be resolved or started, set in [`Cli/UsageError.cs:29`](Cli/UsageError.cs) and
+  mapped at [`Cli/CliApp.cs:1326`](Cli/CliApp.cs). A usage error is reported
+  before any match runs and writes no artifact.
+- **`CHANGELOG.md` and `CITATION.cff`.**
+
+### Changed
+
+- **The forfeit rule.** A failed match forfeits: the row carries the external
+  agent's score as `0` and the opponent's as it stood at the moment of failure.
+  The forfeit is a property of the score on the row, never of its
+  classification, so the match is still classified a win for the baseline side
+  and the external agent's own outcome is still a loss. The external agent's
+  partial scores are preserved in `AgentForfeits` for diagnosis and are not
+  scored.
+- **A failed match still occupies both mirrored seatings** for its seed, so the
+  paired analyzer's mirror is never broken. A `host_limit` refusal is the one
+  exception: it produces no match row, is counted as a void run rather than a
+  loss, and reduces the number of valid seeds the grading floor counts.
+- **Per-tick state authentication in `replay --verify`.** The verifier now
+  recomputes a canonical SHA-256 digest of the complete simulation state at
+  every tick and compares it to the digest recorded on the step line, on top of
+  the existing per-step serialized `StepResult` comparison and final-summary
+  re-computation. A schema-3 recording carries these digests; an older one
+  verifies on step results alone and says so.
+- **CI actions moved to Node 24.** `actions/checkout` v4→v5,
+  `actions/setup-dotnet` v4→v5, `actions/upload-artifact` v4→v6,
+  `actions/configure-pages` v5→v6, `actions/deploy-pages` v4→v5, and
+  `actions/upload-pages-artifact` v3→v5. Runner images, jobs, steps, .NET
+  versions, and test commands are unchanged. The Node 20 deprecation annotation
+  is gone from the CI, Benchmarks, and Pages run summaries.
+- **Stability work across the evidence base.** Site recordings were re-recorded
+  on the current engine and gated in CI by a job that replays every recording
+  under `site/`; the committed benchmark baselines were re-anchored on a single
+  reference host after the choke-crossing fix (`28c89d3`, `41530ef`); the strict
+  throughput gate is now armed only on a matching host class, with other hosts
+  receiving an informational cross-host comparison; CLI JSON artifacts are
+  LF-only and golden comparison is newline-agnostic; two Windows-only test
+  failures and two flaky external-agent spawn tests were fixed; and drifted
+  file:line citations were corrected.
+- **Version 2.3.2 → 3.0.0** across the nine project `<Version>` elements and the
+  CLI's reported version. The release workflow's tag-parity gate asserts that
+  tag, project, and `CLI --version` agree.
+- **Documentation.** The README is reorganised around a claim-and-proof table in
+  which every claim carries a command a reader can run and the artifact it
+  rests on, plus a bring-your-own-agent section and an explicit known-limitations
+  section. `docs/reproduction_packet.md` and `docs/VALIDATION_PLAN.md` are
+  labelled as scoped to the v2.3.2 release assets and checksums, which are
+  deliberately unchanged.
+
+### Known limitations
+
+- A seed with one completed match and one void refuses the study: there is no
+  drop-and-count yet. `Agents/PairedEvaluation.cs:100-105` throws when a seed is
+  missing one side of the mirrored pair, and a void run produces no match row
+  at all.
+- Replay verifies the recorded environment actions; it cannot reproduce a
+  nondeterministic external agent's decisions. Such an agent yields a different
+  trajectory from the same seed on every run, and `replay --verify` still
+  succeeds on each one.
+- Exit code 2 is reserved for `--agent-cmd` usage errors. An unknown flag on
+  `evaluate` still exits 1, like every other command and every other usage
+  error, so the two are not the same channel.
+- Timing bounds are calibrated on an Apple M1 and are far from binding: the
+  default step budget is 5000 ms and the whole-match budget is
+  `5000 × max_ticks + 30000` ms. They were not measured on slower runners.
+- The `TempFile` test helper swallows an `IOException` on delete and leaves the
+  file, so a refused delete is not a test failure. Real handle leaks are caught
+  directly, by asserting the exclusive-open property, in
+  `ExternalAgentFileHandleTests`.
+- `benchmarks/throughput_summary.md` describes the regression gate as failing on
+  a `>20%` drop while the README describes the enforced ratios of 0.75, 0.6, and
+  0.85. The conflict is recorded, not reconciled; the workflow and comparator
+  are authoritative.
+
+## Prior versions
+
+Release notes for `v1.0.0`, `v2.0.0`, `v2.1.0`, `v2.2.0`, `v2.3.0`, `v2.3.1`, and
+`v2.3.2` are the published GitHub releases, and this project did not keep
+in-repository release notes before 3.0.0. History is there and is not
+paraphrased here:
+<https://github.com/candavere/lattice/releases>.
+
+The reproduction and independent-replication procedures that cover those
+releases are [`docs/reproduction_packet.md`](docs/reproduction_packet.md) and
+[`docs/VALIDATION_PLAN.md`](docs/VALIDATION_PLAN.md), both scoped to the
+`v2.3.2` release assets and checksums.
+
+[3.0.0]: https://github.com/candavere/lattice/compare/v2.3.2...HEAD

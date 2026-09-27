@@ -37,7 +37,7 @@ public static class CliApp
     /// The CLI's reported version. Kept in lockstep with the project
     /// <c>&lt;Version&gt;</c> elements by the release workflow's tag-parity gate.
     /// </summary>
-    public const string Version = "2.3.2";
+    public const string Version = "3.0.0";
 
     private static readonly GeneratorConfig DefaultGeneratorConfig = new(3, 5, 1, 1, 3, GeneratorConfig.DefaultRetryCap);
     private const int DefaultSimulationSteps = 100;

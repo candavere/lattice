@@ -65,8 +65,18 @@ public class ExternalAgentDeterminismTests
             // trajectory rather than an in-memory object nobody serialized.
             await Task.Run(() => RecordExternalTo(map, config, path));
 
-            // The library path the CLI's `replay --verify` calls.
-            var recording = TrajectoryReader.Read(new StreamReader(path));
+            // The library path the CLI's `replay --verify` calls. The reader is
+            // this test's own and is disposed here rather than left to the
+            // collector: an undisposed reader keeps the file open, and the delete
+            // in the finally below then fails on Windows, where an open handle
+            // cannot be unlinked. The read completes into a fully materialized
+            // recording, so nothing after this point needs the file.
+            TrajectoryRecording recording;
+            using (var reader = new StreamReader(path))
+            {
+                recording = TrajectoryReader.Read(reader);
+            }
+
             var verification = TrajectoryReplay.VerifyDetailed(recording);
             Assert.Empty(verification.Problems);
             Assert.Equal(MaxTicks, recording.Steps.Length);

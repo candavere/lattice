@@ -74,33 +74,55 @@ public class ExternalAgentCodeTests
         // choice. match_timeout_ms >= step_timeout_ms x max_ticks, and the step
         // loop runs exactly max_ticks steps, so the step waits alone can never
         // reach the match budget. The budget the handshake consumes is what tips
-        // it over -- so the stub answers the handshake immediately and then spends
-        // most of each step budget before answering. With 3 ticks, a 1500 ms step
-        // budget and a 1300 ms per-step delay, the budget is gone partway through
-        // the last step, where the step budget no longer fits inside what is left
-        // and the match limit is what fires.
-        // One tick, no slack, and a delay 50 ms under the step budget. That is the
-        // whole configuration, and each number is load-bearing:
+        // it over, so the stub answers the handshake immediately and then spends
+        // more than the whole match budget before answering step 0.
         //
-        //   * match_timeout_ms = step_timeout_ms x 1, so the budget the handshake
-        //     consumed is the whole of what is left when step 0 begins. Whatever
-        //     the child's startup cost, less than a full step budget remains.
-        //   * the stub then delays 1950 ms, which is more than the 2000 - startup
-        //     that remains, so the match limit is what fires. More ticks would
-        //     make the budget *harder* to exhaust, since each extra tick adds
-        //     budget without adding a delay.
-        //   * the 50 ms gap is the only margin protecting the *step* budget, and
-        //     it is enough because Thread.Sleep never returns early and the stub's
-        //     own parse-and-encode is sub-millisecond.
+        // One tick, no slack, and a stall three times the entire match budget.
+        // Each number is load-bearing, and none of them is a margin:
         //
-        // So the test passes for any child startup between a few milliseconds and
-        // the full step budget, which is the entire realistic range.
+        //   * match_timeout_ms = step_timeout_ms x 1 + 0, so the two budgets are
+        //     equal. The host waits on whichever is smaller, and the match budget
+        //     is the smaller one from the first wait onward -- the elapsed time is
+        //     already non-zero by then, because hello is on the wire and the
+        //     handshake round trip is what the child spent starting up. So a
+        //     budget that runs out here is a timeout_match and can never be
+        //     reported as a timeout_step.
+        //   * the stub then stalls 6000 ms before its first action, which is three
+        //     times the 2000 ms match budget rather than 50 ms under it. This is
+        //     the whole fix: the earlier version slept 1950 ms, so whether the
+        //     match budget expired depended on the child having spent more than
+        //     50 ms starting up, and the comment claimed the opposite. Measured on
+        //     an idle machine that startup is 70-115 ms, and the boundary sits
+        //     exactly at match_timeout_ms - startup: at a 1900 ms delay the same
+        //     match completes with no fault at all, and on a host where the child
+        //     starts in under 50 ms the test failed. A stall above the entire
+        //     budget has no such boundary -- no startup cost, however small, can
+        //     leave a budget the agent could still answer inside.
+        //   * more ticks would make the budget *harder* to exhaust, since each
+        //     extra tick adds budget without adding delay, so one tick is what
+        //     keeps the two budgets equal.
+        //
+        // The budgets are still built through the spec's own formula rather than
+        // typed, so §7's floor is satisfied by construction, as it is in every
+        // other test here.
         const int stepMs = 2_000;
-        var result = await Match(mode: "slow", argument: "1950", stepMs: stepMs, maxTicks: 1, slackMs: 0);
+        const int stallMs = 6_000;
+        Assert.True(stallMs > stepMs, "the stall must exceed the whole match budget, or the test is a race again.");
+
+        var result = await Match(
+            mode: "stall-match",
+            argument: stallMs.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            stepMs: stepMs,
+            maxTicks: 1,
+            slackMs: 0);
 
         Assert.Equal(ProtocolReason.TimeoutMatch, Fault(result).Reason);
         AssertScoredAsLoss(result, "timeout_match");
         AssertStderrTailAttached(result);
+
+        // The budget expired answering step 0, not later, so the record says the
+        // overrun happened on the first exchange.
+        Assert.Equal(0, Fault(result).Step);
     }
 
     [Fact(Timeout = ExternalAgentTestHost.TestTimeoutMs)]

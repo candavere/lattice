@@ -84,6 +84,14 @@ public static class Program
         var at = int.TryParse(argument, out var parsed) ? parsed : -1;
         var slowMs = mode == "slow" && parsed > 0 ? parsed : 0;
 
+        // `stall-match` costs the given number of milliseconds before it answers
+        // its first step, and it is used with a figure larger than the host's whole
+        // match_timeout_ms. That is the difference from `slow`, which delays by
+        // less than one step budget and so stays inside it: a delay that exceeds
+        // the entire match budget cannot be waited out at any child startup speed,
+        // which is what makes timeout_match reachable without a race.
+        var stallMs = mode == "stall-match" && parsed > 0 ? parsed : 0;
+
         // The handshake is answered immediately. The delay is spent inside the
         // step loop instead, where the host is actually counting: with
         // match_timeout_ms >= step_timeout_ms x max_ticks, a budget the handshake
@@ -112,6 +120,18 @@ public static class Program
             if (slowMs > 0)
             {
                 Thread.Sleep(slowMs);
+            }
+
+            // The overrun is spent once, on the first exchange, and the host is
+            // waiting on stdout throughout it. Sleep, not an infinite hang: the
+            // figure is a known number the test can hold against match_timeout_ms,
+            // so the mode says "more than the whole budget" rather than "forever",
+            // and the host is still the one that gives up first.
+            if (stallMs > 0 && step == 0)
+            {
+                Console.Error.WriteLine($"stub: stalling {stallMs} ms before the first action");
+                Console.Error.Flush();
+                Thread.Sleep(stallMs);
             }
 
             // The flood is orthogonal to the exchange: it happens, and then the

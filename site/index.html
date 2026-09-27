@@ -22,14 +22,26 @@
     <details class="honest-fog" open>
       <summary>About the &ldquo;fog&rdquo; on this page</summary>
       <p>
-        The treasure recordings were captured with <strong>unbounded</strong> vision (the study
-        suite used <code>Vision = -1</code>), so the engine never recorded &ldquo;fog&rdquo; &mdash;
-        there is no fog field in the recording. The dashed sightline the agent view draws is a
-        <strong>reconstruction by this page</strong>, computed from recorded positions using a
-        2-hop rule (&ldquo;which rooms could a 2-hop agent see?&rdquo;). It is the page&rsquo;s
-        honest answer to an &ldquo;audit it yourself&rdquo; prompt &mdash; not a claim about what
-        the engine knew, and never &ldquo;the Vault was unseen&rdquo;. On the Agent view it is
-        labelled &ldquo;reconstructed sightline&rdquo;, not &ldquo;recorded fog&rdquo;.
+        <code>infiltration.jsonl</code> is recorded at trajectory schema v4, which stores what each
+        agent&rsquo;s own perception filter produced <strong>at the moment it chose its action</strong>
+        &mdash; one <code>Perceptions</code> entry per agent per tick, plus the cone each filter used
+        (<code>AgentVision: [2, 2]</code>, two graph hops apiece). The agent view here draws that
+        record and nothing else, and labels it &ldquo;recorded perception&rdquo;. The core&rsquo;s
+        <code>Vision</code> stays unbounded by design: the fog is the agents&rsquo;, not the
+        simulation&rsquo;s.
+      </p>
+      <p>
+        <code>demo.jsonl</code> predates the field, so it carries no fog at all. For that recording
+        the agent view falls back to a <strong>reconstruction by this page</strong>, computed from
+        recorded positions with a 2-hop rule, and says so: the chip reads &ldquo;reconstructed
+        sightline&rdquo;, never &ldquo;recorded perception&rdquo;. One page, two recordings, two
+        different answers &mdash; each labelled with where it came from.
+      </p>
+      <p>
+        The final frame is the one case a scrubber can get wrong. The episode ended there, so no
+        agent ever decided from that world and no perception was recorded for it. The map shows the
+        <strong>last decision-time view</strong> it did act on and says which tick that was, rather
+        than passing step 20&rsquo;s fog off as a fresh reading of the terminal frame.
       </p>
     </details>
     <p class="recorded-note">
@@ -39,20 +51,28 @@
     <aside class="moment-callout" aria-label="The moment to watch">
       <h3 class="moment-label">The moment to watch &mdash; ticks 9, 19 and 20</h3>
       <p>
-        On the <em>Infiltrator</em> view chip the Treasure Vault dims to &ldquo;last known&rdquo; at
-        <strong>ticks 9, 19 and 20</strong>, while ground truth keeps it fully lit: at tick 9 the
-        Infiltrator is back in the Entry Hall, three hops from the vault, four ticks after it claimed
-        the chest there; at ticks 19-20 it has looted both chests and the room is last known again.
-        On the <em>Sentry</em> view chip the vault dims only on the final tick, 20. Step to tick 9,
-        select the <em>Infiltrator</em> view chip above the map, and watch the room dim on one map
-        while it stays lit on ground truth. The explanation sentence follows the same line.
+        On the <em>Infiltrator</em> view chip the Treasure Vault is recorded as &ldquo;last
+        known&rdquo; at <strong>ticks 9, 19 and 20</strong>, while ground truth keeps it fully lit:
+        at tick 9 the Infiltrator is back in the Entry Hall, three hops from the vault; at tick 19
+        it has looted both chests and the room goes last known again, and tick 20 &mdash; the last
+        decision-time view in the file &mdash; still shows it dimmed. Step to tick 9, select the
+        <em>Infiltrator</em> view chip above the map, and watch the room dim on one map while it
+        stays lit on ground truth. The explanation sentence follows the same line.
+      </p>
+      <p>
+        The <em>Sentry</em> view is the mirror image, and worth stepping to as well: the guard
+        records its own post and the entry hall as &ldquo;last known&rdquo; at <strong>ticks 15 and
+        16</strong>, and at its final decision-time view (tick 20) it records every room as
+        observed. The vault it has not seen since the opening two frames.
       </p>
       <p class="moment-honest" id="moment-arena">
-        Honest framing: this is page-<em>reconstructed</em> sight from recorded positions. The
-        engine recorded <strong>no fog</strong> (unbounded vision); the dashed 2-hop ring is
-        this page&rsquo;s reconstruction, so &ldquo;drops out of sight&rdquo; here always means
-        &ldquo;out of the reconstructed 2-hop sightline&rdquo; &mdash; never &ldquo;the engine
-        could not see it&rdquo;.
+        Honest framing: on <code>infiltration.jsonl</code> these tiers are the agent&rsquo;s own
+        recorded perception, and <code>lattice replay --verify</code> recomputes all 20 of them and
+        fails if one is edited. On <code>demo.jsonl</code> the same tiers are this page&rsquo;s
+        2-hop reconstruction, because that file records no fog &mdash; so &ldquo;drops out of
+        sight&rdquo; there always means &ldquo;out of the reconstructed 2-hop sightline&rdquo;,
+        never &ldquo;the engine could not see it&rdquo;. The chip on the map tells you which
+        recording you are looking at.
       </p>
     </aside>
     <div class="badges" aria-label="Repository information">
@@ -100,6 +120,8 @@
           Your browser does not support the HTML5 canvas element. Read the metrics below, or
           open the recording directly: <a href="./demo.jsonl">demo.jsonl</a>.
         </canvas>
+        <p class="fog-badge" id="fog-badge" hidden></p>
+        <div class="door-layer" id="door-layer" aria-hidden="true"></div>
         <div id="viewer-hint" hidden>
           <div>
             Replay view is empty.<br>
@@ -161,9 +183,8 @@
           <li><span class="swatch ring-swatch sight"></span>
               <p class="legend-text"><b>Patrol perimeter</b> (dashed) around a guard in ground truth.</p></li>
           <li><span class="swatch ring-swatch vision"></span>
-              <p class="legend-text"><b>Reconstructed 2-hop sightline</b> (dashed ring) around the selected agent on an
-              agent view chip — the rooms this page judges reachable from recorded positions,
-              not a claim about recorded fog.</p></li>
+              <p class="legend-text"><b>Perception horizon</b> (dashed ring) around the selected agent — its own
+              cone where the file records one, this page&rsquo;s 2-hop rule where it does not.</p></li>
           <li><span class="swatch" style="background:#40c4ff"></span>
               <p class="legend-text"><b>Extraction marker</b> (cyan) above an infiltrator, when one is present.</p></li>
         </ul>
@@ -175,13 +196,13 @@
           <summary>Agent view details</summary>
           <ul class="legend-grid">
             <li><span class="swatch room-swatch observed"></span>
-                <p class="legend-text"><b>Observed room</b> — inside the reconstructed 2-hop sightline horizon this tick.</p></li>
+                <p class="legend-text"><b>Observed room</b> — inside the observer&rsquo;s horizon on the tick it decided.</p></li>
             <li><span class="swatch room-swatch stale"></span>
-                <p class="legend-text"><b>Last known</b> — seen earlier, now out of the reconstructed sightline.</p></li>
+                <p class="legend-text"><b>Last known</b> — seen earlier, outside the horizon it decided from.</p></li>
             <li><span class="swatch room-swatch unknown"></span>
                 <p class="legend-text"><b>Unexplored</b> — this agent has never seen it.</p></li>
             <li><span class="swatch ring-swatch vision"></span>
-                <p class="legend-text"><b>Reconstructed horizon</b> — where the dashed ring sits on an agent view chip.</p></li>
+                <p class="legend-text"><b>Perimeter</b> — where the dashed ring sits on an agent view chip.</p></li>
             <li><span class="swatch ring-swatch ghost"></span>
                 <p class="legend-text"><b>Last-seen ghost</b> — faded rival memory labeled with its age.</p></li>
             <li><span class="swatch" style="background:#16233f;border:1px solid #1e293b"></span>

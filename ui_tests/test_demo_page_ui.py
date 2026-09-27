@@ -46,9 +46,13 @@ SITE = ROOT / "site"
 
 MEASURE_PARAMS = "?measure=1&infiltration.jsonl"
 
-# JS helpers (the room-label badge lives on a ::after, so read it via
-# getComputedStyle rather than a selector).
-BADGE = "() => getComputedStyle(document.querySelector('.viewer'), '::after').content"
+# The fog-source chip is real text in the DOM, not a CSS pseudo-element, so it
+# is read as text and is in the accessibility tree. Its wording is the page's
+# claim about where the fog on the map came from, and each recording gets the
+# one that is true of it: "Recorded perception" where the file stores the fog,
+# "Reconstructed sightline" where this page had to derive it.
+BADGE_RECORDED = "Recorded perception"
+BADGE_RECONSTRUCTED = "Reconstructed sightline"
 
 SLIDE = """(t) => { const s = document.querySelector('#scrub-slider');
   s.value = String(t); s.dispatchEvent(new Event('input', {bubbles: true})); }"""
@@ -78,13 +82,22 @@ def overlaps(a, b):
 
 
 # --- what the recording itself implies -------------------------------------
-# The page reconstructs an agent's sight from recorded positions (see the
-# "reconstructed sightline" copy) with a vision radius in graph hops. These
-# helpers re-derive that from the recording alone, so the UI assertions below
-# can be made against the file instead of against a hand-picked tick: if the
-# engine moves the episode, the derived frames and fog moments move with it.
+# These helpers read the recording alone, so the UI assertions below can be
+# made against the file instead of against a hand-picked tick: if the engine
+# moves the episode, the derived frames and fog moments move with it.
+#
+# The fog the page draws on an agent view is the recording's own: a schema-4
+# file carries, per step and per agent, the PartialObservation that agent's
+# perception filter produced inside its Decide call, plus the cone it was
+# projected through. Frame i is the world AFTER step i, so the decision made
+# from it is step i+1 — that is the perception recorded on step line i+1, and
+# that is what the expectation below compares against. Nothing here re-derives
+# a sightline; the old 2-hop rule is gone, because a page that guesses the fog
+# and then asserts the guess is what it drew proves nothing about the file.
 
-DEFAULT_VISION_HOPS = 2  # the page's fallback when the header records no radius
+# KnowledgeStatus travels as an integer (System.Text.Json's default enum form).
+# Environment/PerceptionFilter.cs declares Observed=0, Stale=1, Unknown=2.
+KNOWLEDGE = {0: "observed", 1: "stale", 2: "unknown"}
 
 
 def fetch_recording(base, name="infiltration.jsonl"):
@@ -94,12 +107,13 @@ def fetch_recording(base, name="infiltration.jsonl"):
     return [json.loads(line) for line in text.splitlines() if line.strip()]
 
 
-def vision_hops(header):
-    """Mirror of the page's visionHops(): the recorded radius, else its default."""
-    vision = header.get("SimulationConfig", {}).get("Vision")
-    if isinstance(vision, int) and vision >= 1:
-        return vision
-    return DEFAULT_VISION_HOPS
+def recorded_steps(recording):
+    return [line for line in recording if line.get("Kind") == "step"]
+
+
+def has_recorded_perception(recording):
+    """Does this file record what its agents perceived when they decided?"""
+    return any(step.get("Perceptions") for step in recorded_steps(recording))
 
 
 def recorded_frames(recording):
@@ -109,64 +123,49 @@ def recorded_frames(recording):
     zone_count = len(header["Map"]["Zones"])
     agents = header["SimulationConfig"]["AgentCount"]
     frames = [[{"AgentId": i, "ZoneId": i % zone_count} for i in range(agents)]]
-    for line in recording:
-        if line.get("Kind") != "step":
-            continue
+    for line in recorded_steps(recording):
         observed = line["Result"]["Observations"][0]
         frames.append(observed["AgentStates"])
     return frames
 
 
-def _adjacency(header):
-    adj = {zone["Id"]: [] for zone in header["Map"]["Zones"]}
-    for choke in header["Map"]["ChokePoints"]:
-        adj[choke["FromZoneId"]].append(choke["ToZoneId"])
-        adj[choke["ToZoneId"]].append(choke["FromZoneId"])
-    return {zone_id: sorted(neighbours) for zone_id, neighbours in adj.items()}
+def perception_at(steps, frame, ego_id):
+    """The recorded decision-time perception the page must draw on `frame`, or
+    None when the file has none for it.
 
-
-def _zones_within(adj, origin, hops):
-    """Zones within `hops` graph hops of `origin`, inclusive (breadth-first)."""
-    seen = {origin: 0}
-    frontier = [origin]
-    while frontier:
-        current = frontier.pop(0)
-        if seen[current] >= hops:
-            continue
-        for neighbour in adj[current]:
-            if neighbour not in seen:
-                seen[neighbour] = seen[current] + 1
-                frontier.append(neighbour)
-    return set(seen)
-
-
-def ego_zone(agents, ego_id):
-    """Where the page believes the agent is: the crossing's destination while a
-    transit is in flight, otherwise the recorded zone."""
-    ego = next((a for a in agents if a["AgentId"] == ego_id), None) or agents[0]
-    transit = ego.get("Transit")
-    return transit["ToZoneId"] if transit else ego["ZoneId"]
+    Frame i shows the world after step i, and the decision taken from that world
+    is step i+1, so the perception belongs to step line i+1. The last frame is
+    the post-terminal one: the episode ended there, nothing was ever decided
+    from it, and the page shows the last decision-time view it did act on
+    rather than passing step N's fog off as fresh.
+    """
+    step = frame + 1
+    if step <= len(steps):
+        index = step - 1
+    elif frame == len(steps):
+        index = len(steps) - 1
+    else:
+        return None
+    for perception in steps[index].get("Perceptions") or []:
+        if perception["AgentId"] == ego_id:
+            return perception
+    return None
 
 
 def status_timeline(recording, ego_id):
     """{frame: {zone: 'observed' | 'stale' | 'unknown'}} for one agent view,
-    with the page's cumulative discovery: a room that has been reachable at any
-    earlier frame but is not now reads 'last known'."""
-    header = recording[0]
-    adj = _adjacency(header)
-    hops = vision_hops(header)
-    zone_ids = [zone["Id"] for zone in header["Map"]["Zones"]]
-    last_seen = {}
+    read straight off the file's recorded perceptions."""
+    steps = recorded_steps(recording)
+    zone_ids = [zone["Id"] for zone in recording[0]["Map"]["Zones"]]
     timeline = {}
-    for index, agents in enumerate(recorded_frames(recording)):
-        seen = _zones_within(adj, ego_zone(agents, ego_id), hops)
-        for zone_id in seen:
-            last_seen[zone_id] = index
-        timeline[index] = {
-            zone_id: "observed" if zone_id in seen
-            else "stale" if zone_id in last_seen
-            else "unknown"
-            for zone_id in zone_ids
+    for frame in range(len(steps) + 1):
+        perception = perception_at(steps, frame, ego_id)
+        if perception is None:
+            continue
+        timeline[frame] = {
+            zone["ZoneId"]: KNOWLEDGE[zone["Status"]]
+            for zone in perception["Zones"]
+            if zone["ZoneId"] in zone_ids
         }
     return timeline
 
@@ -180,10 +179,11 @@ def vault_zone(recording):
 
 
 def stale_moments(recording, agent_ids):
-    """(view, frame) pairs where an agent view calls a room 'last known' while
-    ground truth still calls it observed. Ground truth is the recorded state, so
-    every room is observed there by definition. The first pair is the moment the
-    page's guided copy points a visitor at."""
+    """(view, frame) pairs where an agent's own recorded perception calls a room
+    'last known' while ground truth still calls it observed. Ground truth is the
+    recorded state, so every room is observed there by definition. Discovered
+    from the file, never hard-coded: the first pair is the moment the page's
+    guided copy points a visitor at."""
     zone = vault_zone(recording)
     if zone is None:
         return []
@@ -191,7 +191,7 @@ def stale_moments(recording, agent_ids):
     for view in agent_ids:
         timeline = status_timeline(recording, view)
         for frame, statuses in timeline.items():
-            if statuses[zone] == "stale":
+            if statuses.get(zone) == "stale":
                 moments.append((view, frame))
     return sorted(moments, key=lambda pair: (pair[1], pair[0]))
 
@@ -533,25 +533,31 @@ async def run_viewport(browser, base, label, viewport, reduced):
         ))
 
         # -- default perspective + badge ------------------------------------
+        # This recording stores its agents' decision-time perception, so the one
+        # claim the chip is allowed to make here is "recorded". Asserting the
+        # other wording would be asserting a claim this file does not support.
         active = await page.locator("#perspective-chips .chip.active").all_text_contents()
-        badge = await page.evaluate(BADGE)
-        ok_default = active == ["Sentry"] and "Reconstructed sightline" in badge
-        results.append((f"[{label}] default Sentry chip + badge", ok_default, f"active={active} badge={badge}"))
+        badge = (await page.locator("#fog-badge").text_content() or "").strip()
+        ok_default = active == ["Sentry"] and badge == BADGE_RECORDED
+        results.append((f"[{label}] default Sentry chip + recorded-perception badge",
+                        ok_default, f"active={active} badge={badge!r}"))
 
         # -- one-click chips: ground aside, then back to Sentry --------------
         await page.locator('#perspective-chips .chip[data-id="ground"]').click()
         await page.wait_for_function(wait_frame(0, "ground"))
         caption = await page.locator("#map-caption").text_content()
-        badge = await page.evaluate(BADGE)
-        ok_ground = str(caption).startswith("Ground truth:") and badge == "none"
+        hidden = await page.locator("#fog-badge").is_hidden()
+        ok_ground = str(caption).startswith("Ground truth:") and hidden
         results.append((f"[{label}] one-click ground chip (caption+no badge)", ok_ground, caption))
 
         await page.locator('#perspective-chips .chip[data-id="0"]').click()
         await page.wait_for_function(wait_frame(0, "0"))
         caption = await page.locator("#map-caption").text_content()
-        badge = await page.evaluate(BADGE)
-        ok_sentry = str(caption).startswith("What the Sentry could reach") and "Reconstructed sightline" in badge
-        results.append((f"[{label}] one-click Sentry chip (caption+badge)", ok_sentry, caption))
+        badge = (await page.locator("#fog-badge").text_content() or "").strip()
+        ok_sentry = (str(caption).startswith("What the Sentry perceived when it chose")
+                     and badge == BADGE_RECORDED)
+        results.append((f"[{label}] one-click Sentry chip (caption+badge)", ok_sentry,
+                        f"caption={caption!r} badge={badge!r}"))
 
         # -- keyboard roving: focus Infiltrator chip, ArrowLeft -> Sentry ----
         await page.locator('#perspective-chips .chip[data-id="1"]').focus()
@@ -586,10 +592,15 @@ async def run_viewport(browser, base, label, viewport, reduced):
         results.append((f"[{label}] no token/label overlap", worst is None, worst or "NONE"))
 
         # -- fog: the room status the page renders, every frame, every view ---
-        # Re-derived from the recording, so this asserts "the page renders what
-        # the file implies" rather than "the page renders what it used to".
+        # The expectation is the recording's own Perceptions, zone by zone and
+        # frame by frame. This asserts "the page draws the record" rather than
+        # "the page draws what it used to draw".
         agent_ids = list(range(recording[0]["SimulationConfig"]["AgentCount"]))
         zone_ids = [str(zone["Id"]) for zone in recording[0]["Map"]["Zones"]]
+        results.append((
+            f"[{label}] the recording stores decision-time perception",
+            has_recorded_perception(recording),
+            "no step line carries a Perceptions array"))
         expected = {view: status_timeline(recording, view) for view in agent_ids}
         ground_want = {zone_id: "observed" for zone_id in zone_ids}  # the recorded state
         rendered = {}
@@ -608,15 +619,61 @@ async def run_viewport(browser, base, label, viewport, reduced):
                 if statuses != want:
                     worst_fog = f"view {view} frame {tick}: page {statuses} != recording {want}"
         results.append((
-            f"[{label}] rendered room status matches the recording, "
+            f"[{label}] rendered room status matches the recorded perceptions, "
             f"{frame_count} frames x {len(agent_ids) + 1} views",
             worst_fog is None, worst_fog or "NONE"))
 
+        # -- the terminal frame does not pass step N's fog off as fresh -----
+        last = frame_count - 1
+        await page.locator(f'#perspective-chips .chip[data-id="0"]').click()
+        await page.evaluate(SLIDE, last)
+        await page.wait_for_function(wait_frame(last, "0"))
+        terminal_caption = await page.locator("#map-caption").text_content()
+        terminal_sentence = await page.locator("#tick-sentence").text_content()
+        terminal_label = await page.locator("#viewer-canvas").get_attribute("aria-label")
+        ok_terminal = ("Last decision-time view (tick %d)" % (last)) in str(terminal_caption)
+        results.append((
+            f"[{label}] post-terminal frame labelled as the last decision-time view",
+            ok_terminal, terminal_caption))
+        results.append((
+            f"[{label}] post-terminal frame says so in the sentence and aria-label too",
+            "last decision-time view" in str(terminal_sentence).lower()
+            and "last decision-time view" in str(terminal_label).lower(),
+            f"sentence={terminal_sentence!r} aria-label={terminal_label!r}"))
+
+        # -- a recording with no perception field says it reconstructed -------
+        # The other committed recording, read from the same server: demo.jsonl
+        # predates the field, so the chip must make the other claim — and only
+        # that one. A page that cannot tell the two apart is not auditing
+        # anything.
+        demo = fetch_recording(base, "demo.jsonl")
+        await page.locator('#scenario-chips .chip[data-id="demo"]').click()
+        await page.wait_for_function(
+            "() => document.querySelector('#source-label').textContent === 'demo.jsonl'")
+        await page.wait_for_function(
+            "() => document.querySelectorAll('#perspective-chips .chip').length >= 2")
+        await page.locator('#perspective-chips .chip[data-id="0"]').click()
+        await page.evaluate(SLIDE, 0)
+        await page.wait_for_function(wait_frame(0, "0"))
+        demo_badge = (await page.locator("#fog-badge").text_content() or "").strip()
+        demo_caption = await page.locator("#map-caption").text_content()
+        results.append((
+            f"[{label}] demo.jsonl run badges the reconstruction, not a record",
+            (not has_recorded_perception(demo)) and demo_badge == BADGE_RECONSTRUCTED
+            and "derived by this page" in str(demo_caption),
+            f"badge={demo_badge!r} caption={demo_caption!r}"))
+        # Back to the infiltration recording for the checks that follow.
+        await page.locator('#scenario-chips .chip[data-id="infiltration"]').click()
+        await page.wait_for_function(
+            "() => document.querySelector('#source-label').textContent === 'infiltration.jsonl'")
+        await page.wait_for_function(
+            "() => document.querySelectorAll('#perspective-chips .chip').length >= 3")
+
         # -- the "last known" moment, discovered from the recording -----------
-        # Found, not hard-coded: the first frame where some agent view calls the
-        # vault last-known while ground truth still calls it observed. A
-        # recording with no such moment leaves the page nothing to demonstrate,
-        # which is a failure rather than a pass.
+        # Found, not hard-coded: the first frame where some agent's own
+        # recorded perception calls the vault last-known while ground truth
+        # still calls it observed. A recording with no such moment leaves the
+        # page nothing to demonstrate, which is a failure rather than a pass.
         zone = vault_zone(recording)
         moments = stale_moments(recording, agent_ids)
         results.append((
@@ -683,24 +740,43 @@ async def run_viewport(browser, base, label, viewport, reduced):
         # -- door pills on hover ---------------------------------------------
         # Any mid-episode frame will do; it is clamped to the recording rather
         # than assumed, so a shorter episode cannot strand this on a frame that
-        # does not exist.
+        # does not exist. The pointer goes to a real element: the viewer lays a
+        # transparent hit target over each gate's pill, so this hovers that
+        # instead of re-deriving a canvas coordinate from the probe and hoping
+        # the two agree. Scrolling it into view first means the assertion is
+        # about the hover, not about whether the page happened to be scrolled.
         pill_tick = min(13, frame_count - 1)
         await page.locator('#perspective-chips .chip[data-id="ground"]').click()
         await page.evaluate(SLIDE, pill_tick)
         await page.wait_for_function(wait_frame(pill_tick, "ground"))
         doors = (await page.evaluate("window.__latticeGeo"))["doors"]
         ndoors = len(doors)
+        targets = page.locator("#door-layer .door-hit")
+        ntargets = await targets.count()
         cursor = False
-        if doors:
-            d = next(iter(doors.values()))
-            xy = await page.evaluate(
-                """() => { const r = document.querySelector('#viewer-canvas').getBoundingClientRect();
-                return [r.left, r.top]; }"""
-            )
-            await page.mouse.move(xy[0] + d["x"] + d["w"] / 2, xy[1] + d["y"] + 12, steps=2)
+        if ntargets:
+            door = targets.first
+            await door.scroll_into_view_if_needed()
+            await door.hover()
             await page.wait_for_timeout(150)
-            cursor = await page.evaluate("(document.querySelector('canvas').style.cursor === 'pointer')")
-        results.append((f"[{label}] door pills hover", ndoors == 7 and cursor, f"doors={ndoors} cursor={cursor}"))
+            cursor = await page.evaluate(
+                "(document.querySelector('canvas').style.cursor === 'pointer')")
+            # And the hover must actually reveal that gate's pill, not merely
+            # move a cursor: the pill is only painted while a door is hovered.
+            revealed = await page.evaluate(
+                """() => {
+                  const g = window.__latticeGeo;
+                  const hit = document.querySelector('#door-layer .door-hit');
+                  const id = hit && hit.dataset.door;
+                  return !!(id && g.doors && g.doors[id]);
+                }"""
+            )
+        else:
+            revealed = False
+        results.append((
+            f"[{label}] door pills hover",
+            ndoors == 7 and ntargets == ndoors and cursor and revealed,
+            f"doors={ndoors} hit-targets={ntargets} cursor={cursor} revealed={revealed}"))
 
         # -- legend: compact aligned item grid ------------------------------
         # Each item is one unit [16px swatch][bold label + description flowing as

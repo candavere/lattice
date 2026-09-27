@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/media/hero.gif" alt="Live replay viewer, Infiltrator view, of the recorded infiltration run: the Treasure Vault drifts out of the reconstructed 2-hop sightline for a few ticks while ground truth keeps it observed, then the Infiltrator cuts across toward the armory. Captured live from the shipped viewer." />
+  <img src="docs/media/hero.gif" alt="Live replay viewer, Infiltrator view, of the recorded infiltration run: the Treasure Vault is recorded as last-known by the Infiltrator's own perception filter for a few ticks while ground truth keeps it observed, then the Infiltrator cuts across toward the armory. Captured live from the shipped viewer." />
 </p>
 
 ## What Lattice is
@@ -46,7 +46,7 @@ benchmark -> throughput JSON          evaluate -> evaluation JSON
 The full diagram is [`docs/architecture.svg`](docs/architecture.svg):
 
 <p align="center">
-  <img src="docs/architecture.svg" alt="Lattice architecture. A seeded lattice simulate run writes one schema 3 JSONL recording, and four readers consume it: replay --verify, render, analyze, and the site replay viewer. Independently of any recording, lattice benchmark writes a host-scoped throughput JSON and lattice evaluate writes an evaluation JSON; seated instead of the in-process MCTS candidate, evaluate --agent-cmd runs an external agent process that speaks protocol 1 over stdin and stdout. The test suite and the three-operating-system CI gates block a merge on the recording." />
+  <img src="docs/architecture.svg" alt="Lattice architecture. A seeded lattice simulate run writes one schema 4 JSONL recording, and four readers consume it: replay --verify, render, analyze, and the site replay viewer. Independently of any recording, lattice benchmark writes a host-scoped throughput JSON and lattice evaluate writes an evaluation JSON; seated instead of the in-process MCTS candidate, evaluate --agent-cmd runs an external agent process that speaks protocol 1 over stdin and stdout. The test suite and the three-operating-system CI gates block a merge on the recording." />
 </p>
 
 Where each box in that diagram is implemented, at this commit:
@@ -54,8 +54,8 @@ Where each box in that diagram is implemented, at this commit:
 | Box | Implementation |
 | --- | --- |
 | `lattice simulate` | `Cli/CliApp.cs:218`; the header is stamped with the current schema at `Trajectories/TrajectoryWriter.cs:47` |
-| `recording .jsonl` (schema 3) | `Trajectories/TrajectoryModel.cs:21`; one header line, one line per tick, one final line |
-| `lattice replay --verify` | `Cli/CliApp.cs:221`; per-tick result and state-digest comparison at `Trajectories/TrajectoryReplay.cs:169-183` |
+| `recording .jsonl` (schema 4) | `Trajectories/TrajectoryModel.cs:26`; one header line, one line per tick, one final line. Schema 4 adds the per-agent decision-time `Perceptions` and the header's `AgentVision`; schema 3's per-tick state hash is unchanged |
+| `lattice replay --verify` | `Cli/CliApp.cs:221`; per-tick result, state-digest and decision-time perception comparison at `Trajectories/TrajectoryReplay.cs` |
 | `lattice render` | `Cli/CliApp.cs:219`, over `Visualization/` |
 | `lattice analyze` | `Cli/CliApp.cs:220`, over `Analytics/` |
 | `site/ replay viewer` | `site/app.js`, deployed by `.github/workflows/pages.yml` |
@@ -388,19 +388,45 @@ Only claims the repository can back up are listed here.
   policy loses to the deterministic Scout heuristic on standard generated maps
   (`benchmarks/mcts_evaluation_results.json`). It is the baseline any future
   policy must beat under the identical protocol.
-- **What the site calls "fog" was never recorded.** The committed recordings,
-  including `site/demo.jsonl` and `site/infiltration.jsonl`, were captured by
-  the study suite with unbounded vision (`Vision = -1` in the recording
-  header), so the engine never recorded a fog field. The dashed sightline the
-  agent view draws is a reconstruction by the page, computed from recorded
-  positions with a 2-hop rule ("which rooms could a 2-hop agent see?"). The
-  vault therefore never "drops out of view"; it **drifts out of the
-  reconstructed sightline**. In the committed infiltration recording, on the
-  page's own tick numbering, the vault goes "last known" on the Infiltrator view
-  at ticks 9, 19 and 20, and on the Sentry view only at tick 20 — the
-  mid-episode Sentry window the page's guided callout points at is not in this
-  file
+- **What the site calls "fog" is now recorded, for the infiltration run.**
+  `site/infiltration.jsonl` is trajectory schema v4: every step line carries a
+  `Perceptions` entry per agent, holding the masked view that agent's *own*
+  `PerceptionFilter` produced inside its `Decide` call at that tick, and the
+  header declares the cone each filter was built with (`AgentVision: [2, 2]`,
+  two graph hops apiece). The viewer draws that record, labels it "recorded
+  perception", and `replay --verify` reprojects all 20 of them and fails on any
+  edit. The core's `Vision` stays unbounded (`Vision = -1` in the header) by
+  design — the fog belongs to the agents, not the simulation.
+  The older recordings still have no fog field: `site/demo.jsonl` is schema v3,
+  so the viewer reconstructs its sightline from recorded positions with a 2-hop
+  rule and labels that "reconstructed sightline" instead. The two chips are the
+  honest answer to "where did this come from?" on a page that shows both.
+- **The recorded fog's own tick disclosures.** Derived from
+  `site/infiltration.jsonl` (seed 42, 20 steps, `AgentVision [2, 2]`), reading
+  `Perceptions` and nothing else. On the Infiltrator's view the Treasure Vault
+  (zone 5) is not `Observed` at frame 0 (`Unknown`), 9 (`Stale`) and 19
+  (`Stale`), and the terminal frame 20 shows the last decision-time view —
+  step 20, where the vault is still `Stale`. On the Sentry's view the vault is
+  not observed only at frames 0 and 1; what the guard actually loses is its own
+  post and the entry hall, at frames 15 and 16, and at its final
+  decision-time view (tick 20) it records every room as observed. The page's
+  guided callout follows exactly these frames
   ([`site/index.html`](site/index.html), [`site/infiltration.jsonl`](site/infiltration.jsonl)).
+- **The terminal frame is labelled, not dressed up as fresh.** Frame 20 is the
+  world *after* the last step; no agent ever decided from it, so no perception
+  was recorded for it. The viewer shows the last decision-time view the agents
+  did act on and says so in the caption, the badge-adjacent text, the frame
+  sentence and the canvas `aria-label` ("last decision-time view (tick 20)").
+- **The re-recording is bigger, and that is the whole point.**
+  `site/infiltration.jsonl` went from **66,465 bytes** (schema v3, SHA-256
+  `fe213bd5ed2180942cba5334e350a974d3a36e17b319281d9ad8efe99d57f3f5`) to
+  **114,983 bytes** (schema v4, SHA-256
+  `22f9b0fe391fa7dd2e3f6e1975f4fa7582c9b84d314723c0260d4c7feabf4cfc`) —
+  **+48,518 bytes, 1.73x**, for the same 20 ticks of the same episode. Strip the
+  two new fields and the file is the old one byte for byte, which
+  `Tests/Trajectories/DecisionTimePerceptionTests.cs` pins by digest: the extra
+  bytes are evidence, not a behavioural change to the run. Reproduce with
+  `dotnet run --project Cli -- simulate --seed 42 --scenario infiltration --steps 100 --out site/infiltration.jsonl`.
 - **Per-tick state hash.** `replay --verify` recomputes a SHA-256 digest of
   the full simulation state at every tick — zone and resource positions,
   occupancy, the per-tick choke capacities and derived edge load, scores,

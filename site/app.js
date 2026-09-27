@@ -9,10 +9,11 @@
   'use strict';
 
   // The guided hero is the infiltration recording (Sentry vs Infiltrator): its
-  // "moment to watch" (ticks 9, 19 and 20, the Vault drifting out of the
-  // Infiltrator's reconstructed 2-hop sightline) is what the hero copy walks a
-  // visitor through. The demo.jsonl (MCTS card) stays reachable from the Preset
-  // menu.
+  // "moment to watch" (ticks 9, 19 and 20, the Vault recorded as last-known by
+  // the Infiltrator's own perception filter) is what the hero copy walks a
+  // visitor through. Those tiers are read from the file, not rebuilt here. The
+  // demo.jsonl (MCTS card) stays reachable from the Preset menu, and is the case
+  // that has to fall back to a reconstruction and say so.
   const DEFAULT_TRAJECTORY = './infiltration.jsonl';
 
   // Pinned revision the page's evidence links and result fetches target.
@@ -151,6 +152,8 @@
     dom.perspectiveChips = document.getElementById('perspective-chips');
     dom.speedChips = document.getElementById('speed-chips');
     dom.mapCaption = document.getElementById('map-caption');
+    dom.fogBadge = document.getElementById('fog-badge');
+    dom.doorLayer = document.getElementById('door-layer');
     dom.sentence = document.getElementById('tick-sentence');
     dom.legendRoles = document.getElementById('legend-roles');
     dom.provGrid = document.getElementById('prov-grid');
@@ -568,13 +571,14 @@
     if (perspectiveIsAgent()) state.egoId = state.perspective;
     if (!opts.silent) {
       refreshChipActive(dom.perspectiveChips, String(state.perspective));
-      updateMapCaption();
       if (perspectiveIsAgent() !== wasAgent) {
         if (perspectiveIsAgent()) startPulse(); else stopPulse();
       }
       scheduleDraw();
       if (perspectiveIsAgent() && !opts.noFade) fadeCanvas();
-      updateCanvasLabel();
+      // The caption, the fog chip and the canvas label are all written by
+      // draw(), from the fog it actually drew: they cannot be set from here,
+      // or they would describe a frame that has not been painted yet.
     }
   }
 
@@ -589,19 +593,46 @@
     });
   }
 
-  // The one caption line under the map changes with the perspective chip.
-  function updateMapCaption() {
+  // What the fog chip says, and the one caption line under the map. Both are
+  // derived from the fog object itself, so the badge can never claim a source
+  // the frame is not drawn from.
+  function fogBadgeText(fog) {
+    if (!fog) return null;
+    return fog.source === 'recorded' ? 'Recorded perception' : 'Reconstructed sightline';
+  }
+
+  function updateFogBadge(fog) {
+    if (!dom.fogBadge) return;
+    const text = fogBadgeText(fog);
+    if (text) {
+      if (dom.fogBadge.textContent !== text) dom.fogBadge.textContent = text;
+      dom.fogBadge.removeAttribute('hidden');
+    } else {
+      dom.fogBadge.setAttribute('hidden', '');
+    }
+  }
+
+  function updateMapCaption(fog) {
     if (!dom.mapCaption) return;
     const traj = state.trajectory;
     let text;
-    if (!traj) {
+    if (!traj || !perspectiveIsAgent()) {
       text = 'Ground truth: everything in the world.';
-    } else if (!perspectiveIsAgent()) {
-      text = 'Ground truth: everything in the world.';
+    } else if (!fog) {
+      text = 'No recorded perception for this frame: everything in the world.';
     } else {
       const role = traj.header.AgentRoles && traj.header.AgentRoles[state.egoId];
       const name = role || 'Agent ' + state.egoId;
-      text = 'What the ' + name + ' could reach (reconstructed 2-hop sightline).';
+      if (fog.source === 'recorded') {
+        text = fog.fresh
+          ? 'What the ' + name + ' perceived when it chose (tick ' + fog.tick +
+            '), read from the recording.'
+          : 'Last decision-time view (tick ' + fog.tick + '): the episode ended here, so no ' +
+            name + ' ever decided from this frame — the fog shown is the last one it acted on.';
+      } else {
+        text = 'What the ' + name + ' could reach (reconstructed ' + fog.vision +
+          '-hop sightline) — derived by this page, not recorded.';
+      }
     }
     if (dom.mapCaption.textContent !== text) dom.mapCaption.textContent = text;
   }
@@ -619,13 +650,22 @@
     }, 240);
   }
 
-  function updateCanvasLabel() {
+  function updateCanvasLabel(fog) {
     const traj = state.trajectory;
-    const label = perspectiveIsAgent()
-      ? 'Replay view — ' + egoLabel(traj) + "'s reconstructed 2-hop sightline" +
-        ', tick ' + state.index + ' of ' + (traj ? traj.frames.length - 1 : 0)
-      : 'Replay view — Ground truth, tick ' + state.index +
+    let label;
+    if (!perspectiveIsAgent()) {
+      label = 'Replay view — Ground truth, tick ' + state.index +
         ' of ' + (traj ? traj.frames.length - 1 : 0);
+    } else if (!fog) {
+      label = 'Replay view — no recorded perception for tick ' + state.index +
+        ' of ' + (traj ? traj.frames.length - 1 : 0);
+    } else {
+      const source = fog.source === 'recorded'
+        ? "recorded perception at tick " + fog.tick + (fog.fresh ? '' : ' (last decision-time view)')
+        : "reconstructed " + fog.vision + "-hop sightline";
+      label = 'Replay view — ' + egoLabel(traj) + "'s " + source +
+        ', tick ' + state.index + ' of ' + (traj ? traj.frames.length - 1 : 0);
+    }
     if (dom.canvas && dom.canvas.getAttribute('aria-label') !== label) {
       dom.canvas.setAttribute('aria-label', label);
     }
@@ -651,6 +691,10 @@
     dom.provOpen.innerHTML = '';
     dom.provRepro.innerHTML = '';
     dom.sentence.textContent = 'Load a recording to see its frames described here.';
+    if (dom.fogBadge) {
+      dom.fogBadge.setAttribute('hidden', '');
+      dom.fogBadge.textContent = '';
+    }
     updateTransportDisabled();
     clearCanvas();
     showDom(dom.hint);
@@ -998,9 +1042,10 @@
 
     renderStatus();
     renderMetrics();
-    updateSentence();
-    updateMapCaption();
-    updateCanvasLabel();
+    updateSentence(fog);
+    updateMapCaption(fog);
+    updateFogBadge(fog);
+    updateCanvasLabel(fog);
     updateTransportDisabled();
     publishMeasureProbe();
     if (drawnAt) measureProbe.frame.ms = performance.now() - drawnAt;
@@ -1014,8 +1059,9 @@
   }
 
   // One full-canvas viewport: a fitted layout and an optional fog policy.
-  // No in-canvas header badge — the "RECONSTRUCTED SIGHTLINE" label is the
-  // CSS chip on the viewer wrapper, and the caption below the map re-states it.
+  // No in-canvas header badge — the fog-source chip is a real element on the
+  // viewer wrapper (so it is in the accessibility tree), and the caption below
+  // the map re-states it in words.
   function drawViewport(ctx, traj, frame, region, fog) {
     const layout = ensureLayout(traj, region.w, region.h);
     if (!layout) return;
@@ -1045,13 +1091,57 @@
     const map = state.trajectory.header.Map;
     const regions = map._doorRegions;
     if (!regions) return;
-    const found = hitDoor(event.offsetX, event.offsetY, regions);
-    if (found !== state.hoverDoorId) {
-      state.hoverDoorId = found;
-      scheduleDraw();
-      if (found !== null) dom.canvas.style.cursor = 'pointer';
-      else dom.canvas.style.cursor = '';
-    }
+    setHoverDoor(hitDoor(event.offsetX, event.offsetY, regions));
+  }
+
+  // One place that owns "which door is hovered". The canvas pointer path and
+  // the per-door hit targets both go through it, so a hover revealed one way
+  // is cleared the same way whichever pointer leaves.
+  function setHoverDoor(id) {
+    if (state.hoverDoorId === id) return;
+    state.hoverDoorId = id;
+    if (dom.canvas) dom.canvas.style.cursor = id === null ? '' : 'pointer';
+    scheduleDraw();
+  }
+
+  // A transparent hit target per door, laid over the canvas at the pill's own
+  // box. It gives every capacity gate a real element to point at — which is
+  // what the browser test hovers instead of re-deriving canvas geometry from
+  // the probe — and it is the same rect the canvas hit test already used, so
+  // the pointer path has one source of truth. Not focusable and hidden from
+  // assistive tech: the canvas carries the accessible description, and seven
+  // more tab stops over content the canvas already describes would be noise.
+  function syncDoorLayer(regions, map) {
+    if (!dom.doorLayer) return;
+    const signature = Object.keys(regions).sort().map(function (id) {
+      const r = regions[id];
+      return id + ':' + Math.round(r.x) + ',' + Math.round(r.y) + ',' + Math.round(r.w) + ',' + Math.round(r.h);
+    }).join('|');
+    if (dom.doorLayer._signature === signature) return;
+    dom.doorLayer._signature = signature;
+    dom.doorLayer.textContent = '';
+
+    Object.keys(regions).forEach(function (id) {
+      const r = regions[id];
+      const choke = map.ChokePoints.filter(function (c) { return String(c.Id) === String(id); })[0];
+      const hit = document.createElement('div');
+      hit.className = 'door-hit';
+      hit.dataset.door = String(id);
+      hit.style.left = r.x + 'px';
+      hit.style.top = r.y + 'px';
+      hit.style.width = r.w + 'px';
+      hit.style.height = r.h + 'px';
+      if (choke) {
+        const label = choke.MaxOccupancy === 0 ? 'locked' : 'capacity ' + choke.MaxOccupancy;
+        hit.title = 'Gate ' + choke.FromZoneId + '–' + choke.ToZoneId + ' · ' + label;
+      }
+      hit.addEventListener('mouseenter', function () { setHoverDoor(Number(id)); });
+      hit.addEventListener('mouseleave', function () { setHoverDoor(null); });
+      hit.addEventListener('click', function () {
+        setHoverDoor(state.hoverDoorId === Number(id) ? null : Number(id));
+      });
+      dom.doorLayer.appendChild(hit);
+    });
   }
 
   function onCanvasFocus() {
@@ -1109,7 +1199,22 @@
 
   /* ---------------------------------------------------- fog of war (ego)  */
 
+  // KnowledgeStatus travels as System.Text.Json's default enum form: an
+  // integer. Environment/PerceptionFilter.cs declares Observed=0, Stale=1,
+  // Unknown=2, and the recorded fog is only as good as that declaration, so
+  // the mapping is named here once rather than spelled as bare numbers at each
+  // use. The engine filters on the zone an element is in, so a resource and
+  // its room always carry the same status; the per-resource read is still taken
+  // from the recording, because that is what the recording says.
+  const KNOWLEDGE_OBSERVED = 0;
+  const KNOWLEDGE_NAME = { 0: 'observed', 1: 'stale', 2: 'unknown' };
+
   function visionHops(traj) {
+    // The cone the recording declares for the observer, when it declares one.
+    // The agents each carry their own filter, so this is per-agent, not the
+    // simulation's core config (which stays unbounded by design).
+    const declared = traj.header.AgentVision;
+    if (declared && typeof declared[state.egoId] === 'number') return declared[state.egoId];
     const cfg = traj.header.SimulationConfig;
     if (cfg && typeof cfg.Vision === 'number' && cfg.Vision >= 1) return cfg.Vision;
     return 2; // both tactical roster roles perceive two graph hops
@@ -1148,10 +1253,97 @@
     return seen;
   }
 
-  // Cumulative discovery up to the scrubbed tick: what the observer sees now
-  // (Observed), what it remembers (Stale), and what it has never reached
-  // (Unknown) — plus ghost memories of rival agents last spotted.
+  // The recorded decision-time view of frame `index`, or null when the file
+  // carries none for it.
+  //
+  // Frame i is the world AFTER step i, so the decision made from it is step
+  // i+1 — and that is the perception recorded on step line i+1. The final
+  // frame is the exception the viewer must not paper over: the episode ended
+  // there, so no agent ever decided from that world and no perception was ever
+  // recorded for it. The last view that WAS decided on is shown, flagged
+  // `fresh: false` so the caption can label it as the last decision-time view
+  // rather than present it as a live reading of the terminal frame.
+  function perceptionAt(traj, index, egoId) {
+    const recorded = traj.perceptions;
+    if (!recorded || !recorded.length) return null;
+    const step = index + 1;
+    if (step <= recorded.length) {
+      const row = recorded[step - 1];
+      return row ? { row: row, tick: step, fresh: true, egoId: egoId } : null;
+    }
+    if (index === recorded.length) {
+      const row = recorded[recorded.length - 1];
+      return row ? { row: row, tick: recorded.length, fresh: false, egoId: egoId } : null;
+    }
+    return null;
+  }
+
+  // The fog object every draw call reads. `source` is what the badge and the
+  // caption are honest about: 'recorded' means these are the values the
+  // agent's own filter produced, 'reconstructed' means this page re-derived
+  // them from omniscient positions and is guessing on the recording's behalf.
   function computePerception(traj, index, egoId) {
+    const recorded = perceptionAt(traj, index, egoId);
+    if (recorded) return fogFromRecording(recorded);
+    // A file that carries perceptions is a file whose fog is a record; if this
+    // particular frame has none (a recording that does not verify), showing a
+    // reconstruction here would pass a guess off as a record. Ground truth is
+    // the honest fallback.
+    if (traj.hasPerceptions) return null;
+    return reconstructPerception(traj, index, egoId);
+  }
+
+  // Straight off the recording: the three data tiers, the rivals it saw, and
+  // the ticks it saw them on. Nothing is inferred here.
+  function fogFromRecording(view) {
+    const me = view.row.find(function (p) { return p.AgentId === view.egoId; });
+    if (!me) return null;
+
+    const zones = {};
+    const resources = {};
+    const sightings = {};
+    const ghosts = {};
+    (me.Zones || []).forEach(function (zone) {
+      zones[zone.ZoneId] = KNOWLEDGE_NAME[zone.Status] || 'unknown';
+    });
+    (me.Resources || []).forEach(function (res) {
+      resources[res.ResourceId] = KNOWLEDGE_NAME[res.Status] || 'unknown';
+    });
+    (me.Agents || []).forEach(function (agent) {
+      if (agent.AgentId === view.egoId) return;
+      const status = KNOWLEDGE_NAME[agent.Status] || 'unknown';
+      sightings[agent.AgentId] = { status: status, state: agent.LastKnownState, tick: agent.LastSeenTick };
+      // A sighting the observer has: the rival is drawn live, not as a ghost.
+      if (agent.Status !== KNOWLEDGE_OBSERVED && agent.LastKnownState) {
+        ghosts[agent.AgentId] = {
+          state: agent.LastKnownState,
+          // The frame that sighting was made from, so "last seen N t ago"
+          // counts the same way it does on the reconstruction path. The
+          // recorded tick is the decision it was seen on; frame = tick - 1.
+          frame: agent.LastSeenTick - 1,
+        };
+      }
+    });
+
+    return {
+      source: 'recorded',
+      vision: me.Vision,
+      egoId: view.egoId,
+      tick: view.tick,
+      fresh: view.fresh,
+      zones: zones,
+      resources: resources,
+      sightings: sightings,
+      ghosts: ghosts,
+    };
+  }
+
+  // Cumulative discovery up to the scrubbed tick, for a recording with no
+  // perception field: what the observer could reach now (Observed), what it
+  // remembers (Stale), and what it has never reached (Unknown) — plus ghost
+  // memories of rival agents last spotted. This is a page-side derivation, not
+  // a record, and every string it reaches says so.
+  function reconstructPerception(traj, index, egoId) {
     const map = traj.header.Map;
     const vision = visionHops(traj);
     const egoZone = function (frame) {
@@ -1161,6 +1353,7 @@
 
     const lastSeenAt = {};
     const ghosts = {};
+    const sightings = {};
     for (let ti = 0; ti <= index; ti += 1) {
       const frame = traj.frames[ti];
       const seen = observedZones(map, egoZone(frame), vision);
@@ -1168,24 +1361,58 @@
       frame.agents.forEach(function (agent) {
         if (agent.AgentId === egoId) return;
         if (seen[agent.ZoneId] !== undefined) {
-          ghosts[agent.AgentId] = { state: agent, tick: ti };
+          ghosts[agent.AgentId] = { state: agent, frame: ti };
+          sightings[agent.AgentId] = { status: 'observed', state: agent, frame: ti };
+        } else if (ghosts[agent.AgentId]) {
+          sightings[agent.AgentId] = {
+            status: 'stale', state: ghosts[agent.AgentId].state, frame: ghosts[agent.AgentId].frame,
+          };
+        } else {
+          sightings[agent.AgentId] = { status: 'unknown', state: null, frame: -1 };
         }
       });
     }
 
     const current = observedZones(map, egoZone(traj.frames[index]), vision);
     const zones = {};
+    const resources = {};
     map.Zones.forEach(function (zone) {
       zones[zone.Id] = current[zone.Id] !== undefined
         ? 'observed'
         : lastSeenAt[zone.Id] !== undefined ? 'stale' : 'unknown';
     });
+    map.Resources.forEach(function (res) { resources[res.Id] = zones[res.ZoneId]; });
 
-    return { vision: vision, egoId: egoId, zones: zones, ghosts: ghosts };
+    return {
+      source: 'reconstructed',
+      vision: vision,
+      egoId: egoId,
+      tick: index + 1,
+      fresh: true,
+      zones: zones,
+      resources: resources,
+      sightings: sightings,
+      ghosts: ghosts,
+    };
   }
 
   function zoneStatus(fog, zoneId) {
     return fog ? fog.zones[zoneId] || 'unknown' : 'observed';
+  }
+
+  // A resource's tier, from the recording where it has one. A reconstructed
+  // fog reads it off the room, which is what the reconstruction can know.
+  function resourceStatus(fog, res) {
+    if (!fog) return 'observed';
+    return fog.resources[res.Id] || zoneStatus(fog, res.ZoneId);
+  }
+
+  // Live rival, or a memory of one? From the recorded sighting where the file
+  // has one, from the room tier otherwise.
+  function rivalStatus(fog, agent) {
+    if (!fog) return 'observed';
+    if (fog.sightings && fog.sightings[agent.AgentId]) return fog.sightings[agent.AgentId].status;
+    return zoneStatus(fog, agent.ZoneId);
   }
 
   // The observer's horizon: a dashed sight ring plus a slow radar pulse.
@@ -1386,6 +1613,7 @@
     const regions = {};
     Object.keys(leveledDoors).forEach(function (id) { regions[id] = leveledDoors[id]; });
     map._doorRegions = regions;
+    syncDoorLayer(regions, map);
 
     // Drop a hover that no longer targets a door (e.g. door left the view).
     if (state.hoverDoorId !== null && !regions[state.hoverDoorId]) {
@@ -1408,21 +1636,25 @@
     map.Zones.forEach(function (zone) {
       const items = byZone[zone.Id];
       if (!items || !items.length) return;
-      const status = zoneStatus(fog, zone.Id);
-      if (status === 'unknown') return; // unexplored rooms reveal nothing
+      // The recording states each resource's tier, so an unexplored chest is
+      // left out even in a room that is. (The engine filters on the room, so
+      // in practice the two agree; the per-resource read is what the file
+      // says, and the layout is unchanged either way.)
+      const shown = items.filter(function (res) { return resourceStatus(fog, res) !== 'unknown'; });
+      if (!shown.length) return;
       const rect = roomRect(zone, layout);
       const y = rect.y + layout.bands.lootY;
       const spacing = 14;
       // Anchor the loot row to the room's lower-left corner so it never
       // collides with the centered agent tokens and the count pill.
       const startX = rect.x - rect.hw + layout.pad - 4;
-      ctx.globalAlpha = status === 'stale' ? 0.35 : 1;
-      items.forEach(function (res, i) {
+      ctx.globalAlpha = resourceStatus(fog, shown[0]) === 'stale' ? 0.35 : 1;
+      shown.forEach(function (res, i) {
         drawDiamond(ctx, startX + i * spacing, y, 5, claimed[res.Id] ? COLORS.claimed : COLORS.unclaimed);
       });
       ctx.globalAlpha = 1;
       if (measureProbe.on) {
-        const endX = startX + (items.length - 1) * spacing;
+        const endX = startX + (shown.length - 1) * spacing;
         measureProbe.loot[zone.Id] = { x: startX - 5, y: y - 5, w: endX - startX + 10, h: 10 };
       }
     });
@@ -1580,14 +1812,14 @@
     pool.forEach(function (agent) {
       if (agent.Transit) return;
       const isEgo = fog && agent.AgentId === fog.egoId;
-      const ghosted = fog && !isEgo && zoneStatus(fog, agent.ZoneId) !== 'observed';
+      const ghosted = fog && !isEgo && rivalStatus(fog, agent) !== 'observed';
       let zoneId = agent.ZoneId;
       let text;
       if (ghosted) {
         const ghost = fog.ghosts[agent.AgentId];
         if (!ghost) return; // never spotted — nothing to remember
         zoneId = ghost.state.ZoneId;
-        const age = state.index - ghost.tick;
+        const age = state.index - ghost.frame;
         text = 'last seen ' + (age === 0 ? 'now' : age + 't ago');
       } else {
         const role = roles && roles[agent.AgentId];
@@ -1647,10 +1879,11 @@
     });
 
     pool.forEach(function (agent) {
-      // Fog rule: the observer is real-time; rivals render only when their
-      // room is inside the current horizon, otherwise as a memory ghost.
+      // Fog rule: the observer is real-time; a rival renders live only while
+      // the recording says it is inside the observer's horizon, and otherwise
+      // as a memory ghost at the room it was last seen in.
       const isEgo = fog && agent.AgentId === fog.egoId;
-      if (fog && !isEgo && zoneStatus(fog, agent.ZoneId) !== 'observed') {
+      if (fog && !isEgo && rivalStatus(fog, agent) !== 'observed') {
         drawGhost(ctx, map, frame, layout, fog, agent, roles, nameSlots);
         return;
       }
@@ -1995,21 +2228,21 @@
     const rivalIds = frame.agents.filter(function (a) { return a.AgentId !== state.egoId; });
     if (!rivalIds.length) return 'no rival agents in this recording';
 
-    const inView = rivalIds.filter(function (a) { return skel.zones[a.ZoneId] === 'observed'; });
+    const inView = rivalIds.filter(function (a) { return rivalStatus(skel, a) === 'observed'; });
     const clauses = [];
     if (inView.length) {
       clauses.push('sees ' + inView.map(function (a) { return roleLabel(a.AgentId); }).join(' and '));
     }
     Object.keys(skel.ghosts).forEach(function (id) {
       const ghost = skel.ghosts[id];
-      const age = index - ghost.tick;
+      const age = index - ghost.frame;
       clauses.push('last saw ' + roleLabel(Number(id)) + (age === 0 ? ' moments ago' : ' ' + age + ' ticks ago'));
     });
     if (!clauses.length) clauses.push('no rivals in view');
     return clauses.join('; ');
   }
 
-  function describeFrame() {
+  function describeFrame(fog) {
     const traj = state.trajectory;
     if (!traj || !traj.frames.length) return 'No recording loaded.';
     const last = traj.frames.length - 1;
@@ -2030,7 +2263,7 @@
           ' resource' + (map.Resources.length === 1 ? '' : 's') + ' claimed.';
       }
     } else {
-      sentence = describeFrameAgentSide(traj, index, last, frame, map);
+      sentence = describeFrameAgentSide(traj, index, last, frame, map, fog);
     }
 
     if (index === last && traj.final && traj.final.Metrics) {
@@ -2045,27 +2278,37 @@
     return 'Recorded frame · tick ' + index + ' of ' + last + ' — ' + sentence;
   }
 
-  function describeFrameAgentSide(traj, index, last, frame, map) {
+  function describeFrameAgentSide(traj, index, last, frame, map, fog) {
     if (!frame.agents || !frame.agents.length) {
       return 'This recorded frame carries no agent states.';
     }
-    const skel = computePerception(traj, index, state.egoId);
+    const skel = fog;
+    if (!skel) {
+      return 'This recording carries no decision-time perception for this frame, so nothing is ' +
+        'masked: ' + frame.agents.length + ' agent(s) shown as recorded.';
+    }
     let observed = 0, stale = 0, unknown = 0;
     map.Zones.forEach(function (z) {
       if (skel.zones[z.Id] === 'observed') observed += 1;
       else if (skel.zones[z.Id] === 'stale') stale += 1;
       else unknown += 1;
     });
-    let s = 'From ' + roleLabel(state.egoId) + "'s recorded position: " +
+    let s = (skel.source === 'recorded'
+      ? 'Recorded at tick ' + skel.tick + ', what ' + roleLabel(state.egoId) + ' perceived when it chose: '
+      : 'Derived by this page, what ' + roleLabel(state.egoId) + ' could reach: ') +
       observed + ' of ' + map.Zones.length + ' rooms observed, ' +
       stale + ' last known, ' + unknown + ' unexplored';
     const rivals = describeRivalSight(skel, index);
     s += '; ' + rivals + '.';
+    if (skel.source === 'recorded' && !skel.fresh) {
+      s += ' This is the last decision-time view in the recording: the episode ended at tick ' +
+        skel.tick + ', so no decision was made from this frame.';
+    }
     return s;
   }
 
-  function updateSentence() {
-    const text = describeFrame();
+  function updateSentence(fog) {
+    const text = describeFrame(fog);
     if (dom.sentence.textContent !== text) {
       dom.sentence.textContent = text;
     }
@@ -2094,6 +2337,10 @@
         ' · vision ' + (cfg.Vision !== undefined ? cfg.Vision : '?')],
       ['Rooms / resources / gates',
         hdr.Map.Zones.length + ' / ' + hdr.Map.Resources.length + ' / ' + hdr.Map.ChokePoints.length],
+      ['Decision-time perception', traj.hasPerceptions
+        ? 'recorded — each agent\'s own view at its decision, cone per agent ' +
+          ((hdr.AgentVision || []).join(' / ')) + ' hops'
+        : 'not recorded — the agent-view sightline is reconstructed by this page'],
     ];
 
     let html = '';
@@ -2379,13 +2626,25 @@
       AgentRoles: decoded[0].AgentRoles || null,
       SchemaVersion: decoded[0].SchemaVersion,
       DynamicRules: decoded[0].DynamicRules || null,
+      AgentVision: decoded[0].AgentVision || null,
     };
     const steps = [];
+    // Schema 4 records, per step, what each agent's own perception filter
+    // produced at the moment it decided. Index i is step i+1 — the decision
+    // made FROM the world that frame i shows. A recording without the field
+    // (every pre-schema-4 file, demo.jsonl included) leaves this null and the
+    // viewer falls back to reconstructing a sightline, saying so.
+    const perceptions = [];
+    let hasPerceptions = false;
     let final = null;
 
     decoded.slice(1).forEach(function (rec) {
       if (rec.Kind === 'step') {
         steps.push(rec);
+        if (rec.Perceptions && rec.Perceptions.length) {
+          hasPerceptions = true;
+          perceptions[steps.length - 1] = rec.Perceptions;
+        }
       } else if (rec.Kind === 'final') {
         final = rec;
       }
@@ -2407,7 +2666,15 @@
       frames.push({ agents: agents, claims: claims, info: step.Result && step.Result.Info });
     });
 
-    return { header: header, final: final, frames: frames };
+    return {
+      header: header,
+      final: final,
+      frames: frames,
+      // Cached once per recording: the fog source is a property of the file,
+      // not of the frame, and the draw path asks for it on every repaint.
+      hasPerceptions: hasPerceptions,
+      perceptions: hasPerceptions ? perceptions : null,
+    };
   }
 
   function decodeMap(m) {

@@ -355,16 +355,18 @@ main {
   color: var(--muted);
 }
 
-/* Reconstruction chip: shown only while an agent-view chip (not the ground
-   truth chip) is active in the perspective radiogroup. Purely presentational
-   — never intercepts pointer events, and never appears above ground truth
-   where no fog is drawn. */
-.control-strip:has(#perspective-chips .chip.active:not([data-id="ground"])) ~ .viewer::after {
-  content: "Reconstructed sightline";
+/* Fog-source chip: says whether the fog on the map is a record or a
+   page-side derivation. Real text, not a ::after pseudo-element, so it is in
+   the accessibility tree and can be read by assistive tech and by the browser
+   test harness. Shown and worded by the viewer, which knows which of the two
+   the loaded recording supports; hidden over ground truth, where no fog is
+   drawn. Purely presentational — never intercepts pointer events. */
+.fog-badge {
   position: absolute;
   top: 8px;
   right: 8px;
   z-index: 2;
+  margin: 0;
   font-family: var(--mono);
   font-size: 0.68rem;
   letter-spacing: 0.04em;
@@ -376,6 +378,27 @@ main {
   padding: 3px 8px;
   pointer-events: none;
   user-select: none;
+}
+
+.fog-badge[hidden] {
+  display: none;
+}
+
+/* Invisible hit targets, one per capacity gate, laid over the canvas at the
+   pill's own box so a pointer (or a test) can address a door by element rather
+   than by re-deriving canvas coordinates. Sits under the fog chip. */
+.door-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.door-hit {
+  position: absolute;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
 }
 
 /* ---- legend ---- */

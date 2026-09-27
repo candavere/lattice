@@ -384,10 +384,13 @@ Only claims the repository can back up are listed here.
   policy must beat under the identical protocol.
 - **Demo fog is recording-dependent.** Infiltration recordings carry
   decision-time `Perceptions` (header `AgentVision`) so the site agent view can
-  draw recorded fog. Older files such as `site/demo.jsonl` still lack that
-  side-channel; for those the page reconstructs a 2-hop sightline from
-  positions. `SimulationConfig.Vision` remains `-1` (omniscient StepResult) per
-  adr-002.
+  draw recorded fog. That side-channel grows `site/infiltration.jsonl` by about
+  73% versus the same episode without it. Older files such as `site/demo.jsonl`
+  still lack that side-channel; for those the page reconstructs a 2-hop
+  sightline from positions. `SimulationConfig.Vision` remains `-1` (omniscient
+  StepResult) per adr-002. On the infiltration demo, the vault goes “last known”
+  on the Infiltrator view at ticks 9 and 19; tick 20 is the post-terminal frame
+  and does not draw decision-time fog.
 - **Per-tick state hash.** `replay --verify` recomputes a SHA-256 digest of
   the full simulation state at every tick — zone and resource positions,
   occupancy, the per-tick choke capacities and derived edge load, scores,

@@ -56,6 +56,9 @@ public sealed class ScoutCollectorAgent : IAgent
     public AgentBeliefMap Belief => _belief;
 
     /// <inheritdoc />
+    public PartialObservation? LastDecisionPerception { get; private set; }
+
+    /// <inheritdoc />
     public AgentAction Decide(Observation observation)
     {
         // The full observation is used only to build the observer's own sensor
@@ -63,6 +66,7 @@ public sealed class ScoutCollectorAgent : IAgent
         // exclusively the projected partial view and this agent's beliefs.
         _filter ??= new PerceptionFilter(observation.Map, AgentId, _vision);
         var partial = _filter.Project(_tick++, observation);
+        LastDecisionPerception = partial;
         _belief.Update(partial);
         _zoneCount = partial.Zones.Length;
 

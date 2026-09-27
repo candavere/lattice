@@ -123,15 +123,6 @@ public static class InfiltrationScenario
     }
 
     /// <summary>
-    /// Per-agent hop horizons for infiltration recordings (Sentry then
-    /// Infiltrator), matching each agent's <c>DefaultVision</c>.
-    /// </summary>
-    public static int[] DefaultAgentVision(
-        int sentryVision = SentryPatrolAgent.DefaultVision,
-        int infiltratorVision = InfiltratorAgent.DefaultVision) =>
-        new[] { sentryVision, infiltratorVision };
-
-    /// <summary>
     /// Scans the recorded step results for the two victory conditions:
     /// interception when the guard and rogue share a zone at any tick boundary,
     /// exfiltration when every resource (both chests and the extraction) is

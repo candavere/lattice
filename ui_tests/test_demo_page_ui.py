@@ -7,15 +7,15 @@ and door pill just drawn, plus per-frame index/perspective).
 
 Covers what the demo simplification stage asserts:
   * one-click perspective chips (ground aside, agent views) + keyboard roving,
-  * single-map viewer with a fog badge ("Recorded perception" or
-    "Reconstructed sightline") + moving caption,
+  * single-map viewer with a fog badge: infiltration asserts "Recorded
+    perception"; demo.jsonl asserts "Reconstructed sightline",
   * no token ever overlaps a room label (every frame, both perspectives),
   * no horizontal overflow of the page or the graph canvas,
-  * the fog reconstruction: the per-room status the page renders on every frame
-    of both agent views is re-derived from the recording and compared zone by
-    zone, and a "last known" moment (one agent view's room stale while ground
-    truth still calls it observed) is discovered from the recording, required to
-    exist, and checked to be painted the way the page says it is,
+  * the fog check: when the recording carries Perceptions, per-room status is
+    read from those decision-time records (post-terminal frame has no fog);
+    otherwise the old 2-hop reconstruction is used. A "last known" moment is
+    discovered from that timeline, required to exist for infiltration, and
+    checked to be painted the way the page says it is,
   * door pills appear on hover (pointer cursor),
   * legend renders as a compact aligned item grid (per-item height caps,
     swatch top-aligned with its label, inline code chips never wrap, no
@@ -45,7 +45,9 @@ from playwright.async_api import async_playwright
 ROOT = Path(__file__).resolve().parent.parent
 SITE = ROOT / "site"
 
-MEASURE_PARAMS = "?measure=1&infiltration.jsonl"
+def measure_params(recording_name="infiltration.jsonl"):
+    return f"?measure=1&{recording_name}"
+
 
 # JS helpers (the room-label badge lives on a ::after, so read it via
 # getComputedStyle rather than a selector).
@@ -79,11 +81,9 @@ def overlaps(a, b):
 
 
 # --- what the recording itself implies -------------------------------------
-# The page reconstructs an agent's sight from recorded positions (see the
-# "reconstructed sightline" copy) with a vision radius in graph hops. These
-# helpers re-derive that from the recording alone, so the UI assertions below
-# can be made against the file instead of against a hand-picked tick: if the
-# engine moves the episode, the derived frames and fog moments move with it.
+# Prefer decision-time Perceptions when present (mirror of site/app.js).
+# Older files without that side-channel fall back to the page's 2-hop
+# reconstruction from positions. Either way the UI asserts against the file.
 
 DEFAULT_VISION_HOPS = 2  # the page's fallback when the header records no radius
 
@@ -96,7 +96,10 @@ def fetch_recording(base, name="infiltration.jsonl"):
 
 
 def vision_hops(header):
-    """Mirror of the page's visionHops(): the recorded radius, else its default."""
+    """Mirror of the page's visionHops(): AgentVision[0], SimulationConfig.Vision, or default."""
+    agent_vision = header.get("AgentVision")
+    if isinstance(agent_vision, list) and agent_vision and isinstance(agent_vision[0], int) and agent_vision[0] >= 1:
+        return agent_vision[0]
     vision = header.get("SimulationConfig", {}).get("Vision")
     if isinstance(vision, int) and vision >= 1:
         return vision
@@ -116,6 +119,22 @@ def recorded_frames(recording):
         observed = line["Result"]["Observations"][0]
         frames.append(observed["AgentStates"])
     return frames
+
+
+def recorded_steps(recording):
+    return [line for line in recording if line.get("Kind") == "step"]
+
+
+def has_recorded_perceptions(recording):
+    return any(step.get("Perceptions") for step in recorded_steps(recording))
+
+
+def knowledge_status_name(status):
+    if status == 0 or status == "Observed":
+        return "observed"
+    if status == 1 or status == "Stale":
+        return "stale"
+    return "unknown"
 
 
 def _adjacency(header):
@@ -150,16 +169,39 @@ def ego_zone(agents, ego_id):
 
 
 def status_timeline(recording, ego_id):
-    """{frame: {zone: 'observed' | 'stale' | 'unknown'}} for one agent view,
-    with the page's cumulative discovery: a room that has been reachable at any
-    earlier frame but is not now reads 'last known'."""
+    """{frame: {zone: 'observed' | 'stale' | 'unknown'}} for one agent view.
+
+    When the file carries Perceptions, those decision-time records are the
+    source of truth (the post-terminal frame has no Decide, so no fog).
+    Otherwise the page's cumulative 2-hop reconstruction is used.
+    """
     header = recording[0]
+    zone_ids = [zone["Id"] for zone in header["Map"]["Zones"]]
+    frames = recorded_frames(recording)
+    steps = recorded_steps(recording)
+
+    if has_recorded_perceptions(recording):
+        timeline = {}
+        for index in range(len(frames)):
+            if index >= len(steps):
+                timeline[index] = {zone_id: "observed" for zone_id in zone_ids}
+                continue
+            perceptions = steps[index].get("Perceptions") or []
+            partial = next((p for p in perceptions if p.get("AgentId") == ego_id), None)
+            if partial is None and 0 <= ego_id < len(perceptions):
+                partial = perceptions[ego_id]
+            statuses = {zone_id: "unknown" for zone_id in zone_ids}
+            if partial:
+                for zone in partial.get("Zones") or []:
+                    statuses[zone["ZoneId"]] = knowledge_status_name(zone.get("Status"))
+            timeline[index] = statuses
+        return timeline
+
     adj = _adjacency(header)
     hops = vision_hops(header)
-    zone_ids = [zone["Id"] for zone in header["Map"]["Zones"]]
     last_seen = {}
     timeline = {}
-    for index, agents in enumerate(recorded_frames(recording)):
+    for index, agents in enumerate(frames):
         seen = _zones_within(adj, ego_zone(agents, ego_id), hops)
         for zone_id in seen:
             last_seen[zone_id] = index
@@ -493,7 +535,10 @@ def start_server():
     return httpd, port
 
 
-async def run_viewport(browser, base, label, viewport, reduced):
+async def run_viewport(browser, base, label, viewport, reduced,
+                       recording_name="infiltration.jsonl",
+                       expected_badge="Recorded perception",
+                       require_stale_moment=True):
     results = []
     context = await browser.new_context(
         viewport=viewport, reduced_motion="reduce" if reduced else "no-preference"
@@ -505,7 +550,7 @@ async def run_viewport(browser, base, label, viewport, reduced):
     page.on("pageerror", lambda e: errors.append(f"pageerror:{e}"))
 
     try:
-        await page.goto(base + MEASURE_PARAMS, wait_until="networkidle")
+        await page.goto(base + measure_params(recording_name), wait_until="networkidle")
         await page.wait_for_function(
             "window.__latticeGeo && window.__latticeGeo.frame && "
             "document.querySelectorAll('#perspective-chips .chip').length >= 3"
@@ -524,7 +569,7 @@ async def run_viewport(browser, base, label, viewport, reduced):
         # -- the recording, read from the same server the page read it from ---
         # Frame count and fog expectation both come from here, never from a
         # constant: an engine change that reshapes the episode moves them.
-        recording = fetch_recording(base)
+        recording = fetch_recording(base, recording_name)
         frame_count = len(recorded_frames(recording))
         slider_max = int(await page.evaluate("() => document.querySelector('#scrub-slider').max"))
         results.append((
@@ -536,9 +581,7 @@ async def run_viewport(browser, base, label, viewport, reduced):
         # -- default perspective + badge ------------------------------------
         active = await page.locator("#perspective-chips .chip.active").all_text_contents()
         badge = await page.evaluate(BADGE)
-        ok_default = active == ["Sentry"] and (
-            "Reconstructed sightline" in badge or "Recorded perception" in badge
-        )
+        ok_default = active == ["Sentry"] and expected_badge in badge
         results.append((f"[{label}] default Sentry chip + badge", ok_default, f"active={active} badge={badge}"))
 
         # -- one-click chips: ground aside, then back to Sentry --------------
@@ -553,10 +596,7 @@ async def run_viewport(browser, base, label, viewport, reduced):
         await page.wait_for_function(wait_frame(0, "0"))
         caption = await page.locator("#map-caption").text_content()
         badge = await page.evaluate(BADGE)
-        ok_sentry = (
-            str(caption).startswith("What the Sentry")
-            and ("Reconstructed sightline" in badge or "Recorded perception" in badge)
-        )
+        ok_sentry = str(caption).startswith("What the Sentry") and expected_badge in badge
         results.append((f"[{label}] one-click Sentry chip (caption+badge)", ok_sentry, caption))
 
         # -- keyboard roving: focus Infiltrator chip, ArrowLeft -> Sentry ----
@@ -622,18 +662,19 @@ async def run_viewport(browser, base, label, viewport, reduced):
         # Found, not hard-coded: the first frame where some agent view calls the
         # vault last-known while ground truth still calls it observed. A
         # recording with no such moment leaves the page nothing to demonstrate,
-        # which is a failure rather than a pass.
+        # which is a failure for infiltration rather than a pass.
         zone = vault_zone(recording)
         moments = stale_moments(recording, agent_ids)
-        results.append((
-            f"[{label}] recording has a 'last known' moment to demonstrate",
-            zone is not None and bool(moments),
-            f"vault zone {zone}, moments {moments}" if zone is not None
-            else "no zone carries the TreasureVault role"))
-        if zone is None or not moments:
+        if require_stale_moment:
+            results.append((
+                f"[{label}] recording has a 'last known' moment to demonstrate",
+                zone is not None and bool(moments),
+                f"vault zone {zone}, moments {moments}" if zone is not None
+                else "no zone carries the TreasureVault role"))
+        if require_stale_moment and (zone is None or not moments):
             results.append((f"[{label}] vault last-known moment renders as recorded", False,
                             "no moment discovered, so there is nothing to check"))
-        else:
+        elif moments and zone is not None:
             view, tick = moments[0]
             room = str(zone)
             view_status = rendered[(str(view), tick)].get(room)
@@ -689,7 +730,8 @@ async def run_viewport(browser, base, label, viewport, reduced):
         # -- door pills on hover ---------------------------------------------
         # Any mid-episode frame will do; it is clamped to the recording rather
         # than assumed, so a shorter episode cannot strand this on a frame that
-        # does not exist.
+        # does not exist. Scroll the canvas into view first — small viewports
+        # otherwise miss the hit target.
         pill_tick = min(13, frame_count - 1)
         await page.locator('#perspective-chips .chip[data-id="ground"]').click()
         await page.evaluate(SLIDE, pill_tick)
@@ -697,13 +739,11 @@ async def run_viewport(browser, base, label, viewport, reduced):
         doors = (await page.evaluate("window.__latticeGeo"))["doors"]
         ndoors = len(doors)
         cursor = False
+        canvas = page.locator("#viewer-canvas")
+        await canvas.scroll_into_view_if_needed()
         if doors:
             d = next(iter(doors.values()))
-            xy = await page.evaluate(
-                """() => { const r = document.querySelector('#viewer-canvas').getBoundingClientRect();
-                return [r.left, r.top]; }"""
-            )
-            await page.mouse.move(xy[0] + d["x"] + d["w"] / 2, xy[1] + d["y"] + 12, steps=2)
+            await canvas.hover(position={"x": d["x"] + d["w"] / 2, "y": d["y"] + 12})
             await page.wait_for_timeout(150)
             cursor = await page.evaluate("(document.querySelector('canvas').style.cursor === 'pointer')")
         results.append((f"[{label}] door pills hover", ndoors == 7 and cursor, f"doors={ndoors} cursor={cursor}"))
@@ -792,7 +832,8 @@ async def run_viewport(browser, base, label, viewport, reduced):
 
 
 class TestDemoPageUI(unittest.TestCase):
-    def _check(self, viewport, reduced):
+    def _check(self, viewport, reduced, recording_name="infiltration.jsonl",
+               expected_badge="Recorded perception", require_stale_moment=True):
         httpd, port = start_server()
         base = f"http://127.0.0.1:{port}/"
         try:
@@ -804,6 +845,9 @@ class TestDemoPageUI(unittest.TestCase):
                             browser, base,
                             "desktop" if viewport["width"] >= 1280 else "mobile",
                             viewport, reduced,
+                            recording_name=recording_name,
+                            expected_badge=expected_badge,
+                            require_stale_moment=require_stale_moment,
                         )
                     finally:
                         await browser.close()
@@ -824,6 +868,47 @@ class TestDemoPageUI(unittest.TestCase):
 
     def test_mobile_390x844_reduced_motion(self):
         self._check({"width": 390, "height": 844}, reduced=True)
+
+    def test_demo_jsonl_badge_is_reconstructed_sightline(self):
+        """demo.jsonl has no Perceptions; the page must say Reconstructed sightline."""
+        httpd, port = start_server()
+        base = f"http://127.0.0.1:{port}/"
+        try:
+            async def run():
+                async with async_playwright() as p:
+                    browser = await p.chromium.launch()
+                    try:
+                        context = await browser.new_context(viewport={"width": 1440, "height": 900})
+                        page = await context.new_page()
+                        await page.goto(base + measure_params("infiltration.jsonl"), wait_until="networkidle")
+                        await page.wait_for_function(
+                            "window.__latticeGeo && window.__latticeGeo.frame && "
+                            "document.querySelectorAll('#perspective-chips .chip').length >= 3"
+                        )
+                        await page.locator('#scenario-chips .chip[data-id="demo"]').click()
+                        await page.wait_for_function(
+                            "() => document.querySelector('#source-label')?.textContent?.includes('demo.jsonl')"
+                        )
+                        await page.wait_for_function(
+                            "window.__latticeGeo && window.__latticeGeo.frame && "
+                            "document.querySelectorAll('#perspective-chips .chip').length >= 2"
+                        )
+                        agent = page.locator('#perspective-chips .chip:not([data-id="ground"])').first
+                        await agent.click()
+                        await page.wait_for_timeout(150)
+                        badge = await page.evaluate(BADGE)
+                        recording = fetch_recording(base, "demo.jsonl")
+                        self.assertFalse(
+                            has_recorded_perceptions(recording),
+                            "demo.jsonl unexpectedly carries Perceptions")
+                        self.assertIn("Reconstructed sightline", badge, badge)
+                    finally:
+                        await browser.close()
+
+            asyncio.run(run())
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
 
     def test_title_census_rejects_a_mispainted_title(self):
         """The ink floor and the colour claims must not make the census lenient.
@@ -859,7 +944,7 @@ class TestDemoPageUI(unittest.TestCase):
                         viewport={"width": 390, "height": 844},
                         reduced_motion="reduce")
                     page = await context.new_page()
-                    await page.goto(base + MEASURE_PARAMS, wait_until="networkidle")
+                    await page.goto(base + measure_params("infiltration.jsonl"), wait_until="networkidle")
                     await page.wait_for_function(
                         "window.__latticeGeo && window.__latticeGeo.frame")
                     recording = fetch_recording(base)

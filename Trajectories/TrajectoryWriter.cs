@@ -155,12 +155,7 @@ public static class TrajectoryWriter
                 "DecisionPerceptions and AgentVision must be supplied together (or both omitted).");
         }
 
-        if (agentVision.Length != simulationConfig.AgentCount)
-        {
-            throw new ArgumentException(
-                $"AgentVision length ({agentVision.Length}) must equal AgentCount ({simulationConfig.AgentCount}).",
-                nameof(agentVision));
-        }
+        DecisionPerceptionRecording.ValidateAgentVision(simulationConfig.AgentCount, agentVision);
 
         if (decisionPerceptions.Length != actions.Length)
         {

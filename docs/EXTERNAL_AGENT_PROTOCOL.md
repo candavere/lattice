@@ -1486,10 +1486,10 @@ file.
 | `Cli/CliApp.cs:913-919` | Canonical seed suites, tick budget, `PairedStudy.Analyze`. |
 | `Cli/CliApp.cs:1434` | `simulate --agent` usage text. |
 | `Generator/MapGenerator.cs:13-25` | Zone and resource bounds are caller-configured, no ceiling. |
-| `Trajectories/TrajectoryModel.cs:6-31` | `TrajectorySchema.CurrentVersion = 3`, state-hash version. |
+| `Trajectories/TrajectoryModel.cs:6-44` | `TrajectorySchema.CurrentVersion = 4`, state-hash version 3, perception side-channel version 4. |
 | `Trajectories/TrajectoryModel.cs:33-45` | The header: seed and map captured so replay needs no generator. |
 | `Trajectories/TrajectoryModel.cs:46-53` | `TrajectoryHeader` — no external-agent field. |
-| `Trajectories/TrajectoryModel.cs:68-72` | `TrajectoryStep` — actions plus result plus state hash. |
+| `Trajectories/TrajectoryModel.cs:73-85` | `TrajectoryStep` — actions plus result plus state hash plus optional Perceptions. |
 | `Trajectories/TrajectoryModel.cs:79-85` | `TrajectoryFinal` — no external-agent field. |
 | `Trajectories/TrajectoryReader.cs:77-80` | Newer schema versions are rejected, not guessed. |
 | `docs/SUPPORT_AND_REPRODUCIBILITY.md:212-220` | Structural replay invariants; action validity at record and verify. |

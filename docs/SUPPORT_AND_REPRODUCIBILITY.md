@@ -157,7 +157,7 @@ produced, and those recorded values are the only provenance a result carries.
 
 ## 4. Trajectory Schema and Release Immutability Policy
 
-### Schema v3 header requirements
+### Schema v4 header requirements
 
 Trajectories are JSONL with a fixed line grammar: exactly one `header` line
 first, one `step` line per tick, and exactly one `final` line last. Every line
@@ -173,11 +173,12 @@ the generator:
 | `Map` | yes | The fully materialized map graph. |
 | `SimulationConfig` | yes | Configuration used to rebuild the environment. |
 | `DynamicRules` | no | The dynamic topology policy; omitted (null) for static maps. |
-| `SchemaVersion` | yes | Wire format stamp; the current version is `TrajectorySchema.CurrentVersion` (currently `3`). |
+| `SchemaVersion` | yes | Wire format stamp; the current version is `TrajectorySchema.CurrentVersion` (currently `4`). |
 | `Scenario` | no | Demonstration-layer metadata; ignored by the replay core. |
 | `AgentRoles` | no | Demonstration-layer roster metadata; ignored by the replay core. |
+| `AgentVision` | no | Per-agent hop horizons for the optional decision-time fog side-channel; omitted when the recording carries no `Perceptions`. |
 
-Newly written files carry `TrajectorySchema.CurrentVersion` (currently `3`);
+Newly written files carry `TrajectorySchema.CurrentVersion` (currently `4`);
 this document cites that constant rather than a bare literal, so it cannot
 drift out of step with the code. Schema 2 introduced the episode's dynamic
 topology policy (`DynamicRules`, timed portcullises and event locks), which the
@@ -210,6 +211,29 @@ Schema 3 does not change the header. It changes the step lines.
   recording's own header version, so rewriting a pre-hash file cannot promote
   it to schema 3 with no digests present (see the migration invariant below).
 
+#### What schema 4 adds
+
+Schema 4 documents the optional decision-time fog side-channel. The fields are
+nullable and omitted when absent, so a schema-3 file without them still reads
+and verifies.
+
+- **`AgentVision` on the header** (optional). Per-agent hop horizons used when
+  the recording carries decision-time perceptions. Length must equal
+  `SimulationConfig.AgentCount` when present.
+- **`Perceptions` on each step line** (optional). The `PartialObservation` each
+  agent projected *before* choosing that tick's action — decision-time fog, not
+  a post-step reconstruction. Verify re-projects with fresh filters from the
+  same pre-step observations and fails if the recorded perceptions diverge.
+- **The notice path when the side-channel is absent.** A schema-4 recording
+  without `AgentVision`/`Perceptions` still verifies on `StepResult` (and
+  `StateHash`) and reports
+  `no decision-time perceptions: fog side-channel not verified`
+  (`TrajectoryReplay.NoPerceptionNotice`), mirroring the hash-less notice for
+  pre-schema-3 files. Stripping both channels from a file that had them is
+  silent on fog only when the header never claimed them; `StateHash` remains
+  mandatory from schema 3 onward.
+- **`SimulationConfig.Vision` is unchanged.** It stays `-1` (omniscient
+  `StepResult`) per adr-002; recorded fog lives only in the side-channel.
 ### Structural and migration invariants
 
 - The header must be the first line; a second header anywhere is rejected.

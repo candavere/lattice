@@ -17,6 +17,15 @@ public interface IAgent
     int AgentId { get; }
 
     /// <summary>
+    /// The <see cref="PartialObservation"/> this agent projected inside its
+    /// most recent <see cref="Decide"/> call, or null when the agent does not
+    /// use a perception filter. Scenario recording reads this after Decide so
+    /// the trajectory side-channel matches the agent's own filter, not a
+    /// separately constructed one.
+    /// </summary>
+    PartialObservation? LastDecisionPerception => null;
+
+    /// <summary>
     /// Produces the agent's action for the current tick from its
     /// <paramref name="observation"/>. Must be deterministic for a given
     /// (agent state, observation) pair — any randomness must come from an

@@ -127,7 +127,10 @@ public class ExternalAgentDeterminismTests
                 Assert.Contains("replay verified", stderr, StringComparison.Ordinal);
                 Assert.Contains("state hash(es) matched", stderr, StringComparison.Ordinal);
                 Assert.DoesNotContain("replay error", stderr, StringComparison.Ordinal);
-                Assert.DoesNotContain("replay notice", stderr, StringComparison.Ordinal);
+                // Schema 4 without a fog side-channel emits NoPerceptionNotice
+                // (same class of advisory as NoStateHashNotice on legacy files).
+                Assert.Contains("replay notice", stderr, StringComparison.Ordinal);
+                Assert.Contains(TrajectoryReplay.NoPerceptionNotice, stderr, StringComparison.Ordinal);
                 Assert.Equal(string.Empty, stdout);
             }
             finally

@@ -119,10 +119,14 @@ public sealed class InfiltratorAgent : IAgent
     public AgentBeliefMap Belief => _belief;
 
     /// <inheritdoc />
+    public PartialObservation? LastDecisionPerception { get; private set; }
+
+    /// <inheritdoc />
     public AgentAction Decide(Observation observation)
     {
         _filter ??= new PerceptionFilter(observation.Map, AgentId, _vision);
         var partial = _filter.Project(++_tick, observation);
+        LastDecisionPerception = partial;
         _belief.Update(partial);
 
         if (_belief.MyZone is not int myZone)

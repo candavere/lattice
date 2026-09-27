@@ -13,16 +13,17 @@ namespace Lattice.Trajectories;
 /// schedule the recording was made under. Files written before either field
 /// existed read back as schema version 0 — the static-map contract — and are
 /// still accepted by <see cref="TrajectoryReader"/>; a recording with no state
-/// hash anywhere verifies on step results alone and says so. Optional
-/// decision-time fog fields (<see cref="TrajectoryHeader.AgentVision"/>,
-/// <see cref="TrajectoryStep.Perceptions"/>) are additive on any schema
-/// version: absent on legacy files, present on infiltration recordings that
-/// carry the fog side-channel.
+/// hash anywhere verifies on step results alone and says so. Schema 4 documents
+/// the optional decision-time fog side-channel
+/// (<see cref="TrajectoryHeader.AgentVision"/>,
+/// <see cref="TrajectoryStep.Perceptions"/>): absent on files that omit it
+/// (with <see cref="TrajectoryReplay.NoPerceptionNotice"/>), present on
+/// infiltration recordings that carry it.
 /// </summary>
 public static class TrajectorySchema
 {
     /// <summary>The version this library writes and can verify.</summary>
-    public const int CurrentVersion = 3;
+    public const int CurrentVersion = 4;
 
     /// <summary>
     /// The first schema version in which a per-step
@@ -32,6 +33,15 @@ public static class TrajectorySchema
     /// legitimately has none and verifies with a notice instead.
     /// </summary>
     public const int StateHashRequiredVersion = 3;
+
+    /// <summary>
+    /// The first schema version that documents the optional decision-time fog
+    /// side-channel (<see cref="TrajectoryHeader.AgentVision"/> /
+    /// <see cref="TrajectoryStep.Perceptions"/>). Schema 4 recordings without
+    /// that side-channel still verify, and report
+    /// <see cref="TrajectoryReplay.NoPerceptionNotice"/>.
+    /// </summary>
+    public const int PerceptionSideChannelVersion = 4;
 }
 
 /// <summary>

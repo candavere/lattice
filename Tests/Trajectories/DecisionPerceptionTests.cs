@@ -144,20 +144,81 @@ public class DecisionPerceptionTests
     }
 
     [Fact]
-    public void DecisionPerceptions_MatchAgentFilterProjection_OnPreStepObservation()
+    public void DecisionPerceptions_EqualWhatEachAgentsOwnFilterProducedInDecide()
     {
-        var run = InfiltrationScenario.Run(seed: 42, maxSteps: 30);
-        Assert.NotNull(run.Base.DecisionPerceptions);
+        var map = DungeonMapBuilder.Build(42);
+        var config = InfiltrationScenario.DefaultConfig(30);
+        var sentry = new SentryPatrolAgent(
+            InfiltrationScenario.SentryAgentId, InfiltrationScenario.InfiltratorAgentId);
+        var infiltrator = new InfiltratorAgent(
+            InfiltrationScenario.InfiltratorAgentId, InfiltrationScenario.SentryAgentId);
 
-        // Independent filters fed the same pre-step observation stream must
-        // reproduce the recorded decision-time perceptions exactly.
-        var filters = DecisionPerceptionRecording.CreateFilters(run.Map, run.AgentVision);
-        var state = Simulation.CreateInitial(run.Map, run.Config);
-        for (var i = 0; i < run.Base.Turns.Length; i++)
+        var fromDecide = new List<PartialObservation[]>();
+        var state = Simulation.CreateInitial(map, config);
+        for (var step = 0; step < 30; step++)
         {
             var observations = state.Agents.ToDictionary(
                 a => a.AgentId,
                 a => new Observation(a.AgentId, state.Map, state.Agents, state.Claims, state.StepCount));
+            var turn = new AgentAction[config.AgentCount];
+            turn[sentry.AgentId] = sentry.Decide(observations[sentry.AgentId]);
+            turn[infiltrator.AgentId] = infiltrator.Decide(observations[infiltrator.AgentId]);
+            fromDecide.Add(new[]
+            {
+                sentry.LastDecisionPerception
+                    ?? throw new InvalidOperationException("Sentry did not set LastDecisionPerception."),
+                infiltrator.LastDecisionPerception
+                    ?? throw new InvalidOperationException("Infiltrator did not set LastDecisionPerception."),
+            });
+            var outcome = Simulation.Step(state, turn, config);
+            state = outcome.NextState;
+            if (outcome.Result.Info.IsTerminal)
+            {
+                break;
+            }
+        }
+
+        var run = InfiltrationScenario.Run(seed: 42, maxSteps: 30);
+        Assert.NotNull(run.Base.DecisionPerceptions);
+        Assert.Equal(fromDecide.Count, run.Base.DecisionPerceptions!.Length);
+        for (var i = 0; i < fromDecide.Count; i++)
+        {
+            Assert.Equal(
+                JsonSerializer.Serialize(fromDecide[i], Json),
+                JsonSerializer.Serialize(run.Base.DecisionPerceptions[i], Json));
+        }
+    }
+
+    [Fact]
+    public void Verify_Schema4WithoutPerceptions_EmitsNoPerceptionNotice()
+    {
+        var config = new SimulationConfig(2, 20);
+        var map = Lattice.Tests.Environment.TestMaps.TriangleWithResources();
+        var actions = new[]
+        {
+            new[] { new AgentAction(ActionKind.Wait), new AgentAction(ActionKind.Wait) },
+        };
+        var recording = TrajectoryWriter.Record(map, config, 1UL, actions, new StringWriter());
+        Assert.Equal(TrajectorySchema.CurrentVersion, recording.Header.SchemaVersion);
+        Assert.Null(recording.Header.AgentVision);
+        var detailed = TrajectoryReplay.VerifyDetailed(recording);
+        Assert.Empty(detailed.Problems);
+        Assert.Contains(TrajectoryReplay.NoPerceptionNotice, detailed.Notices);
+    }
+
+    [Fact]
+    public void DecisionPerceptions_MatchFreshFilterReplay_OnPreStepObservation()
+    {
+        var run = InfiltrationScenario.Run(seed: 42, maxSteps: 30);
+        Assert.NotNull(run.Base.DecisionPerceptions);
+
+        // Verify path re-projects with fresh filters; that must still match
+        // agent-captured DecisionPerceptions for the same observation stream.
+        var filters = DecisionPerceptionRecording.CreateFilters(run.Map, run.AgentVision);
+        var state = Simulation.CreateInitial(run.Map, run.Config);
+        for (var i = 0; i < run.Base.Turns.Length; i++)
+        {
+            var observations = DecisionPerceptionRecording.BuildObservations(state);
             var projected = DecisionPerceptionRecording.ProjectTurn(filters, observations, i + 1);
             Assert.Equal(
                 JsonSerializer.Serialize(run.Base.DecisionPerceptions![i], Json),

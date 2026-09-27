@@ -140,10 +140,14 @@ public sealed class SentryPatrolAgent : IAgent
     public int? PursuitTargetZone { get; private set; }
 
     /// <inheritdoc />
+    public PartialObservation? LastDecisionPerception { get; private set; }
+
+    /// <inheritdoc />
     public AgentAction Decide(Observation observation)
     {
         _filter ??= new PerceptionFilter(observation.Map, AgentId, _vision);
         var partial = _filter.Project(++_tick, observation);
+        LastDecisionPerception = partial;
         var myZone = ObservationView.MyZone(observation);
 
         if (TryResolvePursuitTarget(partial, observation, myZone, out var targetZone))

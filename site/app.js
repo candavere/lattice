@@ -605,9 +605,13 @@
     } else {
       const role = traj.header.AgentRoles && traj.header.AgentRoles[state.egoId];
       const name = role || 'Agent ' + state.egoId;
-      text = hasRecordedPerceptions(traj)
-        ? 'What the ' + name + ' knew at decision time (recorded perception).'
-        : 'What the ' + name + ' could reach (reconstructed 2-hop sightline).';
+      if (hasRecordedPerceptions(traj) && isPostTerminalFrame(traj, state.index)) {
+        text = 'Post-terminal frame — no decision-time fog (episode ended).';
+      } else if (hasRecordedPerceptions(traj)) {
+        text = 'What the ' + name + ' knew at decision time (recorded perception).';
+      } else {
+        text = 'What the ' + name + ' could reach (reconstructed 2-hop sightline).';
+      }
     }
     if (dom.mapCaption.textContent !== text) dom.mapCaption.textContent = text;
   }
@@ -627,12 +631,17 @@
 
   function updateCanvasLabel() {
     const traj = state.trajectory;
+    const last = traj ? traj.frames.length - 1 : 0;
+    let fogLabel = 'reconstructed 2-hop sightline';
+    if (hasRecordedPerceptions(traj)) {
+      fogLabel = isPostTerminalFrame(traj, state.index)
+        ? 'post-terminal (no decision-time fog)'
+        : 'recorded perception';
+    }
     const label = perspectiveIsAgent()
-      ? 'Replay view — ' + egoLabel(traj) + "'s " +
-        (hasRecordedPerceptions(traj) ? 'recorded perception' : 'reconstructed 2-hop sightline') +
-        ', tick ' + state.index + ' of ' + (traj ? traj.frames.length - 1 : 0)
-      : 'Replay view — Ground truth, tick ' + state.index +
-        ' of ' + (traj ? traj.frames.length - 1 : 0);
+      ? 'Replay view — ' + egoLabel(traj) + "'s " + fogLabel +
+        ', tick ' + state.index + ' of ' + last
+      : 'Replay view — Ground truth, tick ' + state.index + ' of ' + last;
     if (dom.canvas && dom.canvas.getAttribute('aria-label') !== label) {
       dom.canvas.setAttribute('aria-label', label);
     }
@@ -1202,20 +1211,36 @@
     return !!(traj && traj.steps && traj.steps.some(function (s) { return s.Perceptions && s.Perceptions.length; }));
   }
 
+  function isPostTerminalFrame(traj, index) {
+    return !!(traj && traj.steps && index >= traj.steps.length);
+  }
+
   function knowledgeStatusName(status) {
     if (status === 0 || status === 'Observed') return 'observed';
     if (status === 1 || status === 'Stale') return 'stale';
     return 'unknown';
   }
 
-  // Frame index i is the world before step i+1 (steps[i]). On the final
-  // post-terminal frame, reuse the last step's decision-time perceptions.
+  // Frame index i is the world before step i+1 (steps[i]). There are
+  // steps.length + 1 frames; the last is post-terminal and has no decision,
+  // so we must not clamp to the last step's pre-decision Perceptions (that
+  // wrongly paints stale fog as fresh on the ended world).
   function perceptionFromRecording(traj, index, egoId) {
     if (!hasRecordedPerceptions(traj)) return null;
-    let stepIndex = index;
-    if (stepIndex >= traj.steps.length) stepIndex = traj.steps.length - 1;
-    if (stepIndex < 0) return null;
-    const step = traj.steps[stepIndex];
+    if (isPostTerminalFrame(traj, index)) {
+      const map = traj.header.Map;
+      const zones = {};
+      map.Zones.forEach(function (zone) { zones[zone.Id] = 'observed'; });
+      return {
+        vision: visionHops(traj),
+        egoId: egoId,
+        zones: zones,
+        ghosts: {},
+        source: 'post-terminal',
+      };
+    }
+    if (index < 0 || index >= traj.steps.length) return null;
+    const step = traj.steps[index];
     if (!step || !step.Perceptions || !step.Perceptions.length) return null;
 
     const partial = step.Perceptions.find(function (p) { return p.AgentId === egoId; })

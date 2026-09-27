@@ -50,6 +50,12 @@ public static class TrajectoryReplay
     public const string NoStateHashNotice = "no state hash: step-level verification only";
 
     /// <summary>
+    /// The notice emitted when a schema-4-or-later recording carries no
+    /// decision-time perception side-channel, so fog was not authenticated.
+    /// </summary>
+    public const string NoPerceptionNotice = "no decision-time perceptions: fog side-channel not verified";
+
+    /// <summary>
     /// Replays the recorded actions from a fresh initial state and returns
     /// the resulting StepResults in order (stopping at the recorded terminal
     /// tick, like <see cref="SimulationDriver"/>). Purely for inspection;
@@ -192,7 +198,7 @@ public static class TrajectoryReplay
         }
 
         AppendFinalProblems(problems, recording.Final, TrajectoryWriter.BuildFinal(finalState, lastInfo));
-        AppendPerceptionProblems(problems, recording);
+        AppendPerceptionProblems(problems, notices, recording);
 
         return new TrajectoryVerification(problems, notices);
     }
@@ -201,15 +207,26 @@ public static class TrajectoryReplay
     /// When any step carries <see cref="TrajectoryStep.Perceptions"/> (or the
     /// header carries <see cref="TrajectoryHeader.AgentVision"/>), require a
     /// complete side-channel and compare re-projected decision-time fog to the
-    /// recorded arrays. Absent both fields: no-op (legacy fixtures).
+    /// recorded arrays. Schema-4+ recordings with neither field get
+    /// <see cref="NoPerceptionNotice"/>. Pre-v4 recordings without the
+    /// side-channel stay silent on fog.
     /// </summary>
-    private static void AppendPerceptionProblems(List<string> problems, TrajectoryRecording recording)
+    private static void AppendPerceptionProblems(
+        List<string> problems,
+        List<string> notices,
+        TrajectoryRecording recording)
     {
         var hasAnyPerceptions = recording.Steps.Any(step => step.Perceptions is not null);
         var hasVision = recording.Header.AgentVision is not null;
 
         if (!hasAnyPerceptions && !hasVision)
         {
+            if (recording.Header.SchemaVersion >= TrajectorySchema.PerceptionSideChannelVersion
+                && recording.Steps.Length > 0)
+            {
+                notices.Add(NoPerceptionNotice);
+            }
+
             return;
         }
 

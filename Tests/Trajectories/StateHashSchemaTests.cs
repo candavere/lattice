@@ -48,9 +48,11 @@ public class StateHashSchemaTests
     }
 
     [Fact]
-    public void CurrentSchemaVersion_IsThree()
+    public void CurrentSchemaVersion_IsFour()
     {
-        Assert.Equal(3, TrajectorySchema.CurrentVersion);
+        Assert.Equal(4, TrajectorySchema.CurrentVersion);
+        Assert.Equal(3, TrajectorySchema.StateHashRequiredVersion);
+        Assert.Equal(4, TrajectorySchema.PerceptionSideChannelVersion);
     }
 
     [Fact]

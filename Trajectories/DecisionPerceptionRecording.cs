@@ -12,13 +12,34 @@ namespace Lattice.Trajectories;
 public static class DecisionPerceptionRecording
 {
     /// <summary>
+    /// Ensures <paramref name="agentVision"/> is null or length-matches
+    /// <paramref name="agentCount"/>. Shared by the writer, verify path, and
+    /// filter construction so the length rule is stated once.
+    /// </summary>
+    public static void ValidateAgentVision(int agentCount, int[]? agentVision, string paramName = "agentVision")
+    {
+        if (agentVision is null)
+        {
+            return;
+        }
+
+        if (agentVision.Length != agentCount)
+        {
+            throw new ArgumentException(
+                $"AgentVision length ({agentVision.Length}) must equal AgentCount ({agentCount}).",
+                paramName);
+        }
+    }
+
+    /// <summary>
     /// Creates one <see cref="PerceptionFilter"/> per agent slot using
     /// <paramref name="agentVision"/>[agentId]. Filters start with empty
     /// memory and must be fed turns in ascending step order.
     /// </summary>
     public static PerceptionFilter[] CreateFilters(MapGraph map, int[] agentVision)
     {
-        if (agentVision is null || agentVision.Length == 0)
+        ArgumentNullException.ThrowIfNull(agentVision);
+        if (agentVision.Length == 0)
         {
             throw new ArgumentException("AgentVision must contain one horizon per agent.", nameof(agentVision));
         }
@@ -72,12 +93,7 @@ public static class DecisionPerceptionRecording
         var vision = recording.Header.AgentVision
             ?? throw new ArgumentException("Recording has no AgentVision; cannot replay decision perceptions.");
 
-        if (vision.Length != recording.Header.SimulationConfig.AgentCount)
-        {
-            throw new ArgumentException(
-                $"AgentVision length ({vision.Length}) must equal AgentCount ({recording.Header.SimulationConfig.AgentCount}).");
-        }
-
+        ValidateAgentVision(recording.Header.SimulationConfig.AgentCount, vision);
         var filters = CreateFilters(recording.Header.Map, vision);
         var state = Simulation.CreateInitial(
             recording.Header.Map,
@@ -100,7 +116,8 @@ public static class DecisionPerceptionRecording
         return projected.ToArray();
     }
 
-    private static Dictionary<int, Observation> BuildObservations(SimulationState state) =>
+    /// <summary>Omniscient per-agent observations for the current state.</summary>
+    public static Dictionary<int, Observation> BuildObservations(SimulationState state) =>
         state.Agents.ToDictionary(
             a => a.AgentId,
             a => new Observation(a.AgentId, state.Map, state.Agents, state.Claims, state.StepCount));

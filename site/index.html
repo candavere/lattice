@@ -37,13 +37,15 @@
       committed recording; your browser does not run a new simulation.
     </p>
     <aside class="moment-callout" aria-label="The moment to watch">
-      <h3 class="moment-label">The moment to watch &mdash; ticks 9 and 19</h3>
+      <h3 class="moment-label">The moment to watch &mdash; ticks 9, 19 and 20</h3>
       <p>
         On the <em>Infiltrator</em> view chip the Treasure Vault dims to &ldquo;last known&rdquo; at
         <strong>ticks 9 and 19</strong>, while ground truth keeps it fully lit — recorded
         decision-time fog from the file, not a page guess. Step to tick 9, select the
         <em>Infiltrator</em> view chip above the map, and watch the room dim on one map
-        while it stays lit on ground truth.
+        while it stays lit on ground truth. <strong>Tick 20</strong> is the post-terminal
+        frame (21 frames for 20 steps): it has no new decision, so the page does not
+        reuse step 20&rsquo;s pre-decision fog on the ended world.
       </p>
       <p class="moment-honest" id="moment-arena">
         Prefer the badge on the map: <em>Recorded perception</em> means the fog came from the

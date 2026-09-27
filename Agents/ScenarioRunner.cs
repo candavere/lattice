@@ -48,34 +48,31 @@ public static class ScenarioRunner
         var turns = new List<AgentAction[]>();
         var results = new List<StepResult>();
         var decisionPerceptions = agentVision is null ? null : new List<PartialObservation[]>();
-        var perceptionFilters = agentVision is null
-            ? null
-            : agentVision.Select((vision, agentId) => new PerceptionFilter(map, agentId, vision)).ToArray();
         var contendedTicks = 0;
 
         for (var step = 0; step < maxSteps && (results.Count == 0 || !results[^1].Info.IsTerminal); step++)
         {
-            // Decision tick is 1-based and equals the forthcoming StepNumber —
-            // the same ++tick agents pass into PerceptionFilter.Project before
-            // choosing an action. Project on the pre-step observation here so
-            // recorded fog matches what Decide consumed, not a post-step view.
-            var decisionTick = results.Count + 1;
-            if (perceptionFilters is not null && decisionPerceptions is not null)
-            {
-                var turnPerceptions = new PartialObservation[config.AgentCount];
-                foreach (var agent in agents.OrderBy(a => a.AgentId))
-                {
-                    turnPerceptions[agent.AgentId] = perceptionFilters[agent.AgentId]
-                        .Project(decisionTick, observations[agent.AgentId]);
-                }
-
-                decisionPerceptions.Add(turnPerceptions);
-            }
-
             var turn = new AgentAction[config.AgentCount];
             foreach (var agent in agents.OrderBy(a => a.AgentId))
             {
                 turn[agent.AgentId] = agent.Decide(observations[agent.AgentId]);
+            }
+
+            // Capture after Decide so the side-channel is exactly what each
+            // agent's own PerceptionFilter projected inside Decide — not a
+            // separately constructed filter.
+            if (decisionPerceptions is not null)
+            {
+                var turnPerceptions = new PartialObservation[config.AgentCount];
+                foreach (var agent in agents.OrderBy(a => a.AgentId))
+                {
+                    turnPerceptions[agent.AgentId] = agent.LastDecisionPerception
+                        ?? throw new InvalidOperationException(
+                            $"Agent {agent.AgentId} did not expose LastDecisionPerception after Decide; " +
+                            "agents recorded with AgentVision must project fog inside Decide.");
+                }
+
+                decisionPerceptions.Add(turnPerceptions);
             }
 
             turns.Add(turn);

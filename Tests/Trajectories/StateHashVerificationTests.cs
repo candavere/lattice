@@ -71,12 +71,12 @@ public class StateHashVerificationTests
     }
 
     [Fact]
-    public void UntamperedRecording_VerifiesWithNoProblemsAndNoNotice()
+    public void UntamperedRecording_VerifiesWithNoProblemsAndPerceptionNoticeOnly()
     {
         var report = TrajectoryReplay.VerifyDetailed(Recorded());
 
         Assert.Empty(report.Problems);
-        Assert.Empty(report.Notices);
+        Assert.Equal(new[] { TrajectoryReplay.NoPerceptionNotice }, report.Notices);
     }
 
     [Fact]
@@ -249,7 +249,7 @@ public class StateHashVerificationTests
         var report = TrajectoryReplay.VerifyDetailed(recording);
 
         Assert.Empty(report.Problems);
-        Assert.Empty(report.Notices);
+        Assert.Equal(new[] { TrajectoryReplay.NoPerceptionNotice }, report.Notices);
     }
 
     private static DynamicMapRuleSet Portcullis() => new(new IDynamicMapRule[]
@@ -275,7 +275,7 @@ public class StateHashVerificationTests
         var report = TrajectoryReplay.VerifyDetailed(readBack);
 
         Assert.Empty(report.Problems);
-        Assert.Empty(report.Notices);
+        Assert.Equal(new[] { TrajectoryReplay.NoPerceptionNotice }, report.Notices);
         Assert.All(readBack.Steps, step => Assert.Matches("^[0-9a-f]{64}$", step.StateHash ?? string.Empty));
     }
 

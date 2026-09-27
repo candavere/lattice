@@ -27,7 +27,7 @@ points were genuinely open, and each had at least two defensible answers:
    `Environment/StepContracts.cs:62-67`). Should the protocol project be able
    to see those types, or should the boundary hold?
 4. **How an external agent is named on the command line.** `simulate` already
-   owns `--agent greedy|random|mcts` (`Cli/CliApp.cs:206-222`). What does the
+   owns `--agent greedy|random|mcts` (`Cli/CliApp.cs:316-323`). What does the
    external-agent flag on `evaluate` look like?
 
 Each of these interacts with an existing, deliberate property of the codebase.
@@ -160,7 +160,8 @@ Alternatives considered:
 External agents are scored through the existing `evaluate` path with the
 existing mirrored seatings, the existing seed suites, the existing statistics,
 and the existing 30-seed grading floor
-(`Cli/CliApp.cs:745-771`, `Agents/PairedEvaluation.cs:144-150`). Every protocol
+(`Cli/CliApp.cs:900`, `Cli/CliApp.cs:65-66`,
+`Agents/PairedEvaluation.cs:144-150`). Every protocol
 failure is recorded as a result and scored as a **loss** for the external agent;
 failures are never retried, and a failed match still occupies both mirrored
 seatings so the pair stays whole (`Agents/PairedEvaluation.cs:100-105`).
@@ -173,12 +174,12 @@ Alternatives considered:
 
 - **Reuse `--agent` on `evaluate`, accepting any string as a command.**
   Rejected. `--agent` in this CLI means a three-value policy enum
-  (`Cli/CliApp.cs:206-222`, `docs/CLI.md:34`). Overloading it with an arbitrary
+  (`Cli/CliApp.cs:316-323`, `docs/CLI.md:34`). Overloading it with an arbitrary
   command line makes `--agent mcts` and `--agent "python3 my_agent.py"`
   syntactically identical and semantically unrelated, and forces a reader to
   know which subcommand they are under to know what the value means. The
   existing flag also has a hard rule attached to it — `--agent` is *forbidden*
-  with `--scenario infiltration` (`Cli/CliApp.cs:291-293`) — and a flag cannot
+  with `--scenario infiltration` (`Cli/CliApp.cs:391-393`) — and a flag cannot
   carry a three-way meaning.
 - **A separate subcommand, e.g. `lattice evaluate-external`.** Rejected: it
   duplicates the entire `evaluate` flag surface, and the two commands would

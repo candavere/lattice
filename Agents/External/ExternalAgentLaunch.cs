@@ -20,8 +20,10 @@ namespace Lattice.Agents.External;
 /// </para>
 /// <para>
 /// How a CLI string such as <c>--agent-cmd "python3 my_agent.py"</c> becomes a
-/// program and an argv is explicitly <b>stage 4's</b> concern and not this
-/// type's. Everything here holds unchanged whichever splitter produces the argv.
+/// program and an argv is <b><see cref="Lattice.Cli.AgentCommandLine"/></b>'s
+/// concern and not this type's: it is the splitter that decides, and this type
+/// only ever receives the program and the already-split arguments. Everything
+/// here holds unchanged whichever splitter produces the argv.
 /// </para>
 /// <para>
 /// The working directory is the <b>caller's</b> current directory — never

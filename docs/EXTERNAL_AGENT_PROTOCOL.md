@@ -239,7 +239,7 @@ See §14, U-9.
 | :--- | :--- | :--- | :--- |
 | `type` | string | yes | Exactly `"hello"`. |
 | `protocol` | integer | yes | Exactly `1`. |
-| `scenario` | string | yes | The evaluation scenario family that selected the map. In v3.0 the closed set is `"standard"` and `"bottleneck"` (`Cli/CliApp.cs:736-742`). |
+| `scenario` | string | yes | The evaluation scenario family that selected the map. In v3.0 the closed set is `"standard"` and `"bottleneck"` (`Cli/CliApp.cs:845-851`). |
 | `seed` | integer | yes | The run seed, an unsigned 64-bit value (`Agents/EvaluationHarness.cs:29`). MUST be a JSON number with no fraction, no exponent, no leading `+`, and no leading zeros. |
 | `agent_slot` | integer | yes | The agent slot this process plays, in `0..AgentCount-1` (`Environment/Simulation.cs:58-60`). In the `evaluate` path this is exactly `0` or `1`, because evaluation pairings are head-to-head (`Agents/EvaluationHarness.cs:112-117`). |
 | `max_ticks` | integer ≥ 1 | yes | The match's tick budget, from `SimulationConfig.MaxTicks` (`Environment/Simulation.cs:28`). It is the **same value** as `EvaluationSimulationConfig.MaxTicks`, which is the per-match `MaxSteps` the harness passes down (`Agents/EvaluationHarness.cs:147-148`). This is the horizon an agent plans against; §7's `match_timeout_ms ≥ step_timeout_ms × MaxTicks` constraint is computed from this number. |
@@ -280,7 +280,7 @@ suppress a timeout. See §7, §14, U-2.
 `scenario` is the closed v3.0 set. The `infiltration` scenario is **not**
 reachable through the external-agent path in v3.0: it is a `simulate`-only
 roster and is explicitly separate from the `evaluate` path
-(`Cli/CliApp.cs:291-293`, `Cli/CliApp.cs:736-742`).
+(`Cli/CliApp.cs:391-393`, `Cli/CliApp.cs:845-851`).
 
 `hello` carries **no map**. The map arrives with the first `observation` (§5.3),
 which is re-sent in full on every step. What `hello` does carry beyond its
@@ -1104,11 +1104,11 @@ to an in-process agent. There is no external-agent-specific statistic, no
 adjusted floor, and no separate report. Specifically, an external agent run
 through `evaluate` MUST use the same:
 
-- mirrored-seat pairings `(0, 1)` and `(1, 0)` (`Cli/CliApp.cs:750`);
+- mirrored-seat pairings `(0, 1)` and `(1, 0)` (`Cli/CliApp.cs:900`);
 - canonical seed suites, dev `1001..1050` and held-out `2001..2050`
-  (`Cli/CliApp.cs:753-756`);
+  (`Cli/CliApp.cs:65-66`);
 - per-match tick budget `EvaluationSimulationConfig.MaxTicks`
-  (`Cli/CliApp.cs:765-770`);
+  (`Cli/CliApp.cs:74-75`);
 - paired-delta definition, Δ = avg((policy − baseline) at seat 0,
   (baseline − policy) at seat 1) (`Agents/PairedEvaluation.cs:107-115`);
 - dispersion statistics, 95% confidence interval, and per-outcome rates
@@ -1122,7 +1122,7 @@ An external agent that clears fewer than 30 seeds is reported as
 ### 9.5 Flag collision: `--agent`
 
 `simulate` already has `--agent <greedy|random|mcts>`, an **in-process policy
-selector** (`Cli/CliApp.cs:206-222`, `Cli/CliApp.cs:1029-1031`,
+selector** (`Cli/CliApp.cs:316-323`, `Cli/CliApp.cs:1434`,
 `docs/CLI.md:34`). That selector is **unchanged** by this protocol.
 
 The external-agent flag on `evaluate` is a different kind of thing: it names a
@@ -1335,7 +1335,7 @@ protocol `1`:
 
 - **Custom scenario files.** Scenario selection in v3.0 is the existing
   `evaluate --scenario standard|bottleneck` switch
-  (`Cli/CliApp.cs:736-742`). A user-authored scenario file is a later
+  (`Cli/CliApp.cs:845-851`). A user-authored scenario file is a later
   protocol.
 - **In-process plugins.** An `IAgent` loaded into the harness
   (`Agents/IAgent.cs:14-27`) is the existing path and is unchanged. The wire
@@ -1348,7 +1348,7 @@ protocol `1`:
   not one: a single episode has no mirror, no confidence interval, and no
   grading floor, so a result from it could not be compared with anything
   published here. `simulate --agent greedy|random|mcts` keeps its exact
-  meaning — an in-process policy enum (`Cli/CliApp.cs:206-222`) — and MUST NOT
+  meaning — an in-process policy enum (`Cli/CliApp.cs:316-323`) — and MUST NOT
   grow an external-agent spelling. The external path is `evaluate
   --agent-cmd` only (§9.5). See §14, U-10.
 - **Network transports.** Loopback sockets, TCP, and shared memory are out.
@@ -1464,13 +1464,13 @@ file.
 | `Agents/PairedEvaluation.cs:120-142` | Dispersion, CI, and per-outcome rates. |
 | `Agents/PairedEvaluation.cs:144-150` | Decision rule and the 30-seed grading floor. |
 | `Agents/PairedEvaluation.cs:181-195` | Policy outcome from seat and `MatchOutcome`. |
-| `Cli/CliApp.cs:206-222` | `simulate --agent greedy\|random\|mcts` — the existing selector. |
-| `Cli/CliApp.cs:291-293` | `infiltration` forbids `--agent`. |
-| `Cli/CliApp.cs:708` | The `evaluate` command. |
-| `Cli/CliApp.cs:736-742` | `evaluate --scenario standard\|bottleneck`. |
-| `Cli/CliApp.cs:745-750` | Evaluation teams and mirrored pairings. |
-| `Cli/CliApp.cs:753-771` | Canonical seed suites, tick budget, `PairedStudy.Analyze`. |
-| `Cli/CliApp.cs:1029-1031` | `simulate --agent` usage text. |
+| `Cli/CliApp.cs:316-323` | `simulate --agent greedy\|random\|mcts` — the existing selector. |
+| `Cli/CliApp.cs:391-393` | `infiltration` forbids `--agent`. |
+| `Cli/CliApp.cs:804` | The `evaluate` command. |
+| `Cli/CliApp.cs:845-851` | `evaluate --scenario standard\|bottleneck`. |
+| `Cli/CliApp.cs:854-858` | Evaluation teams and mirrored pairings. |
+| `Cli/CliApp.cs:913-919` | Canonical seed suites, tick budget, `PairedStudy.Analyze`. |
+| `Cli/CliApp.cs:1434` | `simulate --agent` usage text. |
 | `Generator/MapGenerator.cs:13-25` | Zone and resource bounds are caller-configured, no ceiling. |
 | `Trajectories/TrajectoryModel.cs:6-31` | `TrajectorySchema.CurrentVersion = 3`, state-hash version. |
 | `Trajectories/TrajectoryModel.cs:33-45` | The header: seed and map captured so replay needs no generator. |

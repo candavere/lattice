@@ -962,6 +962,14 @@ that match; the external agent's own policy outcome is always a **loss**
 (`Agents/PairedEvaluation.cs:181-195`,
 `Agents/EvaluationHarness.cs:200-213`).
 
+Every agent-attributable code in that table additionally **forfeits**: the row
+carries the external agent's score as `0` and the opponent's as it stood at the
+moment of failure. The forfeit is a property of the *score* on the row and never
+of its classification, so the "Match classified as" column above is unchanged by
+it. See "A failed match's scores" below for the rule, the incentive it removes, and
+where the partial scores are recorded. `host_limit` is not a forfeit: it is a void
+run, and produces no row at all.
+
 **Void runs.** A `host_limit` run produces no `MatchOutcome` at all: it is not a
 win, a loss, a draw, or a timeout. It MUST be reported as a **count** —
 `VoidRuns`, alongside the reason breakdown — so that a reader can see that a
@@ -1011,29 +1019,73 @@ it:
   means a clean run; **`VoidRuns`**, the void count above; **`AgentCommand`**, the
   argv the §3.3 splitter produced, with the program as its first element, so the
   exact command that was scored is part of the result rather than part of the
-  reader's shell history; and **`AgentLimits`**, the two effective §7 limits the
+  reader's shell history; **`AgentLimits`**, the two effective §7 limits the
   matches were actually played under — `step_timeout_ms` and the
-  `match_timeout_ms` computed from it — as §3.1 requires a reported run to state.
+  `match_timeout_ms` computed from it — as §3.1 requires a reported run to state;
+  and **`AgentForfeits`**, one entry per forfeited match, carrying the partial
+  scores the forfeit was computed from. That last field is present only when
+  something was forfeited, and is described under "A failed match's scores" below.
 
 `AgentFailures` is **report-only** here exactly as it is above: it enters no
 rate, no delta, no confidence interval, and no decision rule, and it MUST NOT be
 added to `Wins`, `Draws`, `Losses`, or `Timeouts`. Every failure is already a
 loss in those four, by §9.1; this field says how many of the losses had a cause.
 
-**A failed match's scores.** A recorded row carries the scores the match had
-reached when it failed, not `0-0`: a match that ran twelve steps and then stalled
-reports what it was worth at step twelve, because a fabricated zero tells a reader
-nothing they can act on. The outcome on that row is still a win for the baseline
-side — a failure cannot be won, whatever the numbers say. The paired delta of
-§9.4 is computed from **scores**, so those partial scores do enter it, and this is
-stated rather than left to be discovered: an agent that plays well for a while and
-then crashes can therefore contribute a positive delta while still being counted a
-loss. The costs of that are bounded by two things that are already true — the
-outcome rates cannot be improved by crashing, and `AgentFailures` reports every
-such match next to the delta rather than inside it — and the alternative, a delta
-computed over completed matches only, would be a **different statistic from the
-in-process one**, which §9.4 forbids. A study that wants the stricter rule has to
-change the analyzer for both paths at once, not the external row.
+**A failed match's scores: the forfeit.** A recorded row for a match that ended in
+an agent failure MUST carry the external agent's score as **`0`**, whatever the
+scoreboard said when the plumbing broke, and MUST carry the **opponent's** score as
+it stood at the moment of failure. The outcome on that row is still a win for the
+baseline side — a failure cannot be won, whatever the numbers say — so the forfeit
+moves a score and never an outcome. Both scores are indexed by **slot**, as every
+row this protocol writes, so which side forfeits is decided by the seat the agent
+actually played and never by the position of a field.
+
+*Handshake failures* are `0-0` already: no step ever began, so there is no partial
+to forfeit from, and the opponent's score at that moment is `0` as well. The rule
+is a no-op there and states it rather than inventing a number in either direction.
+
+*Void runs are unaffected.* `host_limit` is not an agent failure, so it is not a
+forfeit: it still produces no row, no delta, and no denominator, exactly as above.
+
+**Why.** The paired delta of §9.4 is computed from **scores**, so the score a row
+carries is the score the delta is built from. While a failed match reported the
+scoreboard it had reached, an agent that led `5-1` and then stopped answering banked
+a `+4` contribution to the mean paired delta **and** took the loss in the outcome
+rates — leading and then stalling was strictly better than never leading, because
+the crash was free. The delta measures how well a policy played; a policy that
+stopped playing did not play well, so crediting it for the lead it abandoned
+measured the stall rather than the play. The forfeit removes that incentive. It
+does so **without** making the delta a different statistic from the in-process one,
+because it is applied to the external row before the row is built and the same
+`PairedStudy.Analyze` still computes everything else identically — which §9.4
+requires and which an analyzer change would have broken.
+
+**Why the opponent keeps its score.** Only the side that broke the contract
+forfeits. The baseline played every step it was asked to play; zeroing its score as
+well would make a stall a **draw**, handing the external agent a point for its own
+failure and reintroducing the same incentive one level down. The kept score is also
+what keeps the result honest: with the external side at `0` and the opponent's at a
+non-negative number, each mirrored delta is `-opponent`, so **a stall can never
+produce a positive delta for the external side** — a structural property of the
+rule rather than a property any particular case happens to have.
+
+**Where the partial scores live.** The raw scores at the moment of failure MUST be
+preserved, because a row of zeros alone would make a match that ran two hundred
+steps and one that never started indistinguishable, and telling those apart is the
+whole of what a reader diagnosing a flaky agent has to go on. They are recorded
+**outside the row that reaches the analyzer**, in the fields
+`PartialScoreAtSlot0` and `PartialScoreAtSlot1` of the artifact's `AgentForfeits`
+array, alongside `Seed`, `ExternalSeat`, `Reason`, and the two scores the study was
+actually scored from (`ScoredExternalScore`, `ScoredOpponentScore`). Each entry
+names the seat, so the slot-indexed partials are never misread as team-indexed ones.
+
+Those partials are **report-only** in the strongest available sense: they enter no
+rate, no delta, no confidence interval, no per-seed row, and no decision rule. The
+guarantee is structural rather than a promise — the statistics are computed by the
+analyzer from the `MatchResult` rows *before* `AgentForfeits` is assembled, and the
+analyzer has no field from which to read a partial. `AgentForfeits` is **absent**
+from a run in which nothing was forfeited, so a clean run's artifact is unchanged
+byte for byte.
 
 **Voids and the grading floor.** Void runs are excluded from the denominator
 above, so they reduce the number of **valid seeds** — the seeds for which *both*

@@ -387,10 +387,43 @@ change to the delta, the confidence interval, the per-outcome rates, the 30-seed
 floor, or the decision rule: an external run is converted into the same
 `MatchResult` rows an in-process run produces and handed to the same analyzer,
 so "identical statistics" (§9.4) is a property of the code path rather than a
-promise. The study artifact gains `AgentFailures`, `VoidRuns`, the agent argv,
-and the effective limits **only** on the external path; an in-process artifact
-carries exactly the seven fields it carried before this protocol existed, in the
-same order, and the golden fixture that pins that field set is the check. It
+promise. The one scoring decision this ADR had to make is **what a failed match's
+row carries**, and it is made on the external row rather than in the analyzer, which
+is what keeps the two paths on one implementation.
+
+That decision is the **forfeit**. A match that ends in an agent failure is scored
+from `0` for the external side, with the opponent keeping the score it had at the
+moment of failure (§9.3). The rejected alternative was to carry the scoreboard the
+match had reached, on the reasoning that a real number beats a fabricated zero.
+That reasoning was sound about the *report* and wrong about the *statistic*: the
+paired delta is computed from scores, so carrying the partials let an agent that
+led 5-1 and then stalled bank a `+4` contribution to the mean delta while taking
+the loss in the outcome rates. Leading and then stalling was strictly better than
+never leading, because the crash was free. The delta is meant to measure how well a
+policy played, and a policy that stopped playing did not play well.
+
+Two properties of the chosen form are worth recording, because they are what make
+it safe rather than merely stricter. First, the forfeit is applied **to the row
+before the row is built**, in `ExternalMatchRunner`, and the analyzer is untouched
+— so the statistic stays the same statistic, which an analyzer-level exclusion of
+failed matches would not have been. Second, only the side that broke the contract
+forfeits: zeroing the opponent too would make a stall a **draw**, handing the agent
+a point for its own failure and reintroducing the same incentive one level down.
+With the external side at `0` and the opponent's at a non-negative number, each
+mirrored delta is `-opponent`, so a stall can never produce a positive delta for
+the external side — a structural consequence rather than a hoped-for one.
+
+The information the forfeit discards is not discarded. The raw partials are
+recorded on `ExternalMatchResult` and in the artifact's `AgentForfeits` array,
+**outside** the `MatchResult` the analyzer reads, so no code path exists by which a
+partial reaches the delta, a rate, an interval, or the decision rule. A match that
+ran two hundred steps and one that never started therefore stay distinguishable,
+and `AgentForfeits` is absent entirely when nothing was forfeited.
+
+The study artifact gains `AgentFailures`, `VoidRuns`, the agent argv, the
+effective limits, and `AgentForfeits` **only** on the external path; an in-process
+artifact carries exactly the seven fields it carried before this protocol existed,
+in the same order, and the golden fixture that pins that field set is the check. It
 compares canonicalized tokens rather than raw bytes, and excludes the timestamp
 and the host provenance, so "unchanged" here means every field name, every field
 order, and every evaluation value — which is the claim worth making.

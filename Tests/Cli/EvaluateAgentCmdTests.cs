@@ -156,6 +156,97 @@ public class EvaluateAgentCmdTests
         }
     }
 
+    [Fact(Timeout = TestTimeoutMs)]
+    public async Task A_Forfeited_Match_Records_Its_Partial_Scores_And_Scores_From_Zero()
+    {
+        // The §9.3 forfeit, end to end through the CLI. A crashed agent is used
+        // because the stub's `crash` mode never collects anything, so its partial
+        // scores are 0-0 and the forfeit is a no-op on the numbers -- which is the
+        // point of pairing this with the unit tests: what is asserted here is that
+        // the record is *written*, carries the seat and the reason, and states the
+        // scores the study was scored from, so a reader can see how far a failure
+        // got even though the row said 0.
+        var path = TempPath();
+        try
+        {
+            var (exit, _, _) = await Task.Run(() => Run(
+                "evaluate",
+                "--scenario", "standard",
+                "--seed-set", "dev",
+                "--seeds", "1",
+                "--rollouts", "2",
+                "--agent-cmd", AgentCommand("crash"),
+                "--agent-step-timeout-ms", "2000",
+                "--out", path));
+
+            Assert.Equal(0, exit);
+
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            var artifact = document.RootElement;
+
+            var forfeits = artifact.GetProperty("AgentForfeits");
+            Assert.Equal(2, forfeits.GetArrayLength());
+
+            // Both mirrored seatings, each naming the seat it played so the
+            // slot-indexed partials are never read as team-indexed ones.
+            var seats = forfeits.EnumerateArray()
+                .Select(f => f.GetProperty("ExternalSeat").GetInt32())
+                .Order()
+                .ToArray();
+            Assert.Equal([0, 1], seats);
+
+            foreach (var forfeit in forfeits.EnumerateArray())
+            {
+                Assert.Equal("agent_crashed", forfeit.GetProperty("Reason").GetString());
+                Assert.Equal(0, forfeit.GetProperty("ScoredExternalScore").GetInt32());
+                Assert.True(forfeit.GetProperty("Seed").GetUInt64() > 0, "the forfeit record names no seed.");
+            }
+
+            // And the statistics are computed from the forfeited rows, so a
+            // crashed agent is two losses and its partials moved nothing.
+            var statistics = artifact.GetProperty("Studies")[0].GetProperty("Statistics");
+            Assert.Equal(2, statistics.GetProperty("Losses").GetInt32());
+            Assert.Equal(0, statistics.GetProperty("Wins").GetInt32());
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact(Timeout = TestTimeoutMs)]
+    public async Task A_Clean_External_Run_Records_No_Forfeits_At_All()
+    {
+        // The mirror of the case above: nothing failed, so the field is absent
+        // rather than an empty array. Absent is the honest spelling for "this run
+        // had no external agent failure to describe", and it keeps a clean run's
+        // artifact byte-identical to what it was before the forfeit existed.
+        var path = TempPath();
+        try
+        {
+            var (exit, _, _) = await Task.Run(() => Run(
+                "evaluate",
+                "--scenario", "standard",
+                "--seed-set", "dev",
+                "--seeds", "1",
+                "--rollouts", "2",
+                "--agent-cmd", AgentCommand("conform"),
+                "--agent-step-timeout-ms", "2000",
+                "--out", path));
+
+            Assert.Equal(0, exit);
+
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            Assert.False(
+                document.RootElement.TryGetProperty("AgentForfeits", out _),
+                "a clean run wrote an AgentForfeits field.");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     [Fact]
     public void A_Program_That_Does_Not_Resolve_Is_A_Usage_Error_And_Writes_No_Artifact()
     {

@@ -46,6 +46,16 @@ namespace Lattice.Agents.External;
 /// 64 KiB ring -- and therefore the evidence that the drain kept up rather than
 /// that the agent happened to stay quiet.
 /// </param>
+/// <param name="PartialScoreA">
+/// Slot 0's score at the moment the match failed, or <see langword="null"/> when
+/// the match did not fail on the agent's plumbing — a completed match, a void run,
+/// or a failure with no step behind it. A <b>diagnostic</b>: it reports how far the
+/// match actually got, and it deliberately lives on this record rather than on
+/// <paramref name="Match"/> so the paired analyzer, which reads only
+/// <see cref="MatchResult"/>, cannot see it. See
+/// <see cref="ScoreWithForfeit"/> for why the row carries a forfeit instead.
+/// </param>
+/// <param name="PartialScoreB">Slot 1's partial score, on the same terms as <paramref name="PartialScoreA"/>.</param>
 public sealed record ExternalMatchResult(
     ulong Seed,
     int ExternalSlot,
@@ -55,7 +65,9 @@ public sealed record ExternalMatchResult(
     ScenarioResult? Episode,
     int? ChildProcessId = null,
     bool ChildExited = true,
-    long StderrBytesObserved = 0)
+    long StderrBytesObserved = 0,
+    int? PartialScoreA = null,
+    int? PartialScoreB = null)
 {
     /// <summary>True when the match played to a normal ending, with no protocol failure.</summary>
     public bool Completed => Fault is null;
@@ -128,9 +140,12 @@ public sealed record ExternalMatchReport(
 /// <para>
 /// <b>Scoring.</b> Every agent-attributable code becomes a recorded row whose
 /// outcome is a win for the baseline side, so the external agent's own outcome is
-/// a loss. Nothing is retried and no default action is ever substituted (§9.1,
-/// §9.2). A <c>host_limit</c> refusal becomes a void run: no row, not a loss, and
-/// counted separately.
+/// a loss, and whose score for the external side is <b>0</b> — the §9.3 forfeit,
+/// applied by <see cref="ScoreWithForfeit"/>, with the raw partials kept on the
+/// result rather than the row so no statistic can read them. Nothing is retried
+/// and no default action is ever substituted (§9.1, §9.2). A <c>host_limit</c>
+/// refusal becomes a void run: no row, not a loss, not a forfeit, and counted
+/// separately.
 /// </para>
 /// </remarks>
 public static class ExternalMatchRunner
@@ -318,8 +333,85 @@ public static class ExternalMatchRunner
     }
 
     /// <summary>
-    /// The row for a match the external agent lost, carrying the reason code and
-    /// the scores as they stood when it stopped.
+    /// The four numbers a failed match is recorded with: the two scores that go on
+    /// the row, and the two raw partials kept beside them.
+    /// </summary>
+    /// <param name="ScoreA">Slot 0's score as the row will carry it, after the forfeit.</param>
+    /// <param name="ScoreB">Slot 1's score as the row will carry it, after the forfeit.</param>
+    /// <param name="PartialScoreA">Slot 0's score at the moment of failure, unaltered.</param>
+    /// <param name="PartialScoreB">Slot 1's score at the moment of failure, unaltered.</param>
+    public sealed record ForfeitScores(
+        int ScoreA,
+        int ScoreB,
+        int PartialScoreA,
+        int PartialScoreB);
+
+    /// <summary>
+    /// The §9.3 forfeit rule: a match that ended in an agent failure is scored
+    /// from <b>0 for the external side</b>, and the opponent keeps the score it
+    /// had at the moment the plumbing broke.
+    /// </summary>
+    /// <param name="externalSlot">The seat the external agent played, which is what decides <em>which</em> score is zeroed.</param>
+    /// <param name="scoresAtFailure">
+    /// Both slots' scores when the failure was detected, or <see langword="null"/>
+    /// when no step ever began — a handshake failure, where 0-0 is the true score
+    /// rather than a missing one, and the rule is a no-op.
+    /// </param>
+    /// <returns>
+    /// The row's two scores and the two raw partials. The partials are returned
+    /// alongside rather than instead of, so the caller records both in one place
+    /// and cannot score a forfeit while dropping the evidence for it.
+    /// </returns>
+    /// <remarks>
+    /// <para>
+    /// <b>The incentive it removes.</b> The paired delta is computed from scores.
+    /// While a failed match carried the scoreboard it had reached, an agent that
+    /// led 5-1 and then stopped answering banked a <c>+4</c> contribution to the
+    /// mean paired delta <em>and</em> took the loss in the outcome rates. Leading
+    /// and then stalling was therefore strictly better than never leading: the
+    /// crash was free. The delta is meant to measure how well a policy played, and
+    /// a policy that stopped playing did not play well, so crediting it for the
+    /// lead it abandoned measured the stall rather than the play.
+    /// </para>
+    /// <para>
+    /// <b>Why the opponent keeps its score.</b> Only the side that broke the
+    /// contract forfeits. The baseline played every step it was asked to play, and
+    /// zeroing its score as well would make a stall a <em>draw</em> — handing the
+    /// external agent a point for its own failure and reintroducing the same
+    /// incentive one level down. The opponent's kept score is also the only thing
+    /// that keeps the delta negative, which is what makes "a stall can never pay"
+    /// a structural property rather than a hoped-for one.
+    /// </para>
+    /// <para>
+    /// <b>Why the partials survive.</b> Zeroing the row alone would lose how far
+    /// the match actually got, making a late failure indistinguishable from a
+    /// handshake that never started. They are returned here and recorded on
+    /// <see cref="ExternalMatchResult"/>, never on the <see cref="MatchResult"/>
+    /// row, so the analyzer cannot see them. Placement is the guarantee: no
+    /// statistic reads a field the delta is not built from.
+    /// </para>
+    /// </remarks>
+    public static ForfeitScores ScoreWithForfeit(
+        int externalSlot,
+        (int Slot0Score, int Slot1Score)? scoresAtFailure)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(externalSlot);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(externalSlot, 1);
+
+        var (slot0, slot1) = scoresAtFailure ?? (0, 0);
+
+        // Indexed by slot, like every row this runner writes, so the seat decides
+        // which side forfeits. Written as a swap of the external seat's score to
+        // zero rather than as "ScoreA = 0", because at seat 1 the external side's
+        // score is ScoreB and a field-position rule would zero the baseline's.
+        return externalSlot == 0
+            ? new ForfeitScores(ScoreA: 0, ScoreB: slot1, PartialScoreA: slot0, PartialScoreB: slot1)
+            : new ForfeitScores(ScoreA: slot0, ScoreB: 0, PartialScoreA: slot0, PartialScoreB: slot1);
+    }
+
+    /// <summary>
+    /// The row for a match the external agent lost, carrying the reason code, the
+    /// forfeited score, and the partials the forfeit came from.
     /// </summary>
     /// <param name="seed">The run seed.</param>
     /// <param name="externalSlot">The seat the external process played.</param>
@@ -331,24 +423,13 @@ public static class ExternalMatchRunner
     /// 0-0 is the true score rather than a missing one.
     /// </param>
     /// <remarks>
-    /// The scores on the row are the ones the match had reached, not 0-0. They come
-    /// from the last observation the exchange was driven with, so they are the state
-    /// the failing step started from, and a reader comparing two seeds can see that
-    /// one agent got further than the other before its plumbing broke. They are
-    /// indexed by slot, like every other row this runner writes, so the seat is
-    /// never guessed from the numbers.
-    /// <para>
-    /// <b>What they do to the score.</b> They are a report of how far the match
-    /// got, and the paired delta is computed from scores, so a failed match's
-    /// partial scores do enter the delta even though its outcome counts as a loss.
-    /// That is deliberate and it is the price of reporting a real number instead of
-    /// a fabricated 0-0: an agent that plays well for a while and then crashes can
-    /// therefore contribute a positive delta. The outcome accounting is what stops
-    /// a crash from buying a <em>win</em>, and §9.3's <c>AgentFailures</c> count is
-    /// what makes the crashes visible next to the delta rather than inside it. A
-    /// study that wants the delta to exclude failed matches has to say so in the
-    /// analyzer, not here.
-    /// </para>
+    /// The row carries the forfeited scores from <see cref="ScoreWithForfeit"/>,
+    /// so the external side enters the paired delta as 0 and the opponent keeps
+    /// what it had. The raw partials are recorded on the
+    /// <see cref="ExternalMatchResult"/> instead of the row, which is what keeps
+    /// them out of every statistic: the analyzer reads
+    /// <see cref="MatchResult"/> and has no field to read them from. They are
+    /// indexed by slot like the row, so the seat is never guessed from the numbers.
     /// </remarks>
     private static ExternalMatchResult Failed(
         ulong seed,
@@ -362,7 +443,7 @@ public static class ExternalMatchRunner
             return VoidResult(seed, externalSlot, fault, childId);
         }
 
-        var (scoreA, scoreB) = scoresAtFailure ?? (0, 0);
+        var scores = ScoreWithForfeit(externalSlot, scoresAtFailure);
 
         // Every agent-attributable code is a win for the baseline side, which is
         // the same shape as any other loss for the external agent, and the reason
@@ -375,7 +456,8 @@ public static class ExternalMatchRunner
         // PolicyOutcome would report the external agent as the winner of a match
         // it lost. A protocol failure is a loss for the external side whatever the
         // seat and whatever the scores (§9.1), so it is stated rather than
-        // computed.
+        // computed. The forfeit moved a score and not an outcome: a stall is still
+        // a loss, and stays one however far ahead the agent was.
         var outcome = MatchOutcome.TeamBWin;
         var row = new MatchResult(
             seed,
@@ -384,8 +466,8 @@ public static class ExternalMatchRunner
             "external",
             "baseline",
             outcome,
-            ScoreA: scoreA,
-            ScoreB: scoreB,
+            ScoreA: scores.ScoreA,
+            ScoreB: scores.ScoreB,
             TotalSteps: Math.Max(0, fault.Step),
             TerminationReason: fault.TerminationReason,
             ContentionRate: 0.0);
@@ -397,7 +479,9 @@ public static class ExternalMatchRunner
             MatchOutcome.TeamBWin,
             fault,
             Episode: null,
-            childId);
+            childId,
+            PartialScoreA: scores.PartialScoreA,
+            PartialScoreB: scores.PartialScoreB);
     }
 
     private static ExternalMatchResult VoidResult(ulong seed, int externalSlot, ExternalAgentFault fault, int? childId = null) =>

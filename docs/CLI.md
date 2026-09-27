@@ -186,8 +186,16 @@ Argument errors in the other commands keep their existing exit status of 1.
 | `VoidRuns` | Matches Lattice refused on its own limits. Not a loss, and excluded from every statistic and from the grading denominator |
 | `AgentCommand` | The argv that was launched, program first |
 | `AgentLimits` | The `StepTimeoutMs` and `MatchTimeoutMs` the matches were played under; the match budget is computed from the step budget, never chosen separately |
+| `AgentForfeits` | One entry per match that failed on the agent's plumbing: `Seed`, `ExternalSeat`, `Reason`, `PartialScoreAtSlot0`, `PartialScoreAtSlot1`, and the `ScoredExternalScore` / `ScoredOpponentScore` the study was scored from. Absent when nothing was forfeited |
 
-All four appear only when `--agent-cmd` is used: an in-process artifact carries
+A match that ends in an agent failure is scored from **0 for the external side**,
+with the opponent keeping the score it had at the moment of failure, so an agent
+that leads and then stalls cannot bank a positive paired delta for the crash. The
+partial scores it had reached are still recorded, under `AgentForfeits`, and enter
+no statistic: the delta, the rates, the interval, and the decision are all computed
+from the forfeited rows, which carry no field a partial could be read from.
+
+All five appear only when `--agent-cmd` is used: an in-process artifact carries
 exactly the seven fields it carried before external agents existed, in the same
 order. The golden fixture pins that field set and every evaluation value in it,
 though it compares tokens rather than raw bytes and excludes the clock and the

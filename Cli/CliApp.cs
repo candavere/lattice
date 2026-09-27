@@ -103,7 +103,43 @@ public static class CliApp
         [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         string[]? AgentCommand = null,
         [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        EvaluationAgentLimits? AgentLimits = null);
+        EvaluationAgentLimits? AgentLimits = null,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        EvaluationForfeit[]? AgentForfeits = null);
+
+    /// <summary>
+    /// One forfeited match: the scoreboard as it stood when the external agent's
+    /// plumbing broke, beside the scores the study was actually scored from.
+    /// </summary>
+    /// <remarks>
+    /// §9.3 scores an agent failure from 0 for the external side, so the row that
+    /// reached the analyzer does not carry the lead the agent abandoned. Without
+    /// this record that information would be gone, and a failure at step 200 would
+    /// be indistinguishable from a handshake that never started — which is a
+    /// difference a reader diagnosing a flaky agent very much needs.
+    /// <para>
+    /// <b>Report-only, and placed so that it cannot be otherwise.</b> The
+    /// per-seed statistics are computed by <c>PairedStudy.Analyze</c> from
+    /// <c>MatchResult</c> rows built before this record exists, and this array is
+    /// attached to the artifact afterwards. There is no code path by which a
+    /// partial score reaches the delta, the confidence interval, the outcome rates,
+    /// or the decision rule.
+    /// </para>
+    /// <para>
+    /// The scores are indexed by <em>slot</em>, like every row the runner writes,
+    /// and <c>ExternalSeat</c> says which slot the external agent played — so the
+    /// seat is never guessed from the numbers. An empty or absent array means no
+    /// match was forfeited.
+    /// </para>
+    /// </remarks>
+    internal sealed record EvaluationForfeit(
+        ulong Seed,
+        int ExternalSeat,
+        string Reason,
+        int PartialScoreAtSlot0,
+        int PartialScoreAtSlot1,
+        int ScoredExternalScore,
+        int ScoredOpponentScore);
 
     /// <summary>
     /// The two spec §7 limits an external run was actually played under.
@@ -952,6 +988,7 @@ public static class CliApp
         // bytes: a report whose field order depended on a dictionary's insertion
         // order would differ between runs for no reason a reader could see.
         var failures = new SortedDictionary<string, int>(StringComparer.Ordinal);
+        var forfeits = new List<EvaluationForfeit>();
         var voidRuns = 0;
 
         foreach (var suite in request.Suites)
@@ -994,6 +1031,23 @@ public static class CliApp
                 failures[code] = failures.TryGetValue(code, out var seen) ? seen + count : count;
             }
 
+            // The §9.3 partials, recorded after the analyzer has already run. The
+            // study above was computed from the forfeited rows, so nothing here can
+            // reach a statistic; this exists so a reader can still see how far each
+            // failed match actually got.
+            foreach (var result in results.Where(r => r.IsAgentFailure))
+            {
+                var match = result.Match!;
+                forfeits.Add(new EvaluationForfeit(
+                    result.Seed,
+                    result.ExternalSlot,
+                    result.Fault!.TerminationReason,
+                    result.PartialScoreA ?? match.ScoreA,
+                    result.PartialScoreB ?? match.ScoreB,
+                    result.ExternalSlot == 0 ? match.ScoreA : match.ScoreB,
+                    result.ExternalSlot == 0 ? match.ScoreB : match.ScoreA));
+            }
+
             voidRuns += report.VoidRuns;
         }
 
@@ -1008,7 +1062,8 @@ public static class CliApp
             AgentFailures: failures,
             VoidRuns: voidRuns,
             AgentCommand: argv,
-            AgentLimits: new EvaluationAgentLimits(limits.StepTimeoutMs, limits.MatchTimeoutMs));
+            AgentLimits: new EvaluationAgentLimits(limits.StepTimeoutMs, limits.MatchTimeoutMs),
+            AgentForfeits: forfeits.Count == 0 ? null : [.. forfeits]);
         var json = JsonArtifact.SerializeIndented(artifact);
         return WriteOutput(flags, "--out", json, stdout, stderr);
     }

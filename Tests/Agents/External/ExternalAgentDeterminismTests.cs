@@ -38,8 +38,15 @@ public class ExternalAgentDeterminismTests
         // half that is about Lattice's determinism, and it would fail if the wire
         // path introduced a wall clock, a hash-order iteration, or a
         // thread-scheduling dependency.
-        var first = await Task.Run(() => RecordExternal(map, config));
-        var second = await Task.Run(() => RecordExternal(map, config));
+        //
+        // The recordings are written to real files — a byte comparison against a
+        // file nobody serialized would prove less — and the test owns both paths,
+        // so a run leaves nothing behind in the temp directory.
+        using var firstFile = ExternalAgentTestHost.TempFile.Create("lattice-ext", ".jsonl");
+        using var secondFile = ExternalAgentTestHost.TempFile.Create("lattice-ext", ".jsonl");
+
+        var first = await Task.Run(() => RecordExternalTo(map, config, firstFile.Path));
+        var second = await Task.Run(() => RecordExternalTo(map, config, secondFile.Path));
         Assert.Equal(first, second);
         Assert.NotEmpty(first);
 
@@ -182,9 +189,6 @@ public class ExternalAgentDeterminismTests
             seed,
             maxSteps: MaxTicks,
             limits: ExternalAgentTestHost.StandardBudget(MaxTicks));
-
-    private static string RecordExternal(MapGraph map, SimulationConfig config) =>
-        RecordExternalTo(map, config, Path.Combine(Path.GetTempPath(), $"lattice-ext-{Guid.NewGuid():N}.jsonl"));
 
     private static string RecordExternalTo(MapGraph map, SimulationConfig config, string path)
     {

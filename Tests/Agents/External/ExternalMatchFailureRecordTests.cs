@@ -70,6 +70,11 @@ public class ExternalMatchFailureRecordTests
     [Fact(Timeout = ExternalAgentTestHost.TestTimeoutMs)]
     public async Task A_Handshake_Timeout_Names_The_Step_Budget_That_Expired()
     {
+        // A behaviour pin, not a fix demonstration: this asserts what the detail
+        // string says today and would also have passed against the string it
+        // replaced. What it protects is the contract a reader depends on — the
+        // detail names the knob that actually expired, and names only that one —
+        // so the assertion is kept for the property rather than for the history.
         var result = await Task.Run(() => ExternalMatchRunner.Run(
             ExternalAgentTestHost.TwoZoneMap(),
             ExternalAgentTestHost.Config(MaxTicks),
@@ -98,6 +103,11 @@ public class ExternalMatchFailureRecordTests
         // slack make the two budgets equal, so the match budget is the smaller one
         // from the first wait onward. The stub then stalls three times the entire
         // budget, so no child startup cost can decide the outcome.
+        //
+        // A behaviour pin, not a fix demonstration, for the same reason as the
+        // handshake test above: it asserts the detail's current content, and the
+        // property worth protecting is that a match timeout names the match
+        // budget rather than the step budget.
         const int stepMs = 2_000;
         const int stallMs = 6_000;
 

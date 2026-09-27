@@ -397,6 +397,13 @@ public class EvaluateAgentCmdTests
         // The other half of the same promise: with no --agent-cmd the artifact is
         // exactly what it was, so the golden fixture that pins it cannot go stale
         // on a field nobody asked for.
+        //
+        // This deliberately re-asserts the field set that the golden artifact test
+        // already pins, at the cost of one more two-seed in-process run. The
+        // duplication is the point: the golden test compares a committed fixture,
+        // so a field added on both sides at once would satisfy it, and this one
+        // asks the live artifact directly. Kept as insurance against a future
+        // unconditional field rather than trimmed for the seconds it costs.
         var path = TempPath();
         try
         {

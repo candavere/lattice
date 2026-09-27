@@ -114,6 +114,64 @@ internal static class ExternalAgentTestHost
     public static SimulationConfig Config(int maxTicks) => new(AgentCount: 2, MaxTicks: maxTicks);
 
     /// <summary>
+    /// A temp file this test owns and removes on dispose.
+    /// </summary>
+    /// <remarks>
+    /// The path is generated, not taken from a caller, and disposal removes the
+    /// file if it is there. A test that mints a recording to compare bytes never
+    /// has a reason to keep the file, so owning the path is what keeps a suite
+    /// from growing a temp directory by two files every run. Disposal rather than
+    /// a <c>finally</c> at each call site means the delete cannot be skipped by a
+    /// later edit that adds an early return.
+    /// </remarks>
+    public sealed class TempFile : IDisposable
+    {
+        private TempFile(string path) => Path = path;
+
+        /// <summary>The absolute path to write to. The file does not exist yet.</summary>
+        public string Path { get; }
+
+        /// <summary>A unique path under the system temp directory.</summary>
+        public static TempFile Create(string prefix, string extension) =>
+            new(System.IO.Path.Combine(
+                System.IO.Path.GetTempPath(),
+                $"{prefix}-{Guid.NewGuid():N}{extension}"));
+
+        /// <summary>
+        /// Deletes the file if it exists, tolerating a delete that a transient
+        /// lock refused.
+        /// </summary>
+        /// <remarks>
+        /// The <see cref="IOException"/> catch is not a retry and adds no wait: it
+        /// makes one attempt and, if the OS refuses it, leaves the file. That is
+        /// deliberate, because the alternative is worse on Windows, where an
+        /// indexer or a virus scanner holding a temp file for a moment would
+        /// otherwise turn a passing determinism test into a failure that says
+        /// nothing about determinism. A genuinely leaked handle is still caught,
+        /// deliberately and loudly, by
+        /// <c>ExternalAgentFileHandleTests</c>, which asserts the exclusive-open
+        /// property directly instead of inferring it from a temp directory. Every
+        /// other exception propagates: a permissions or path fault is a real
+        /// problem, not noise.
+        /// </remarks>
+        public void Dispose()
+        {
+            try
+            {
+                if (System.IO.File.Exists(Path))
+                {
+                    System.IO.File.Delete(Path);
+                }
+            }
+            catch (IOException)
+            {
+                // One attempt refused by the OS; the file stays and the next run
+                // uses a different path, so nothing accumulates within a run.
+            }
+        }
+    }
+
+    /// <summary>
     /// Asserts the child process is really gone, by asking the OS. The runner's
     /// kill-on-dispose is the thing under test, so the assertion is deliberately
     /// stronger than "dispose was called": a process id that still resolves is a

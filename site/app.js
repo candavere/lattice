@@ -254,6 +254,33 @@
     dict[key] = box;
   }
 
+  // The painted vertical extent of a run of text drawn on a `middle` baseline:
+  // the glyphs' own ascent and descent, measured from where the alphabetic
+  // baseline sits under that anchor, and never less than the 1.3x-font-size
+  // line box. A box one font-size tall clips the ascenders and descenders off
+  // a small face, which is exactly what a census of the painted label must not
+  // do — at a phone's font scale it left the glyph cores out of the window.
+  // Test hook only — the production draw path never calls it.
+  function probeTextLines(ctx, text, anchorY, size) {
+    const m = ctx.measureText(String(text));
+    const exact = typeof m.actualBoundingBoxAscent === 'number'
+      && typeof m.actualBoundingBoxDescent === 'number'
+      && typeof m.fontBoundingBoxAscent === 'number'
+      && typeof m.fontBoundingBoxDescent === 'number';
+    // Where the alphabetic baseline falls under a `middle` anchor, and how far
+    // the glyphs reach either side of it.
+    const shift = exact ? (m.fontBoundingBoxAscent - m.fontBoundingBoxDescent) / 2 : size * 0.3;
+    const up = exact ? m.actualBoundingBoxAscent : size * 0.8;
+    const down = exact ? m.actualBoundingBoxDescent : size * 0.2;
+    const inkTop = anchorY + shift - up;
+    const inkBottom = anchorY + shift + down;
+    // Widen to the fallback line box about the same centre, so the box holds
+    // every glyph pixel whatever the face reports.
+    const centre = (inkTop + inkBottom) / 2;
+    const half = Math.max((inkBottom - inkTop) / 2, Math.ceil(size * 1.3) / 2);
+    return { top: centre - half, bottom: centre + half };
+  }
+
   /* ------------------------------------------------------- trajectory IO  */
 
   function loadDefault() {
@@ -1463,8 +1490,9 @@
       ctx.fillText(label, rect.x, labelY);
       if (measureProbe.on) {
         const lw = ctx.measureText(label).width;
+        const line = probeTextLines(ctx, label, labelY, layout.titlePx);
         measureProbe.labels[zone.Id] = {
-          x: rect.x - lw / 2, y: labelY - layout.titlePx / 2, w: lw, h: layout.titlePx,
+          x: rect.x - lw / 2, y: line.top, w: lw, h: line.bottom - line.top,
         };
       }
 

@@ -14,6 +14,17 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+        # A stable per-OS slug for the artifact name. The runner labels above
+        # are rolling (ubuntu-latest moves), so the published artifact name
+        # should not move with them; the exact image the leg actually ran on is
+        # recorded inside the summary as runnerImage.
+        include:
+          - os: ubuntu-latest
+            os_slug: ubuntu
+          - os: windows-latest
+            os_slug: windows
+          - os: macos-latest
+            os_slug: macos
     steps:
       - uses: actions/checkout@v5
 
@@ -31,8 +42,60 @@ jobs:
       - name: Verify Golden Trajectory Replay Equivalence
         run: dotnet run -c Release --project Cli -- replay Tests/fixtures/golden_trajectory.jsonl --verify
 
+      # `--logger trx` is what makes the run's counts machine-readable. The
+      # step keeps the original command and exit code exactly: the TRX is
+      # written for evidence, not as a substitute for the pass/fail decision.
       - name: Test
-        run: dotnet test Lattice.sln -c Release --no-build --verbosity normal
+        shell: bash
+        run: |
+          set -euo pipefail
+          RESULTS="$RUNNER_TEMP/test-results"
+          mkdir -p "$RESULTS"
+          dotnet test Lattice.sln -c Release --no-build --verbosity normal \
+            --logger trx \
+            --results-directory "$RESULTS"
+
+      # Reduces the TRX reports to one small JSON document carrying the counts
+      # next to the commit they came from. `if: always()` so a failing run
+      # still publishes its real numbers for inspection, and so a publishable
+      # artifact always matches the log.
+      #
+      # Exit codes: 0 clean, 1 parsed but something failed, 2 untrustworthy
+      # input. Step 1 already fails the job on a failing suite, so this step
+      # can only ever be additive; it never turns a red run green.
+      - name: Publish machine-readable test summary
+        if: always()
+        shell: bash
+        run: |
+          BASE_PY="$(command -v python3 || command -v python)"
+          "$BASE_PY" .github/workflows/summarize_test_results.py \
+            "$RUNNER_TEMP/test-results" \
+            --out "$RUNNER_TEMP/test-summary.json" \
+            --commit-sha "$GITHUB_SHA" \
+            --event "$GITHUB_EVENT_NAME" \
+            --ref "$GITHUB_REF" \
+            --runner-os "$RUNNER_OS" \
+            --os-slug "${{ matrix.os_slug }}" \
+            --runner-image "$ImageOS $ImageVersion" \
+            --dotnet-version "$(dotnet --version)"
+
+      # One artifact per OS, named `dotnet-test-summary-<os_slug>`
+      # (ubuntu, windows, macos), retained 30 days. The JSON holds the
+      # total/passed/failed/skipped counts and the head SHA; the raw TRX is
+      # included so the JSON can be re-derived and audited rather than trusted.
+      # `if: always()` so a red run's numbers survive without log access, and
+      # `if-no-files-found: error` so a silently empty upload is a failure
+      # rather than a missing number nobody notices.
+      - name: Upload test summary artifact (${{ matrix.os_slug }})
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: dotnet-test-summary-${{ matrix.os_slug }}
+          path: |
+            ${{ runner.temp }}/test-summary.json
+            ${{ runner.temp }}/test-results
+          retention-days: 30
+          if-no-files-found: error
 
       - name: One-command setup (setup.sh)
         if: runner.os != 'Windows'
@@ -96,3 +159,20 @@ jobs:
             echo "::endgroup::"
           done
           echo "verified ${#recordings[@]} site recording(s)"
+
+  test-summary-parser:
+    # The published test counts come out of summarize_test_results.py, so its
+    # refusal logic is itself under test: absent, malformed, duplicate and
+    # self-contradicting reports must all exit non-zero rather than publishing
+    # an empty count. Same pattern as the comparator job in benchmarks.yml.
+    name: Test summary parser unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Unit-test the CI test-result summarizer
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s .github/workflows \
+            -p 'test_summarize_test_results.py' -v

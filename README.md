@@ -144,9 +144,11 @@ in-process MCTS study shows in [Results](#results).
 ## Claims and proofs
 
 Every claim on this page has a command you can run and a committed artifact it
-rests on. All commands were run at the commit that introduced this page on
-macOS 27.0.0 arm64, .NET 10.0.12, 8 cores; the output fragments below are
-verbatim.
+rests on. Unless a row names a revision, the output fragments below are
+verbatim from runs at the commit that introduced this page, on a macOS arm64
+host with .NET 10.0.12. A local run is evidence that the command worked on one
+machine, not that CI is green; the current per-OS CI counts are the CI
+artifacts linked under [Test totals, as CI publishes them](#test-totals-as-ci-publishes-them).
 
 | Claim | Verify with | Rests on |
 | :--- | :--- | :--- |
@@ -154,7 +156,7 @@ verbatim.
 | Replay is hash-verified, not just re-run. | `dotnet run -c Release --project Cli -- replay Tests/fixtures/golden_trajectory.jsonl --verify` | `replay verified: 12 step(s) serialized-equivalent, 12 state hash(es) matched (seed 2024, schema v3).` Exit 0. Digest computed by [`Trajectories/SimulationStateHash.cs`](Trajectories/SimulationStateHash.cs), compared in [`Trajectories/TrajectoryReplay.cs`](Trajectories/TrajectoryReplay.cs). |
 | The same check runs on all three operating systems. | Read the `Build & test` matrix in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | The golden replay-verify step is a matrix step over `ubuntu-latest`, `windows-latest`, `macos-latest`; run [36302783294](https://github.com/candavere/lattice/actions/runs/36302783294) shows all three green. |
 | Every committed recording replays, not just the golden one. | `dotnet run -c Release --project Cli -- replay site/demo.jsonl --verify` and the same for `site/infiltration.jsonl` | `27 step(s) … 27 state hash(es) matched` and `20 step(s) … 20 state hash(es) matched`. A separate CI job replays every recording under `site/`. |
-| The suite is green. | `dotnet test Lattice.sln -c Release` | `Passed! - Failed: 0, Passed: 711, Skipped: 0, Total: 711`. |
+| The suite has 711 tests. | `dotnet test Lattice.sln -c Release` | Historical: `Passed! - Failed: 0, Passed: 711, Skipped: 0, Total: 711`, recorded at `a8b2fc6` (the v3.0.0 release commit), not at the current head. 711 is the discovered test count, and it is not a claim that any given run passes 711 — see [flaky tests](#flaky-tests-are-known-and-listed) and the CI artifacts for the current per-OS counts. |
 | A paired study needs 30 seeds, and the rule is mean > 0 **and** CI lower > 0. | `dotnet run -c Release --project Cli -- evaluate --scenario standard --seed-set dev --seeds 29 --agent-cmd "python3 examples/python/lattice_agent.py"`, then the same with `--seeds 30` | `--seeds 29` → `Not graded: 29 seeds is below the 30-seed floor of the decision rule (the canonical suites run 50).` `--seeds 30` → `Fail: mean paired delta -0.383 and/or the 95% CI lower bound -0.672 did not clear 0 on 30 seeds.` The rule is [`Agents/PairedEvaluation.cs:144-145`](Agents/PairedEvaluation.cs): `graded = deltas.Length >= 30` and `passed = graded && mean > 0.0 && ciLower > 0.0`, with `ConfidenceLevel = 0.95` at line 74. |
 | Every protocol failure is a loss, never a retry. | `dotnet run -c Release --project Cli -- evaluate --scenario standard --seed-set dev --seeds 2 --agent-step-timeout-ms 300 --agent-cmd "python3 crash.py"`, where `crash.py` is `import sys; sys.exit(3)` | `"AgentFailures": {"agent_crashed": 4}`, `VoidRuns: 0`, wins/draws/losses `0/0/4` of 4. The reason set is the closed fourteen-code table at [`docs/EXTERNAL_AGENT_PROTOCOL.md` §8](docs/EXTERNAL_AGENT_PROTOCOL.md) and [`Protocol/ProtocolReasons.cs:17-30`](Protocol/ProtocolReasons.cs); thirteen are agent-attributable and one, `host_limit`, is host-attributable. |
 | A failed match forfeits: external side 0, opponent keeps its score, partials are diagnostic only. | An agent that plays normally, then `sys.exit(3)` at step 10, over 3 seeds | `AgentForfeits` rows read `"PartialScoreAtSlot0": 2, "PartialScoreAtSlot1": 3, "ScoredExternalScore": 0, "ScoredOpponentScore": 3` — the external side's 2 and 3 are recorded but not scored, and the opponent keeps 3 and 2. `AgentFailures: {"agent_crashed": 6}`, all 6 matches losses, mean delta −2.333. |
@@ -172,7 +174,7 @@ Each row is one committed benchmark claim, with the artifact behind it.
 | :--- | :--- |
 | 32-rollout MCTS loses to the deterministic Scout heuristic on standard generated maps: mean paired delta -1.12, 95% CI [-1.37, -0.87] on the dev suite. This loss is the committed negative baseline. | [`benchmarks/mcts_evaluation_results.json`](benchmarks/mcts_evaluation_results.json) |
 | The same 32-rollout MCTS policy wins when both agents are funneled through capacity-1 chokepoints into one shared vault: +2.03, CI [+1.66, +2.41] on the dev suite. Topology changed the conclusion. | [`benchmarks/bottleneck_evaluation_results.json`](benchmarks/bottleneck_evaluation_results.json) |
-| 99.61% scoped mutation score on `Simulation.cs` + `PerceptionFilter.cs` only (252 killed / 1 timed out / 1 survived / 0 no-coverage). Not whole-repository coverage. | [`benchmarks/mutation_stryker_summary.json`](benchmarks/mutation_stryker_summary.json) |
+| 99.61% scoped mutation score on `Simulation.cs` + `PerceptionFilter.cs` only (252 killed / 1 timed out / 1 survived / 0 no-coverage). A historical local calibration at `053f3eb`, not a rerun at the current head, not whole-repository coverage, and not a CI gate. | [`benchmarks/mutation_stryker_summary.json`](benchmarks/mutation_stryker_summary.json) |
 | Five-workload throughput record on one host: median 14,916 to 899,075 steps/s depending on workload (the MCTS case reports decisions/s). Speed is measured, not advertised. | [`benchmarks/throughput_benchmark.json`](benchmarks/throughput_benchmark.json), [`benchmarks/throughput_summary.md`](benchmarks/throughput_summary.md) |
 
 ### The standard study: a committed loss
@@ -336,9 +338,13 @@ disagree are called out below rather than resolved.
   `high: 80`, `low: 60`, `break: 0`. The only threshold the tool enforces is
   `break`, so the committed gate fails only at a 0% score; `high`/`low` are
   informational. There is no mutation step in CI (`.github/workflows/ci.yml`
-  runs restore, build, replay-verify, test, the UI regression, and a second job
-  that replays every `site/` recording). The
-  99.61% figure is a committed calibration record, not a CI gate.
+  runs restore, build, replay-verify, test, the UI regression, a parser unit-test
+  job, and a second job that replays every `site/` recording). The 99.61% figure
+  is a historical local calibration recorded in
+  [`benchmarks/mutation_stryker_summary.json`](benchmarks/mutation_stryker_summary.json)
+  at `053f3eb`, scoped to `Simulation.cs` and `PerceptionFilter.cs`. It was not
+  rerun at the current head, it is not whole-repository coverage, and it is not
+  a CI gate: nothing in CI runs Stryker.
 
 ### Determinism and seeds
 
@@ -455,6 +461,9 @@ Only claims the repository can back up are listed here.
   a `>20%` drop while this page describes the enforced ratios of 0.75, 0.6, and
   0.85. The conflict is recorded, not reconciled; the workflow and comparator
   are authoritative.
+- A small number of tests fail intermittently under the full parallel run and
+  pass when run alone, so a green run is evidence, not a guarantee. See
+  [Flaky tests are known and listed](#flaky-tests-are-known-and-listed).
 
 ## Repository layout
 
@@ -514,6 +523,62 @@ everywhere else.
 The flag-by-flag reference, every flag, its semantics, and worked examples,
 lives in [`docs/CLI.md`](docs/CLI.md).
 
+## Test totals, as CI publishes them
+
+`dotnet test` prints a summary line, but a log line is not something a reader can
+check. So CI writes VSTest TRX reports and reduces them to one small JSON
+document per operating system, uploaded as an Actions artifact:
+
+- **Artifact names.** `dotnet-test-summary-ubuntu`, `dotnet-test-summary-windows`,
+  `dotnet-test-summary-macos`, one per matrix leg, retained 30 days. Each
+  contains `test-summary.json` plus the raw `.trx` files it was derived from.
+- **What is in it.** `total`, `passed`, `failed`, `skipped` and `notRun` counts,
+  the head `commitSha` that was tested, the `runnerOs`, `osSlug`, `runnerImage`
+  and `dotnetVersion`, and the name of every TRX file the numbers came from.
+  Because the raw TRX ships alongside the JSON, the counts can be re-derived
+  and audited rather than taken on trust.
+- **Read the numbers per OS.** The three legs are three separate documents and
+  they are never added together. Summing them would triple-count one suite and
+  produce a figure that describes no real run. There is deliberately no
+  repository-wide "N tests" shield: a static count goes stale silently, and
+  a cross-OS total is not a fact about the suite.
+- **The parser refuses rather than guesses.** `.github/workflows/summarize_test_results.py`
+  exits non-zero and publishes no JSON when the reports are absent, malformed,
+  duplicated, internally contradictory, or when a run discovered zero tests. A
+  `total: 0` that reads as a pass is the failure this exists to prevent, so a
+  run that finds nothing is reported as an error, not as a green empty suite.
+  Exit 0 means parsed and nothing failed; exit 1 means parsed with failures,
+  and the JSON is still written so a red run's numbers survive.
+- **Run the same parser yourself.** `python3 -m unittest discover -s .github/workflows -p 'test_summarize_test_results.py'`
+  — 24 tests covering the valid, missing, malformed, duplicate, contradictory
+  and nonzero-failure cases, run in CI as the `Test summary parser unit tests`
+  job so the refusal logic is itself covered.
+
+Verify an artifact against its run: open the CI run for the commit, download
+`test-summary.json`, and check that `commitSha` is the commit you are reading
+and that the four counts match the job's log summary for that OS.
+
+### Flaky tests are known and listed
+
+711 is the discovered test count. On the current head, five consecutive full
+`dotnet test Lattice.sln -c Release` runs on one macOS arm64 host gave 711/711
+twice, 709/711 once, 710/711 once, and 707/711 once. Every failure was in the
+external-agent and CLI-argument-fuzz areas, and all 20 of those tests pass when
+run on their own, so they race on shared temporary state under the parallel
+suite rather than being deterministically broken. The mutation summary at
+[`benchmarks/mutation_stryker_summary.json`](benchmarks/mutation_stryker_summary.json)
+records the same class of problem: two mutants attributed to
+`CliArgumentFuzzTests` are non-reproducible batch-mode artifacts of the fuzz
+harness's shared temp workspace.
+
+Stated rather than smoothed, because the alternative is worse: a README that
+says "the suite is green" while a run in three goes red is a claim that cannot
+survive a reader running the command. Fixing the shared-state races is real
+work in `Tests/**` and the fuzz harness, and not something a README row can
+paper over. So this page does not claim a green suite for the current head; it
+points at the CI artifact, which reports what actually happened on the run you
+are looking at.
+
 ## How evidence works
 
 Each committed artifact below is the exact file behind a claim on this page:
@@ -525,7 +590,7 @@ Each committed artifact below is the exact file behind a claim on this page:
 | [`benchmarks/mcts_evaluation_results.json`](benchmarks/mcts_evaluation_results.json) | Standard-map paired study, dev + held-out | Negative baseline, delta, CI, verdict |
 | [`benchmarks/bottleneck_evaluation_results.json`](benchmarks/bottleneck_evaluation_results.json) | Contention-bearing paired study, dev + held-out | Topology-dependent inversion |
 | [`benchmarks/throughput_benchmark.json`](benchmarks/throughput_benchmark.json) | Five-workload timing record on one host | Performance, qualified |
-| [`benchmarks/mutation_stryker_summary.json`](benchmarks/mutation_stryker_summary.json) | Stryker run summary with survivor classification | Mutation score, scope |
+| [`benchmarks/mutation_stryker_summary.json`](benchmarks/mutation_stryker_summary.json) | Stryker run summary with survivor classification, from a historical local calibration at `053f3eb` scoped to two files. Not a current rerun, not whole-repo coverage, not a CI gate | Mutation score, scope |
 | [`docs/reproduction_packet.md`](docs/reproduction_packet.md) | Turnkey guide to verifying the published `v2.3.2` and `v3.0.0` releases asset-for-asset | Release claims, checksums |
 | [`docs/FINDINGS_LEDGER.md`](docs/FINDINGS_LEDGER.md) | Append-only record of criticisms, edge cases, and resolved issues | Governance, traceability |
 | [`docs/CLAIM_CALIBRATION_MATRIX.md`](docs/CLAIM_CALIBRATION_MATRIX.md) | Every public claim mapped to its proving artifact, tested matrix, and boundary | Claim-to-artifact traceability |

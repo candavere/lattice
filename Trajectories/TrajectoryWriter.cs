@@ -7,7 +7,10 @@ namespace Lattice.Trajectories;
 /// <summary>
 /// Records full episodes to inspectable JSONL: a header line (seed + map +
 /// sim config), one line per tick (actions + complete StepResult), and a
-/// final metrics line. Each line is independently parseable JSON; simulation
+/// final metrics line. From schema 4 a step line may also carry the
+/// decision-time <see cref="PartialObservation"/>s the agents acted on, with
+/// the per-agent cones they were projected through declared in the header.
+/// Each line is independently parseable JSON; simulation
 /// output is byte-stable so re-recording or replaying yields identical lines.
 /// Newlines are emitted as a bare <c>\n</c> on every platform, so two
 /// recordings of the same episode are byte-identical once line endings are
@@ -26,6 +29,17 @@ public static class TrajectoryWriter
     /// <see cref="ActionSpace"/> first so a malformed episode never lands on
     /// disk; stepping stops at the first terminal tick (extra turns are
     /// ignored, mirroring <see cref="SimulationDriver"/>).
+    /// <para>
+    /// <paramref name="perceptions"/> is the decision-time fog, one array per
+    /// turn in agent-slot order, supplied by the caller from the agents' own
+    /// filters (<c>ScenarioResult.Perceptions</c>); this writer never projects
+    /// anything itself, because a perception it rebuilt would be a second
+    /// reading of the world rather than a record of the one the agents acted on.
+    /// It does derive the header's per-agent <see cref="TrajectoryHeader.AgentVision"/>
+    /// from those perceptions, so the declared cone cannot disagree with the
+    /// recorded fog. Null records no perceptions at all, and then the file is
+    /// byte-for-byte what a build without the field produced.
+    /// </para>
     /// </summary>
     public static TrajectoryRecording Record(
         MapGraph map,
@@ -35,17 +49,27 @@ public static class TrajectoryWriter
         TextWriter sink,
         string? scenario = null,
         string[]? agentRoles = null,
-        DynamicMapRuleSet? rules = null)
+        DynamicMapRuleSet? rules = null,
+        PartialObservation[][]? perceptions = null)
     {
         var effectiveRules = rules ?? DynamicMapRuleSet.None;
         // A static-map episode writes no rules at all: the header field is
         // only present when a non-empty policy governs the recording.
         var serializedRules = effectiveRules == DynamicMapRuleSet.None ? null : effectiveRules;
+        int[]? agentVision = PerceptionProjector.DeclaredVision(perceptions);
+        if (perceptions is not null && perceptions.Length < actions.Length)
+        {
+            throw new ArgumentException(
+                $"Supplied {perceptions.Length} perception step(s) for {actions.Length} turn(s); " +
+                "every turn must carry the perceptions its agents decided from.",
+                nameof(perceptions));
+        }
+
         var state = Simulation.CreateInitial(map, simulationConfig, effectiveRules);
 
         sink.Write(Serialize(new HeaderLine(
             "header", seed, map, simulationConfig, serializedRules, TrajectorySchema.CurrentVersion,
-            Scenario: scenario, AgentRoles: agentRoles)) + "\n");
+            Scenario: scenario, AgentRoles: agentRoles, AgentVision: agentVision)) + "\n");
 
         var steps = new List<TrajectoryStep>();
         Info? lastInfo = null;
@@ -59,9 +83,12 @@ public static class TrajectoryWriter
             // state the summary line aggregates come from, and hash[N] is the
             // pre-state of step N+1 — one field chain-pins the whole episode.
             var stateHash = SimulationStateHash.Compute(outcome.NextState, seed);
-            var step = new TrajectoryStep(outcome.Result.Info.StepNumber, turn, outcome.Result, stateHash);
+            var stepPerceptions = perceptions?[steps.Count];
+            var step = new TrajectoryStep(
+                outcome.Result.Info.StepNumber, turn, outcome.Result, stateHash, stepPerceptions);
             steps.Add(step);
-            sink.Write(Serialize(new StepLine("step", step.StepNumber, turn, outcome.Result, stateHash)) + "\n");
+            sink.Write(Serialize(new StepLine(
+                "step", step.StepNumber, turn, outcome.Result, stateHash, stepPerceptions)) + "\n");
             state = outcome.NextState;
             lastInfo = outcome.Result.Info;
 
@@ -75,7 +102,9 @@ public static class TrajectoryWriter
         sink.Write(Serialize(new FinalLine("final", final)) + "\n");
 
         return new TrajectoryRecording(
-            new TrajectoryHeader(seed, map, simulationConfig, serializedRules, TrajectorySchema.CurrentVersion, scenario, agentRoles),
+            new TrajectoryHeader(
+                seed, map, simulationConfig, serializedRules, TrajectorySchema.CurrentVersion,
+                scenario, agentRoles, agentVision),
             steps.ToArray(),
             final);
     }
@@ -106,12 +135,13 @@ public static class TrajectoryWriter
             recording.Header.DynamicRules,
             recording.Header.SchemaVersion,
             Scenario: scenario ?? recording.Header.Scenario,
-            AgentRoles: agentRoles ?? recording.Header.AgentRoles)) + "\n");
+            AgentRoles: agentRoles ?? recording.Header.AgentRoles,
+            AgentVision: recording.Header.AgentVision)) + "\n");
 
         foreach (var step in recording.Steps)
         {
             sink.Write(Serialize(new StepLine(
-                "step", step.StepNumber, step.Actions, step.Result, step.StateHash)) + "\n");
+                "step", step.StepNumber, step.Actions, step.Result, step.StateHash, step.Perceptions)) + "\n");
         }
 
         sink.Write(Serialize(new FinalLine("final", recording.Final)) + "\n");
@@ -159,9 +189,11 @@ public static class TrajectoryWriter
         [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] DynamicMapRuleSet? DynamicRules = null,
         int SchemaVersion = 0,
         string? Scenario = null,
-        string[]? AgentRoles = null)
+        string[]? AgentRoles = null,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int[]? AgentVision = null)
     {
-        public TrajectoryHeader ToModel() => new(Seed, Map, SimulationConfig, DynamicRules, SchemaVersion, Scenario, AgentRoles);
+        public TrajectoryHeader ToModel() =>
+            new(Seed, Map, SimulationConfig, DynamicRules, SchemaVersion, Scenario, AgentRoles, AgentVision);
     }
 
     internal sealed record StepLine(
@@ -169,9 +201,10 @@ public static class TrajectoryWriter
         int StepNumber,
         AgentAction[] Actions,
         StepResult Result,
-        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? StateHash = null)
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? StateHash = null,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] PartialObservation[]? Perceptions = null)
     {
-        public TrajectoryStep ToModel() => new(StepNumber, Actions, Result, StateHash);
+        public TrajectoryStep ToModel() => new(StepNumber, Actions, Result, StateHash, Perceptions);
     }
 
     internal sealed record FinalLine(string Kind, TrajectoryFinal Metrics);

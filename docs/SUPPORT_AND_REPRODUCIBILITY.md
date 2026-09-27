@@ -173,16 +173,18 @@ the generator:
 | `Map` | yes | The fully materialized map graph. |
 | `SimulationConfig` | yes | Configuration used to rebuild the environment. |
 | `DynamicRules` | no | The dynamic topology policy; omitted (null) for static maps. |
-| `SchemaVersion` | yes | Wire format stamp; the current version is `TrajectorySchema.CurrentVersion` (currently `3`). |
+| `SchemaVersion` | yes | Wire format stamp; the current version is `TrajectorySchema.CurrentVersion` (currently `4`). |
 | `Scenario` | no | Demonstration-layer metadata; ignored by the replay core. |
 | `AgentRoles` | no | Demonstration-layer roster metadata; ignored by the replay core. |
+| `AgentVision` | no | Schema 4: the perception cone, in graph hops, each agent's own filter was built with, indexed by agent slot. Present exactly when the step lines carry `Perceptions`, and omitted otherwise. |
 
-Newly written files carry `TrajectorySchema.CurrentVersion` (currently `3`);
+Newly written files carry `TrajectorySchema.CurrentVersion` (currently `4`);
 this document cites that constant rather than a bare literal, so it cannot
 drift out of step with the code. Schema 2 introduced the episode's dynamic
 topology policy (`DynamicRules`, timed portcullises and event locks), which the
 current schema still records, so a replay recreates the exact choke-capacity
-schedule the recording was made under. The simulation config is the required
+schedule the recording was made under. Schema 4 adds the decision-time
+perceptions, described below. The simulation config is the required
 second half of that contract: a replay with a different config is not a replay
 of the same episode.
 
@@ -210,6 +212,66 @@ Schema 3 does not change the header. It changes the step lines.
   recording's own header version, so rewriting a pre-hash file cannot promote
   it to schema 3 with no digests present (see the migration invariant below).
 
+#### What schema 4 adds
+
+Schema 4 changes the header and the step lines, and it adds a fifth thing to
+check: what each agent actually saw when it chose.
+
+- **`Perceptions` is a step-line field.** Each `step` line may carry a
+  `Perceptions` array with one `PartialObservation` per agent slot, indexed by
+  slot, each naming the agent it belongs to. It is the masked, vision-bounded
+  view that agent's own `PerceptionFilter` produced **inside** its `Decide`
+  call, stamped with the tick it decided (`Perceptions[i].Tick` is the
+  decision's tick, which is the *pre*-step world, not the world the step
+  produced). It carries the three data tiers the filter defines: real-time
+  detail inside the cone, last-known stale memory beyond it, and fully masked
+  entries for everything never seen.
+- **`AgentVision` is the header half of the same contract.** It declares the
+  radius, in graph hops, each agent's filter was built with, so a reader can
+  rebuild those filters. The writer derives it *from* the perceptions
+  (`PerceptionProjector.DeclaredVision`) rather than accepting it as an
+  independent claim, so the declared cone cannot disagree with the recorded fog.
+- **The recording path never re-derives a perception.** `ScenarioRunner`
+  captures what each agent's own filter produced
+  (`IDecidesFromPerception.LastPerception`) immediately after that agent
+  decides; `TrajectoryWriter.Record` records those values and nothing else. A
+  second projection would be a second opinion about what the agent saw, not a
+  record of it, and the two could be compared only if one of them were rebuilt
+  anyway — which is exactly what verification does, separately.
+- **`replay --verify` recomputes each perception.** Every recorded
+  `PartialObservation` is reprojected through a `PerceptionFilter` built from
+  the header's `AgentVision` over the world the step was decided from, and
+  compared, naming the first offending tick and agent slot. A single edited
+  zone status, `LastSeenTick`, or rival sighting fails. The filter is
+  deterministic and its stale memory accumulates across the episode exactly as
+  the agent's own did, so the comparison is a check of the recorded fog rather
+  than a re-derivation of it from omniscient positions.
+- **Coverage is all-or-nothing, like the state hash.** Every step line must
+  carry a `Perceptions` array or none may; a partial block is a **discrepancy**,
+  so the fog cannot be stripped from some steps to narrow the check. A header
+  that declares an `AgentVision` no step backs, or a recording whose steps carry
+  perceptions but whose header declares no cone, is likewise a discrepancy.
+- **The notice path.** A recording that declares schema
+  `TrajectorySchema.DecisionTimePerceptionVersion` (currently `4`) or later and
+  carries neither perceptions nor a declared vision reports
+  `no recorded perception: decision-time visibility not verified`, published as
+  `TrajectoryReplay.NoPerceptionNotice`. It is a notice rather than a
+  discrepancy because the fields are optional on the wire — an agent that
+  carries no filter has no decision-time fog to record, and an external-agent
+  match is exactly that — but it is never silence, because a reader that did
+  not check the fog must not be able to report a pass that reads as though it
+  had. A recording from **before** schema 4 is not nagged: the field never
+  existed, so there is nothing it failed to carry. The committed
+  `demo.jsonl` and the golden fixture are in that position and verify as they
+  always did.
+- **A recording without the fields is byte-identical to one written before
+  them.** Both new fields are nullable and omitted when absent
+  (`JsonIgnoreCondition.WhenWritingNull`), so the schema-4 writer's output for a
+  perception-free episode differs from the pre-schema-4 output only in the
+  header's own version stamp. `Tests/Trajectories/DecisionTimePerceptionTests.cs`
+  pins that: stripping the fields from the committed infiltration episode
+  reproduces its pre-change SHA-256 exactly.
+
 ### Structural and migration invariants
 
 - The header must be the first line; a second header anywhere is rejected.
@@ -220,6 +282,12 @@ Schema 3 does not change the header. It changes the step lines.
   `ActionSpace`, so a step outside the action space is rejected rather than
   replayed.
 - Every non-blank line must declare a known `Kind`; unknown kinds fail loudly.
+- A `Perceptions` array must hold exactly one non-null entry per agent slot,
+  each entry naming the slot it sits in; a header's `AgentVision` must hold
+  exactly one radius per declared agent, and a radius must be
+  `SimulationConfig.UnboundedVision` or at least 1. The rule is stated once, in
+  `Trajectories/PerceptionProjector.cs`, and the reader, the writer and
+  verification all call it.
 - A truncated or hand-corrupted recording is rejected instead of silently
   replaying wrong data.
 
@@ -246,6 +314,13 @@ The golden fixtures used to pin these invariants are
 [`../Tests/fixtures/golden_trajectory.jsonl`](../Tests/fixtures/golden_trajectory.jsonl)
 (schema v3, seed 2024) and
 [`../Tests/fixtures/golden_dynamic_rules.json`](../Tests/fixtures/golden_dynamic_rules.json).
+The v3 fixture stays at v3 on purpose: it is the standing proof that a
+pre-perception recording is still read, still verified, and still emits no
+perception notice. The committed
+[`../site/infiltration.jsonl`](../site/infiltration.jsonl) is the schema-4
+counterpart (seed 42, 20 steps, per-agent vision `[2, 2]`), and
+`../site/demo.jsonl` remains a schema-3 recording with no perceptions, which is
+why the viewer labels its sightline a reconstruction rather than a record.
 
 ### Release immutability policy
 

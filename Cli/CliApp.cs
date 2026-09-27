@@ -405,6 +405,9 @@ public static class CliApp
         var jsonl = new StringBuilder();
         using (var sink = new StringWriter(jsonl))
         {
+            // The decision-time perceptions come from the agents' own filters
+            // as they decided, carried on the run; the writer records them and
+            // declares the cone each one was projected through.
             TrajectoryWriter.Record(
                 run.Map,
                 run.Config,
@@ -412,7 +415,8 @@ public static class CliApp
                 run.Base.Turns,
                 sink,
                 scenario: InfiltrationScenario.ScenarioName,
-                agentRoles: new[] { InfiltrationScenario.SentryRole, InfiltrationScenario.InfiltratorRole });
+                agentRoles: new[] { InfiltrationScenario.SentryRole, InfiltrationScenario.InfiltratorRole },
+                perceptions: run.Base.Perceptions);
         }
 
         var lastInfo = run.Base.Results[^1].Info;
@@ -751,8 +755,12 @@ public static class CliApp
             var stateCoverage = hashed == recording.Steps.Length && hashed > 0
                 ? $", {hashed} state hash(es) matched"
                 : string.Empty;
+            var perceived = recording.Steps.Count(step => step.Perceptions is not null);
+            var perceptionCoverage = perceived == recording.Steps.Length && perceived > 0
+                ? $", {perceived} decision-time perception(s) matched"
+                : string.Empty;
             stderr.WriteLine(
-                $"replay verified: {recording.Steps.Length} step(s) serialized-equivalent{stateCoverage} " +
+                $"replay verified: {recording.Steps.Length} step(s) serialized-equivalent{stateCoverage}{perceptionCoverage} " +
                 $"(seed {recording.Header.Seed}, schema v{recording.Header.SchemaVersion}).");
             return Success;
         }

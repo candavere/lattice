@@ -1201,16 +1201,25 @@ The consequences MUST hold:
   (`docs/SUPPORT_AND_REPRODUCIBILITY.md:212-220`,
   `Trajectories/TrajectoryModel.cs:55-72`). A match with an external agent
   produces a recording of the same schema as any other, so the existing
-  verification path applies with no special case.
+  verification path applies with no special case. The one visible addition is a
+  notice on stderr: since schema 4 a recording that carries no decision-time
+  perceptions reports `no recorded perception: decision-time visibility not
+  verified` (`TrajectoryReplay.NoPerceptionNotice`). An external match is
+  exactly such a recording — the agents are another process, so there is no
+  library-side `PerceptionFilter` whose output could have been recorded — and
+  the notice is a true statement about the file. It is not a failure: the exit
+  code is still 0 and the verdict line still reads `replay verified`.
 - **State hashes work unchanged.** A schema-3 recording carries a SHA-256
   digest of the state at every step (`Trajectories/TrajectoryModel.cs:6-31`).
   A digest attests to the state the recorded actions produced; it makes no
   statement about who chose those actions.
-- **The trajectory schema is not bumped.** This protocol adds no field to
-  `TrajectoryHeader`, `TrajectoryStep`, or `TrajectoryFinal`
-  (`Trajectories/TrajectoryModel.cs:46-85`), so `TrajectorySchema.CurrentVersion`
-  stays `3` (`Trajectories/TrajectoryModel.cs:21`) and no existing golden
-  fixture changes.
+- **The trajectory schema was not bumped for this protocol.** This protocol
+  adds no field to `TrajectoryHeader`, `TrajectoryStep`, or `TrajectoryFinal`,
+  and no existing golden fixture changes. `TrajectorySchema.CurrentVersion` is
+  now `4`, which is the decision-time perception recording added for the
+  in-process demonstration scenario (schema 3's state hashes are unchanged, and
+  the state-hash contract still starts at `3`). An external match simply leaves
+  the schema-4 fields absent, which is a legal recording.
 
 ### 10.3 Replay never re-runs the external process
 
@@ -1486,10 +1495,10 @@ file.
 | `Cli/CliApp.cs:913-919` | Canonical seed suites, tick budget, `PairedStudy.Analyze`. |
 | `Cli/CliApp.cs:1434` | `simulate --agent` usage text. |
 | `Generator/MapGenerator.cs:13-25` | Zone and resource bounds are caller-configured, no ceiling. |
-| `Trajectories/TrajectoryModel.cs:6-31` | `TrajectorySchema.CurrentVersion = 3`, state-hash version. |
-| `Trajectories/TrajectoryModel.cs:33-45` | The header: seed and map captured so replay needs no generator. |
-| `Trajectories/TrajectoryModel.cs:46-53` | `TrajectoryHeader` — no external-agent field. |
-| `Trajectories/TrajectoryModel.cs:68-72` | `TrajectoryStep` — actions plus result plus state hash. |
+| `Trajectories/TrajectoryModel.cs` | `TrajectorySchema.CurrentVersion = 4`, state-hash version 3, decision-time perception version 4. |
+| `Trajectories/TrajectoryModel.cs` | The header: seed and map captured so replay needs no generator. |
+| `Trajectories/TrajectoryModel.cs` | `TrajectoryHeader` — no external-agent field. |
+| `Trajectories/TrajectoryModel.cs` | `TrajectoryStep` — actions plus result plus state hash, plus the optional schema-4 `Perceptions` array (one `PartialObservation` per agent slot, the view that agent's own filter produced at its decision). |
 | `Trajectories/TrajectoryModel.cs:79-85` | `TrajectoryFinal` — no external-agent field. |
 | `Trajectories/TrajectoryReader.cs:77-80` | Newer schema versions are rejected, not guessed. |
 | `docs/SUPPORT_AND_REPRODUCIBILITY.md:212-220` | Structural replay invariants; action validity at record and verify. |

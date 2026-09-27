@@ -42,8 +42,22 @@ public sealed record ScenarioMetrics(
 /// callers can replay, verify, or re-render the exact episode that produced
 /// the numbers. All three views describe the same events, so they can never
 /// drift apart.
+/// <para>
+/// <see cref="Perceptions"/> is the optional fourth view: what each agent
+/// actually perceived at the moment it chose, indexed
+/// <c>[step][agentId]</c>, taken from the agents' own filters. It is null for a
+/// run that recorded no perceptions, which is the default — an episode is
+/// reproduced from its turns alone, so nothing here depends on it.
+/// </para>
 /// </summary>
+/// <param name="Metrics">The episode-level aggregates.</param>
+/// <param name="Turns">The submitted actions, one array per tick.</param>
+/// <param name="Results">The simulation's own results, one per tick.</param>
+/// <param name="Perceptions">
+/// The decision-time perceptions, one array per tick in agent-slot order, or
+/// null when the run recorded none.</param>
 public sealed record ScenarioResult(
     ScenarioMetrics Metrics,
     AgentAction[][] Turns,
-    StepResult[] Results);
+    StepResult[] Results,
+    PartialObservation[][]? Perceptions = null);

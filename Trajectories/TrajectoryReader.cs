@@ -24,7 +24,7 @@ public static class TrajectoryReader
     {
         var header = ReadHeader(source);
         TrajectoryFinal? final = null;
-        var steps = ReadSteps(source, value => final = value).ToArray();
+        var steps = ReadSteps(source, value => final = value, header.SimulationConfig.AgentCount).ToArray();
         var recording = new TrajectoryRecording(header, steps, final!);
 
         if (recording.Final.FinalScores is null)
@@ -74,6 +74,12 @@ public static class TrajectoryReader
 
         ValidateMapElements(header.Map);
 
+        // A schema-3 recording is accepted unchanged: the perception fields are
+        // optional on the wire, so their absence is not a defect. What is a
+        // defect is a header that declares a cone its roster does not have.
+        PerceptionProjector.ReadVision(
+            header.SimulationConfig.AgentCount, header.AgentVision, "header line");
+
         if (header.SchemaVersion > TrajectorySchema.CurrentVersion)
         {
             throw new InvalidDataException(
@@ -85,10 +91,21 @@ public static class TrajectoryReader
 
     public static IEnumerable<TrajectoryStep> StreamSteps(TextReader source)
     {
-        return ReadSteps(source, null);
+        return ReadSteps(source, null, agentCount: null);
     }
 
-    private static IEnumerable<TrajectoryStep> ReadSteps(TextReader source, Action<TrajectoryFinal>? onFinal)
+    /// <summary>
+    /// The roster a step line's perceptions are checked against: the agent count
+    /// the header declared when the caller has it (<see cref="Read"/>), and
+    /// otherwise the number of observations the step itself carries, which is the
+    /// same roster stated per line. 0 when neither is readable, which skips the
+    /// count check — a line with no observations of its own is a defect
+    /// verification names, not one this reader has to guess about.
+    /// </summary>
+    private static int Roster(TrajectoryStep step, int? agentCount) =>
+        agentCount ?? step.Result.Observations?.Length ?? 0;
+
+    private static IEnumerable<TrajectoryStep> ReadSteps(TextReader source, Action<TrajectoryFinal>? onFinal, int? agentCount)
     {
         var stepCount = 0;
         TrajectoryFinal? final = null;
@@ -131,6 +148,9 @@ public static class TrajectoryReader
                         throw new InvalidDataException(
                             $"Line {lineNumber} has a 'StateHash' that is not 64 lowercase hex characters: '{stateHash}'.");
                     }
+
+                    PerceptionProjector.CheckStep(
+                        Roster(step, agentCount), step.Perceptions, $"Line {lineNumber}");
 
                     if (step.StepNumber != stepCount + 1)
                     {

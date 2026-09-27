@@ -27,12 +27,22 @@ public static class ScenarioRunner
     /// policy (timed portcullises, event locks); when non-null it seeds the
     /// initial state's dynamics exactly as a recorded dynamic episode would.
     /// </summary>
+    /// <param name="perceptions">
+    /// When non-null, records the decision-time perception of every agent at
+    /// every tick, read from each agent's own filter
+    /// (<see cref="IDecidesFromPerception.LastPerception"/>) immediately after it
+    /// decided. Defaults to null, which records no perceptions at all — a
+    /// roster whose agents do not carry a filter has no decision-time fog to
+    /// record, and a partial roster is not recorded rather than recorded
+    /// half-blind, because a per-agent array with a hole in it cannot be read
+    /// back as "this agent saw nothing".</param>
     public static ScenarioResult Run(
         MapGraph map,
         SimulationConfig config,
         IAgent[] agents,
         int maxSteps,
-        DynamicMapRuleSet? rules = null)
+        DynamicMapRuleSet? rules = null,
+        bool recordPerceptions = false)
     {
         if (maxSteps < 1)
         {
@@ -40,11 +50,19 @@ public static class ScenarioRunner
         }
 
         ValidateAgents(config, agents);
+        if (recordPerceptions && agents.Any(agent => agent is not IDecidesFromPerception))
+        {
+            throw new ArgumentException(
+                "Every agent must implement IDecidesFromPerception to record decision-time perceptions; " +
+                $"agent {agents.First(a => a is not IDecidesFromPerception).AgentId} does not.",
+                nameof(agents));
+        }
 
         var state = Simulation.CreateInitial(map, config, rules ?? DynamicMapRuleSet.None);
         var observations = BuildObservations(state);
         var turns = new List<AgentAction[]>();
         var results = new List<StepResult>();
+        var perceptions = recordPerceptions ? new List<PartialObservation[]>() : null;
         var contendedTicks = 0;
 
         for (var step = 0; step < maxSteps && (results.Count == 0 || !results[^1].Info.IsTerminal); step++)
@@ -53,6 +71,11 @@ public static class ScenarioRunner
             foreach (var agent in agents.OrderBy(a => a.AgentId))
             {
                 turn[agent.AgentId] = agent.Decide(observations[agent.AgentId]);
+            }
+
+            if (perceptions is not null)
+            {
+                perceptions.Add(CapturePerceptions(agents, config.AgentCount));
             }
 
             turns.Add(turn);
@@ -77,7 +100,28 @@ public static class ScenarioRunner
             ContentionRate: results.Count == 0 ? 0.0 : contendedTicks / (double)results.Count,
             Agents: BuildAgentMetrics(state, turns));
 
-        return new ScenarioResult(metrics, turns.ToArray(), results.ToArray());
+        return new ScenarioResult(metrics, turns.ToArray(), results.ToArray(), perceptions?.ToArray());
+    }
+
+    /// <summary>
+    /// Reads every agent's <see cref="IDecidesFromPerception.LastPerception"/>
+    /// right after the turn was decided, in agent-slot order. The agents are
+    /// read in the same ascending-id order they were polled in, and each value
+    /// is the one its own filter produced for this tick — the runner never
+    /// projects anything itself, because a second projection would be a second
+    /// opinion about what the agent saw rather than a record of it.
+    /// </summary>
+    private static PartialObservation[] CapturePerceptions(IAgent[] agents, int agentCount)
+    {
+        var captured = new PartialObservation[agentCount];
+        foreach (var agent in agents)
+        {
+            captured[agent.AgentId] = ((IDecidesFromPerception)agent).LastPerception
+                ?? throw new InvalidOperationException(
+                    $"Agent {agent.AgentId} decided without projecting a perception.");
+        }
+
+        return captured;
     }
 
     private static void ValidateAgents(SimulationConfig config, IAgent[] agents)

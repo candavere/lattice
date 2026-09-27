@@ -4,8 +4,13 @@ using Lattice.Environment;
 namespace Lattice.Trajectories;
 
 /// <summary>
-/// The current on-disk trajectory schema version. Version 3 records a
-/// SHA-256 digest of the simulation state at every step
+/// The current on-disk trajectory schema version. Version 4 records what each
+/// agent actually perceived at the moment it decided
+/// (<see cref="TrajectoryStep.Perceptions"/>, with the per-agent radii in
+/// <see cref="TrajectoryHeader.AgentVision"/>), so the fog a viewer draws is
+/// the agent's own decision-time view rather than something a reader
+/// reconstructs from omniscient positions. Version 3 records a SHA-256 digest
+/// of the simulation state at every step
 /// (<see cref="TrajectoryStep.StateHash"/>), so verification can attest to the
 /// state each tick produced and not only the step results. Version 2 recorded the
 /// episode's dynamic topology policy (<see cref="TrajectoryHeader.DynamicRules"/>,
@@ -18,7 +23,7 @@ namespace Lattice.Trajectories;
 public static class TrajectorySchema
 {
     /// <summary>The version this library writes and can verify.</summary>
-    public const int CurrentVersion = 3;
+    public const int CurrentVersion = 4;
 
     /// <summary>
     /// The first schema version in which a per-step
@@ -28,6 +33,19 @@ public static class TrajectorySchema
     /// legitimately has none and verifies with a notice instead.
     /// </summary>
     public const int StateHashRequiredVersion = 3;
+
+    /// <summary>
+    /// The first schema version in which a recording is expected to carry
+    /// decision-time <see cref="TrajectoryStep.Perceptions"/>. A recording that
+    /// declares this version or later but carries neither perceptions nor a
+    /// <see cref="TrajectoryHeader.AgentVision"/> is checked with a notice
+    /// rather than passing silently, because the viewer would otherwise draw a
+    /// reconstruction and call it the record. This is a notice and not a
+    /// discrepancy: the perception fields are optional on the wire (an agent
+    /// that carries no filter has none to record), so a schema-4 episode
+    /// without them is a legitimate recording of a fog-free roster.
+    /// </summary>
+    public const int DecisionTimePerceptionVersion = 4;
 }
 
 /// <summary>
@@ -41,7 +59,11 @@ public static class TrajectorySchema
 /// reader. <see cref="Scenario"/> and <see cref="AgentRoles"/> are optional
 /// demonstration-layer metadata (e.g. the "infiltration" scenario and its
 /// "Sentry"/"Infiltrator" roster) that viewer tooling reads to render tactical
-/// roles; the replay core ignores them.
+/// roles; the replay core ignores them. <see cref="AgentVision"/> declares the
+/// perception cone, in graph hops, each agent's own filter was built with, so a
+/// reader can rebuild those filters to check the recorded
+/// <see cref="TrajectoryStep.Perceptions"/>; it is null for a recording with no
+/// decision-time perceptions, which is every recording made before schema 4.
 /// </summary>
 public sealed record TrajectoryHeader(
     ulong Seed,
@@ -50,7 +72,8 @@ public sealed record TrajectoryHeader(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] DynamicMapRuleSet? DynamicRules = null,
     int SchemaVersion = 0,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Scenario = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string[]? AgentRoles = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string[]? AgentRoles = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int[]? AgentVision = null);
 
 /// <summary>
 /// One recorded tick: the exact <see cref="AgentAction"/>s submitted, the
@@ -64,12 +87,23 @@ public sealed record TrajectoryHeader(
 /// schema 3, which still verifies on step results alone and says so; a
 /// schema-3-or-later recording with no digest anywhere is a corrupt file and is
 /// reported as a discrepancy.
+/// <para>
+/// <see cref="Perceptions"/> (schema 4) is the decision-time counterpart of that
+/// result: one <see cref="PartialObservation"/> per agent slot, in slot order,
+/// carrying the masked view each agent's own filter produced for this tick's
+/// decision. It is the object the agents acted on, recorded rather than
+/// re-derived, so a viewer can draw the fog the agents actually faced and
+/// verification can recompute it and compare. Null for a recording made before
+/// schema 4, or for one whose agents carry no perception filter — the field is
+/// omitted from the line entirely when absent.
+/// </para>
 /// </summary>
 public sealed record TrajectoryStep(
     int StepNumber,
     AgentAction[] Actions,
     StepResult Result,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? StateHash = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? StateHash = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] PartialObservation[]? Perceptions = null);
 
 /// <summary>
 /// Terminal bookkeeping: why the episode ended, who won, and final aggregate

@@ -127,7 +127,19 @@ public class ExternalAgentDeterminismTests
                 Assert.Contains("replay verified", stderr, StringComparison.Ordinal);
                 Assert.Contains("state hash(es) matched", stderr, StringComparison.Ordinal);
                 Assert.DoesNotContain("replay error", stderr, StringComparison.Ordinal);
-                Assert.DoesNotContain("replay notice", stderr, StringComparison.Ordinal);
+                // Since schema 4 a recording that carries no decision-time
+                // perceptions says so rather than passing in silence, and an
+                // external match is exactly that: the agents are another
+                // process, so there is no library-side PerceptionFilter whose
+                // output could have been recorded. The statement is true of this
+                // file, and the exit code is still 0. Any notice OTHER than that
+                // one means the pass was degraded somewhere it should not have
+                // been.
+                Assert.Contains(
+                    TrajectoryReplay.NoPerceptionNotice, stderr, StringComparison.Ordinal);
+                Assert.Equal(
+                    1,
+                    stderr.Split("replay notice:", StringSplitOptions.None).Length - 1);
                 Assert.Equal(string.Empty, stdout);
             }
             finally

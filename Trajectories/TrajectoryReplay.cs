@@ -32,6 +32,14 @@ public sealed record TrajectoryVerification(
 /// reports <see cref="NoStateHashNotice"/> saying so. A recording that claims
 /// schema 3 or later but carries no state hash is a PROBLEM, not a notice —
 /// stripping the hashes must never be a way to make a tampered file pass.
+/// Where the recording carries per-step decision-time
+/// <see cref="PartialObservation"/>s (schema 4), each is likewise recomputed —
+/// reprojected through a <see cref="PerceptionFilter"/> under the header's
+/// declared per-agent vision — and compared, so verification attests to the fog
+/// each agent actually faced and not merely to the results. All steps or none:
+/// a partial block is a discrepancy, and a recording new enough to be expected
+/// to carry perceptions that carries none reports
+/// <see cref="NoPerceptionNotice"/> instead of passing in silence.
 /// </summary>
 public static class TrajectoryReplay
 {
@@ -43,6 +51,19 @@ public static class TrajectoryReplay
     /// of the contract: tooling and humans both key off it.
     /// </summary>
     public const string NoStateHashNotice = "no state hash: step-level verification only";
+
+    /// <summary>
+    /// The notice emitted when a recording that declares
+    /// <see cref="TrajectorySchema.DecisionTimePerceptionVersion"/> or later
+    /// carries neither recorded perceptions nor a declared per-agent vision, so
+    /// the pass silently degrades to step-level verification and says so. The
+    /// mirror of <see cref="NoStateHashNotice"/> for the decision-time fog: a
+    /// reader that did not check the fog must not be able to report a pass that
+    /// reads as though it had. A recording from before that schema version
+    /// predates the fields and is not nagged about them.
+    /// </summary>
+    public const string NoPerceptionNotice =
+        "no recorded perception: decision-time visibility not verified";
 
     /// <summary>
     /// Replays the recorded actions from a fresh initial state and returns
@@ -59,12 +80,17 @@ public static class TrajectoryReplay
     /// The full re-simulation behind <see cref="Replay"/>: every replayed
     /// <see cref="StepResult"/>, the <see cref="SimulationState"/> the replayed
     /// run ends in after each step (in order, so per-step state digests can be
-    /// recomputed), and the last replayed step's <see cref="Info"/> (why the
-    /// episode ended, who won). The final state is what the final summary
-    /// line's aggregates are recomputed from.
+    /// recomputed), the state each step was decided from (so the recorded
+    /// decision-time perceptions can be reprojected), and the last replayed
+    /// step's <see cref="Info"/> (why the episode ended, who won). The final
+    /// state is what the final summary line's aggregates are recomputed from.
     /// </summary>
-    private static (List<StepResult> Results, List<SimulationState> States, SimulationState FinalState, Info? LastInfo) ReplayFull(
-        TrajectoryRecording recording)
+    private static (
+        List<StepResult> Results,
+        List<SimulationState> States,
+        List<SimulationState> PreStepStates,
+        SimulationState FinalState,
+        Info? LastInfo) ReplayFull(TrajectoryRecording recording)
     {
         var state = Simulation.CreateInitial(
             recording.Header.Map,
@@ -72,6 +98,11 @@ public static class TrajectoryReplay
             recording.Header.DynamicRules ?? DynamicMapRuleSet.None);
         var results = new List<StepResult>();
         var states = new List<SimulationState>();
+        // The world each step was decided FROM, kept alongside the world it
+        // produced: an agent's perception is projected from the pre-step
+        // observation, so recomputing one needs this list and the states alone
+        // are off by a tick.
+        var preStepStates = new List<SimulationState> { state };
         Info? lastInfo = null;
 
         foreach (var step in recording.Steps)
@@ -81,6 +112,7 @@ public static class TrajectoryReplay
             states.Add(outcome.NextState);
             state = outcome.NextState;
             lastInfo = outcome.Result.Info;
+            preStepStates.Add(state);
 
             if (outcome.Result.Info.IsTerminal)
             {
@@ -88,7 +120,7 @@ public static class TrajectoryReplay
             }
         }
 
-        return (results, states, state, lastInfo);
+        return (results, states, preStepStates, state, lastInfo);
     }
 
     /// <summary>
@@ -109,13 +141,15 @@ public static class TrajectoryReplay
     /// summary line field by field. Where the recording carries per-step
     /// <see cref="SimulationStateHash"/> digests, each digest is also recomputed
     /// from the replayed state and compared, so the pass attests to the state
-    /// each tick produced and not only the step results.
+    /// each tick produced and not only the step results. Where it carries
+    /// decision-time <see cref="PartialObservation"/>s, each is reprojected and
+    /// compared agent by agent, so the pass also attests to what each agent saw.
     /// </summary>
     public static TrajectoryVerification VerifyDetailed(TrajectoryRecording recording)
     {
         var problems = new List<string>();
         var notices = new List<string>();
-        var (replayed, states, finalState, lastInfo) = ReplayFull(recording);
+        var (replayed, states, preStepStates, finalState, lastInfo) = ReplayFull(recording);
 
         if (replayed.Count != recording.Steps.Length)
         {
@@ -185,9 +219,124 @@ public static class TrajectoryReplay
             }
         }
 
+        AppendPerceptionProblems(problems, notices, recording, preStepStates, turns);
+
         AppendFinalProblems(problems, recording.Final, TrajectoryWriter.BuildFinal(finalState, lastInfo));
 
         return new TrajectoryVerification(problems, notices);
+    }
+
+    /// <summary>
+    /// The decision-time half of the pass. A recording that carries
+    /// <see cref="TrajectoryStep.Perceptions"/> has each one reprojected
+    /// through a <see cref="PerceptionFilter"/> built from the header's
+    /// declared per-agent vision — the world the agent decided from is
+    /// available, the filter is deterministic, and the stale memory it
+    /// accumulates is the same memory the agent's own filter accumulated — and
+    /// every recorded entry is compared to what that projection produced. A
+    /// single edited zone status, last-seen tick or rival sighting therefore
+    /// fails, and the offending tick and agent slot are named.
+    /// <para>
+    /// The gate is the same shape as the state hash's. All the steps or none:
+    /// a partial block is a discrepancy, because a recording that can be made
+    /// to stop claiming its fog is not one whose fog was checked. A header
+    /// that declares a vision no step backs is a discrepancy for the mirror
+    /// reason. Neither present on a recording that declares a version new
+    /// enough to be expected to have them is a notice, and neither present on
+    /// an older recording is silence, because that recording never claimed to
+    /// carry any.
+    /// </para>
+    /// </summary>
+    private static void AppendPerceptionProblems(
+        List<string> problems,
+        List<string> notices,
+        TrajectoryRecording recording,
+        IReadOnlyList<SimulationState> preStepStates,
+        int turns)
+    {
+        var recorded = recording.Steps.Count(step => step.Perceptions is not null);
+        if (recorded == 0)
+        {
+            if (recording.Header.AgentVision is not null)
+            {
+                problems.Add(
+                    $"The header declares an 'AgentVision', but none of the {recording.Steps.Length} " +
+                    "step line(s) carry a 'Perceptions' array. Every step must carry one, or none may.");
+            }
+            else if (recording.Header.SchemaVersion >= TrajectorySchema.DecisionTimePerceptionVersion
+                && recording.Steps.Length > 0)
+            {
+                notices.Add(NoPerceptionNotice);
+            }
+
+            return;
+        }
+
+        if (recorded != recording.Steps.Length)
+        {
+            problems.Add(
+                $"Recording is inconsistent: {recorded} of {recording.Steps.Length} step line(s) carry " +
+                "'Perceptions'. Every step must carry one, or none may.");
+            return;
+        }
+
+        if (recording.Header.AgentVision is null)
+        {
+            problems.Add(
+                $"{recorded} step line(s) carry 'Perceptions', but the header declares no 'AgentVision', " +
+                "so the perception cones that produced them cannot be rebuilt.");
+            return;
+        }
+
+        PartialObservation[][] projected;
+        try
+        {
+            // The header's own declaration is checked by the same rule the
+            // reader applies, so an in-memory recording cannot smuggle past
+            // verify a cone that does not match its roster.
+            var vision = PerceptionProjector.ReadVision(
+                recording.Header.SimulationConfig.AgentCount, recording.Header.AgentVision, "header line")
+                ?? throw new InvalidDataException("The header declares no 'AgentVision'.");
+
+            projected = PerceptionProjector.Project(
+                recording.Header.Map, vision, preStepStates.Take(turns + 1).ToList());
+        }
+        catch (InvalidDataException ex)
+        {
+            problems.Add(ex.Message);
+            return;
+        }
+        catch (ArgumentOutOfRangeException ex)
+        {
+            problems.Add(
+                $"The header's 'AgentVision' cannot be projected through: {ex.Message}");
+            return;
+        }
+
+        for (var i = 0; i < turns; i++)
+        {
+            var step = recording.Steps[i];
+            try
+            {
+                PerceptionProjector.CheckStep(
+                    recording.Header.SimulationConfig.AgentCount, step.Perceptions, $"Step {step.StepNumber}");
+            }
+            catch (InvalidDataException ex)
+            {
+                problems.Add(ex.Message);
+                continue;
+            }
+
+            for (var agentId = 0; agentId < step.Perceptions!.Length; agentId++)
+            {
+                if (JsonSerializer.Serialize(step.Perceptions[agentId], Options) !=
+                    JsonSerializer.Serialize(projected[i][agentId], Options))
+                {
+                    problems.Add(
+                        $"Step {step.StepNumber} perception diverges from replay for agent {agentId}.");
+                }
+            }
+        }
     }
 
     /// <summary>

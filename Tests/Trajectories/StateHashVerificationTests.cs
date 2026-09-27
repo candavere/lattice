@@ -71,12 +71,19 @@ public class StateHashVerificationTests
     }
 
     [Fact]
-    public void UntamperedRecording_VerifiesWithNoProblemsAndNoNotice()
+    public void UntamperedRecording_VerifiesWithNoProblemsAndNoStateHashNotice()
     {
         var report = TrajectoryReplay.VerifyDetailed(Recorded());
 
         Assert.Empty(report.Problems);
-        Assert.Empty(report.Notices);
+        // Scoped to the state hash, which is what this file is about: a
+        // recording written by the current writer carries a digest at every
+        // step, so the pass is not degraded on that axis. Whether the episode
+        // carried decision-time perceptions is a separate question with its own
+        // notice (DecisionTimePerceptionTests).
+        Assert.DoesNotContain(
+            report.Notices,
+            n => n.Contains("step-level verification only", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -249,7 +256,9 @@ public class StateHashVerificationTests
         var report = TrajectoryReplay.VerifyDetailed(recording);
 
         Assert.Empty(report.Problems);
-        Assert.Empty(report.Notices);
+        Assert.DoesNotContain(
+            report.Notices,
+            n => n.Contains("step-level verification only", StringComparison.Ordinal));
     }
 
     private static DynamicMapRuleSet Portcullis() => new(new IDynamicMapRule[]
@@ -275,7 +284,9 @@ public class StateHashVerificationTests
         var report = TrajectoryReplay.VerifyDetailed(readBack);
 
         Assert.Empty(report.Problems);
-        Assert.Empty(report.Notices);
+        Assert.DoesNotContain(
+            report.Notices,
+            n => n.Contains("step-level verification only", StringComparison.Ordinal));
         Assert.All(readBack.Steps, step => Assert.Matches("^[0-9a-f]{64}$", step.StateHash ?? string.Empty));
     }
 

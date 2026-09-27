@@ -27,7 +27,7 @@ namespace Lattice.Agents;
 /// to canonical order, so the policy is a total, deterministic function of the
 /// observation stream.
 /// </summary>
-public sealed class InfiltratorAgent : IAgent
+public sealed class InfiltratorAgent : IAgent, IDecidesFromPerception
 {
     /// <summary>Default fog-of-war cone, in graph hops.</summary>
     public const int DefaultVision = 2;
@@ -48,6 +48,7 @@ public sealed class InfiltratorAgent : IAgent
     private readonly int _patienceTicks;
     private readonly AgentBeliefMap _belief;
     private PerceptionFilter? _filter;
+    private PartialObservation? _lastPerception;
     private int _tick;
     private int _consecutiveWaits;
     private int _claimsThisVisit;
@@ -119,10 +120,16 @@ public sealed class InfiltratorAgent : IAgent
     public AgentBeliefMap Belief => _belief;
 
     /// <inheritdoc />
+    public PartialObservation? LastPerception => _lastPerception;
+
+    /// <inheritdoc />
     public AgentAction Decide(Observation observation)
     {
         _filter ??= new PerceptionFilter(observation.Map, AgentId, _vision);
         var partial = _filter.Project(++_tick, observation);
+        // Kept as the filter's own value, before the belief map folds it in: the
+        // recorded fog is the perception this decision was made from.
+        _lastPerception = partial;
         _belief.Update(partial);
 
         if (_belief.MyZone is not int myZone)

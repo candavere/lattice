@@ -35,7 +35,7 @@ public enum SentryMode
 /// zone observations, so identical observation streams yield identical
 /// serialized actions.
 /// </summary>
-public sealed class SentryPatrolAgent : IAgent
+public sealed class SentryPatrolAgent : IAgent, IDecidesFromPerception
 {
     /// <summary>Default perception cone, in graph hops.</summary>
     public const int DefaultVision = 2;
@@ -52,6 +52,7 @@ public sealed class SentryPatrolAgent : IAgent
     private readonly int _pursuitRecallTicks;
     private readonly int[] _patrolRoute;
     private PerceptionFilter? _filter;
+    private PartialObservation? _lastPerception;
     private int _tick;
     private int _patrolIndex;
     private bool _hasHistory;
@@ -140,10 +141,17 @@ public sealed class SentryPatrolAgent : IAgent
     public int? PursuitTargetZone { get; private set; }
 
     /// <inheritdoc />
+    public PartialObservation? LastPerception => _lastPerception;
+
+    /// <inheritdoc />
     public AgentAction Decide(Observation observation)
     {
         _filter ??= new PerceptionFilter(observation.Map, AgentId, _vision);
         var partial = _filter.Project(++_tick, observation);
+        // The decision-time view of the world, kept exactly as the filter built
+        // it: a recording of this guard's fog is a record of this object, not a
+        // projection someone else could have made differently.
+        _lastPerception = partial;
         var myZone = ObservationView.MyZone(observation);
 
         if (TryResolvePursuitTarget(partial, observation, myZone, out var targetZone))

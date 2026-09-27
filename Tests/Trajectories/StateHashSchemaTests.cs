@@ -47,10 +47,17 @@ public class StateHashSchemaTests
         };
     }
 
+    /// <summary>
+    /// The state-hash contract starts at schema 3 and is still the current
+    /// contract: the writer has moved on since (schema 4 adds the decision-time
+    /// perceptions, which are optional), so pinning the *current* version here
+    /// would make this file fail on a bump that says nothing about digests.
+    /// </summary>
     [Fact]
-    public void CurrentSchemaVersion_IsThree()
+    public void StateHashesAreRequiredFromSchemaThree_AndTheWriterIsAtOrPastIt()
     {
-        Assert.Equal(3, TrajectorySchema.CurrentVersion);
+        Assert.Equal(3, TrajectorySchema.StateHashRequiredVersion);
+        Assert.True(TrajectorySchema.CurrentVersion >= TrajectorySchema.StateHashRequiredVersion);
     }
 
     [Fact]

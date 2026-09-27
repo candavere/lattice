@@ -107,7 +107,8 @@ public static class InfiltrationScenario
             map,
             config,
             new IAgent[] { sentry, infiltrator },
-            maxSteps: maxSteps);
+            maxSteps: maxSteps,
+            recordPerceptions: true);
 
         return new InfiltrationScenarioResult(
             DetectOutcome(map, result),

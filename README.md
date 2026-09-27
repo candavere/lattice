@@ -220,12 +220,12 @@ disagree are called out below rather than resolved.
   reserved for a matching host class. The measured artifact is uploaded with
   `if: always()` (`benchmarks.yml:111-119`) so runner numbers survive a
   failed gate without log access.
-  **Doc-vs-code conflict:** this README and
-  [`benchmarks/throughput_summary.md`](benchmarks/throughput_summary.md)
-  previously described the gate as failing on "a >20% regression". The
-  enforced ratios above are 0.75, 0.6, and 0.85 plus per-workload derived
-  tolerances, which do not all equal a 20% drop. Both statements are recorded
-  here; the workflow and comparator are the authority.
+  **Doc-vs-code conflict:** this README previously described the gate as
+  failing on "a >20% regression", and
+  [`benchmarks/throughput_summary.md`](benchmarks/throughput_summary.md) still
+  does. The enforced ratios above are 0.75, 0.6, and 0.85 plus per-workload
+  derived tolerances, which do not all equal a 20% drop. Both statements are
+  recorded here; the workflow and comparator are the authority.
 - **Mutation gate.** `stryker-config.json:22-26` sets Stryker thresholds
   `high: 80`, `low: 60`, `break: 0`. The only threshold the tool enforces is
   `break`, so the committed gate fails only at a 0% score; `high`/`low` are
@@ -356,6 +356,8 @@ The data flow above is drawn from the committed tools; the full diagram is
 - `Generator/` - seeded procedural maps with a caller-supplied fairness gate.
 - `Agents/` - evaluation subjects (MCTS, Scout) and the mirrored-seat paired
   evaluation.
+- `Protocol/` - the external-agent wire types, a leaf that references nothing in
+  this repository.
 - `Trajectories/` - the JSONL recording model, writer, reader, and replay
   verifier.
 - `Analytics/` - the benchmark harness and analysis.
@@ -368,6 +370,8 @@ The data flow above is drawn from the committed tools; the full diagram is
 - `site/` - the browser replay viewer deployed to GitHub Pages; it reads
   committed `.jsonl` recordings.
 - `ui_tests/` - the tracked Playwright regression for the demo page.
+- `examples/` - worked external agents; `examples/python/` is a conformant
+  standard-library agent.
 
 The assembly map and how the layers fit together are in
 [`docs/ECOSYSTEM.md`](docs/ECOSYSTEM.md). The engine mechanics and their
@@ -388,7 +392,12 @@ argument or runtime error.
 | `analyze` | Report on a recording (contention, pathing, heatmaps) | `--trajectory`, `--out` |
 | `replay` | Replay and optionally verify per-step serialized equivalence and the final summary line | `<file>`, `--verify`, `--out` |
 | `benchmark` | Run the five-case workload matrix | `--runs`, `--warmup`, `--commit`, `--cpu`, `--out` |
-| `evaluate` | Mirror-seated paired MCTS study | `--seed-set`, `--rollouts`, `--seeds`, `--scenario`, `--out` |
+| `evaluate` | Mirror-seated paired MCTS study, or an external agent process | `--seed-set`, `--rollouts`, `--seeds`, `--scenario`, `--out`, `--agent-cmd`, `--agent-step-timeout-ms` |
+
+`evaluate --agent-cmd "<command line>"` scores an external agent process in place
+of the in-process MCTS candidate, under the same seeds, budget, and statistics; a
+complete conformant agent is in
+[`examples/python/`](examples/python/README.md).
 
 The flag-by-flag reference, every flag, its semantics, and worked examples,
 lives in [`docs/CLI.md`](docs/CLI.md).

@@ -188,6 +188,16 @@ Argument errors in the other commands keep their existing exit status of 1.
 | `AgentLimits` | The `StepTimeoutMs` and `MatchTimeoutMs` the matches were played under; the match budget is computed from the step budget, never chosen separately |
 | `AgentForfeits` | One entry per match that failed on the agent's plumbing: `Seed`, `ExternalSeat`, `Reason`, `PartialScoreAtSlot0`, `PartialScoreAtSlot1`, and the `ScoredExternalScore` / `ScoredOpponentScore` the study was scored from. Absent when nothing was forfeited |
 
+`AgentForfeits` is omitted rather than written as an empty array, **by design**,
+for byte stability: a run in which nothing was forfeited emits exactly the bytes
+it would have emitted had the field not been defined, so the field costs a clean
+run nothing and its presence stays a reliable "something was forfeited" signal —
+a reader tests for the field, not for its emptiness. The trade-off is that the
+field has no zero value, so a reader wanting a count must read absence as `0`.
+This is the opposite of `AgentFailures` above, which *is* written as `{}` on a
+clean run because a per-code breakdown with no codes still says "the breakdown
+exists, and it is empty".
+
 A match that ends in an agent failure is scored from **0 for the external side**,
 with the opponent keeping the score it had at the moment of failure, so an agent
 that leads and then stalls cannot bank a positive paired delta for the crash. The

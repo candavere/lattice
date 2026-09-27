@@ -47,7 +47,7 @@
   <rect x="360" y="180" width="230" height="58" class="box"/>
   <text x="375" y="200" class="title">lattice replay --verify</text>
   <text x="375" y="216" class="sub">rebuild from header, compare every</text>
-  <text x="375" y="230" class="sub">re-serialized StepResult (TrajectoryReplay.cs:57)</text>
+  <text x="375" y="230" class="sub">re-serialized StepResult (TrajectoryReplay.cs:169-170)</text>
   <text x="375" y="244" class="small">CI gate ci.yml:31-32 on golden_trajectory.jsonl</text>
 
   <line x1="230" y1="138" x2="230" y2="300" class="edge" marker-end="url(#arrow)"/>
@@ -76,7 +76,7 @@
   <text x="659" y="200" class="title">throughput JSON</text>
   <text x="659" y="216" class="sub">committed baseline; regression</text>
   <text x="659" y="230" class="sub">gate when host fingerprint matches</text>
-  <text x="659" y="244" class="small">compare_benchmarks.py:151-172</text>
+  <text x="659" y="244" class="small">compare_benchmarks.py:150-213</text>
 
   <!-- tests -->
   <line x1="475" y1="238" x2="475" y2="304" class="edge" marker-end="url(#arrow)"/>

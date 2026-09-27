@@ -5,7 +5,7 @@ namespace Lattice.Tests.Property;
 
 /// <summary>
 /// Spatial capacity, stated as the two invariants the step function provably
-/// honors on every tick (docs/adr-002.md, Simulation.Step):
+/// honors on every tick (docs/adr/0003-simultaneous-actions-step-contract.md, Simulation.Step):
 ///
 /// Chokes — the move gateway only grants a crossing onto a choke while the
 /// choke's running load stays below its effective capacity at that tick. Since

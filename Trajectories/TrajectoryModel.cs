@@ -4,21 +4,34 @@ using Lattice.Environment;
 namespace Lattice.Trajectories;
 
 /// <summary>
-/// The current on-disk trajectory schema version. Version 2 records the
+/// The current on-disk trajectory schema version. Version 3 records a
+/// SHA-256 digest of the simulation state at every step
+/// (<see cref="TrajectoryStep.StateHash"/>), so verification can attest to the
+/// state each tick produced and not only the step results. Version 2 recorded the
 /// episode's dynamic topology policy (<see cref="TrajectoryHeader.DynamicRules"/>,
 /// null for static maps) so a replay can recreate the exact choke-capacity
-/// schedule the recording was made under. Files written before this field
+/// schedule the recording was made under. Files written before either field
 /// existed read back as schema version 0 — the static-map contract — and are
-/// still accepted by <see cref="TrajectoryReader"/>. Optional decision-time
-/// fog fields (<see cref="TrajectoryHeader.AgentVision"/>,
-/// <see cref="TrajectoryStep.Perceptions"/>) are additive on the same schema
+/// still accepted by <see cref="TrajectoryReader"/>; a recording with no state
+/// hash anywhere verifies on step results alone and says so. Optional
+/// decision-time fog fields (<see cref="TrajectoryHeader.AgentVision"/>,
+/// <see cref="TrajectoryStep.Perceptions"/>) are additive on any schema
 /// version: absent on legacy files, present on infiltration recordings that
 /// carry the fog side-channel.
 /// </summary>
 public static class TrajectorySchema
 {
     /// <summary>The version this library writes and can verify.</summary>
-    public const int CurrentVersion = 2;
+    public const int CurrentVersion = 3;
+
+    /// <summary>
+    /// The first schema version in which a per-step
+    /// <see cref="TrajectoryStep.StateHash"/> is mandatory. A recording that
+    /// declares this version or later but carries no state hash is internally
+    /// inconsistent and fails verification; a recording from an earlier version
+    /// legitimately has none and verifies with a notice instead.
+    /// </summary>
+    public const int StateHashRequiredVersion = 3;
 }
 
 /// <summary>
@@ -49,18 +62,26 @@ public sealed record TrajectoryHeader(
 
 /// <summary>
 /// One recorded tick: the exact <see cref="AgentAction"/>s submitted, the
-/// tick number, and the full <see cref="StepResult"/> (observations, rewards,
-/// terminal info). The result embeds its own observations, so nothing else is
-/// needed to replay the tick. Optional <see cref="Perceptions"/> holds the
-/// decision-time <see cref="PartialObservation"/> each agent projected
-/// <em>before</em> this step's actions were applied (tick-aligned with
-/// <see cref="StepNumber"/>) — never a post-step re-projection of
-/// <see cref="Result"/>.
+/// tick number, the full <see cref="StepResult"/> (observations, rewards,
+/// terminal info), and the <see cref="SimulationStateHash"/> digest of the world
+/// as it stands at the <i>end</i> of that tick. The result embeds its own
+/// observations, so nothing else is needed to replay the tick; the hash adds the
+/// one piece of persistent state an observation does not carry — the
+/// per-tick dynamic choke-capacity snapshot — and is what lets verification
+/// attest to the state each tick produced. Null for a recording made before
+/// schema 3, which still verifies on step results alone and says so; a
+/// schema-3-or-later recording with no digest anywhere is a corrupt file and is
+/// reported as a discrepancy.
+/// Optional <see cref="Perceptions"/> holds the decision-time
+/// <see cref="PartialObservation"/> each agent projected <em>before</em> this
+/// step's actions were applied (tick-aligned with <see cref="StepNumber"/>) —
+/// never a post-step re-projection of <see cref="Result"/>.
 /// </summary>
 public sealed record TrajectoryStep(
     int StepNumber,
     AgentAction[] Actions,
     StepResult Result,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? StateHash = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] PartialObservation[]? Perceptions = null);
 
 /// <summary>

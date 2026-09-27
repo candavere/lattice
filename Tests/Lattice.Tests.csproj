@@ -2,13 +2,21 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <Version>2.3.2</Version>
+    <Version>3.0.0</Version>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RollForward>LatestMajor</RollForward>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The stub is its own executable project, not part of this assembly. Without
+         this the default **/*.cs glob would compile its Program.cs into the test
+         assembly as well, giving it a second entry point. -->
+    <Compile Remove="ExternalAgentStub\**" />
+    <None Remove="ExternalAgentStub\**" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
@@ -27,6 +35,25 @@
     <ProjectReference Include="..\Trajectories\Lattice.Trajectories.csproj" />
     <ProjectReference Include="..\Analytics\Lattice.Analytics.csproj" />
     <ProjectReference Include="..\Cli\Lattice.Cli.csproj" />
+    <ProjectReference Include="..\Protocol\Lattice.Protocol.csproj" />
+
+    <!-- Built only, never referenced. The external-agent tests need a REAL child
+         process, and the stub is a console app launched as `dotnet <stub>.dll`, so
+         it is an application to be deployed rather than a library to link against.
+         ReferenceOutputAssembly=false keeps the stub's types out of the test
+         assembly; the copy target below puts its runnable output next to the tests,
+         which is what lets the tests resolve the path from AppContext.BaseDirectory. -->
+    <ProjectReference Include="ExternalAgentStub\Lattice.ExternalAgentStub.csproj"
+                      ReferenceOutputAssembly="false" />
   </ItemGroup>
+
+  <Target Name="CopyExternalAgentStub" AfterTargets="Build">
+    <ItemGroup>
+      <ExternalAgentStubOutput Include="$(MSBuildThisFileDirectory)ExternalAgentStub\bin\$(Configuration)\$(TargetFramework)\Lattice.ExternalAgentStub.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(ExternalAgentStubOutput)"
+          DestinationFolder="$(OutDir)"
+          SkipUnchangedFiles="true" />
+  </Target>
 
 </Project>

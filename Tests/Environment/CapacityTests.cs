@@ -12,8 +12,9 @@ namespace Lattice.Tests.Environment;
 /// (agentId + state.StepCount) % agentCount; denied agents stay put. Node
 /// capacity is a same-tick entry gate (bookings and same-tick arrivals count
 /// against it, departures do not free their slot mid-tick); choke capacity
-/// persists across ticks while a transit is on the edge and is only consulted
-/// for crossings that actually take more than one tick.
+/// persists across ticks while a transit is on the edge and gates every
+/// crossing, including instant and one-tick ones (a granted instant or
+/// one-tick crossing occupies the choke for the tick it happens in).
 /// </summary>
 public class CapacityTests
 {
@@ -123,10 +124,14 @@ public class CapacityTests
     }
 
     [Fact]
-    public void EdgeCapacity_IsNotConsulted_ForInstantMoves()
+    public void ChokeMaxOccupancy_CapacityOne_GatesInstantMoves_OneGranted()
     {
+        // Instant crossings pass the same choke admission check as every
+        // other crossing: at capacity 1 the first resolver is granted and
+        // occupies the choke for the tick it happens in, so the second
+        // same-tick mover is refused.
         var map = TwoZoneMap(chokeOccupancy: 1);
-        var config = new SimulationConfig(2, 20); // instant transit: no real crossing
+        var config = new SimulationConfig(2, 20); // instant transit
 
         var outcome = Simulation.Step(
             TwoAgentsAt(map, 0),
@@ -134,15 +139,18 @@ public class CapacityTests
             config);
 
         Assert.Equal(1, outcome.NextState.Agents[0].ZoneId);
-        Assert.Equal(1, outcome.NextState.Agents[1].ZoneId);
+        Assert.Null(outcome.NextState.Agents[0].Transit);
+        Assert.Equal(0, outcome.NextState.Agents[1].ZoneId);
+        Assert.Null(outcome.NextState.Agents[1].Transit);
     }
 
     [Fact]
-    public void OneTickKinematicEdge_BypassesTheChokeOccupancyGate()
+    public void OneTickKinematicEdge_RespectsTheChokeOccupancyGate()
     {
-        // A crossing that takes exactly one tick arrives instantly and never
-        // occupies the choke, even when the choke itself is impassable
-        // (capacity 0).
+        // A crossing that takes exactly one tick arrives instantly but still
+        // passes the choke admission check: at capacity 0 the choke itself is
+        // impassable and the crossing is denied, exactly like a denied
+        // multi-tick crossing.
         var map = TwoZoneMap(chokeOccupancy: 0);
         var config = new SimulationConfig(2, 20, TransitSpeed: 10); // ceil(10/10) = 1 tick
 
@@ -151,9 +159,44 @@ public class CapacityTests
             new[] { new AgentAction(ActionKind.Move, ZoneId: 1), new AgentAction(ActionKind.Move, ZoneId: 1) },
             config);
 
-        Assert.Equal(1, outcome.NextState.Agents[0].ZoneId);
-        Assert.Equal(1, outcome.NextState.Agents[1].ZoneId);
+        Assert.Equal(0, outcome.NextState.Agents[0].ZoneId);
+        Assert.Equal(0, outcome.NextState.Agents[1].ZoneId);
         Assert.All(outcome.NextState.Agents, agent => Assert.Null(agent.Transit));
+    }
+
+    [Fact]
+    public void InstantMove_CapacityZeroChoke_IsDenied()
+    {
+        // An instant (TransitSpeed 0) crossing is admitted through the same
+        // choke gate as every crossing: at capacity 0 the choke is impassable
+        // and the move is denied.
+        var map = TwoZoneMap(chokeOccupancy: 0);
+        var config = new SimulationConfig(2, 20); // instant transit
+
+        var outcome = Simulation.Step(
+            new SimulationState(map, new[] { new AgentState(0, 0, 0) }, Array.Empty<int>(), 0),
+            new[] { new AgentAction(ActionKind.Move, ZoneId: 1) },
+            config);
+
+        Assert.Equal(0, outcome.NextState.Agents[0].ZoneId);
+        Assert.Null(outcome.NextState.Agents[0].Transit);
+    }
+
+    [Fact]
+    public void InstantMove_CapacityOneEmptyChoke_IsGranted()
+    {
+        // At capacity 1 with an empty choke, an instant crossing is granted:
+        // the gate admits the crossing and the agent arrives the same tick.
+        var map = TwoZoneMap(chokeOccupancy: 1);
+        var config = new SimulationConfig(2, 20); // instant transit
+
+        var outcome = Simulation.Step(
+            new SimulationState(map, new[] { new AgentState(0, 0, 0) }, Array.Empty<int>(), 0),
+            new[] { new AgentAction(ActionKind.Move, ZoneId: 1) },
+            config);
+
+        Assert.Equal(1, outcome.NextState.Agents[0].ZoneId);
+        Assert.Null(outcome.NextState.Agents[0].Transit);
     }
 
     [Fact]

@@ -17,7 +17,7 @@ public static class MapLimits
 /// <summary>
 /// A 2D integer coordinate on the map plane. Immutable and value-comparable,
 /// so graph nodes can hold one without imposing grid structure: the map is a
-/// graph (see docs/adr-001.md), and positions are an embedding for the spatial
+/// graph (see docs/adr/0002-mapgraph-graph-over-zones.md), and positions are an embedding for the spatial
 /// reasoning agents need (e.g. "nearest resource"), not a storage lattice.
 /// This is also the kinematic measure of edge length: Manhattan distance here
 /// feeds <see cref="Simulation.TransitTicks"/> with pure integer arithmetic.

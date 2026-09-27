@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RollForward>LatestMajor</RollForward>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+
+    <!-- Not a test project, and must never be mistaken for one: `dotnet test` on
+         the solution would otherwise try to run it as a test host. -->
+    <IsTestProject>false</IsTestProject>
+    <IsPublishable>false</IsPublishable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The stub parses and writes with the SAME protocol library the host uses,
+         so a "conforming" stub is conforming by construction rather than by a
+         hand-rolled JSON string that could drift from the contract. The failure
+         modes deliberately bypass it and write raw bytes, which is the only way to
+         produce a line the library would refuse to write. -->
+    <ProjectReference Include="..\..\Protocol\Lattice.Protocol.csproj" />
+  </ItemGroup>
+
+</Project>

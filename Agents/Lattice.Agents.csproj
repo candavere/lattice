@@ -2,13 +2,20 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <Version>2.3.2</Version>
+    <Version>3.0.0</Version>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Environment\Lattice.Environment.csproj" />
+
+    <!-- The external-agent runner (Agents/External/) is the one place that knows
+         both vocabularies: the wire types of Lattice.Protocol and the step contract
+         of Lattice.Environment. Spec §11.2 puts the mapping there, and the direction
+         stays one-way: Lattice.Protocol is a leaf that references nothing in this
+         repository, and this reference is the only coupling it ever has. -->
+    <ProjectReference Include="..\Protocol\Lattice.Protocol.csproj" />
   </ItemGroup>
 
 </Project>

@@ -23,9 +23,10 @@ Scope notes:
   reproducibility documentation): the packet verifies released binaries behave
   per contract; this document defines the contract an independent oracle
   checks.
-- A canonical simulation-state hash tree is **not** part of the contract and
-  is not specified anywhere below (see Invariant 5 and the equivalence
-  vocabulary in the support documentation).
+- A canonical simulation-state hash **tree** is not part of the contract. What is
+  specified is a single per-tick digest of the state, defined in Invariant 5
+  below; there is no Merkle structure, no cross-recording root, and no
+  cross-episode chaining claimed anywhere here.
 
 ---
 
@@ -406,20 +407,41 @@ no ambient randomness anywhere in the law.
 reconstructs `S(0)` from the episode header (map, seed-derived topology,
 simulation configuration, and the dynamic choke policy), feeds each recorded
 action vector through `step`, and compares the replayed output to the
-recording. The comparison is **per-step, over the serialized `StepResult`**
-for every tick of the episode.
+recording. The comparison is **per-tick and two-layered**: the serialized
+`StepResult` stream is compared for every tick, and — where the recording
+carries one (schema 3 and later) — the SHA-256 digest of the complete
+simulation state at the end of that tick is recomputed and compared as well.
 
-The precise, and deliberately narrow, contract:
+The precise contract:
 
 - equivalence is evaluated over the per-step serialized `StepResult` stream
   (each recorded tick's serialized result equals the replayed tick's
   serialized result);
+- where a per-tick state hash is present, the replayed state's digest must
+  equal the recorded digest, so the tick's world — zone and resource positions,
+  occupancy, per-tick choke capacities and the derived per-tick edge load,
+  scores, claims, the episode seed and the tick — is authenticated, not just
+  the results. The digest covers the **post**-step state, which is the state the
+  tick's own observation describes, so the final recorded tick's hash also
+  pins `S(T)`;
 - it is **not** raw file-byte identity across hosts;
-- **no canonical simulation-state hash tree exists or is specified.** Replay
-  verification never reduces an episode to a single state digest, so no
-  oracle is expected to produce one. A re-generated episode compared only by
-  digest would be a different (stronger, and currently implemented
-  nowhere) contract.
+- a recording made before the digest field existed verifies on the serialized
+  `StepResult` stream alone and says so explicitly
+  (`no state hash: step-level verification only`), so a pre-hash file is
+  never mistaken for a fully state-verified one. A recording that *declares*
+  schema 3 or later but carries no digest is reported as a discrepancy instead,
+  so deleting the digests cannot be used to downgrade the check.
+
+The state digest is a SHA-256 over a canonical serialization with fixed field
+order, invariant-culture integer formatting and no floating-point values, so it
+is stable across locales and hosts. It covers the zone and resource
+`GridPoint` X/Y positions, because they are state and not rendering:
+`TransitTicks` reads `Zone.Position` for a crossing's kinematic length, and the
+perception filter reads both positions to build the observations a step line
+carries. What it excludes is the demonstration-layer `Role` label on zones,
+resources and choke points, which the step contract never reads, and the
+header's `SimulationConfig` and `DynamicMapRuleSet` — so the digest attests to
+the state each tick produced, not to the whole episode configuration.
 
 Terminal states: an episode is terminal at the first tick where either (a)
 `|ρ| > 0` and every resource is claimed (`|R̲(t)| = |ρ|`), or (b)
@@ -554,6 +576,6 @@ rewriting a published release.
 | 2 | Deterministic conflict resolution | `π_i(t) = (i + t) mod N`, ascending order; injective, rotating, host-invariant. |
 | 3 | Resource conservation & score monotonicity | `Σ s_i = |R̲|`, `s_i(t+1) ≥ s_i(t)`, claim requires residency at `home(r)` post-move; one claim per resource per tick. |
 | 4 | Graph-reachability perception | observable ⟺ `d_G(u, v) ≤ Vh` over static `E`; Euclidean distance is not an oracle; gate state never enters the operator. |
-| 5 | Determinism vs. replay equivalence | identical `(S, actions) →` identical next state and result; equivalence is per-step serialized `StepResult` equality; no canonical state hash tree exists or is specified. |
+| 5 | Determinism vs. replay equivalence | identical `(S, actions) →` identical next state and result; equivalence is per-step serialized `StepResult` equality plus, where recorded, a per-tick SHA-256 state-digest equality over the canonical state serialization. |
 
 End of specification.

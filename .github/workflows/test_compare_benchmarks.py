@@ -52,27 +52,33 @@ def make_workloads(rows):
 
 
 def make_artifact(rows=None, os_="macOS 27.0.0", arch="Arm64",
-                  runtime=".NET 10.0.10", ram=8_589_934_592, cores=8):
+                  runtime=".NET 10.0.10", ram=8_589_934_592, cores=8,
+                  cpu="Apple M1"):
+    metadata = {
+        "Commit": "deadbeef",
+        "Timestamp": "2026-09-18T20:02:47",
+        "Runtime": runtime,
+        "Configuration": "Release",
+        "Os": os_,
+        "Architecture": arch,
+        "Cores": cores,
+        "RamBytes": ram,
+    }
+    if cpu is not None:  # cpu=None models an artifact missing the Cpu field
+        metadata["Cpu"] = cpu
     return {
-        "Metadata": {
-            "Commit": "deadbeef",
-            "Timestamp": "2026-09-18T20:02:47",
-            "Runtime": runtime,
-            "Configuration": "Release",
-            "Os": os_,
-            "Architecture": arch,
-            "Cores": cores,
-            "RamBytes": ram,
-        },
+        "Metadata": metadata,
         "Workloads": make_workloads(rows if rows is not None else BASELINE_ROWS),
     }
 
 
 def below_threshold_artifact(os_="macOS 27.0.0", arch="Arm64",
-                             runtime=".NET 10.0.10", factor=0.5):
+                             runtime=".NET 10.0.10", factor=0.5, cores=8,
+                             cpu="Apple M1"):
     rows = [(name, max(median * factor, 1.0), stddev, latency, alloc)
             for name, median, stddev, latency, alloc in BASELINE_ROWS]
-    return make_artifact(rows=rows, os_=os_, arch=arch, runtime=runtime)
+    return make_artifact(rows=rows, os_=os_, arch=arch, runtime=runtime,
+                         cores=cores, cpu=cpu)
 
 
 class ComparatorTestCase(unittest.TestCase):
@@ -290,6 +296,59 @@ class StrictGateEndToEndTests(ComparatorTestCase):
             "--strict-if-matching")
         self.assertEqual(rc, 0)
         self.assertIn("cross-host comparison (informational)", out)
+
+    # Host-class gate tests: the strict fingerprint must include the logical
+    # core count and the CPU model string, so a GitHub-hosted runner (same OS
+    # family + architecture as the bare-metal M1 baseline, but a different
+    # host class) gets an informational comparison instead of a strict
+    # verdict, while a truly matching host still gets the strict gate.
+
+    def test_different_core_count_is_cross_host_informational(self):
+        rc, out, err = self.run_comparator(
+            make_artifact(), below_threshold_artifact(cores=3),
+            "--strict-if-matching")
+        self.assertEqual(rc, 0)
+        self.assertIn("cross-host comparison (informational)", out)
+        self.assertIn("logical cores differ", out)
+
+    def test_different_cpu_model_is_cross_host_informational(self):
+        rc, out, err = self.run_comparator(
+            make_artifact(), below_threshold_artifact(cpu="Apple M2"),
+            "--strict-if-matching")
+        self.assertEqual(rc, 0)
+        self.assertIn("cross-host comparison (informational)", out)
+        self.assertIn("CPU model differs", out)
+
+    def test_fully_matching_host_strict_gate_still_fails(self):
+        rc, out, err = self.run_comparator(
+            make_artifact(), below_threshold_artifact(), "--strict-if-matching")
+        self.assertEqual(rc, 1)
+        self.assertIn("workload regression on a matching host", out)
+
+    def test_fully_matching_host_above_floor_passes(self):
+        rc, out, err = self.run_comparator(
+            make_artifact(), make_artifact(), "--strict-if-matching")
+        self.assertEqual(rc, 0)
+        self.assertIn("strict comparison passed", out)
+        self.assertNotIn("::error::", out)
+
+    def test_missing_cpu_on_baseline_treated_as_mismatch(self):
+        rc, out, err = self.run_comparator(
+            make_artifact(cpu=None), below_threshold_artifact(),
+            "--strict-if-matching")
+        self.assertEqual(rc, 0)
+        self.assertIn("cross-host comparison (informational)", out)
+        self.assertIn("baseline.Cpu", out)
+        self.assertNotIn("strict comparison passed", out)
+
+    def test_missing_cpu_on_current_treated_as_mismatch(self):
+        rc, out, err = self.run_comparator(
+            make_artifact(), below_threshold_artifact(cpu=None),
+            "--strict-if-matching")
+        self.assertEqual(rc, 0)
+        self.assertIn("cross-host comparison (informational)", out)
+        self.assertIn("current.Cpu", out)
+        self.assertNotIn("strict comparison passed", out)
 
     def test_runtime_major_mismatch_disarms_strict_gate(self):
         rc, out, err = self.run_comparator(

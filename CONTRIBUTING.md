@@ -26,7 +26,8 @@ Four ideas govern every change:
 
 2. **Strict platform determinism.** The core guarantee is **same seed + same
    actions → deterministic transitions under the pure .NET 8 BCL runtime, and
-   verified per-step serialized StepResult equivalence on all supported CI
+   verified per-step serialized StepResult equivalence plus per-tick state-digest
+   equality on all supported CI
    targets**: .NET 8 on Linux, macOS, and Windows, on x64 and ARM64. There is
    no ambient randomness, no hidden mutable state, no `System.Random` without
    an explicit seeded instance, and no behavior that depends on `GetHashCode`,
@@ -78,20 +79,31 @@ The evidentiary standard makes three things mandatory for PRs:
    a CI lower bound > 0 — is the verdict. An improvement is demonstrated by
    clearing the rule, not by a narrative.
 3. **Equivalence claims name their level.** Claims of state or replay
-   equivalence must specify which of four standards they assert:
+   equivalence must specify which of these standards they assert:
    - **Engine transition determinism:** under the stated .NET 8 BCL runtime
      contract, same state + same actions → same next state.
    - **Per-step serialized StepResult equivalence:** `TrajectoryReplay.Verify`
      passes against the canonical golden trajectory across the supported CI
      targets (Ubuntu, macOS, and Windows).
-- **Same-host normalized JSONL byte identity:** asserted only when
-      explicitly verified on identical host configurations.
-   - **No canonical simulation-state hash tree currently exists:** replays
-      verify serialized `StepResult` equality, never a state digest. The
-      benchmark FNV-1a step digest anchors a warm-up iteration as an internal
-      repeatability check; it is not a canonical simulation-state hash.
-   Do not claim raw cross-host file-byte identity or a canonical
-   simulation-state hash unless an explicit canonical hasher was executed. Say
+   - **Same-host normalized JSONL byte identity:** asserted only when
+     explicitly verified on identical host configurations.
+   - **Per-tick state-digest equality (schema 3 and later):** each step line
+     records a SHA-256 digest of the simulation state at the end of that tick,
+     and `TrajectoryReplay.VerifyDetailed` recomputes and compares it, so the
+     tick's world — zone and resource positions, occupancy, per-tick choke
+     capacities and derived edge load, scores, claims, seed and tick — is
+     authenticated. A pre-hash recording verifies on step results alone and
+     must report `no state hash: step-level verification only`; a recording that
+     declares schema 3 or later but carries no digest must instead be reported as
+     a discrepancy, so the hashes cannot be stripped to downgrade the check.
+
+   Two caveats travel with the list. The benchmark FNV-1a step digest anchors a
+   warm-up iteration as an internal repeatability check and is unrelated to the
+   trajectory state digest; and the digest covers the state, not the header's
+   `SimulationConfig` or `DynamicMapRuleSet`, so no state hash beyond that
+   per-tick digest is claimed.
+   Do not claim raw cross-host file-byte identity unless it was explicitly
+   measured. Say
    which tier you changed and which tier your tests assert; the verifier's
    documented capability must match what the code actually enforces.
 
@@ -159,9 +171,10 @@ results in the PR description.
 2. **Per-step serialized StepResult equivalence across the CI matrix.**
    `TrajectoryReplay.Verify` must pass on Ubuntu, macOS, and Windows (x64 and
    ARM64) — that is serialized-result equivalence against the recorded
-   trajectory, not raw cross-platform file-byte identity. CI runs the suite on
-   the full matrix; confirm it is green in your PR. If you cannot run all
-   platforms locally, say so explicitly so reviewers know the matrix is the
+   trajectory, not raw cross-platform file-byte identity, and for schema-3
+   recordings it also requires the per-tick state digest to match. CI runs the
+   suite on the full matrix; confirm it is green in your PR. If you cannot run
+   all platforms locally, say so explicitly so reviewers know the matrix is the
    coverage.
 
 3. **Floating-point hygiene.** No simulation rule may depend on IEEE
@@ -221,7 +234,8 @@ on dev and held-out seeds under the same budget), not by a narrative. Run
 
 Either way, the Determinism Testing Checklist above is mandatory: normalized
 JSONL byte identity on one identical host, per-step serialized `StepResult`
-replay equivalence on the CI matrix, integer-quantized (never IEEE-ordered)
+replay equivalence plus per-tick state-digest equality on the CI matrix,
+integer-quantized (never IEEE-ordered)
 tie-breaks, and a pinning determinism regression test that fails before your
 change and passes after it. A scenario or agent that re-tilts an existing
 trajectory without updating the affected pins in the same commit, with a

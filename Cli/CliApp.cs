@@ -3,11 +3,14 @@ using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Lattice.Agents;
+using Lattice.Agents.External;
 using Lattice.Analytics.Benchmarking;
 using Lattice.Cli.Presentation;
 using Lattice.Environment;
 using Lattice.Generator;
+using Lattice.Protocol;
 using Lattice.Trajectories;
 using Lattice.Visualization;
 
@@ -34,7 +37,7 @@ public static class CliApp
     /// The CLI's reported version. Kept in lockstep with the project
     /// <c>&lt;Version&gt;</c> elements by the release workflow's tag-parity gate.
     /// </summary>
-    public const string Version = "2.3.2";
+    public const string Version = "3.0.0";
 
     private static readonly GeneratorConfig DefaultGeneratorConfig = new(3, 5, 1, 1, 3, GeneratorConfig.DefaultRetryCap);
     private const int DefaultSimulationSteps = 100;
@@ -44,6 +47,14 @@ public static class CliApp
     private const string HeldOutSuite = "heldout";
     private const string EvaluationTargetPolicy = "MCTS";
     private const string EvaluationBaselinePolicy = "Scout";
+
+    /// <summary>
+    /// The baseline's index in the evaluation roster. The external path takes the
+    /// candidate seat, so it needs the opponent by index rather than by building
+    /// a second one: the baseline it plays must be the same agent the in-process
+    /// study is published against, or the two results would not be commensurable.
+    /// </summary>
+    private const int EvaluationBaselineIndex = 1;
 
     /// <summary>
     /// The canonical versioned evaluation seed sets: seeds 1001..1050 are the
@@ -63,13 +74,20 @@ public static class CliApp
     private static readonly SimulationConfig EvaluationSimulationConfig =
         new(AgentCount: 2, MaxTicks: 200, TransitSpeed: 4);
 
-    private static readonly JsonSerializerOptions ArtifactJsonOptions = new() { WriteIndented = true };
-
     /// <summary>
     /// The machine-readable evaluation artifact written by
     /// <c>evaluate --out</c>: the per-suite paired-study reports plus the
     /// host and provenance facts the numbers were produced on.
     /// </summary>
+    /// <remarks>
+    /// The last four fields carry the external-agent reporting of spec §9.3 and
+    /// are <b>omitted entirely unless <c>--agent-cmd</c> was used</b>, so an
+    /// in-process artifact stays byte-identical to the one that existed before
+    /// this protocol did — a property the golden fixture pins by asserting the
+    /// exact top-level field set rather than by tolerating new fields. Each is
+    /// nullable for that reason alone: a null field does not mean "no external
+    /// agent failed", it means "this run had no external agent to report on".
+    /// </remarks>
     internal sealed record EvaluationArtifact(
         string? CommitSha,
         DateTime CreatedAtUtc,
@@ -77,7 +95,87 @@ public static class CliApp
         string Os,
         int Cores,
         string Architecture,
-        PairedStudyReport[] Studies);
+        PairedStudyReport[] Studies,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        IReadOnlyDictionary<string, int>? AgentFailures = null,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        int? VoidRuns = null,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        string[]? AgentCommand = null,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        EvaluationAgentLimits? AgentLimits = null,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        EvaluationForfeit[]? AgentForfeits = null);
+
+    /// <summary>
+    /// One forfeited match: the scoreboard as it stood when the external agent's
+    /// plumbing broke, beside the scores the study was actually scored from.
+    /// </summary>
+    /// <remarks>
+    /// §9.3 scores an agent failure from 0 for the external side, so the row that
+    /// reached the analyzer does not carry the lead the agent abandoned. Without
+    /// this record that information would be gone, and a failure at step 200 would
+    /// be indistinguishable from a handshake that never started — which is a
+    /// difference a reader diagnosing a flaky agent very much needs.
+    /// <para>
+    /// <b>Report-only, and placed so that it cannot be otherwise.</b> The
+    /// per-seed statistics are computed by <c>PairedStudy.Analyze</c> from
+    /// <c>MatchResult</c> rows built before this record exists, and this array is
+    /// attached to the artifact afterwards. There is no code path by which a
+    /// partial score reaches the delta, the confidence interval, the outcome rates,
+    /// or the decision rule.
+    /// </para>
+    /// <para>
+    /// The scores are indexed by <em>slot</em>, like every row the runner writes,
+    /// and <c>ExternalSeat</c> says which slot the external agent played — so the
+    /// seat is never guessed from the numbers. An empty or absent array means no
+    /// match was forfeited.
+    /// </para>
+    /// </remarks>
+    internal sealed record EvaluationForfeit(
+        ulong Seed,
+        int ExternalSeat,
+        string Reason,
+        int PartialScoreAtSlot0,
+        int PartialScoreAtSlot1,
+        int ScoredExternalScore,
+        int ScoredOpponentScore);
+
+    /// <summary>
+    /// The two spec §7 limits an external run was actually played under.
+    /// </summary>
+    /// <remarks>
+    /// §3.1 requires both values in the run's output metadata, so a reported run
+    /// states the time limits it played under rather than leaving them to be
+    /// inferred from a version number. The JSON spelling is PascalCase to match
+    /// every other field of the artifact; the names are the spec's two named
+    /// limits, and <c>MatchTimeoutMs</c> is always the value computed from
+    /// <c>StepTimeoutMs</c> rather than a second number somebody chose.
+    /// </remarks>
+    internal sealed record EvaluationAgentLimits(int StepTimeoutMs, int MatchTimeoutMs);
+
+    /// <summary>
+    /// One parsed <c>evaluate</c> invocation: the suite selection, the tick and
+    /// rollout budgets, the map provider, the roster, and either the in-process
+    /// candidate or the command line of an external one.
+    /// </summary>
+    /// <remarks>
+    /// Both candidates arrive as the same request so that everything after
+    /// parsing — the suite loop, the mirrored seatings, the artifact, the summary
+    /// lines — is one code path. What differs between them is only who supplies
+    /// the action for the candidate seat, which is exactly the difference §9.4
+    /// says must not reach the statistics.
+    /// </remarks>
+    private sealed record EvaluateRequest(
+        string[] Suites,
+        int Rollouts,
+        int SeedCap,
+        string? Commit,
+        string Scenario,
+        Func<ulong, MapGraph> MapFactory,
+        IReadOnlyList<IAgentFactory> Teams,
+        string? AgentCommand,
+        int AgentStepTimeoutMs);
 
     /// <summary>
     /// The simulation parameters the <c>--min-fairness</c> gate runs its
@@ -629,15 +727,20 @@ public static class CliApp
                 recording = TrajectoryReader.Read(reader);
             }
 
-            var problems = TrajectoryReplay.Verify(recording);
-            if (problems.Count > 0)
+            var report = TrajectoryReplay.VerifyDetailed(recording);
+            if (report.Problems.Count > 0)
             {
-                foreach (var problem in problems)
+                foreach (var problem in report.Problems)
                 {
                     stderr.WriteLine($"replay error: {problem}");
                 }
 
                 return Failure;
+            }
+
+            foreach (var notice in report.Notices)
+            {
+                stderr.WriteLine($"replay notice: {notice}");
             }
 
             if (!verify)
@@ -646,8 +749,12 @@ public static class CliApp
                 return Success;
             }
 
+            var hashed = recording.Steps.Count(step => step.StateHash is not null);
+            var stateCoverage = hashed == recording.Steps.Length && hashed > 0
+                ? $", {hashed} state hash(es) matched"
+                : string.Empty;
             stderr.WriteLine(
-                $"replay verified: {recording.Steps.Length} step(s) serialized-equivalent " +
+                $"replay verified: {recording.Steps.Length} step(s) serialized-equivalent{stateCoverage} " +
                 $"(seed {recording.Header.Seed}, schema v{recording.Header.SchemaVersion}).");
             return Success;
         }
@@ -679,7 +786,7 @@ public static class CliApp
             var metadata = EnvironmentSample.Capture(commit, cpu);
             var result = BenchmarkHarness.RunAll(workloads, metadata, runs, warmupSteps);
 
-            var json = JsonSerializer.Serialize(result, ArtifactJsonOptions);
+            var json = JsonArtifact.SerializeIndented(result);
             return WriteOutput(flags, "--out", json, stdout, stderr);
         }
         catch (Exception ex)
@@ -700,7 +807,16 @@ public static class CliApp
     {
         try
         {
-            var (flags, positionals) = ParseFlags(args, "--seed-set", "--rollouts", "--seeds", "--out", "--commit", "--scenario");
+            // §9.5: --agent-cmd *is* the candidate side, so it cannot be combined
+            // with an in-process candidate selector. Checked against the raw
+            // arguments, before the flag whitelist runs, because a conflict has to
+            // be reported as a conflict rather than as an unknown flag.
+            AgentCandidateSelection.GuardAgainstInProcessSelector(args);
+
+            var (flags, positionals) = ParseFlags(
+                args,
+                "--seed-set", "--rollouts", "--seeds", "--out", "--commit", "--scenario",
+                "--agent-cmd", "--agent-step-timeout-ms");
             GuardNoPositionals(positionals);
             var seedSetText = flags.TryGetValue("--seed-set", out var setText)
                 ? setText.ToLowerInvariant()
@@ -742,47 +858,339 @@ public static class CliApp
                 new MctsAgentFactory(EvaluationSimulationConfig, search, name: EvaluationTargetPolicy),
                 new ScoutCollectorAgentFactory(name: EvaluationBaselinePolicy),
             };
-            var pairings = new[] { (0, 1), (1, 0) };
 
-            var studies = new List<PairedStudyReport>();
-            foreach (var suite in suites)
-            {
-                var seeds = (suite == DevelopmentSuite ? DevelopmentEvaluationSeeds : HeldOutEvaluationSeeds)
-                    .Take(seedCap)
-                    .ToArray();
-                var spec = new EvaluationSpec(
-                    seeds,
-                    mapFactory,
-                    EvaluationSimulationConfig,
-                    teams,
-                    pairings,
-                    maxSteps: EvaluationSimulationConfig.MaxTicks);
-                var study = PairedStudy.Analyze(
-                    suite,
-                    EvaluationTargetPolicy,
-                    EvaluationBaselinePolicy,
-                    rollouts,
-                    EvaluationSimulationConfig.MaxTicks,
-                    EvaluationHarness.Evaluate(spec));
-                studies.Add(study);
-                WriteEvaluationSummary(stderr, study);
-            }
-
-            var artifact = new EvaluationArtifact(
+            var request = new EvaluateRequest(
+                suites,
+                rollouts,
+                seedCap,
                 commit,
-                DateTime.UtcNow,
-                RuntimeDescription(),
-                OsDescription(),
-                System.Environment.ProcessorCount,
-                ArchitectureDescription(),
-                studies.ToArray());
-            var json = JsonSerializer.Serialize(artifact, ArtifactJsonOptions);
-            return WriteOutput(flags, "--out", json, stdout, stderr);
+                scenario,
+                mapFactory,
+                teams,
+                AgentCommand: flags.TryGetValue("--agent-cmd", out var commandText) ? commandText : null,
+                AgentStepTimeoutMs: flags.TryGetValue("--agent-step-timeout-ms", out var stepText)
+                    ? ParseAgentStepTimeoutMs(stepText)
+                    : ExternalTimeLimits.DefaultStepTimeoutMs);
+
+            return request.AgentCommand is null
+                ? EvaluateInProcess(request, flags, stdout, stderr)
+                : EvaluateExternal(request, flags, stdout, stderr);
         }
         catch (Exception ex)
         {
             return Report(ex, stderr);
         }
+    }
+
+    /// <summary>
+    /// The in-process evaluation: the fixed MCTS candidate against the Scout
+    /// baseline, through the batch harness.
+    /// </summary>
+    /// <remarks>
+    /// This path is untouched by the external-agent work, and that is the point of
+    /// keeping it in its own method: the harness has no failure path and needs
+    /// none, because an in-process agent cannot fail the way a process can. Every
+    /// number an in-process run produces still comes from the same harness, the
+    /// same analyzer and the same artifact as before.
+    /// </remarks>
+    private static int EvaluateInProcess(
+        EvaluateRequest request,
+        Dictionary<string, string> flags,
+        TextWriter stdout,
+        TextWriter stderr)
+    {
+        var pairings = new[] { (0, 1), (1, 0) };
+
+        var studies = new List<PairedStudyReport>();
+        foreach (var suite in request.Suites)
+        {
+            var seeds = EvaluationSeeds(suite).Take(request.SeedCap).ToArray();
+            var spec = new EvaluationSpec(
+                seeds,
+                request.MapFactory,
+                EvaluationSimulationConfig,
+                request.Teams,
+                pairings,
+                maxSteps: EvaluationSimulationConfig.MaxTicks);
+            var study = PairedStudy.Analyze(
+                suite,
+                EvaluationTargetPolicy,
+                EvaluationBaselinePolicy,
+                request.Rollouts,
+                EvaluationSimulationConfig.MaxTicks,
+                EvaluationHarness.Evaluate(spec));
+            studies.Add(study);
+            WriteEvaluationSummary(stderr, study);
+        }
+
+        var artifact = new EvaluationArtifact(
+            request.Commit,
+            DateTime.UtcNow,
+            RuntimeDescription(),
+            OsDescription(),
+            System.Environment.ProcessorCount,
+            ArchitectureDescription(),
+            studies.ToArray());
+        var json = JsonArtifact.SerializeIndented(artifact);
+        return WriteOutput(flags, "--out", json, stdout, stderr);
+    }
+
+    /// <summary>
+    /// The external evaluation: one agent process per match, driven by
+    /// <see cref="ExternalMatchRunner"/>, scored by the same
+    /// <see cref="PairedStudy"/> analyzer the in-process path uses.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The mirrors of the in-process study are all here and unchanged: the same
+    /// seed suites, the same <c>(0, 1)</c> and <c>(1, 0)</c> seatings per seed,
+    /// the same per-match tick budget, the same baseline agent built by the same
+    /// factory, and the same <c>rollouts</c> provenance. The external agent takes
+    /// the seat MCTS would have taken, which is what makes the two runs
+    /// commensurable (§9.4).
+    /// </para>
+    /// <para>
+    /// The argv and the program are resolved before the first match (§3.3), and a
+    /// program that cannot be run is a usage error rather than a result: no agent
+    /// would have spoken, so there is nothing to score and nothing to write.
+    /// </para>
+    /// </remarks>
+    private static int EvaluateExternal(
+        EvaluateRequest request,
+        Dictionary<string, string> flags,
+        TextWriter stdout,
+        TextWriter stderr)
+    {
+        var argv = AgentCommandLine.Require(request.AgentCommand);
+        if (!AgentProgramResolver.TryResolve(argv[0], out var program, out var resolutionFailure))
+        {
+            throw new UsageError($"--agent-cmd could not be run: {resolutionFailure}");
+        }
+
+        var maxSteps = EvaluationSimulationConfig.MaxTicks;
+
+        // §7: the match budget is computed from the step budget, so
+        // match_timeout_ms >= step_timeout_ms x max_ticks holds by construction
+        // and a caller cannot mis-set the pair into scoring every match a loss.
+        var limits = new ExternalTimeLimits(
+            request.AgentStepTimeoutMs,
+            ExternalTimeLimits.ComputeMatchTimeoutMs(request.AgentStepTimeoutMs, maxSteps),
+            maxSteps);
+        var launch = new ExternalAgentLaunch(program!, argv[1..]);
+
+        // The baseline is taken from the roster rather than constructed afresh, so
+        // the opponent is the same agent the in-process study is published
+        // against. The external agent takes the candidate seat.
+        var baseline = request.Teams[EvaluationBaselineIndex];
+        var externalName = $"external:{Path.GetFileNameWithoutExtension(program)}";
+
+        var studies = new List<PairedStudyReport>();
+
+        // Sorted, so two runs of the same failing agent produce the same artifact
+        // bytes: a report whose field order depended on a dictionary's insertion
+        // order would differ between runs for no reason a reader could see.
+        var failures = new SortedDictionary<string, int>(StringComparer.Ordinal);
+        var forfeits = new List<EvaluationForfeit>();
+        var voidRuns = 0;
+
+        foreach (var suite in request.Suites)
+        {
+            var results = new List<ExternalMatchResult>();
+            foreach (var seed in EvaluationSeeds(suite).Take(request.SeedCap))
+            {
+                var map = request.MapFactory(seed);
+                foreach (var externalSlot in new[] { 0, 1 })
+                {
+                    results.Add(PlayExternalMatch(
+                        request,
+                        map,
+                        launch,
+                        program!,
+                        externalSlot,
+                        seed,
+                        maxSteps,
+                        limits,
+                        baseline));
+                }
+            }
+
+            var report = ExternalMatchRunner.Report(results);
+            var study = ExternalPairedStudy.Analyze(
+                suite,
+                externalName,
+                baseline.Name,
+                request.Rollouts,
+                maxSteps,
+                results);
+
+            studies.Add(study);
+            WriteEvaluationSummary(stderr, study);
+            WriteExternalSummary(stderr, report, study);
+
+            foreach (var (reason, count) in report.AgentFailuresByCode)
+            {
+                var code = reason.ToWireString();
+                failures[code] = failures.TryGetValue(code, out var seen) ? seen + count : count;
+            }
+
+            // The §9.3 partials, recorded after the analyzer has already run. The
+            // study above was computed from the forfeited rows, so nothing here can
+            // reach a statistic; this exists so a reader can still see how far each
+            // failed match actually got.
+            foreach (var result in results.Where(r => r.IsAgentFailure))
+            {
+                var match = result.Match!;
+                forfeits.Add(new EvaluationForfeit(
+                    result.Seed,
+                    result.ExternalSlot,
+                    result.Fault!.TerminationReason,
+                    result.PartialScoreA ?? match.ScoreA,
+                    result.PartialScoreB ?? match.ScoreB,
+                    result.ExternalSlot == 0 ? match.ScoreA : match.ScoreB,
+                    result.ExternalSlot == 0 ? match.ScoreB : match.ScoreA));
+            }
+
+            voidRuns += report.VoidRuns;
+        }
+
+        var artifact = new EvaluationArtifact(
+            request.Commit,
+            DateTime.UtcNow,
+            RuntimeDescription(),
+            OsDescription(),
+            System.Environment.ProcessorCount,
+            ArchitectureDescription(),
+            studies.ToArray(),
+            AgentFailures: failures,
+            VoidRuns: voidRuns,
+            AgentCommand: argv,
+            AgentLimits: new EvaluationAgentLimits(limits.StepTimeoutMs, limits.MatchTimeoutMs),
+            AgentForfeits: forfeits.Count == 0 ? null : [.. forfeits]);
+        var json = JsonArtifact.SerializeIndented(artifact);
+        return WriteOutput(flags, "--out", json, stdout, stderr);
+    }
+
+    /// <summary>
+    /// Plays one match of an external study: the external process in the candidate
+    /// seat, a fresh baseline in the other, both on the same map and seed.
+    /// </summary>
+    /// <exception cref="UsageError">
+    /// The program resolved but the OS would not start it. That is not a match
+    /// result and not a §8 reason code — no agent ever spoke, so there is no agent
+    /// behaviour to attribute anything to — and it is reported the same way as a
+    /// program that does not resolve, with the run abandoned and no artifact
+    /// written. Resolution catches the common case up front; this catches the one
+    /// that can only be discovered by asking the OS.
+    /// </exception>
+    private static ExternalMatchResult PlayExternalMatch(
+        EvaluateRequest request,
+        MapGraph map,
+        ExternalAgentLaunch launch,
+        string program,
+        int externalSlot,
+        ulong seed,
+        int maxSteps,
+        ExternalTimeLimits limits,
+        IAgentFactory baseline)
+    {
+        try
+        {
+            return ExternalMatchRunner.Run(
+                map,
+                EvaluationSimulationConfig,
+                launch,
+                externalSlot,
+                baseline.Create(1 - externalSlot, seed),
+                seed,
+                maxSteps,
+                request.Scenario,
+                limits);
+        }
+        catch (ExternalAgentLaunchException launchFailure)
+        {
+            throw new UsageError(
+                $"--agent-cmd could not be run: could not start '{program}': {launchFailure.Message}",
+                launchFailure);
+        }
+    }
+
+    /// <summary>
+    /// The external run's own counts, under the ordinary summary: how many seeds
+    /// were valid, how many runs were void, and how the agent's failures broke
+    /// down by §8 reason code.
+    /// </summary>
+    /// <remarks>
+    /// <b>Valid seeds</b> is the number the grading floor actually reads, and it is
+    /// the number a void run reduces — a void contributes no row, so its seed is
+    /// absent from the study rather than counted as a defeat. That is the whole
+    /// point of the carve-out, and it is also the one way a void can change a
+    /// verdict, so the caveat line below spells it out rather than leaving a
+    /// reader to infer a shrunken denominator from a total that came out short.
+    /// </remarks>
+    private static void WriteExternalSummary(
+        TextWriter stderr,
+        ExternalMatchReport report,
+        PairedStudyReport study)
+    {
+        var invariant = CultureInfo.InvariantCulture;
+        var byCode = report.AgentFailuresByCode
+            .OrderBy(pair => pair.Key.ToWireString(), StringComparer.Ordinal)
+            .Select(pair => $"{pair.Key.ToWireString()}={pair.Value.ToString(invariant)}");
+
+        stderr.WriteLine(
+            $"  external        valid_seeds={study.Statistics.Seeds.ToString(invariant)}" +
+            $"  void_runs={report.VoidRuns.ToString(invariant)}" +
+            $"  agent_failures={(report.AgentFailureCount == 0 ? "none" : string.Join(",", byCode))}");
+
+        // The decision itself, in the same analyzer's own words -- the verdict
+        // string the in-process study records under `Decision`, not a second
+        // phrasing of it. The statistics are identical, so the verdict is too.
+        stderr.WriteLine($"  decision        {study.Decision}");
+
+        if (report.VoidRuns > 0 && study.Decision.StartsWith("Not graded", StringComparison.Ordinal))
+        {
+            stderr.WriteLine(
+                $"  void caveat     {report.VoidRuns.ToString(invariant)} void run(s) were excluded from the" +
+                " statistics and from the grading floor, which is why this run is not graded.");
+        }
+    }
+
+    /// <summary>
+    /// The canonical seeds of one suite (spec §9.4: dev 1001..1050, held-out
+    /// 2001..2050), before any <c>--seeds</c> cap.
+    /// </summary>
+    private static ulong[] EvaluationSeeds(string suite) =>
+        suite == DevelopmentSuite ? DevelopmentEvaluationSeeds : HeldOutEvaluationSeeds;
+
+    /// <summary>
+    /// <c>--agent-step-timeout-ms</c>, which is a usage error rather than a plain
+    /// argument error: a budget below 1 would make <c>match_timeout_ms</c>
+    /// unsatisfiable, and a budget so large that the computed
+    /// <c>match_timeout_ms</c> no longer fits the integer the wire carries cannot
+    /// be honoured at all. §7 requires a mis-set pair to be refused rather than
+    /// played, and refusing it here means naming the flag instead of surfacing an
+    /// arithmetic failure from the middle of the run.
+    /// </summary>
+    private static int ParseAgentStepTimeoutMs(string text)
+    {
+        if (!int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var value) || value < 1)
+        {
+            throw new UsageError($"flag '--agent-step-timeout-ms' expects a positive integer, got '{text}'.");
+        }
+
+        // match_timeout_ms = step_timeout_ms x max_ticks + slack, so this is the
+        // largest step budget whose match budget still fits the wire's integer.
+        var largest = (int.MaxValue - ExternalTimeLimits.MatchTimeoutSlackMs) / EvaluationSimulationConfig.MaxTicks;
+        if (value > largest)
+        {
+            throw new UsageError(
+                $"flag '--agent-step-timeout-ms' got '{text}', which cannot be turned into a " +
+                $"match_timeout_ms: the match budget is step_timeout_ms x {EvaluationSimulationConfig.MaxTicks} + " +
+                $"{ExternalTimeLimits.MatchTimeoutSlackMs} and must stay within {int.MaxValue}, so the largest " +
+                $"usable value is {largest}.");
+        }
+
+        return value;
     }
 
     private static void WriteEvaluationSummary(TextWriter stderr, PairedStudyReport study)
@@ -879,6 +1287,12 @@ public static class CliApp
         return builder.ToString();
     }
 
+    /// <summary>
+    /// The single funnel for <c>--out</c> artifact writes. Routing every one
+    /// through <see cref="JsonArtifact"/> is what makes the LF guarantee
+    /// unconditional rather than a property of each call site remembering to
+    /// normalize.
+    /// </summary>
     private static int WriteOutput(
         Dictionary<string, string> flags,
         string outFlag,
@@ -888,7 +1302,7 @@ public static class CliApp
     {
         if (flags.TryGetValue(outFlag, out var path))
         {
-            File.WriteAllText(path, content + "\n");
+            JsonArtifact.Write(path, content);
             stderr.WriteLine($"wrote {path}");
             return Success;
         }
@@ -907,7 +1321,11 @@ public static class CliApp
     private static int Report(Exception ex, TextWriter stderr)
     {
         stderr.WriteLine($"error: {ex.Message}");
-        return Failure;
+
+        // A usage error is reported before any work is done, so it gets its own
+        // exit status (§3.3) and says so on the way out. Everything else keeps the
+        // runtime-failure status it has always returned.
+        return ex is UsageError ? UsageError.ExitCode : Failure;
     }
 
     /// <summary>
@@ -1051,6 +1469,13 @@ public static class CliApp
         sink.WriteLine("            family with capacity-1 choke bottlenecks, so transit denials and claim");
         sink.WriteLine("            races surface non-zero contention; '--out' writes the machine-readable");
         sink.WriteLine("            per-seed + statistics artifact");
+        sink.WriteLine("  evaluate  --agent-cmd \"<command line>\" [--agent-step-timeout-ms <n>] [--seed-set dev|heldout] [--seeds <n>] [--scenario standard|bottleneck] [--out <file>] [--commit <sha>]");
+        sink.WriteLine("            Score an external agent process as the candidate, in the seat MCTS would");
+        sink.WriteLine("            take and against the same Scout baseline, with identical statistics;");
+        sink.WriteLine("            the command line is split without a shell (double quotes group, so a path");
+        sink.WriteLine("            with spaces must be quoted) and a program that cannot be run exits 2 with");
+        sink.WriteLine("            nothing written. '--agent-step-timeout-ms' (default 5000) is the per-step");
+        sink.WriteLine("            budget; the match budget is computed from it");
         sink.WriteLine();
         sink.WriteLine("  -h, --help                                    Show this help and exit");
         sink.WriteLine("  -v, --version                                 Print the version and exit");

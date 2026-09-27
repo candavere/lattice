@@ -6,7 +6,7 @@ namespace Lattice.Tests.Environment;
 
 /// <summary>
 /// Exercises the pure <see cref="Simulation.Step"/> conflict-resolution and
-/// reward rules against a hand-built triangle map (docs/adr-002.md):
+/// reward rules against a hand-built triangle map (docs/adr/0003-simultaneous-actions-step-contract.md):
 /// agent 0 starts in zone 0, agent 1 in zone 1; zones 0/1/2 are pairwise
 /// adjacent; resources 0 and 1 live in zone 1, resource 2 in zone 2.
 /// </summary>

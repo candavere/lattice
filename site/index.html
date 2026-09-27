@@ -36,16 +36,14 @@
       This page <strong>replays recorded evidence</strong>. Every frame below is read from a
       committed recording; your browser does not run a new simulation.
     </p>
-      <aside class="moment-callout" aria-label="The moment to watch">
-      <h3 class="moment-label">The moment to watch &mdash; ticks 9&ndash;13</h3>
+    <aside class="moment-callout" aria-label="The moment to watch">
+      <h3 class="moment-label">The moment to watch &mdash; ticks 9 and 19</h3>
       <p>
-        From <strong>tick 10 through tick 13 the Treasure Vault lies outside the Sentry&rsquo;s
-        recorded (or reconstructed) sightline</strong>: on the Sentry view chip the room dims to
-        &ldquo;last known&rdquo; while ground truth keeps it fully lit. During the same stretch the
-        Infiltrator &mdash; who has already claimed the vault&rsquo;s first chest &mdash; slips out of the
-        Sentry Post and cuts across to the armory, unseen by the Sentry. Step to tick 11, select
-        the <em>Sentry</em> view chip above the map, and watch the room dim on one map while it
-        stays lit on ground truth.
+        On the <em>Infiltrator</em> view chip the Treasure Vault dims to &ldquo;last known&rdquo; at
+        <strong>ticks 9 and 19</strong>, while ground truth keeps it fully lit — recorded
+        decision-time fog from the file, not a page guess. Step to tick 9, select the
+        <em>Infiltrator</em> view chip above the map, and watch the room dim on one map
+        while it stays lit on ground truth.
       </p>
       <p class="moment-honest" id="moment-arena">
         Prefer the badge on the map: <em>Recorded perception</em> means the fog came from the
@@ -266,7 +264,7 @@
         </p>
       </object>
       <p class="card-note" id="static-caption">
-        Seed 42, MCTS vs Random, 30 ticks. Recorded with
+        Seed 42, MCTS vs Random, 27 ticks. Recorded with
         <code>lattice simulate</code> and rendered as a dependency-free
         CSS-animated SVG with <code>lattice render --format svg</code>.
       </p>
@@ -303,9 +301,12 @@
       </ul>
       <p class="card-note">
         Every command is seeded and deterministic under the current engine: the same command and
-        engine re-create the same file. The committed recordings on this page were made with an
-        earlier engine revision (pre-v2 wire schema), so re-running today can record a different
-        tick-by-tick file. The viewer always shows the committed file exactly as it was recorded.
+        engine re-create the same file. The committed recordings on this page were re-recorded with
+        these commands on the engine that ships in this repository, and
+        <code>replay --verify</code> re-simulates both of them tick by tick &mdash; including each
+        tick&rsquo;s state hash &mdash; in CI, so a recording that stopped matching this engine
+        would fail the build rather than sit here quietly. The viewer always shows the committed
+        file exactly as it was recorded.
       </p>
     </section>
   </main>

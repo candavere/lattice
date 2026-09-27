@@ -106,13 +106,17 @@ public class InfiltrationScenarioTests
     }
 
     [Fact]
-    public void Run_TightBudget_TimesOutBeforeTheHaulFinishes()
+    public void Run_TightBudget_InterceptsBeforeTheHaulFinishes()
     {
+        // Under the gated engine a same-tick swap through a capacity-1
+        // portcullis is denied for the second crosser, so the tight-budget
+        // run ends with the sentry catching the rogue at a tick boundary
+        // before the haul finishes (the pre-gate engine granted the swap).
         var run = InfiltrationScenario.Run(DemoSeed, maxSteps: 6);
 
+        Assert.True(run.Outcome.Intercepted);
         Assert.False(run.Outcome.Exfiltrated);
-        Assert.False(run.Outcome.Intercepted);
-        Assert.Equal("timeout", run.Outcome.Status);
+        Assert.Equal("intercepted", run.Outcome.Status);
         Assert.True(run.Base.Results[^1].Observations[0].Claims.Length < run.Map.Resources.Length);
     }
 

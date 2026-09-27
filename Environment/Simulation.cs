@@ -88,7 +88,7 @@ public sealed class SimulationConfig
 /// agent's zone and score, which resource ids are claimed, the tick counter,
 /// and the per-tick dynamic topology overrides. No hidden mutable state —
 /// this record plus the next tick's actions fully determine the following
-/// state (see docs/adr-002.md). <see cref="Dynamics"/> is the way the map's
+/// state (see docs/adr/0003-simultaneous-actions-step-contract.md). <see cref="Dynamics"/> is the way the map's
 /// choke capacities may vary across an episode (timed portcullises, event
 /// locks); when empty, the base <see cref="MapGraph"/> topology is used.
 /// </summary>
@@ -164,7 +164,7 @@ public static class Simulation
     /// Advances <paramref name="state"/> by one tick under the agents'
     /// actions. Pure and total: the input state is never mutated and any
     /// action array yields the next state (invalid/missing actions degrade to
-    /// Wait). Resolution is two-phase (docs/adr-002.md): movement and transit
+    /// Wait). Resolution is two-phase (docs/adr/0003-simultaneous-actions-step-contract.md): movement and transit
     /// resolve first in tick-interleaved priority order, respecting edge
     /// transit and zone/choke capacity, then collects resolve in the same
     /// tick-interleaved order against post-move zones, one claim per resource
@@ -259,18 +259,23 @@ public static class Simulation
 
                     var travelOpen = true;
                     var transitTicks = 0;
+                    var chokeIndex = EdgeChoke(state.Map, current, destination);
                     if (config.TransitSpeed != SimulationConfig.InstantTransit)
                     {
                         transitTicks = TransitTicks(state.Map, current, destination, config.TransitSpeed);
-                        if (transitTicks > 1) // one-tick edges arrive instantly; only real crossings occupy the choke
-                        {
-                            var chokeIndex = EdgeChoke(state.Map, current, destination);
-                            var chokeCapacity = chokeIndex >= 0
-                                ? state.Dynamics.EffectiveChokeCapacity(state.Map, chokeIndex)
-                                : MapLimits.Unlimited;
-                            travelOpen = chokeCapacity > 0 && edgeLoad[chokeIndex] < chokeCapacity;
-                        }
                     }
+
+                    // Every crossing — instant, one-tick, multi-tick — is
+                    // admitted through the same choke gate (spec:
+                    // granted ⟺ C(e,t) > 0 ∧ L_pre(e,t) < C(e,t)). A granted
+                    // instant or one-tick crossing occupies the choke for the
+                    // tick it happens in, so same-tick resolvers cannot
+                    // double-book a slot; the hold does not survive the tick
+                    // (edgeLoad is reseeded from the immutable state).
+                    var chokeCapacity = chokeIndex >= 0
+                        ? state.Dynamics.EffectiveChokeCapacity(state.Map, chokeIndex)
+                        : MapLimits.Unlimited;
+                    travelOpen = chokeCapacity > 0 && (chokeIndex < 0 || edgeLoad[chokeIndex] < chokeCapacity);
 
                     grantsMove = nodeOpen && travelOpen;
                     if (grantsMove)
@@ -278,6 +283,10 @@ public static class Simulation
                         nodeLoad[destination]++; // reserves destination capacity for this tick
                         if (config.TransitSpeed == SimulationConfig.InstantTransit || transitTicks <= 1)
                         {
+                            if (chokeIndex >= 0)
+                            {
+                                edgeLoad[chokeIndex]++; // same-tick crossing occupies the choke for this tick
+                            }
                             nextZones[i] = destination; // arrives the same tick
                             nextTransit[i] = null;
                         }

@@ -7,12 +7,19 @@ Strict comparison (default):
   Fail if ANY workload's median throughput fell below --threshold x the
   baseline median (default 0.8, i.e. a 20% regression) or a workload
   disappeared from the matrix. Strict mode ONLY arms when the current host
-  fingerprint matches the baseline's - the OS family, the architecture, AND
-  the .NET runtime major version. The runtime constraint is deliberate: the
+  fingerprint matches the baseline's - the OS family, the architecture, the
+  .NET runtime major version, the logical core count, AND the CPU model
+  string (trimmed, case-folded). The runtime constraint is deliberate: the
   committed baseline is recorded under a specific runtime, and cross-runtime
   throughput deltas (e.g. .NET 8 vs the .NET 10 baseline) are measurement
   artifacts, not regressions - so a mismatched runtime degrades to the
-  informational cross-host mode instead of failing the gate.
+  informational cross-host mode instead of failing the gate. The
+  core-count/CPU-model constraint is deliberate too: the committed baseline
+  is a bare-metal machine, while GitHub-hosted runners virtualize the CPU
+  with a different core count - an unlike host class whose throughput
+  shortfall is a measurement artifact, not a regression. A missing or empty
+  host field on either side is a mismatch as well (cross-host,
+  informational), never a silent strict pass.
 
   Per-workload thresholds are derived statistically from the committed
   baseline's own dispersion, not hand-picked. For every workload whose baseline
@@ -34,8 +41,9 @@ Strict comparison (default):
   the derivation when one is supplied.
 
   Cross-host mode: never fails, but prints the side-by-side table and flags any
-  workload below the threshold, so OS/arch/runtime-mismatched runs still surface
-  drift.
+  workload below the threshold, so runs on an unlike host class - a different
+  OS family, architecture, runtime major, core count, CPU model, or
+  incomplete host metadata - still surface drift.
 
 Smoke classification (--smoke):
   Structural only. A smoke artifact (short --steps/--runs, possibly a
@@ -112,23 +120,96 @@ def derive_allowed(base_work, cv_multiplier, cv_floor, cv_cap):
     return derived
 
 
+FINGERPRINT_FIELDS = ("Os", "Architecture", "Runtime", "Cores", "Cpu")
+
+
+def describe_fingerprint(meta) -> str:
+    """One-line printable form of the strict fingerprint fields.
+
+    Prints every field the strict gate compares - OS descriptor, architecture,
+    runtime, logical core count, CPU model - with '?' for a missing value, so
+    a mismatched host class is visible in the log on every run.
+    """
+    cores = meta.get("Cores")
+    cpu = _string_component(meta, "Cpu")
+    return (f"{meta.get('Os') or '?'} / {meta.get('Architecture') or '?'} / "
+            f"{meta.get('Runtime') or '?'} / "
+            f"{cores if cores is not None else '?'} cores / {cpu or '?'}")
+
+
+def _string_component(meta, key):
+    """The trimmed descriptor for `key`, or None when missing or empty."""
+    value = meta.get(key)
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
 @dataclass(frozen=True)
 class HostFingerprint:
-    os_arch_matched: bool
+    os_matched: bool
+    arch_matched: bool
     runtime_matched: bool
+    cores_matched: bool
+    cpu_matched: bool
+    missing_fields: tuple = ()
+
+    @property
+    def os_arch_matched(self) -> bool:
+        return self.os_matched and self.arch_matched
 
     @property
     def matched(self) -> bool:
-        return self.os_arch_matched and self.runtime_matched
+        return (self.os_arch_matched and self.runtime_matched
+                and self.cores_matched and self.cpu_matched)
 
 
 def fingerprint(base_meta, curr_meta) -> HostFingerprint:
-    os_arch_matched = \
-        os_family(base_meta["Os"]) == os_family(curr_meta["Os"]) and \
-        base_meta["Architecture"] == curr_meta["Architecture"]
-    runtime_matched = runtime_major(base_meta["Runtime"]) == \
-        runtime_major(curr_meta["Runtime"])
-    return HostFingerprint(os_arch_matched, runtime_matched)
+    """Strict host fingerprint: OS family + architecture + .NET runtime major
+    + logical cores + CPU model string (trimmed, case-folded).
+
+    Every component must be present on BOTH sides and equal: a missing or
+    empty host field is a mismatch (cross-host classification), never a
+    silent strict pass. The bare-metal baseline and a GitHub-hosted runner
+    can share OS family + architecture, so the cores and CPU model components
+    are what keep the strict gate from arming on an unlike host class.
+    """
+    missing = []
+    for meta, side in ((base_meta, "baseline"), (curr_meta, "current")):
+        for key in FINGERPRINT_FIELDS:
+            if key == "Cores":
+                if meta.get("Cores") is None:
+                    missing.append(f"{side}.{key}")
+            elif _string_component(meta, key) is None:
+                missing.append(f"{side}.{key}")
+
+    base_os = _string_component(base_meta, "Os")
+    curr_os = _string_component(curr_meta, "Os")
+    os_matched = bool(base_os and curr_os) and \
+        os_family(base_os).casefold() == os_family(curr_os).casefold()
+
+    base_arch = _string_component(base_meta, "Architecture")
+    curr_arch = _string_component(curr_meta, "Architecture")
+    arch_matched = bool(base_arch and curr_arch) and \
+        base_arch.casefold() == curr_arch.casefold()
+
+    base_rt = runtime_major(base_meta.get("Runtime") or "")
+    curr_rt = runtime_major(curr_meta.get("Runtime") or "")
+    runtime_matched = bool(base_rt and curr_rt) and base_rt == curr_rt
+
+    base_cores = base_meta.get("Cores")
+    curr_cores = curr_meta.get("Cores")
+    cores_matched = (base_cores is not None and curr_cores is not None
+                     and base_cores == curr_cores)
+
+    base_cpu = _string_component(base_meta, "Cpu")
+    curr_cpu = _string_component(curr_meta, "Cpu")
+    cpu_matched = bool(base_cpu and curr_cpu) and \
+        base_cpu.casefold() == curr_cpu.casefold()
+
+    return HostFingerprint(os_matched, arch_matched, runtime_matched,
+                           cores_matched, cpu_matched, tuple(missing))
 
 
 @dataclass(frozen=True)
@@ -255,7 +336,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--strict-if-matching", action="store_true",
                         help="fail on a regression only when the host "
                              "fingerprint (OS family + architecture + runtime "
-                             "major) matches the baseline")
+                             "major + logical cores + CPU model) matches the "
+                             "baseline")
     parser.add_argument("--per-workload-threshold", action="append",
                         default=[], metavar="NAME=RATIO",
                         help="override the threshold for one workload as "
@@ -298,10 +380,8 @@ def main(argv=None) -> int:
         check = smoke_check(baseline, current)
         print(f"smoke classification: structural only - this pass carries no "
               f"throughput ratio against the full-protocol baseline")
-        print(f"baseline host: {base_meta['Os']} / {base_meta['Architecture']} "
-              f"/ {base_meta['Runtime']}")
-        print(f"current host : {curr_meta['Os']} / {curr_meta['Architecture']} "
-              f"/ {curr_meta['Runtime']}")
+        print(f"baseline fingerprint: {describe_fingerprint(base_meta)}")
+        print(f"current fingerprint : {describe_fingerprint(curr_meta)}")
         print(f"fingerprint match: {fp.matched}")
         print()
 
@@ -341,23 +421,33 @@ def main(argv=None) -> int:
         base_work, curr_work, per_workload, derived, args.threshold)
 
     fp = fingerprint(base_meta, curr_meta)
-    os_arch_matched = fp.os_arch_matched
-    runtime_matched = fp.runtime_matched
     matched = fp.matched
     strict = matched and args.strict_if_matching
 
-    print(f"baseline host: {base_meta['Os']} / {base_meta['Architecture']} "
-          f"/ {base_meta['Runtime']}")
-    print(f"current host : {curr_meta['Os']} / {curr_meta['Architecture']} "
-          f"/ {curr_meta['Runtime']}")
-    if not os_arch_matched:
+    print(f"baseline fingerprint: {describe_fingerprint(base_meta)}")
+    print(f"current fingerprint : {describe_fingerprint(curr_meta)}")
+    if fp.missing_fields:
+        print("fingerprint: host metadata is incomplete on one side "
+              f"(missing or empty: {', '.join(fp.missing_fields)}) - "
+              "classified cross-host (informational), never a silent "
+              "strict pass")
+    elif not fp.os_arch_matched:
         print("fingerprint: OS family + architecture do not match the "
               "baseline (strict gate not armed)")
-    elif not runtime_matched:
+    elif not fp.runtime_matched:
         print("fingerprint: runtime major differs from the baseline "
-              f"({runtime_major(base_meta['Runtime'])} vs "
-              f"{runtime_major(curr_meta['Runtime'])}) - strict gate not armed "
-              "to avoid measuring a runtime delta as a regression")
+              f"({runtime_major(base_meta.get('Runtime') or '')} vs "
+              f"{runtime_major(curr_meta.get('Runtime') or '')}) - strict gate "
+              "not armed to avoid measuring a runtime delta as a regression")
+    elif not fp.cores_matched:
+        print("fingerprint: logical cores differ from the baseline "
+              f"({base_meta.get('Cores')} vs {curr_meta.get('Cores')}) - "
+              "classified cross-host (informational): an unlike host class "
+              "is not a throughput regression")
+    elif not fp.cpu_matched:
+        print("fingerprint: CPU model differs from the baseline "
+              f"({base_meta.get('Cpu')!r} vs {curr_meta.get('Cpu')!r}) - "
+              "classified cross-host (informational)")
     else:
         print(f"fingerprint match: {matched}  (strict gate armed: {strict})")
     if per_workload:
@@ -399,7 +489,8 @@ def main(argv=None) -> int:
     else:
         print()
         print("cross-host comparison (informational): the strict gate needs "
-              "a matching OS family + architecture + .NET runtime major.")
+              "a matching OS family + architecture + .NET runtime major + "
+              "logical cores + CPU model.")
     return 0
 
 

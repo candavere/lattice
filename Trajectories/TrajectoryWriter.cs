@@ -16,7 +16,8 @@ namespace Lattice.Trajectories;
 /// Optional decision-time <see cref="PartialObservation"/> fog
 /// (<see cref="TrajectoryHeader.AgentVision"/> + per-step
 /// <see cref="TrajectoryStep.Perceptions"/>) is preserved on write and
-/// round-trip; legacy recordings omit those fields.
+/// round-trip; legacy recordings omit those fields. Schema 3 also records a
+/// per-step <see cref="TrajectoryStep.StateHash"/>.
 /// </summary>
 public static class TrajectoryWriter
 {
@@ -66,10 +67,17 @@ public static class TrajectoryWriter
             ValidateTurn(map, steps.Count + 1, turn);
 
             var outcome = Simulation.Step(state, turn, simulationConfig);
+            // The digest covers the POST-step state: it is the world the step's
+            // own Observation describes, so the last step's hash pins the final
+            // state the summary line aggregates come from, and hash[N] is the
+            // pre-state of step N+1 — one field chain-pins the whole episode.
+            var stateHash = SimulationStateHash.Compute(outcome.NextState, seed);
             var perceptions = decisionPerceptions?[steps.Count];
-            var step = new TrajectoryStep(outcome.Result.Info.StepNumber, turn, outcome.Result, perceptions);
+            var step = new TrajectoryStep(
+                outcome.Result.Info.StepNumber, turn, outcome.Result, stateHash, perceptions);
             steps.Add(step);
-            sink.Write(Serialize(new StepLine("step", step.StepNumber, turn, outcome.Result, perceptions)) + "\n");
+            sink.Write(Serialize(new StepLine(
+                "step", step.StepNumber, turn, outcome.Result, stateHash, perceptions)) + "\n");
             state = outcome.NextState;
             lastInfo = outcome.Result.Info;
 
@@ -94,7 +102,13 @@ public static class TrajectoryWriter
     /// Writes an already-built <paramref name="recording"/> to
     /// <paramref name="sink"/> using the same line format as
     /// <see cref="Record"/>. Byte-identical to the original recording's own
-    /// output, which is how a read-back is verified. Preserves optional
+    /// output, which is how a read-back is verified. The header is stamped
+    /// with the recording's OWN <see cref="TrajectoryHeader.SchemaVersion"/>,
+    /// never <see cref="TrajectorySchema.CurrentVersion"/>: rewriting a
+    /// hash-less schema-2 recording must not silently relabel it as schema 3
+    /// with zero state hashes present. <see cref="Record"/> is the only place
+    /// that mints a new-schema recording, and it stamps
+    /// <see cref="TrajectorySchema.CurrentVersion"/> there. Preserves optional
     /// <see cref="TrajectoryHeader.AgentVision"/> and per-step
     /// <see cref="TrajectoryStep.Perceptions"/> when present.
     /// </summary>
@@ -110,7 +124,7 @@ public static class TrajectoryWriter
             recording.Header.Map,
             recording.Header.SimulationConfig,
             recording.Header.DynamicRules,
-            TrajectorySchema.CurrentVersion,
+            recording.Header.SchemaVersion,
             Scenario: scenario ?? recording.Header.Scenario,
             AgentRoles: agentRoles ?? recording.Header.AgentRoles,
             AgentVision: recording.Header.AgentVision)) + "\n");
@@ -118,7 +132,7 @@ public static class TrajectoryWriter
         foreach (var step in recording.Steps)
         {
             sink.Write(Serialize(new StepLine(
-                "step", step.StepNumber, step.Actions, step.Result, step.Perceptions)) + "\n");
+                "step", step.StepNumber, step.Actions, step.Result, step.StateHash, step.Perceptions)) + "\n");
         }
 
         sink.Write(Serialize(new FinalLine("final", recording.Final)) + "\n");
@@ -222,9 +236,10 @@ public static class TrajectoryWriter
         int StepNumber,
         AgentAction[] Actions,
         StepResult Result,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? StateHash = null,
         [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] PartialObservation[]? Perceptions = null)
     {
-        public TrajectoryStep ToModel() => new(StepNumber, Actions, Result, Perceptions);
+        public TrajectoryStep ToModel() => new(StepNumber, Actions, Result, StateHash, Perceptions);
     }
 
     internal sealed record FinalLine(string Kind, TrajectoryFinal Metrics);

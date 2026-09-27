@@ -9,7 +9,11 @@ companion to the governing thesis in
 [`adr/0001-governing-product-thesis.md`](adr/0001-governing-product-thesis.md).
 
 > **Release status: Research Preview — evaluation by maintainers and
-> collaborators.** The support contract in this document targets `v2.3.2`.
+> collaborators.** The support contract in this document targets the published
+> **v2.3.2** release and its assets. The source tree is now at **3.0.0**; a
+> 3.0.0-scoped contract will be published from the v3.0.0 release assets, and
+> until then every `v2.3.2` reference below describes that release rather than
+> the current source.
 > Publishing that release does not by itself qualify Lattice for production
 > use; it remains a research instrument until independent security review,
 > soak testing, and formal fuzzing are complete (see Section 2).
@@ -22,20 +26,13 @@ interchangeable, and no document may upgrade one into another:
 1. **Engine transition determinism.** Under the stated runtime contract, the
    same `SimulationState` plus the same `AgentAction[]` produces the same next
    state. This is a property of the pure step contract
-   ([`adr-002.md`](adr-002.md)).
+   ([`adr-0003`](adr/0003-simultaneous-actions-step-contract.md)).
 2. **Per-step serialized `StepResult` replay equivalence.** Replaying a
    recording's actions from a fresh initial state reconstructs ticks whose
    serialized `StepResult`s equal the recorded ones. `TrajectoryReplay.Verify`
    asserts exactly this — plus field-by-field authentication of the final
    summary line's aggregates against the re-simulated run — on the tested CI
    platforms; the `replay --verify` command below exercises it.
-
-The four guarantees above are formalized as an implementation-agnostic,
-clean-room contract in
-[`INVARIANT_SPECIFICATION.md`](INVARIANT_SPECIFICATION.md) — the transition
-laws an independent oracle or checker in any language must reproduce, plus
-three falsifiable external challenge questions and the submission contract for
-oracle verification reports.
 3. **Same-host normalized JSONL byte identity.** Two fresh episodes recorded
    from the same seed and the same actions produce byte-identical JSONL only
    where line-ending and formatting normalization is verified on identical host
@@ -43,12 +40,31 @@ oracle verification reports.
    This guarantee is deliberately narrow: newlines are written as a bare `\n`
    on every platform, but a raw byte identity claim is still scoped to
    identical environments and is not a cross-host guarantee.
-4. **Canonical simulation-state hash tree.** **Not currently implemented.**
-   Replay verifies serialized `StepResult` equality, not a state digest, so
-   there is no canonical hash tree to compare against. The benchmark harness's
-   FNV-1a step digest is an internal repeatability check — it anchors one
-   warm-up iteration and proves later iterations did not go off-script — not a
-   canonical simulation-state hash.
+4. **Per-tick canonical simulation-state hash.** **Implemented (trajectory
+   schema 3 and later).** Each step line records a SHA-256 digest of the
+   complete simulation state at the end of that tick, computed from a canonical
+   fixed-field-order, invariant-culture serialization
+   (`Trajectories/SimulationStateHash.cs`), and `replay --verify` recomputes and
+   compares it, naming the first mismatched tick. The serialization covers the
+   zone and resource positions, per-zone occupancy, the per-tick choke capacities
+   and the derived per-choke edge load, scores, claims, the episode seed and the
+   tick. It does **not** cover the header's `SimulationConfig` or
+   `DynamicMapRuleSet`, so it attests to the state each tick produced rather
+   than to the whole episode configuration. A recording that predates the field
+   still verifies on serialized `StepResult` equality and reports
+   `no state hash: step-level verification only`; a recording that declares
+   schema 3 or later but carries no digest is reported as a discrepancy, not a
+   notice, so the hashes cannot be stripped to downgrade the check. The
+   benchmark harness's FNV-1a step digest is an unrelated internal repeatability
+   check — it anchors one warm-up iteration and proves later iterations did not
+   go off-script.
+
+The four guarantees above are formalized as an implementation-agnostic,
+clean-room contract in
+[`INVARIANT_SPECIFICATION.md`](INVARIANT_SPECIFICATION.md) — the transition
+laws an independent oracle or checker in any language must reproduce, plus
+three falsifiable external challenge questions and the submission contract for
+oracle verification reports.
 
 ## 1. Target Support Matrix
 
@@ -115,10 +131,11 @@ produced, and those recorded values are the only provenance a result carries.
 
 ## 3. Known Limitations
 
-- **Replay validation, not state-hash validation.** Replay validation operates
-  on tick-by-tick serialized `StepResult` equality. A canonical
-  simulation-state hash tree is not yet implemented, so a replay cannot be
-  summarized by a single state digest.
+- **Per-tick digests, not a single episode digest.** Replay validation operates
+  on tick-by-tick serialized `StepResult` equality and, for schema-3
+  recordings, on a per-tick state digest. An episode is still not reducible to
+  one state digest: the digests are per tick, and a recording made before the
+  field existed carries none and verifies on step results alone.
 - **Scenario-dependent policy behavior.** With 32 rollouts per action, the MCTS
   evaluation subject underperforms the `ScoutCollectorAgent` baseline on open
   collection topologies while outperforming it under capacity-1 procedural
@@ -126,7 +143,7 @@ produced, and those recorded values are the only provenance a result carries.
   mean paired delta of −1.12 on the dev suite and −1.25 on the held-out suite
   for the standard scenario
   ([`../benchmarks/mcts_evaluation_results.json`](../benchmarks/mcts_evaluation_results.json)),
-  against +1.42 and +1.38 for the bottleneck scenario
+  against +2.03 and +2.60 for the bottleneck scenario
   ([`../benchmarks/bottleneck_evaluation_results.json`](../benchmarks/bottleneck_evaluation_results.json)).
   Policy quality is therefore topology-conditional and must not be described as
   uniformly better or worse.
@@ -140,7 +157,7 @@ produced, and those recorded values are the only provenance a result carries.
 
 ## 4. Trajectory Schema and Release Immutability Policy
 
-### Schema v2 header requirements
+### Schema v3 header requirements
 
 Trajectories are JSONL with a fixed line grammar: exactly one `header` line
 first, one `step` line per tick, and exactly one `final` line last. Every line
@@ -156,15 +173,42 @@ the generator:
 | `Map` | yes | The fully materialized map graph. |
 | `SimulationConfig` | yes | Configuration used to rebuild the environment. |
 | `DynamicRules` | no | The dynamic topology policy; omitted (null) for static maps. |
-| `SchemaVersion` | yes | Wire format stamp; `2` is the current version. |
+| `SchemaVersion` | yes | Wire format stamp; the current version is `TrajectorySchema.CurrentVersion` (currently `3`). |
 | `Scenario` | no | Demonstration-layer metadata; ignored by the replay core. |
 | `AgentRoles` | no | Demonstration-layer roster metadata; ignored by the replay core. |
 
-`SchemaVersion` is `2` for newly written files. Schema v2 records the episode's
-dynamic topology policy (`DynamicRules`, timed portcullises and event locks) so
-a replay recreates the exact choke-capacity schedule the recording was made
-under. The simulation config is the required second half of that contract: a
-replay with a different config is not a replay of the same episode.
+Newly written files carry `TrajectorySchema.CurrentVersion` (currently `3`);
+this document cites that constant rather than a bare literal, so it cannot
+drift out of step with the code. Schema 2 introduced the episode's dynamic
+topology policy (`DynamicRules`, timed portcullises and event locks), which the
+current schema still records, so a replay recreates the exact choke-capacity
+schedule the recording was made under. The simulation config is the required
+second half of that contract: a replay with a different config is not a replay
+of the same episode.
+
+#### What schema 3 adds
+
+Schema 3 does not change the header. It changes the step lines.
+
+- **`StateHash` is a step-line field, not a header field.** Each `step` line
+  carries the SHA-256 digest of the complete simulation state at the *end* of
+  that tick (`Trajectories/SimulationStateHash.cs`), computed from a canonical
+  fixed-field-order, invariant-culture serialization. The header is unchanged
+  apart from its `SchemaVersion` stamp.
+- **State hashes are required from schema 3 onward.** `StateHash` is mandatory
+  per `TrajectorySchema.StateHashRequiredVersion` (currently `3`). A recording
+  that declares schema 3 or later and carries no digest is reported as a
+  **discrepancy, not a notice**, so the hashes cannot be stripped to downgrade
+  the check; a recording that carries some but not all digests is likewise a
+  discrepancy.
+- **The notice path for older trajectories.** A recording written before
+  schema 3 legitimately has no `StateHash` field at all. It still verifies on
+  serialized `StepResult` equality and reports
+  `no state hash: step-level verification only`. The same string is published
+  as `TrajectoryReplay.NoStateHashNotice`.
+- **Rewrites do not relabel.** `TrajectoryWriter.Write` re-emits the
+  recording's own header version, so rewriting a pre-hash file cannot promote
+  it to schema 3 with no digests present (see the migration invariant below).
 
 ### Structural and migration invariants
 
@@ -191,24 +235,30 @@ replay with a different config is not a replay of the same episode.
   wrong contract.
 - **Migration invariant.** Any new optional field must be nullable and omitted
   when absent (`JsonIgnoreCondition.WhenWritingNull`) so older recordings remain
-  readable, and a writer always stamps `TrajectorySchema.CurrentVersion`. When
-  the wire contract changes, the version is incremented and the reader's
-  accepted-version rule is updated in the same change.
+  readable. `TrajectoryWriter.Record` stamps
+  `TrajectorySchema.CurrentVersion` on the recordings it mints, while
+  `TrajectoryWriter.Write` re-emits the recording's *own* header version: a
+  rewrite of a pre-hash file must not relabel it as schema 3 with no digests
+  present. When the wire contract changes, the version is incremented and the
+  reader's accepted-version rule is updated in the same change.
 
 The golden fixtures used to pin these invariants are
 [`../Tests/fixtures/golden_trajectory.jsonl`](../Tests/fixtures/golden_trajectory.jsonl)
-(schema v2, seed 2024) and
+(schema v3, seed 2024) and
 [`../Tests/fixtures/golden_dynamic_rules.json`](../Tests/fixtures/golden_dynamic_rules.json).
 
 ### Release immutability policy
 
-- **`immutable: true` is scoped exclusively to `v2.3.1` and `v2.3.2`, both
-  published.** Only these two lines carry the immutable publishing policy below:
-  permanently pinned tags, checksummed permanently attached assets, and
+- **`immutable: true` is scoped to `v2.3.1`, `v2.3.2`, and `v3.0.0`, all
+  published.** Only these three lines carry the immutable publishing policy
+  below: permanently pinned tags, checksummed permanently attached assets, and
   corrections-by-supersession. `v2.3.1` is published at commit `c0e8342`;
   `v2.3.2` is published and immutable at commit `4f7816f` (tag `v2.3.2` →
   commit `4f7816fa5594f7097d6b2978c6c626553d075326`), superseding `v2.3.1`
-  with the parser hardening, property suites, and fuzz fixtures.
+  with the parser hardening, property suites, and fuzz fixtures; `v3.0.0` is
+  published and immutable at commit `c39d79b` (tag `v3.0.0` →
+  commit `c39d79b746e0f3aebce536dbe1cde387bd4e7991`), superseding `v2.3.2`
+  with schema 3 per-tick state authentication.
 - **`v2.3.0` is historical, untouched, but was published under
   `immutable: false`.** It predates the immutable publishing policy, remains in
   place as part of the record, and is never modified, retagged, or deleted —
@@ -230,9 +280,11 @@ The golden fixtures used to pin these invariants are
 ### External reproduction challenge packet
 
 Independent external evaluators should begin with the self-contained, turnkey
-guide in [`reproduction_packet.md`](reproduction_packet.md). It anchors to
-`v2.3.2` (commit `4f7816fa5594f7097d6b2978c6c626553d075326`), the current
-published immutable release; `v2.3.1` remains historical under
+guide in [`reproduction_packet.md`](reproduction_packet.md). Its current section
+anchors to `v3.0.0` (commit `c39d79b746e0f3aebce536dbe1cde387bd4e7991`),
+published and immutable; the `v2.3.2` section alongside it anchors to `v2.3.2`
+(commit `4f7816fa5594f7097d6b2978c6c626553d075326`), also published and
+immutable, and `v2.3.1` remains historical under
 corrections-by-supersession. It lists the exact published SHA-256
 checksums and download URLs for the three platform binaries, `SHA256SUMS.txt`,
 and `sbom.json`, gives the pre-execution verification command, defines four
@@ -284,8 +336,9 @@ dotnet run -c Release --project Cli -- replay Tests/fixtures/golden_trajectory.j
 ```
 
 A pass prints `replay verified` and exits `0`. This asserts per-step serialized
-`StepResult` equivalence (Section 3) plus field-by-field authentication of the
-final summary line's aggregates, not a state hash.
+`StepResult` equivalence (Section 3), per-tick state-digest equality where the
+recording carries one, and field-by-field authentication of the final summary
+line's aggregates.
 
 ### Five-workload throughput benchmark
 
@@ -351,8 +404,8 @@ A study passes only when both conditions hold: the mean paired delta is positive
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | standard | dev | MCTS | Scout | 50 | 32 | −1.12 | [−1.37, −0.87] | Fail |
 | standard | held-out | MCTS | Scout | 50 | 32 | −1.25 | [−1.54, −0.96] | Fail |
-| bottleneck | dev | MCTS | Scout | 30 | 32 | +1.42 | [+1.11, +1.73] | Pass |
-| bottleneck | held-out | MCTS | Scout | 30 | 32 | +1.38 | [+1.07, +1.69] | Pass |
+| bottleneck | dev | MCTS | Scout | 30 | 32 | +2.03 | [+1.66, +2.41] | Pass |
+| bottleneck | held-out | MCTS | Scout | 30 | 32 | +2.60 | [+2.20, +3.00] | Pass |
 
 A negative delta is not a defect in the harness. It is committed baseline
 empirical evidence that the evaluated policy lost to the Scout baseline under
@@ -368,6 +421,6 @@ protocol on the same seed suites — not re-describing the result.
 - [`../CONTRIBUTING.md`](../CONTRIBUTING.md) — contribution and evidence rules.
 - [`../SECURITY.md`](../SECURITY.md) — supported versions and disclosure.
 - [`adr/0001-governing-product-thesis.md`](adr/0001-governing-product-thesis.md) — governing thesis and evidentiary principles.
-- [`adr-002.md`](adr-002.md) — step contract and runtime targets.
-- [`adr-003.md`](adr-003.md) — evaluation and analytics decisions.
+- [`adr-0003`](adr/0003-simultaneous-actions-step-contract.md) — step contract and runtime targets.
+- [`adr-0004`](adr/0004-spawn-fairness-mirrored-seatings.md) — evaluation and analytics decisions.
 - [`ECOSYSTEM.md`](ECOSYSTEM.md) — assembly and data-flow map.

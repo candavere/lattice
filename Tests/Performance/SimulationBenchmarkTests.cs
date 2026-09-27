@@ -13,6 +13,24 @@ namespace Lattice.Tests.Performance;
 /// (<see cref="BenchmarkRunner"/>) warms JIT first and probes per-thread
 /// allocation so parallel test execution can't skew the numbers.
 /// </summary>
+/// <remarks>
+/// The two timing bounds are absolute wall-clock limits, so their margins are
+/// recorded here rather than asserted to be "generous". Measured on the reference
+/// host (Apple M1, macOS arm64, .NET 10 Release, AC power, 2026-09-27), one
+/// 1000-tick batch per probe run:
+/// <c>ThousandTickBatch_CompletesWellUnderOneSecond</c> ran in <b>0.82 ms</b>
+/// against its 1000 ms limit — a margin of roughly <b>1200x</b> — and
+/// <c>Throughput_MeetsBaselineStepsPerSecondConsistently</c>'s batch measured
+/// <b>1,223,691</b> and <b>706,116</b> steps/s on two separate runs, against its
+/// 5,000 steps/s floor — margins of roughly <b>245x</b> and <b>141x</b>. (The
+/// throughput test itself runs three batches and requires every one of them to
+/// clear the floor; the spread above is the run-to-run variation on this host,
+/// which is itself the reason the floor is set where it is.) At those margins
+/// neither bound can be reached by a slow or loaded host; both are hang detectors
+/// rather than timing assertions, which is what makes them safe to keep absolute.
+/// Tightening either one needs a fresh measurement on the runner class that will
+/// enforce it, not a number chosen at a desk.
+/// </remarks>
 public class SimulationBenchmarkTests
 {
     private static readonly SimulationConfig Config = new(AgentCount: 2, MaxTicks: 10_000);

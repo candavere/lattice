@@ -10,7 +10,7 @@ namespace Lattice.Tests.Environment;
 /// <see cref="SimulationDriver"/> playback loop, and the end-to-end
 /// determinism guarantee (same seed + same actions -> byte-identical
 /// serialized trajectory when re-generated from scratch on the same host
-/// under the normalized JSONL contract — docs/adr-002.md).
+/// under the normalized JSONL contract — docs/adr/0003-simultaneous-actions-step-contract.md).
 /// </summary>
 public class EnvironmentLoopTests
 {

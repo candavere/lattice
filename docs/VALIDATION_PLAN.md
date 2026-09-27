@@ -12,6 +12,14 @@ ingestion contract for the permanent record in
 Its purpose is to make independent replication a first-class, auditable
 activity: a reviewer who follows it produces, in one artifact directory, the
 environment capture, raw transcripts, pass/fail judgments for the four
+
+> **Scope: the v2.3.2 release.** Every judged target, expected `--version`
+> string, and checksum in this plan belongs to the published **v2.3.2** assets
+> and is left unchanged. The source tree is now at **3.0.0**, where
+> `--version` prints `3.0.0`; a 3.0.0-scoped plan and packet will be published
+> from the v3.0.0 release assets. Experiment 2's wording below describes what
+> `replay --verify` checked in v2.3.2 and is not a statement about 3.0.0,
+> which additionally compares a canonical per-tick state digest.
 experiments, and any discrepancies — all of which a second reviewer can
 re-check without trusting the first.
 
@@ -83,20 +91,25 @@ when the source-pinned path is used. It is explicitly **not** canonical
 simulation-state hash-tree equivalence: no canonical state digest exists, and
 the experiment never uses one to summarize an episode.
 
+Lattice 3.0.0 does add per-tick state authentication (`Trajectories/SimulationStateHash.cs:83`, mandatory from schema 3 per `Trajectories/TrajectoryModel.cs:30`, compared at `Trajectories/TrajectoryReplay.cs:176-183`), which this v2.3.2-scoped experiment does not exercise.
+
 Source-pinned path:
 
 ```sh
 git clone https://github.com/candavere/lattice.git lattice
 git -C lattice checkout v2.3.2
 cd lattice
+# The source tree ships no `lattice` executable — supply the checksum-verified
+# release asset of reproduction_packet.md §1.2 under that name.
+cp ../lattice-osx-arm64 ./lattice && chmod +x ./lattice   # macOS; use your platform's asset
 ./lattice replay Tests/fixtures/golden_trajectory.jsonl --verify
 ```
 
-Criterion: `--verify` reports `replay verified: N step(s) serialized-equivalent
-(seed 2024, schema v2).` with the recorded step count, on stderr, and exits
-`0`. Any reported stage of serialized divergence is a fail. Asset-only
-round-trip verification of a freshly simulated episode may be run as a
-supplement but does not substitute for the golden-trajectory check.
+Criterion: `--verify` reports `replay verified: 11 step(s) serialized-equivalent
+(seed 2024, schema v2).` with the recorded step count (`11` at this commit), on
+stderr, and exits `0`. Any reported stage of serialized divergence is a fail.
+Asset-only round-trip verification of a freshly simulated episode may be run as
+a supplement but does not substitute for the golden-trajectory check.
 
 ### Experiment 3 — Context-dependent policy interaction
 
@@ -110,7 +123,7 @@ policy–environment interaction: the 32-rollout MCTS subject loses the paired
 comparison on standard generated layouts (**Scout > MCTS**; committed mean
 paired deltas −1.12 dev / −1.25 held-out, 95% CIs below 0) and wins under
 capacity-1 choke contention (**MCTS > Scout**; committed mean paired deltas
-+1.42 dev / +1.38 held-out, 95% CIs above 0, 22–27% mean contention).
++2.03 dev / +2.60 held-out, 95% CIs above 0, about 16% mean contention).
 
 Criterion: the standard run reports a **negative** mean paired Δ and the
 bottleneck run a **positive** mean paired Δ, each with bounded per-seed

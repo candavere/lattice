@@ -10,18 +10,17 @@ reference record and honest-reading notes:
 
 `dotnet run -c Release --project Cli -- benchmark --out benchmarks/throughput_benchmark.json`
 
-Full flag reference: [CLI reference — benchmark](CLI.md#benchmark--measure-the-work-load-matrix).
+Full flag reference: [CLI reference — benchmark](CLI.md#benchmark-measure-the-work-load-matrix).
 
 ## Host and provenance of the committed record
 
 | Field | Value |
 | --- | --- |
-| Commit (measured tree) | `b7459a1635aca6f56a015d7dc206b550194da368` |
-| Runtime | .NET 10.0.10, Release |
-| OS | macOS 27.0.0 |
-| CPU | Apple M1, Arm64, 8 cores |
-| Addressable RAM | 8 GiB |
+| Commit (measured tree) | `41530efb35ef620c8d0722e20bcd30970468785a` |
+| Runtime | .NET 10.0.12, Release |
 | GC mode | Workstation |
+
+Numbers come from a single reference host; its full metadata (CPU, cores, OS, runtime) is recorded in the artifact.
 
 ## Harness protocol
 
@@ -50,8 +49,8 @@ Every case runs the same protocol (`Analytics/Benchmarking/BenchmarkHarness`):
 | stress topology | 30-zone map at the contract ceiling |
 | MCTS decisions | Decisions/sec under 32 rollouts, not engine steps/sec |
 
-Medians on the committed record span from 9,145 steps/s (30-zone stress case)
-to 653,736 steps/s (micro case). The MCTS case prices per-decision cost under
+Medians on the committed record span from 14,916 steps/s (30-zone stress case)
+to 899,075 steps/s (micro case). The MCTS case prices per-decision cost under
 32 independent depth-12 continuations, so its latency histogram is dominated
 by single heavy decisions, and its iteration budget is small by design.
 
@@ -73,24 +72,41 @@ by single heavy decisions, and its iteration budget is small by design.
 
 ## Reproducing and gating
 
+- **AC power is required on a laptop host.** Before any benchmark session on a
+  laptop, confirm the machine is plugged in and check the power state with
+  `pmset -g batt`; do not record a baseline on battery. This is not a
+  formality: in `FINDING-009` the same protocol, host and runtime measured
+  roughly 2x apart between battery and AC, and battery sessions erased most of
+  the re-anchor shift, so a battery run silently looks like a large regression.
 - Full reference run:
   `dotnet run -c Release --project Cli -- benchmark --out benchmarks/throughput_benchmark.json`
 - Quick smoke:
   `dotnet run -c Release --project Cli -- benchmark --runs 2 --warmup 1000 --steps 20000`
 - CI gate (`.github/workflows/benchmarks.yml`): re-benchmarks the matrix and
-  fails on a **>20% regression** against this record when the host fingerprint
-  (OS family + architecture + .NET runtime major) matches. It installs the
-  same .NET 10 runtime the baseline was recorded under, so a cross-runtime
-  delta is never misread as a regression; on any mismatch it prints a
-  cross-host comparison table instead of failing. The cross-host smoke pass
-  (ubuntu x64, .NET 8) is classified structurally with `--smoke`: workloads
-  present and medians positive, never a throughput-ratio adjudication from a
-  shortened-budget run.
+  fails on a **>20% regression** against this record only when the host
+  fingerprint matches this record's host class: **OS family + architecture +
+  .NET runtime major + logical cores + CPU model** (trimmed, case-folded; a
+  missing or empty host field is also a mismatch). GitHub-hosted runners
+  are a different host class than the reference record, so they
+  get an informational cross-host comparison plus the structural checks, not
+  a throughput verdict. It installs the same .NET 10 runtime the baseline was
+  recorded under, so a cross-runtime delta is never misread as a regression;
+  on any mismatch it prints a cross-host comparison table instead of failing.
+  The cross-host smoke pass (ubuntu x64, .NET 8) is classified structurally
+  with `--smoke`: workloads present and medians positive, never a
+  throughput-ratio adjudication from a shortened-budget run. The reference
+  record remains the research reference.
 - The committed baseline was **re-anchored** after the CI regression gate
-  proved unstable against the earlier one (noisy micro/policy medians). The
-  current record is a conservative full-protocol session — low for the noisy
-  workloads, near-typical elsewhere — so a matching-host pass has real
-  headroom and a genuine >20% drop still trips the gate.
+  proved unstable against the earlier one (noisy micro/policy medians), and
+  re-anchored again on 2026-09-26 for the runtime patch .NET 10.0.10 →
+  10.0.12 (reference host, AC power) using the same conservative method: three
+  consecutive full-protocol sessions, committing the session that is low for
+  the noisy workloads, near-typical elsewhere. The speedup against the
+  previous record is environmental, not an engine change — identical configs
+  and protocol, effectively identical GC counters and allocations, and a
+  uniform +63% to +93% shift across all five workloads including
+  search-bound MCTS — so a matching-host pass has real headroom and a
+  genuine >20% drop still trips the gate.
 
 ## Boundaries
 

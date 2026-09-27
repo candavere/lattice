@@ -213,13 +213,46 @@
   };
 
   // Geometry probe backing the `?measure=1` browser harness (see DOM wiring).
+  // Everything here is observation only: the records are written from the same
+  // values the draw calls already computed, so a probe run can never change
+  // what is painted. `rooms`/`names`/`captions`/`pills`/`ghosts` are the
+  // rectangles the layout invariants are asserted against — room boxes, agent
+  // name ink boxes, transit caption ink boxes, room count pills and the
+  // "last seen" ghost labels.
   const measureProbe = {
     on: false,
     labels: {},         // zoneId -> {x,y,w,h}
     tokens: {},         // agentId -> {x,y,r}
     doors: {},          // chokeId -> {x,y,w,h,edge}
     statusByZone: {},   // zoneId -> 'observed' | 'stale' | 'unknown' (per this draw)
+    rooms: {},          // zoneId -> {x,y,w,h,cx,cy,label,status}
+    names: {},          // agentId -> {x,y,w,h,text,zone} (zone null while in transit)
+    ghosts: {},         // agentId -> {x,y,w,h,text,zone}
+    captions: {},       // agentId -> {x,y,w,h,text}
+    pills: {},          // zoneId -> {x,y,w,h,text,where}
+    loot: {},           // zoneId -> {x,y,w,h} the unclaimed/claimed loot row
+    transit: {},        // agentId -> true (drawn on a corridor, not in a room)
   };
+
+  // Ink box of text drawn at (x, y) under the context's current font, align
+  // and baseline. The box is one font-size tall and centred on a `middle`
+  // baseline, which is deliberately generous for a 8-11px monospace face: the
+  // harness then fails on any near-miss, not only on a clean ink overlap.
+  // Test hook only — the production draw path never calls it.
+  function probeInk(ctx, text, x, y, dict, key, extra) {
+    if (!measureProbe.on || !dict || key === undefined) return;
+    const w = ctx.measureText(String(text)).width;
+    const size = parseFloat(/([0-9.]+)px/.exec(ctx.font || '11px')[1]) || 11;
+    const x0 = ctx.textAlign === 'right' ? x - w
+      : ctx.textAlign === 'center' ? x - w / 2
+      : x;
+    const y0 = ctx.textBaseline === 'middle' ? y - size / 2
+      : ctx.textBaseline === 'top' ? y
+      : y - size;
+    const box = { x: x0, y: y0, w: w, h: size, text: String(text) };
+    if (extra) Object.keys(extra).forEach(function (k) { box[k] = extra[k]; });
+    dict[key] = box;
+  }
 
   /* ------------------------------------------------------- trajectory IO  */
 
@@ -658,9 +691,11 @@
       });
     }
 
+    // Only the zones set the drawn extent: loot is painted inside its room
+    // (see drawResources), so a resource's recorded position must not be
+    // allowed to shrink the map around it.
     const points = [];
     zones.forEach(function (z) { points.push(z.Position); });
-    resources.forEach(function (r) { points.push(r.Position); });
     if (!points.length) return null;
 
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -678,31 +713,223 @@
       return cached;
     }
 
-    // Rooms are label-sized in screen pixels while corridors scale with the
-    // fitted transform, so the margin must reserve the widest possible room
-    // half-width or the outermost rooms get clipped at the canvas edge.
-    const maxRoomHalf = zones.reduce(function (largest, z) {
-      const half = Math.max(ROOM_MIN_WIDTH, roomLabel(z).length * 7.4 + 26) / 2;
-      return Math.max(largest, half);
-    }, 0);
-    const pad = Math.max(46, Math.ceil(maxRoomHalf) + 24);
     const spanX = Math.max(1, maxX - minX);
     const spanY = Math.max(1, maxY - minY);
-    const fitW = Math.max(1, w - 2 * pad);
-    const fitH = Math.max(1, h - 2 * pad);
-    const sx = fitW / spanX;
-    const sy = fitH / spanY;
-    const s = Math.min(sx, sy);
+    const text = roomTextWidths(traj, zones);
+    const room = roomForCanvas(w, h, zones, spanX, spanY, text,
+      maxNameLines(traj, roomInnerWidth(text)), text.marker);
+    const s = room.s;
     const offX = (w - s * spanX) / 2;
     const offY = (h - s * spanY) / 2;
 
     const layout = {
       minX: minX, minY: minY, spanX: spanX, spanY: spanY, s: s, offX: offX, offY: offY,
       w: w, h: h,
-      rAgent: Math.max(7, Math.min(11, 9 * s / 60)),
+      roomW: room.w, roomH: room.h, titlePx: room.titlePx, namePx: room.namePx,
+      pillPx: room.pillPx, pad: ROOM_PAD_X * room.k, nameLines: room.lines,
+      k: room.k, marker: room.marker,
+      rAgent: room.rAgent,
     };
+    layout.bands = roomBands(layout);
     state.layouts[w + 'x' + h] = layout;
     return layout;
+  }
+
+  /* ------------------------------------------------------- room layout  */
+
+  /* Rooms are the viewer's boxes, and every room on a map shares one width,
+     one height and one font scale, so a room can never be narrower than the
+     text it has to hold. The scale itself is the one number that keeps the
+     map honest: rooms are rectangles, so the drawn extent is the zone grid
+     plus one room box at each end, and the scale is the largest that still
+     fits the canvas *and* still keeps ROOM_GAP between neighbouring boxes.
+     Both bounds are derived from the recording — there are no per-map
+     numbers — and both are monotone in the scale, so a bisection lands on the
+     answer. This runs once per canvas size, never per frame. */
+
+  // The most lines any room's name band ever needs, over the whole recording.
+  // Names pack left to right along a line and wrap only when the next one will
+  // not fit, so a room with two short names needs one line and a room with two
+  // long ones needs two. The bound is every agent a frame can put in one room:
+  // those standing there, plus — in a fogged view — every rival remembered
+  // there instead. Once per recording, from the labels the page will draw.
+  function maxNameLines(traj, inner) {
+    if (typeof traj._maxNameLines === 'number') return traj._maxNameLines;
+    const roles = traj.header.AgentRoles || [];
+    const label = function (id) {
+      return roles[id] ? roles[id] + ' · 00' : '· 00';
+    };
+    const widths = [];
+    for (var i = 0; i < roles.length; i += 1) {
+      widths.push(label(i).length * ROOM_CHAR * ROOM_NAME_PX + NAME_GAP);
+    }
+    const packed = function (sizes) {
+      let lines = 1;
+      let used = 0;
+      sizes.forEach(function (w) {
+        if (used > 0 && used + w > inner) { lines += 1; used = w; } else { used += w; }
+      });
+      return lines;
+    };
+    let most = 1;
+    traj.frames.forEach(function (frame) {
+      const inRoom = {};
+      let present = 0;
+      frame.agents.forEach(function (a) {
+        if (a.Transit) return; // a corridor token is not in a room
+        present += 1;
+        (inRoom[a.ZoneId] = inRoom[a.ZoneId] || []).push(widths[a.AgentId] || 0);
+      });
+      // A room can hold every agent on the frame: those standing in it plus,
+      // in a fogged view, every rival remembered there instead. That is the
+      // bound; the per-room live sets are checked too, since how a greedy pack
+      // breaks depends on the order it sees.
+      const everyone = widths.slice(0, present);
+      most = Math.max(most, packed(everyone));
+      Object.keys(inRoom).forEach(function (z) {
+        most = Math.max(most, packed(inRoom[z]));
+      });
+    });
+    traj._maxNameLines = most;
+    return most;
+  }
+
+  // The two text widths a room has to hold, in px at the design font sizes:
+  // its own title, and the widest agent name the roster can produce — the same
+  // string drawAgents paints, with room for a two-digit score. Both come from
+  // the recording, so a map with longer names gets wider rooms rather than
+  // clipped labels. `marker` is the strip the extraction diamond takes above a
+  // token, which a room only has to carry when the roster has a role that
+  // draws one.
+  function roomTextWidths(traj, zones) {
+    let titleChars = 0;
+    zones.forEach(function (z) {
+      titleChars = Math.max(titleChars, roomLabel(z).length);
+    });
+    const roles = traj.header.AgentRoles || [];
+    let nameChars = 0;
+    let marker = 0;
+    for (var i = 0; i < roles.length; i += 1) {
+      nameChars = Math.max(nameChars, (roles[i] ? roles[i] + ' · 00' : '· 00').length);
+      if (roles[i] === 'Infiltrator') marker = EXTRACTION_MARKER;
+    }
+    return { titleChars: titleChars, nameChars: nameChars, marker: marker };
+  }
+
+  // One room box at font scale k: the wider of the title and the name, plus
+  // inner padding, and just tall enough for the title band, the name lines, the
+  // strip the extraction marker takes above a token, and the token row. The
+  // whole card scales with k, so a room is never narrower than the text it
+  // holds at the font size it is holding it at.
+  function roomBoxAt(k, text, lines, radius, marker) {
+    const titlePx = ROOM_TITLE_PX * k;
+    const namePx = ROOM_NAME_PX * k;
+    const w = k * Math.max(ROOM_MIN_WIDTH,
+      text.titleChars * ROOM_CHAR * ROOM_TITLE_PX + 2 * ROOM_PAD_X,
+      text.nameChars * ROOM_CHAR * ROOM_NAME_PX + 2 * ROOM_PAD_X);
+    const h = Math.max(ROOM_HEIGHT, ROOM_BAND_FOOT + titlePx / 2 + 2 * radius + marker
+      + lines * namePx + (lines - 1) * NAME_LINE_GAP);
+    return { w: w, h: h, titlePx: titlePx, namePx: namePx, pillPx: ROOM_PILL_PX * k };
+  }
+
+  function agentRadius(s) {
+    return Math.max(AGENT_MIN_R, Math.min(AGENT_MAX_R, 9 * s / 60));
+  }
+
+  // The room's inner width at full font size — what the name band packs into.
+  function roomInnerWidth(text) {
+    return Math.max(ROOM_MIN_WIDTH,
+      text.titleChars * ROOM_CHAR * ROOM_TITLE_PX + 2 * ROOM_PAD_X,
+      text.nameChars * ROOM_CHAR * ROOM_NAME_PX + 2 * ROOM_PAD_X) - 2 * ROOM_PAD_X;
+  }
+
+  // Largest scale at which the zone grid plus one room box at each end still
+  // fits the canvas.
+  function fitScale(w, h, box, spanX, spanY) {
+    const sx = (w - box.w - 2 * ROOM_EDGE) / spanX;
+    const sy = (h - box.h - 2 * ROOM_EDGE) / spanY;
+    return Math.max(1e-6, Math.min(sx, sy));
+  }
+
+  // Smallest scale at which no two room boxes come within ROOM_GAP of each
+  // other. Room centres are the recorded grid times the scale, so a pair is
+  // clear as soon as it separates on either axis and the bound is analytic.
+  function separationScale(zones, box) {
+    let need = 0;
+    for (var i = 0; i < zones.length; i += 1) {
+      for (var j = i + 1; j < zones.length; j += 1) {
+        const dx = Math.abs(zones[i].Position.X - zones[j].Position.X);
+        const dy = Math.abs(zones[i].Position.Y - zones[j].Position.Y);
+        const sx = dx > 0 ? (box.w + ROOM_GAP) / dx : Infinity;
+        const sy = dy > 0 ? (box.h + ROOM_GAP) / dy : Infinity;
+        const pair = Math.min(sx, sy);
+        if (pair > need) need = pair;
+      }
+    }
+    return need;
+  }
+
+  // The room box and the fitted scale for one canvas size: the largest font
+  // scale whose rooms both fit the canvas and keep their distance, or the
+  // largest scale below 1 that does when the canvas is too small for them at
+  // full size (a phone). A room is never narrower than the label it holds,
+  // because the box is derived from the label and the scale only ever shrinks
+  // both together.
+  //
+  // The token radius follows the fitted scale and the card has to be tall
+  // enough for the token that scale allows, so box, scale and radius are
+  // settled together. Only ever grown, and only while the growth is still
+  // called for, so the card that comes out is never one label too short.
+  function roomForCanvas(w, h, zones, spanX, spanY, text, lines, marker) {
+    const fits = function (k) {
+      const box = roomBoxAt(k, text, lines, AGENT_MIN_R, marker);
+      return fitScale(w, h, box, spanX, spanY) >= separationScale(zones, box);
+    };
+    let k = 1;
+    if (!fits(1)) {
+      let lo = 0;
+      let hi = 1; // fits(lo) holds: an infinitesimal room always separates
+      for (var i = 0; i < 24; i += 1) {
+        const mid = (lo + hi) / 2;
+        if (fits(mid)) lo = mid; else hi = mid;
+      }
+      k = lo;
+    }
+    let box = roomBoxAt(k, text, lines, AGENT_MIN_R, marker);
+    let s = fitScale(w, h, box, spanX, spanY);
+    for (var round = 0; round < 3; round += 1) {
+      const grown = roomBoxAt(k, text, lines, agentRadius(s), marker);
+      if (grown.h <= box.h) break;
+      box = grown;
+      s = fitScale(w, h, box, spanX, spanY);
+    }
+    return { k: k, s: s, w: box.w, h: box.h, rAgent: agentRadius(s),
+             titlePx: box.titlePx, namePx: box.namePx, pillPx: box.pillPx,
+             lines: lines, marker: marker };
+  }
+
+  // Where each band sits inside a room, measured from the room's centre. The
+  // card is exactly as tall as these bands (see roomBoxAt), so a label can
+  // never fall out of the box that was sized for it. The token and loot rows
+  // keep the offsets the viewer has always used; the name band sits on the
+  // token row, above the strip the extraction marker takes, so a name reads as
+  // the token's caption and never lands on the marker.
+  function roomBands(layout) {
+    const hh = layout.roomH / 2;
+    const titleY = -hh + ROOM_BAND_HEAD;
+    const tokenY = hh - 10 - layout.rAgent;
+    const gapTop = titleY + layout.titlePx / 2;
+    const gapBottom = tokenY - layout.rAgent - layout.marker;
+    const block = layout.namePx * layout.nameLines + (layout.nameLines - 1) * NAME_LINE_GAP;
+    const nameTop = Math.max(gapTop + 2, gapBottom - block);
+    return {
+      titleY: titleY,
+      nameTop: nameTop,
+      nameStep: layout.namePx + NAME_LINE_GAP,
+      tokenY: tokenY,
+      lootY: hh - 8,
+      pillY: hh - 8 - 6.5,
+    };
   }
 
   function px(pos, layout) {
@@ -713,12 +940,22 @@
     if (!fitCanvas()) return;
     const ctx = dom.canvas.getContext('2d');
     const traj = state.trajectory;
+    // Cost of this frame, for the ?measure=1 harness only: a perf mark costs
+    // the production path one predictable branch.
+    const drawnAt = measureProbe.on ? performance.now() : 0;
 
     clearCanvas();
     measureProbe.labels = {};
     measureProbe.tokens = {};
     measureProbe.doors = {};
     measureProbe.statusByZone = {};
+    measureProbe.rooms = {};
+    measureProbe.names = {};
+    measureProbe.ghosts = {};
+    measureProbe.captions = {};
+    measureProbe.pills = {};
+    measureProbe.loot = {};
+    measureProbe.transit = {};
     if (!traj || !traj.frames.length) return;
 
     const frame = traj.frames[state.index];
@@ -739,6 +976,7 @@
     updateCanvasLabel();
     updateTransportDisabled();
     publishMeasureProbe();
+    if (drawnAt) measureProbe.frame.ms = performance.now() - drawnAt;
   }
 
   function egoLabel(traj) {
@@ -967,10 +1205,28 @@
   }
 
   /* A room is a rounded rectangle centered on its zone anchor; corridors are
-     trimmed to the room borders so lines never pierce the cards. */
+     trimmed to the room borders so lines never pierce the cards. Every room
+     on a map shares the layout's one width, height and font scale, so the box
+     is always sized to the text it holds and no two boxes can overlap. */
 
-  const ROOM_HEIGHT = 52;
+  const ROOM_HEIGHT = 52;      // the card, at full font size
   const ROOM_MIN_WIDTH = 78;
+  const ROOM_GAP = 12;         // clear space between two room boxes
+  const ROOM_EDGE = 10;        // clear space between the outermost box and the canvas
+  const ROOM_TITLE_PX = 11;
+  const ROOM_NAME_PX = 8.5;
+  const ROOM_PILL_PX = 9;
+  const ROOM_CHAR = 0.62;      // monospace advance as a fraction of the font size
+  const ROOM_PAD_X = 13;       // inner padding, per side
+  const ROOM_BAND_HEAD = 13;   // title band, from the top of the card
+  const ROOM_BAND_FOOT = 25;   // token row + loot row, from the middle of the card
+  const NAME_LINE_GAP = 3;
+  const NAME_GAP = 4;           // clear space between two names on one line
+  const EXTRACTION_MARKER = 12; // strip above a token the cyan diamond takes
+  const AGENT_MIN_R = 7;
+  const AGENT_MAX_R = 11;
+  const CAPTION_PX = 8;
+  const LANE_GAP = 4;          // clear space between a token and a lane's label
 
   function roomLabel(zone) {
     return zone.Role ? spaceCamel(zone.Role) : 'Room ' + zone.Id;
@@ -982,8 +1238,7 @@
 
   function roomRect(zone, layout) {
     const center = px(zone.Position, layout);
-    const width = Math.max(ROOM_MIN_WIDTH, roomLabel(zone).length * 7.4 + 26);
-    return { x: center.x, y: center.y, hw: width / 2, hh: ROOM_HEIGHT / 2 };
+    return { x: center.x, y: center.y, hw: layout.roomW / 2, hh: layout.roomH / 2 };
   }
 
   // Where the segment between two room centers enters/leaves each room rect.
@@ -1129,16 +1384,20 @@
       const status = zoneStatus(fog, zone.Id);
       if (status === 'unknown') return; // unexplored rooms reveal nothing
       const rect = roomRect(zone, layout);
-      const y = rect.y + rect.hh - 8;
+      const y = rect.y + layout.bands.lootY;
       const spacing = 14;
       // Anchor the loot row to the room's lower-left corner so it never
-      // collides with the centered agent tokens and score labels.
-      const startX = rect.x - rect.hw + 9;
+      // collides with the centered agent tokens and the count pill.
+      const startX = rect.x - rect.hw + layout.pad - 4;
       ctx.globalAlpha = status === 'stale' ? 0.35 : 1;
       items.forEach(function (res, i) {
         drawDiamond(ctx, startX + i * spacing, y, 5, claimed[res.Id] ? COLORS.claimed : COLORS.unclaimed);
       });
       ctx.globalAlpha = 1;
+      if (measureProbe.on) {
+        const endX = startX + (items.length - 1) * spacing;
+        measureProbe.loot[zone.Id] = { x: startX - 5, y: y - 5, w: endX - startX + 10, h: 10 };
+      }
     });
   }
 
@@ -1160,7 +1419,13 @@
       const rect = roomRect(zone, layout);
       const status = zoneStatus(fog, zone.Id);
       const borderRadius = 9;
-      if (measureProbe.on) measureProbe.statusByZone[zone.Id] = status;
+      if (measureProbe.on) {
+        measureProbe.statusByZone[zone.Id] = status;
+        measureProbe.rooms[zone.Id] = {
+          x: rect.x - rect.hw, y: rect.y - rect.hh, w: rect.hw * 2, h: rect.hh * 2,
+          cx: rect.x, cy: rect.y, label: roomLabel(zone), status: status,
+        };
+      }
 
       if (status === 'unknown') {
         // Shrouded silhouette: the observer has never reached this room.
@@ -1188,39 +1453,43 @@
       ctx.stroke();
 
       // Room title strip on a dedicated top band, so the labels below (agent
-      // tokens, occupancy) can never sit on top of the room name.
+      // names, tokens, occupancy) can never sit on top of the room name.
       ctx.fillStyle = status === 'stale' ? COLORS.fogText : COLORS.roomText;
-      ctx.font = 'bold 11px monospace';
+      ctx.font = 'bold ' + layout.titlePx + 'px monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       const label = roomLabel(zone);
-      const labelY = rect.y - rect.hh + 13;
+      const labelY = rect.y + layout.bands.titleY;
       ctx.fillText(label, rect.x, labelY);
       if (measureProbe.on) {
         const lw = ctx.measureText(label).width;
-        measureProbe.labels[zone.Id] = { x: rect.x - lw / 2, y: labelY - 6, w: lw, h: 12 };
+        measureProbe.labels[zone.Id] = {
+          x: rect.x - lw / 2, y: labelY - layout.titlePx / 2, w: lw, h: layout.titlePx,
+        };
       }
 
       // Occupancy badge: a clear fraction when capped, a plain count when
-      // not. Top-right when it clears the room name; otherwise bottom-right,
-      // where the loot row (bottom-left) leaves it unimpeded.
+      // not. It lives in the bottom-right corner, on the loot row the loot
+      // never reaches, with the card's own padding all round.
       if (status === 'observed') {
         const present = occupied[zone.Id] || 0;
         const capped = zone.MaxOccupancy !== UNLIMITED && zone.MaxOccupancy < UNLIMITED;
         const occ = capped ? present + '/' + zone.MaxOccupancy : String(present);
-        ctx.font = '9px monospace';
-        const bw = occ.length * 6.4 + 12;
-        const lw = ctx.measureText(label).width;
-        const collide = rect.x + rect.hw - bw - 5 < rect.x + lw / 2 + 4;
-        const bx = rect.x + rect.hw - bw - 5;
-        const by = collide
-          ? rect.y + rect.hh - 8
-          : rect.y - rect.hh + 4;
-        roundedRect(ctx, bx, by, bw, 13, 6);
+        const pillH = 13 * layout.k;
+        ctx.font = layout.pillPx + 'px monospace';
+        const bw = occ.length * ROOM_CHAR * layout.pillPx + 12 * layout.k;
+        const bx = rect.x + rect.hw - layout.pad - bw;
+        const by = rect.y + layout.bands.pillY - pillH / 2 + 6.5 * layout.k;
+        roundedRect(ctx, bx, by, bw, pillH, pillH / 2);
         ctx.fillStyle = present > 0 ? 'rgba(122, 162, 247, 0.25)' : 'rgba(148, 163, 184, 0.15)';
         ctx.fill();
         ctx.fillStyle = COLORS.mutedText;
-        ctx.fillText(occ, bx + bw / 2, by + 6.5);
+        ctx.fillText(occ, bx + bw / 2, by + pillH / 2);
+        if (measureProbe.on) {
+          measureProbe.pills[zone.Id] = {
+            x: bx, y: by, w: bw, h: pillH, text: occ, where: 'bottom',
+          };
+        }
       } else {
         ctx.font = '8px monospace';
         ctx.fillStyle = COLORS.fogText;
@@ -1265,15 +1534,86 @@
     return count ? total / count : layout.rAgent * 6;
   }
 
+  // Where every name this frame paints goes, before anything is drawn: the
+  // live agents' role/score and the remembered rivals' age stamp each take a
+  // slot on their own room's name band, packed left to right and wrapped only
+  // when the next label will not fit inside the card. Every line is then
+  // centred as a row, so two names in one room can never overlap and none can
+  // leave the room. The card is always tall enough for the worst case over the
+  // whole recording (see maxNameLines). Agents in transit are not here: their
+  // labels ride the corridor lanes instead. O(agents + rooms) per frame.
+  function planNames(ctx, pool, map, layout, fog, roles) {
+    const slots = {};
+    const byRoom = {};
+    const inner = layout.roomW - 2 * layout.pad;
+    const saved = ctx.font;
+    ctx.font = layout.namePx + 'px monospace';
+
+    pool.forEach(function (agent) {
+      if (agent.Transit) return;
+      const isEgo = fog && agent.AgentId === fog.egoId;
+      const ghosted = fog && !isEgo && zoneStatus(fog, agent.ZoneId) !== 'observed';
+      let zoneId = agent.ZoneId;
+      let text;
+      if (ghosted) {
+        const ghost = fog.ghosts[agent.AgentId];
+        if (!ghost) return; // never spotted — nothing to remember
+        zoneId = ghost.state.ZoneId;
+        const age = state.index - ghost.tick;
+        text = 'last seen ' + (age === 0 ? 'now' : age + 't ago');
+      } else {
+        const role = roles && roles[agent.AgentId];
+        text = (role ? role + ' ' : '') + '· ' + agent.Score;
+      }
+      const item = { id: agent.AgentId, w: ctx.measureText(text).width, text: text };
+      (byRoom[zoneId] = byRoom[zoneId] || []).push(item);
+    });
+
+    Object.keys(byRoom).forEach(function (zoneId) {
+      const zone = map.Zones[zoneId];
+      if (!zone) return;
+      const rect = roomRect(zone, layout);
+      const lines = [];
+      let row = [];
+      let used = 0;
+      byRoom[zoneId].forEach(function (item) {
+        if (row.length && used + NAME_GAP + item.w > inner) {
+          lines.push(row); row = []; used = 0;
+        }
+        used += (row.length ? NAME_GAP : 0) + item.w;
+        row.push(item);
+      });
+      if (row.length) lines.push(row);
+      lines.forEach(function (line, li) {
+        const total = line.reduce(function (t, item) { return t + item.w; }, 0)
+          + NAME_GAP * (line.length - 1);
+        let x = rect.x - total / 2;
+        line.forEach(function (item) {
+          slots[item.id] = {
+            x: x + item.w / 2,
+            y: rect.y + layout.bands.nameTop + layout.namePx / 2 + li * layout.bands.nameStep,
+            text: item.text,
+            zone: zoneId,
+          };
+          x += item.w + NAME_GAP;
+        });
+      });
+    });
+    ctx.font = saved;
+    return slots;
+  }
+
   function drawAgents(ctx, map, frame, layout, fog) {
     const roles = state.trajectory ? state.trajectory.header.AgentRoles : null;
     const cfg = state.trajectory ? state.trajectory.header.SimulationConfig : null;
     const pool = frame.agents.slice().sort(function (a, b) { return a.AgentId - b.AgentId; });
     const hopRadius = meanCorridorLength(map, layout) * 0.85;
+    const nameSlots = planNames(ctx, pool, map, layout, fog, roles);
 
     // Co-located agents fan out horizontally inside the room.
     const stationedTotal = {};
     const stationedSeen = {};
+    let transitLane = 0;
     pool.forEach(function (agent) {
       if (!agent.Transit) stationedTotal[agent.ZoneId] = (stationedTotal[agent.ZoneId] || 0) + 1;
     });
@@ -1283,17 +1623,24 @@
       // room is inside the current horizon, otherwise as a memory ghost.
       const isEgo = fog && agent.AgentId === fog.egoId;
       if (fog && !isEgo && zoneStatus(fog, agent.ZoneId) !== 'observed') {
-        drawGhost(ctx, map, frame, layout, fog, agent, roles);
+        drawGhost(ctx, map, frame, layout, fog, agent, roles, nameSlots);
         return;
       }
 
       let x = 0, y = 0;
+      let transitEnds = null;
+      const color = agentColor(agent, roles);
+      const role = roles && roles[agent.AgentId];
+      const label = (role ? role + ' ' : '') + '· ' + agent.Score;
       if (agent.Transit) {
         // Snap strictly to the corridor vector: P(t) = A + t·(B − A), t from
         // the engine's remaining-ticks countdown.
         const zoneA = map.Zones[agent.Transit.FromZoneId];
         const zoneB = map.Zones[agent.Transit.ToZoneId];
-        const ends = corridorEndpoints(roomRect(zoneA, layout), roomRect(zoneB, layout));
+        const rectA = roomRect(zoneA, layout);
+        const rectB = roomRect(zoneB, layout);
+        const ends = corridorEndpoints(rectA, rectB);
+        transitEnds = ends;
         const total = transitTotalTicks(map, cfg, agent.Transit.FromZoneId, agent.Transit.ToZoneId);
         let t = Math.min(1, Math.max(0, (total - agent.Transit.RemainingTicks + 1) / total));
         if (ends) {
@@ -1308,8 +1655,7 @@
           x = ends.ax + (ends.bx - ends.ax) * t;
           y = ends.ay + (ends.by - ends.ay) * t;
         } else {
-          const q = roomRect(zoneA, layout);
-          x = q.x; y = q.y;
+          x = rectA.x; y = rectA.y;
         }
         ctx.beginPath();
         ctx.arc(x, y, layout.rAgent + 4, 0, Math.PI * 2);
@@ -1328,14 +1674,12 @@
         x = rect.x + (slot - (mates - 1) / 2) * (layout.rAgent * 2.4);
         // Tokens live on a bottom band inside the room, clear of the room
         // title strip at the top — a token never sits on a room label.
-        y = rect.y + rect.hh - 10 - layout.rAgent;
+        y = rect.y + layout.bands.tokenY;
       }
-
-      const color = agentColor(agent, roles);
-      const role = roles && roles[agent.AgentId];
 
       if (measureProbe.on) {
         measureProbe.tokens[agent.AgentId] = { x: x, y: y, r: layout.rAgent };
+        if (agent.Transit) measureProbe.transit[agent.AgentId] = true;
       }
 
       // The Sentry carries a faint dashed perception perimeter — in ground
@@ -1369,35 +1713,157 @@
       ctx.textBaseline = 'middle';
       ctx.fillText(String(agent.AgentId), x, y);
 
-      // Role/score sits beside the token, never underneath it, so a small
-      // room still shows the room name above and loot below unobscured.
-      ctx.font = '8.5px monospace';
-      ctx.fillStyle = color;
-      ctx.textAlign = 'left';
-      const label = (role ? role + ' ' : '') + '· ' + agent.Score;
-      ctx.fillText(label, x + layout.rAgent + 5, y);
-      ctx.textAlign = 'center';
-
       if (agent.Transit) {
-        ctx.font = '8px monospace';
+        // In transit the label has no room to live in, so it rides the
+        // corridor: the name in one lane beside the axis, the caption in the
+        // lane on the other side of it.
+        const caption = 'crossing to ' + map.Zones[agent.Transit.ToZoneId].Id
+          + ' (' + agent.Transit.RemainingTicks + 't)';
+        const lane = transitLane;
+        transitLane += 1;
+        const at = transitLanes(ctx, map, layout, transitEnds, x, y, lane, label, caption);
+        ctx.font = layout.namePx + 'px monospace';
+        ctx.fillStyle = color;
+        ctx.textAlign = 'center';
+        ctx.fillText(label, at.nameX, at.nameY);
+        if (measureProbe.on) {
+          probeInk(ctx, label, at.nameX, at.nameY, measureProbe.names, agent.AgentId,
+            { zone: null });
+        }
+        ctx.font = CAPTION_PX * layout.k + 'px monospace';
         ctx.fillStyle = COLORS.transitRing;
-        ctx.fillText('crossing to ' + map.Zones[agent.Transit.ToZoneId].Id + ' (' + agent.Transit.RemainingTicks + 't)', x, y - layout.rAgent - 8);
+        ctx.fillText(caption, at.capX, at.capY);
+        if (measureProbe.on) {
+          probeInk(ctx, caption, at.capX, at.capY, measureProbe.captions, agent.AgentId);
+        }
+        return;
+      }
+
+      // In a room: role/score goes on the room's own name band, inside the
+      // card by construction — never beside the token, which is what let a
+      // name run out of its room and into the next one.
+      const slot = nameSlots[agent.AgentId];
+      if (!slot) return;
+      ctx.font = layout.namePx + 'px monospace';
+      ctx.fillStyle = color;
+      ctx.textAlign = 'center';
+      ctx.fillText(label, slot.x, slot.y);
+      if (measureProbe.on) {
+        probeInk(ctx, label, slot.x, slot.y, measureProbe.names, agent.AgentId,
+          { zone: agent.ZoneId });
       }
     });
   }
 
+  // Where a transit label goes. Names and captions take opposite sides of the
+  // corridor axis and step outwards by lane, so a caption can never land on a
+  // name and two of either can never land on each other. Each lane is then
+  // walked outwards from the axis until the label's own box is clear of every
+  // room box and still inside the canvas: a label follows its token, but can
+  // never end up painted on a room or off the edge. A bounded walk of a few
+  // steps, one pass over the rooms per step, so a frame still costs
+  // O(rooms + agents).
+  function transitLanes(ctx, map, layout, ends, x, y, lane, name, caption) {
+    const saved = ctx.font;
+    ctx.font = layout.namePx + 'px monospace';
+    const nameSize = layout.namePx;
+    const nameHalf = ctx.measureText(name).width / 2;
+    ctx.font = CAPTION_PX * layout.k + 'px monospace';
+    const capSize = CAPTION_PX * layout.k;
+    const capHalf = ctx.measureText(caption).width / 2;
+    ctx.font = saved;
+
+    const out = { nameX: x, nameY: y, capX: x, capY: y };
+    if (!ends) return out;
+    const ax = ends.bx - ends.ax;
+    const ay = ends.by - ends.ay;
+    const leg = Math.hypot(ax, ay);
+    if (!leg) return out;
+    const u = { x: ax / leg, y: ay / leg };
+    const n = { x: -u.y, y: u.x };
+    const side = lane % 2 === 0 ? 1 : -1;
+    const depth = Math.floor(lane / 2);
+    // Lanes are a whole label width apart, so two labels in the same lane
+    // column are clear of each other whichever way the corridor runs.
+    const step = nameHalf + capHalf + LANE_GAP;
+
+    // Slide the labels' shared anchor along the axis so their own extent stays
+    // inside the gap between the two rooms the token is travelling between.
+    // One anchor for both, so the only thing separating the name from the
+    // caption is how far out their lanes sit.
+    const half = Math.max(nameHalf, capHalf);
+    const t = (x - ends.ax) * u.x + (y - ends.ay) * u.y;
+    const lo = Math.min(half / leg, 0.5);
+    const hi = Math.max(1 - half / leg, 0.5);
+    const tc = Math.min(hi, Math.max(lo, t));
+    const p = { x: ends.ax + ax * tc, y: ends.ay + ay * tc };
+
+    const at = function (sign, size, halfW, avoid) {
+      const first = layout.rAgent + LANE_GAP + size / 2 + depth * step;
+      // The label is painted unrotated, so its box on the canvas is the box the
+      // room and label tests have to keep clear.
+      for (var i = 0; i < 8; i += 1) {
+        const off = first + i * (size + LANE_GAP);
+        const cx = p.x + n.x * sign * off;
+        const cy = p.y + n.y * sign * off;
+        if (cx - halfW < 1 || cy - size / 2 < 1
+            || cx + halfW > layout.w - 1 || cy + size / 2 > layout.h - 1) break;
+        if (labelHitsRoom(cx, cy, halfW, size / 2, map, layout)) continue;
+        if (avoid && boxesHit(cx, cy, halfW, size / 2, avoid)) continue;
+        return { x: cx, y: cy };
+      }
+      // Nowhere clear on this side (a canvas too small for the lane): keep the
+      // label beside its token, inside the canvas, as the viewer always has.
+      return {
+        x: clamp(x + n.x * sign * (layout.rAgent + LANE_GAP), halfW + 1, layout.w - halfW - 1),
+        y: clamp(y + n.y * sign * (layout.rAgent + LANE_GAP), size / 2 + 1, layout.h - size / 2 - 1),
+      };
+    };
+    const nameAt = at(side, nameSize, nameHalf, null);
+    const capAt = at(-side, capSize, capHalf,
+      { x: nameAt.x, y: nameAt.y, hw: nameHalf, hh: nameSize / 2 });
+    out.nameX = nameAt.x; out.nameY = nameAt.y;
+    out.capX = capAt.x; out.capY = capAt.y;
+    return out;
+  }
+
+  function boxesHit(cx, cy, half, across, box) {
+    return cx - half < box.x + box.hw && cx + half > box.x - box.hw
+      && cy - across < box.y + box.hh && cy + across > box.y - box.hh;
+  }
+
+  // Does the label box centred on (cx, cy), half-extents (half, across), land
+  // on any room box?
+  function labelHitsRoom(cx, cy, half, across, map, layout) {
+    const x0 = cx - half;
+    const x1 = cx + half;
+    const y0 = cy - across;
+    const y1 = cy + across;
+    for (var i = 0; i < map.Zones.length; i += 1) {
+      const r = roomRect(map.Zones[i], layout);
+      if (x0 < r.x + r.hw && x1 > r.x - r.hw && y0 < r.y + r.hh && y1 > r.y - r.hh) return true;
+    }
+    return false;
+  }
+
+  function clamp(v, lo, hi) {
+    return hi < lo ? (lo + hi) / 2 : Math.min(hi, Math.max(lo, v));
+  }
+
   // A stale memory of a rival: translucent token at the zone where the
   // observer last saw it, labeled with the age of that sighting.
-  function drawGhost(ctx, map, frame, layout, fog, agent, roles) {
+  function drawGhost(ctx, map, frame, layout, fog, agent, roles, nameSlots) {
     const ghost = fog.ghosts[agent.AgentId];
     if (!ghost) return; // never spotted — nothing to remember
     const zone = map.Zones[ghost.state.ZoneId];
     if (!zone) return;
+    const slot = nameSlots[agent.AgentId];
+    if (!slot) return;
     const rect = roomRect(zone, layout);
     // Ghost tokens sit on the same bottom band as live tokens, clear of the
-    // room title strip.
+    // room title strip, and the age stamp shares the room's name band.
     const x = rect.x;
-    const y = rect.y + rect.hh - 10 - layout.rAgent;
+    const y = rect.y + layout.bands.tokenY;
 
     ctx.globalAlpha = 0.4;
     ctx.beginPath();
@@ -1410,13 +1876,15 @@
     ctx.setLineDash([3, 3]);
     ctx.stroke();
     ctx.setLineDash([]);
-    ctx.font = '8px monospace';
+    ctx.font = layout.namePx + 'px monospace';
     ctx.fillStyle = COLORS.fogText;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    const age = state.index - ghost.tick;
-    ctx.fillText('last seen ' + (age === 0 ? 'now' : age + 't ago'), x + layout.rAgent + 5, y);
     ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(slot.text, slot.x, slot.y);
+    if (measureProbe.on) {
+      probeInk(ctx, slot.text, slot.x, slot.y, measureProbe.ghosts, agent.AgentId,
+        { zone: ghost.state.ZoneId });
+    }
     ctx.globalAlpha = 1;
   }
 

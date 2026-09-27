@@ -249,13 +249,16 @@ The golden fixtures used to pin these invariants are
 
 ### Release immutability policy
 
-- **`immutable: true` is scoped exclusively to `v2.3.1` and `v2.3.2`, both
-  published.** Only these two lines carry the immutable publishing policy below:
-  permanently pinned tags, checksummed permanently attached assets, and
+- **`immutable: true` is scoped to `v2.3.1`, `v2.3.2`, and `v3.0.0`, all
+  published.** Only these three lines carry the immutable publishing policy
+  below: permanently pinned tags, checksummed permanently attached assets, and
   corrections-by-supersession. `v2.3.1` is published at commit `c0e8342`;
   `v2.3.2` is published and immutable at commit `4f7816f` (tag `v2.3.2` →
   commit `4f7816fa5594f7097d6b2978c6c626553d075326`), superseding `v2.3.1`
-  with the parser hardening, property suites, and fuzz fixtures.
+  with the parser hardening, property suites, and fuzz fixtures; `v3.0.0` is
+  published and immutable at commit `c39d79b` (tag `v3.0.0` →
+  commit `c39d79b746e0f3aebce536dbe1cde387bd4e7991`), superseding `v2.3.2`
+  with schema 3 per-tick state authentication.
 - **`v2.3.0` is historical, untouched, but was published under
   `immutable: false`.** It predates the immutable publishing policy, remains in
   place as part of the record, and is never modified, retagged, or deleted —
@@ -277,9 +280,11 @@ The golden fixtures used to pin these invariants are
 ### External reproduction challenge packet
 
 Independent external evaluators should begin with the self-contained, turnkey
-guide in [`reproduction_packet.md`](reproduction_packet.md). Its `v2.3.2`
-section anchors to `v2.3.2` (commit `4f7816fa5594f7097d6b2978c6c626553d075326`),
-published and immutable; `v2.3.1` remains historical under
+guide in [`reproduction_packet.md`](reproduction_packet.md). Its current section
+anchors to `v3.0.0` (commit `c39d79b746e0f3aebce536dbe1cde387bd4e7991`),
+published and immutable; the `v2.3.2` section alongside it anchors to `v2.3.2`
+(commit `4f7816fa5594f7097d6b2978c6c626553d075326`), also published and
+immutable, and `v2.3.1` remains historical under
 corrections-by-supersession. It lists the exact published SHA-256
 checksums and download URLs for the three platform binaries, `SHA256SUMS.txt`,
 and `sbom.json`, gives the pre-execution verification command, defines four

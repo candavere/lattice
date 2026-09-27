@@ -272,7 +272,7 @@ A pass prints `replay verified` and exits 0. Reproducing the committed
 evaluation artifacts is documented in
 [`docs/SUPPORT_AND_REPRODUCIBILITY.md`](docs/SUPPORT_AND_REPRODUCIBILITY.md)
 (section 5), and the turnkey external-reviewer path, pinned to the published
-`v2.3.2` release, is [`docs/reproduction_packet.md`](docs/reproduction_packet.md).
+`v3.0.0` release, is [`docs/reproduction_packet.md`](docs/reproduction_packet.md).
 
 ### The gates, and where the code is authoritative
 
@@ -525,15 +525,16 @@ Each committed artifact below is the exact file behind a claim on this page:
 | [`benchmarks/bottleneck_evaluation_results.json`](benchmarks/bottleneck_evaluation_results.json) | Contention-bearing paired study, dev + held-out | Topology-dependent inversion |
 | [`benchmarks/throughput_benchmark.json`](benchmarks/throughput_benchmark.json) | Five-workload timing record on one host | Performance, qualified |
 | [`benchmarks/mutation_stryker_summary.json`](benchmarks/mutation_stryker_summary.json) | Stryker run summary with survivor classification | Mutation score, scope |
-| [`docs/reproduction_packet.md`](docs/reproduction_packet.md) | Turnkey guide to verifying the published `v2.3.2` release asset-for-asset | Release claims, checksums |
+| [`docs/reproduction_packet.md`](docs/reproduction_packet.md) | Turnkey guide to verifying the published `v2.3.2` and `v3.0.0` releases asset-for-asset | Release claims, checksums |
 | [`docs/FINDINGS_LEDGER.md`](docs/FINDINGS_LEDGER.md) | Append-only record of criticisms, edge cases, and resolved issues | Governance, traceability |
 | [`docs/CLAIM_CALIBRATION_MATRIX.md`](docs/CLAIM_CALIBRATION_MATRIX.md) | Every public claim mapped to its proving artifact, tested matrix, and boundary | Claim-to-artifact traceability |
 | [`docs/EXTERNAL_AGENT_PROTOCOL.md`](docs/EXTERNAL_AGENT_PROTOCOL.md) | The normative external-agent wire contract, including the closed reason set and the forfeit rule | Bring-your-own-agent, failure accounting |
 
-The reproduction packet is scoped to the **v2.3.2** release assets and
-checksums, which are deliberately unchanged. This source tree is at 3.0.0; a
-v3.0.0 packet will be produced from the v3.0.0 release assets once that
-release is published.
+The reproduction packet covers the **v2.3.2** and **v3.0.0** releases. Each has
+its own section with its own tag, commit, sizes, and SHA-256 checksums, taken
+from the published assets of that release; the v2.3.2 section is deliberately
+unchanged, so the two are verified independently rather than one being edited to
+match the other.
 
 ## Trust, boundaries, and further reading
 
@@ -545,9 +546,10 @@ release is published.
 - **Research preview.** Not qualified for production or critical-infrastructure
   use. The supported matrix and operational boundaries live in
   [`docs/SUPPORT_AND_REPRODUCIBILITY.md`](docs/SUPPORT_AND_REPRODUCIBILITY.md).
-- **Independent replication.** Verify the published `v2.3.2` release
-  asset-for-asset via [`docs/reproduction_packet.md`](docs/reproduction_packet.md),
-  governed by [`docs/VALIDATION_PLAN.md`](docs/VALIDATION_PLAN.md).
+- **Independent replication.** Verify the published `v3.0.0` (or `v2.3.2`)
+  release asset-for-asset via
+  [`docs/reproduction_packet.md`](docs/reproduction_packet.md), governed by
+  [`docs/VALIDATION_PLAN.md`](docs/VALIDATION_PLAN.md).
 - **Governance.** [`docs/FINDINGS_LEDGER.md`](docs/FINDINGS_LEDGER.md) records
   criticisms, edge cases, and resolved issues;
   [`docs/CLAIM_CALIBRATION_MATRIX.md`](docs/CLAIM_CALIBRATION_MATRIX.md) maps

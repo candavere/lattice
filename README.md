@@ -432,7 +432,7 @@ Only claims the repository can back up are listed here.
 
 ## Known limitations
 
-- At a 390px viewport the replay viewer's room titles render at roughly 6.5px.
+- At a 390px viewport the replay viewer's room titles render at roughly 8.3px.
   The infiltration map is three columns of rooms, and a phone canvas is about
   318px wide, so the cards are scaled to fit rather than overlapped: every
   title and agent name is complete, inside its room, and legible, but small.

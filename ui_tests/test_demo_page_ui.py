@@ -196,132 +196,284 @@ def stale_moments(recording, agent_ids):
     return sorted(moments, key=lambda pair: (pair[1], pair[0]))
 
 
-# Pixel census of one room's label box, so "the page says stale" and "the page
-# paints stale" are separate facts. The room title is drawn in COLORS.roomText
-# when observed and COLORS.fogText when stale; both are opaque, so the glyph
-# cores land on the exact colour while only the antialiased edges blend.
+# Pixel census of one room's title box, so "the page says stale" and "the page
+# paints stale" stay separate facts. The room title is drawn in COLORS.roomText
+# when observed and COLORS.fogText when stale, with fillText and no alpha, so
+# every glyph pixel is a straight alpha composite of one of those two colours
+# and whatever the card put down underneath. The census works on that model
+# rather than on exact colour matches, because a stem narrower than a device
+# pixel is plainly visible while painting no fully covered pixel at all. Run
+# 36315512777 read 16 fog cores and 3 lit cores for this 14-glyph title at 390px
+# on windows-latest against a floor of 14, where the incumbent comment recorded
+# 68 for the same title on the reference rasteriser: one core per glyph is not a
+# property of a painted glyph, it is a property of a rasteriser wide enough to
+# fill a whole pixel.
+#
+# Two claims are kept apart, because they fail for different reasons:
+#
+#   * ink: the title has painted enough of itself, measured against the local
+#     room-card fill, in the colour it was drawn in;
+#   * colour: that ink is the expected title colour and not the other one.
+#
+# The background reference is measured, never assumed. A stale card is filled
+# with COLORS.fogStaleFill, a translucent rgba(26, 31, 44, 0.45) whose
+# composite depends on the map behind it, while an observed card is an opaque
+# COLORS.roomFill: on this one title the two measure (27, 31, 44, 115) and
+# (26, 31, 44, 255), so no constant in this file is the fill at both statuses.
 ROOM_TEXT_RGB = (0xC0, 0xCA, 0xF5)  # COLORS.roomText
 FOG_TEXT_RGB = (0x5B, 0x6A, 0x8A)  # COLORS.fogText
-COLOUR_TOLERANCE = 6
 
-# How many pixels of the *painted* title colour a room label must contribute
-# before the census above believes it. A flat constant cannot serve every size,
-# because what the census counts is fully-covered pixels, and a stroke only
-# paints one once it is at least a pixel wide. The design face is 11px, where a
-# monospace stem is ~1.1px and the measured census is 20; at the 390px viewport
-# the layout fits a 3-column map into a 318px canvas and the same title renders
-# at 8.3px, where that stem is 0.83px. Measured on this one 14-glyph title at
-# those two sizes: 149/148/150 cores at 11px (1024/1280/1440) and 68 at 8.3px
-# (390) on the reference rasteriser, against 16 on the Windows one.
-#
-# The rule below has two terms and neither is fitted to a platform:
-#
-#   * a per-glyph floor. A glyph that is visible at all has painted at least one
-#     pixel of the colour it was drawn in, so an n-glyph title can never
-#     legitimately census fewer than n, and a title painted in the wrong colour
-#     — or not painted — censuses zero. The Windows run above lands at 1.1 cores
-#     per glyph, which is this bound very nearly exactly.
-#   * a size term anchored so the rule reproduces the incumbent constant at the
-#     design face: CORE_DENSITY * 11**2 == LABEL_CORE_PIXELS. Above the design
-#     size it scales with the square of the font, the area of the painted
-#     material; below it the rule interpolates down to the per-glyph floor.
-#
-# So the effective minimum is exactly the old constant at 11px and above, and
-# falls only where the raster is demonstrably less reliable.
-LABEL_CORE_PIXELS = 20  # glyph cores at the 11px design face (the incumbent)
-CORE_DENSITY = float(LABEL_CORE_PIXELS) / (11.0 ** 2)
+# How far a pixel may sit from a candidate colour's blend of itself over the
+# measured fill and still count as that colour's ink. This is a property of the
+# two colours and of 8-bit rounding, not of the rasteriser: every correct glyph
+# pixel is an exact composite, and the reference raster at both faces puts all
+# of them within 3.0. A *solid* pixel of the other title colour cannot be
+# explained as the expected one at all in the fog direction (107), and in the
+# lit direction it needs a 7.6 ride, because COLORS.fogText is 43.7% of the way
+# along the blend from the fill to COLORS.roomText. 6 sits inside that gap.
+SEGMENT_TOLERANCE = 6
+
+# Below this a pixel is the card showing through, not ink. Also 8-bit rounding
+# of the fill's own composite, which moves it by up to ~2.
+INK_EPSILON = 4
+
+# The ink floor. A painted glyph leaves at least one pixel that differs from
+# the fill, so an n-glyph title can never ink fewer than n, and a title painted
+# in the wrong colour or not painted at all inks none. The area term is the
+# least-inked correct render measured here: the fog title at the 11px design
+# face inks 233 of its 1380 device px, which is 0.17, and the other three
+# measure 0.19 (fog at 8.3px), 0.235 and 0.267. Divided by an allowance for a
+# rasteriser that paints far less than the reference one. That allowance is 16
+# because this repository has already recorded a 4.25x spread in fully covered
+# cores for this same title between rasterisers (68 against 16 at 8.3px), so 16
+# leaves about four times the spread ever seen. The floor is never a platform's
+# pass target: the erase control inks exactly 0, and the correct paints here
+# clear the floor by 10x to 22x.
+INK_DENSITY = 0.17
+RASTER_ALLOWANCE = 16
 MONO_ADVANCE = 0.6  # a monospace glyph's advance width, in em
 
+# At least this share of the attributable ink must be the expected colour.
+# Majority would not do: a whole title painted in the wrong colour plus a few
+# stray expected-colour pixels is a majority, and is still a mis-render.
+COLOUR_DOMINANCE = 0.85
 
-def min_title_cores(box, label):
-    """Cores the title `label`, painted in a box `box` wide, must census.
 
-    The box width the probe reports is the label's measured advance width, so
-    the font size it was actually painted at follows from the glyph count:
-    advance == MONO_ADVANCE * font_px * glyphs. Reading the size off the box
-    rather than off a constant keeps the threshold tracking the real face at
-    every viewport.
+def blend_fit(pixel, fill, source):
+    """(coverage, residual) of `source` over `fill` that best explains `pixel`.
+
+    The page's titles are opaque text on top of the card, so this two-source
+    compositing model is the whole of what a glyph pixel is. `residual` is the
+    largest channel's error, in 8-bit units.
     """
-    glyphs = max(1, len(label or ""))
-    font_px = box["w"] / (MONO_ADVANCE * glyphs)
-    return max(glyphs, int(round(CORE_DENSITY * font_px * font_px)))
+    num = sum((pixel[i] - fill[i]) * (source[i] - fill[i]) for i in range(3))
+    den = sum((source[i] - fill[i]) ** 2 for i in range(3))
+    alpha = min(1.0, max(0.0, num / den)) if den else 0.0
+    residual = max(abs(pixel[i] - (fill[i] + alpha * (source[i] - fill[i])))
+                   for i in range(3))
+    return alpha, residual
 
 
-def title_painted(px, own_rgb, other_rgb):
-    """Is this room title painted in `own_rgb` and not at all in `other_rgb`?
+def title_fill(ring):
+    """The local room-card fill under a title, or None if it cannot be read.
 
-    The two halves are deliberately separate claims: enough pixels of the
-    colour it should be, judged against the font it was painted at, and not one
-    pixel of the colour it should not be, which is absolute. Returns
-    (held, detail) so a failure says which half and by how much.
+    The most common colour on the same card, on the rows the title crosses,
+    outside the title's own box -- the same reference at every viewport, and one
+    that a case which repaints the box cannot move, since it is read from
+    beside the box rather than from inside it.
+    """
+    counts = {}
+    for pixel in ring:
+        key = tuple(pixel)
+        counts[key] = counts.get(key, 0) + 1
+    if not counts:
+        return None
+    return max(counts.items(), key=lambda kv: (kv[1], kv[0]))[0]
+
+
+def title_font_px(box, label):
+    """The size the title was actually painted at.
+
+    The box the probe reports is the label's measured advance width, so the
+    font follows from the glyph count: advance == MONO_ADVANCE * font * glyphs.
+    """
+    return box["w"] / (MONO_ADVANCE * max(1, len(label or "")))
+
+
+def min_title_ink(area, label):
+    """Ink the title `label` must leave in its own box of `area` device pixels.
+
+    In device pixels, so a denser display is held to proportionally more ink
+    without a second constant.
+    """
+    return max(1, int(round(INK_DENSITY * area / RASTER_ALLOWANCE)))
+
+
+def ambiguous_coverage(own_rgb, other_rgb):
+    """The slice of the coverage range where the two title colours are the same.
+
+    Two candidates are indistinguishable wherever their blended colours are
+    within SEGMENT_TOLERANCE of each other, and at coverage `a` they are `a *
+    span` apart, so they overlap over a 2 * SEGMENT_TOLERANCE / span of the
+    range. Ink in that slice cannot be attributed by colour, and the correct
+    colour's budget has to leave room for it.
+    """
+    span = max(abs(own_rgb[i] - other_rgb[i]) for i in range(3))
+    return (2.0 * SEGMENT_TOLERANCE / span) if span else 0.0
+
+
+def title_census(px, own_rgb, other_rgb):
+    """Count the ink in one title box, or None if the fill cannot be read.
+
+    Every pixel is placed in exactly one bucket: cleared (the canvas was
+    cleared to transparent, which is not ink), the fill showing through (not
+    ink), ink of `own_rgb`, ink of `other_rgb`, or indeterminate. The last is
+    everything else that differs from the fill -- notably the agent-coloured
+    perception ring, which is drawn over the title box and belongs to neither
+    claim. A pixel that fits both candidates is indeterminate too, rather than
+    counted for both, so one ambiguous pixel cannot satisfy two claims.
+    """
+    fill = title_fill(px["ring"])
+    if fill is None:
+        return None
+    own_ink = other_ink = indeterminate = cleared = differing = 0
+    for pixel in px["pixels"]:
+        if pixel[3] == 0:
+            cleared += 1
+            continue
+        if max(abs(pixel[i] - fill[i]) for i in range(3)) < INK_EPSILON:
+            continue
+        differing += 1
+        _, own_residual = blend_fit(pixel, fill, own_rgb)
+        _, other_residual = blend_fit(pixel, fill, other_rgb)
+        fits_own = own_residual <= SEGMENT_TOLERANCE
+        fits_other = other_residual <= SEGMENT_TOLERANCE
+        if fits_own and not fits_other:
+            own_ink += 1
+        elif fits_other and not fits_own:
+            other_ink += 1
+        else:
+            indeterminate += 1
+    area = px["w"] * px["h"]
+    attributable = own_ink + other_ink
+    dominance = (own_ink / attributable) if attributable else 0.0
+    ink_floor = max(len(px["label"] or "") or 1, min_title_ink(area, px["label"]))
+    other_budget = max(2, int(round(ambiguous_coverage(own_rgb, other_rgb) * own_ink)))
+    return {
+        "fill": fill, "area": area, "differing": differing, "cleared": cleared,
+        "own_ink": own_ink, "other_ink": other_ink, "indeterminate": indeterminate,
+        "ink_floor": ink_floor, "other_budget": other_budget, "dominance": dominance,
+        "ink_held": own_ink >= ink_floor,
+        "colour_held": other_ink <= other_budget,
+        # With no ink there is no mix of colours to be wrong about, so the share
+        # abstains and leaves that case to the floor, which is the only claim
+        # that can tell an empty box from a painted one.
+        "share_held": attributable == 0 or dominance >= COLOUR_DOMINANCE,
+    }
+
+
+def title_colours(px, top=5):
+    """The box's most common colours, for a failure message."""
+    counts = {}
+    for pixel in px["pixels"]:
+        key = tuple(pixel)
+        counts[key] = counts.get(key, 0) + 1
+    ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:top]
+    return ", ".join("%s x%d" % ("/".join(str(c) for c in colour), n)
+                      for colour, n in ranked)
+
+
+def title_painted(px, own_rgb, other_rgb, where="?"):
+    """Is this room title painted in `own_rgb`, and not in `other_rgb`?
+
+    Three separate claims, and each is reported on its own so a failure says
+    which one broke and by how much:
+
+      ink     the title inked at least its floor in the expected colour;
+      colour  no more ink than the irreducibly ambiguous share is in the other
+              title colour;
+      share   at least COLOUR_DOMINANCE of the attributable ink is expected.
+
+    Returns (held, detail).
     """
     if px["box"] is None:
-        return False, "the room title was not painted on this view"
-    minimum = min_title_cores(px["box"], px["label"])
-    own = count_near(px["counts"], own_rgb)
-    other = count_near(px["counts"], other_rgb)
-    held = own >= minimum and other == 0
-    return held, "%d of %s, %d of %s, needs %d of %s and none of %s" % (
-        own, own_rgb, other, other_rgb, minimum, own_rgb, other_rgb)
+        return False, "[%s] the room title was not painted on this view" % where
+    census = title_census(px, own_rgb, other_rgb)
+    if census is None:
+        return False, ("[%s] could not read the room-card fill beside the title "
+                       "box, so no ink can be attributed to it" % where)
+    ink_held = census["ink_held"]
+    colour_held = census["colour_held"]
+    share_held = census["share_held"]
+    detail = ("[%s] %.2fpx title, box %dx%d (%d device px), fill %s from %d px: "
+              "%d of %s ink (floor %d), %d of %s (budget %d), share %.3f "
+              "(floor %.2f), %d differing, %d indeterminate, %d cleared"
+              " | colours %s | claims ink %s, colour %s, share %s"
+              % (where, title_font_px(px["box"], px["label"]), px["w"], px["h"],
+                 census["area"], census["fill"], len(px["ring"]),
+                 census["own_ink"], own_rgb, census["ink_floor"],
+                 census["other_ink"], other_rgb, census["other_budget"],
+                 census["dominance"], COLOUR_DOMINANCE,
+                 census["differing"], census["indeterminate"], census["cleared"],
+                 title_colours(px),
+                 "ok" if ink_held else "FAILED", "ok" if colour_held else "FAILED",
+                 "ok" if share_held else "FAILED"))
+    return ink_held and colour_held and share_held, detail
 
-ROOM_LABEL_PIXELS = """(zoneId) => {
+
+# One probe for both callers: the viewport sweep reads a title, and the negative
+# control damages a title first and reads it in the same JavaScript turn, so the
+# census cannot be taken between a repaint and the damage. `mode` is empty for
+# a plain read; the control passes 'lit-row', 'band' or 'erase' together with the
+# colour to paint, which is always the *other* title colour.
+TITLE_CENSUS = """(job) => {
   const g = window.__latticeGeo;
-  const box = g.labels[zoneId];
-  if (!box) return { zoneId: zoneId, box: null, counts: {} };
+  const box = g.labels[job.zoneId];
+  const room = g.rooms[job.zoneId] || {};
   const canvas = document.querySelector('#viewer-canvas');
   const dpr = canvas.width / canvas.getBoundingClientRect().width;
   const ctx = canvas.getContext('2d');
+  if (!box) return { box: null, label: '', w: 0, h: 0, pixels: [], ring: [] };
   const x = Math.round(box.x * dpr), y = Math.round(box.y * dpr);
   const w = Math.max(1, Math.round(box.w * dpr)), h = Math.max(1, Math.round(box.h * dpr));
-  const img = ctx.getImageData(x, y, w, h).data;
-  const counts = {};
-  for (let i = 0; i < img.length; i += 4) {
-    const key = img[i] + ',' + img[i + 1] + ',' + img[i + 2];
-    counts[key] = (counts[key] || 0) + 1;
+  if (job.mode) {
+    if (job.mode === 'erase') {
+      ctx.clearRect(x, y, w, h);
+    } else {
+      ctx.fillStyle = job.colour;
+      // One device row along the top of the box, which carries slack above the
+      // glyphs: lit ink is added without erasing a single fog pixel.
+      if (job.mode === 'lit-row') ctx.fillRect(x, y, w, 1);
+      else ctx.fillRect(x, y, w, h);
+    }
   }
-  const room = g.rooms[zoneId] || {};
-  return { zoneId: zoneId, box: box, label: room.label || '', counts: counts };
+  const at = (ax, ay) => Array.from(ctx.getImageData(ax, ay, 1, 1).data);
+  const pixels = [];
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) pixels.push(at(x + i, y + j));
+  // The fill reference: this card, on the rows the title crosses, beside the
+  // title box. The whole card is the fallback for a title as wide as its card.
+  const rx = Math.round(room.x * dpr), ry = Math.round(room.y * dpr);
+  const rw = Math.max(1, Math.round(room.w * dpr)), rh = Math.max(1, Math.round(room.h * dpr));
+  const bx = x - rx, by = y - ry;
+  const ring = [];
+  for (let cy = 0; cy < rh; cy++) {
+    const titleRow = by + cy >= 0 && by + cy < h;
+    for (let dx = 0; dx < rw; dx++) {
+      const inBox = dx >= bx && dx < bx + w && cy >= by && cy < by + h;
+      if (inBox) continue;
+      if (titleRow || !ring.length) ring.push(at(rx + dx, ry + cy));
+    }
+  }
+  return { box: box, label: room.label || '', dpr: dpr,
+           w: w, h: h, pixels: pixels, ring: ring };
 }"""
 
 
-# Negative control for the core census: damage the painted title band in place,
-# so the check can be asked whether it would still notice. `wrong-colour` lays
-# the *lit* title colour (COLORS.roomText) over the whole band, leaving no fog
-# cores and a full band of lit ones; `erase` clears it to the page behind the
-# canvas, leaving neither. Both are drawn after the frame the page painted, and
-# nothing repaints it until the next interaction, so the census reads exactly
-# what this left there.
-MISPAINT_TITLE = """(job) => {
-  const g = window.__latticeGeo;
-  const box = g.labels[job.zoneId];
-  if (!box) return null;
-  const canvas = document.querySelector('#viewer-canvas');
-  const dpr = canvas.width / canvas.getBoundingClientRect().width;
-  const ctx = canvas.getContext('2d');
-  const x = Math.round(box.x * dpr), y = Math.round(box.y * dpr);
-  const w = Math.max(1, Math.round(box.w * dpr)), h = Math.max(1, Math.round(box.h * dpr));
-  ctx.fillStyle = 'rgb(%d, %d, %d)';
-  if (job.mode === 'erase') {
-    ctx.clearRect(x, y, w, h);
-  } else if (job.mode === 'lit-edge') {
-    // One device pixel of lit colour along the top of the box. The box carries
-    // slack above the glyphs, so this adds lit cores without touching a single
-    // fog core: only the "none of the other colour" half can catch it.
-    ctx.fillRect(x, y, w, 1);
-  } else {
-    ctx.fillRect(x, y, w, h);
-  }
-  return { x: x, y: y, w: w, h: h };
-}""" % ROOM_TEXT_RGB
+def mispaint_job(zone_id, mode=None, colour=ROOM_TEXT_RGB):
+    """The census job for a plain read, or for one of the control's damages."""
+    return {"zoneId": str(zone_id), "mode": mode,
+            "colour": "rgb(%d, %d, %d)" % colour}
 
-
-def count_near(counts, rgb):
-    total = 0
-    for key, count in counts.items():
-        pixel = tuple(int(channel) for channel in key.split(","))
-        if all(abs(pixel[i] - rgb[i]) <= COLOUR_TOLERANCE for i in range(3)):
-            total += count
-    return total
 
 
 class _SiteHandler(SimpleHTTPRequestHandler):
@@ -494,20 +646,22 @@ async def run_viewport(browser, base, label, viewport, reduced):
                             in_both, f"vault={room}"))
 
             # Second half: the paint. The room title is drawn in COLORS.roomText
-            # when observed and COLORS.fogText when last-known, so the glyph
-            # cores tell us what the page actually put on the canvas.
+            # when observed and COLORS.fogText when last-known, so the ink census
+            # below tells us what the page actually put on the canvas.
             await page.locator(f'#perspective-chips .chip[data-id="{view}"]').click()
             await page.evaluate(SLIDE, tick)
             await page.wait_for_function(wait_frame(tick, str(view)))
-            agent_px = await page.evaluate(ROOM_LABEL_PIXELS, room)
+            agent_px = await page.evaluate(TITLE_CENSUS, mispaint_job(room))
             await page.locator('#perspective-chips .chip[data-id="ground"]').click()
             await page.wait_for_function(wait_frame(tick, "ground"))
-            ground_px = await page.evaluate(ROOM_LABEL_PIXELS, room)
+            ground_px = await page.evaluate(TITLE_CENSUS, mispaint_job(room))
             # The paint, judged by the shared predicate the negative control
             # also drives: a stale room shows the fog colour and none of the lit
             # one here, and the reverse on ground truth.
-            agent_held, agent_detail = title_painted(agent_px, FOG_TEXT_RGB, ROOM_TEXT_RGB)
-            ground_held, ground_detail = title_painted(ground_px, ROOM_TEXT_RGB, FOG_TEXT_RGB)
+            agent_held, agent_detail = title_painted(
+                agent_px, FOG_TEXT_RGB, ROOM_TEXT_RGB, f"{label} view {view}")
+            ground_held, ground_detail = title_painted(
+                ground_px, ROOM_TEXT_RGB, FOG_TEXT_RGB, f"{label} ground")
             ok_paint = agent_held and ground_held
             results.append((
                 f"[{label}] stale room painted dim on view {view} and lit on ground "
@@ -665,18 +819,28 @@ class TestDemoPageUI(unittest.TestCase):
     def test_mobile_390x844_reduced_motion(self):
         self._check({"width": 390, "height": 844}, reduced=True)
 
-    def test_glyph_census_rejects_a_mispainted_title(self):
-        """The font-scaled core minimum must not make the census lenient.
+    def test_title_census_rejects_a_mispainted_title(self):
+        """The ink floor and the colour claims must not make the census lenient.
 
         The stale-room check trusts a room title to be painted fog-dim on the
-        agent's view and lit on ground truth by counting pixels of each colour in
-        the title's box. Its minimum is font-scaled, so this pins the other half
-        of that bargain: at a viewport where the scaled minimum is smallest, a
-        title painted in the *wrong* colour, and a title painted in nothing at
-        all, must both still be rejected — the first by the exact "none of the
-        other colour" half, the second by the scaled minimum itself. Without
-        this, dropping the minimum to reach a small face would also drop the
-        check's ability to see a mis-render.
+        agent's view and lit on ground truth by counting the ink in the title's
+        box against the fill of the card it sits on. Its floor is a fraction of
+        the box, deliberately far below what a correct paint leaves, so this
+        pins the other half of that bargain: a title with a full row of the
+        *wrong* colour added and every one of its correct pixels kept, a title
+        painted in the wrong colour throughout, and a title painted in nothing
+        at all, must each still be rejected, and each for the reason it should
+        be. Without this, a floor low enough to survive a sub-pixel rasteriser
+        would also cost the check its ability to see a mis-render.
+
+        The verdict comes from `title_painted`, the same predicate the viewport
+        sweep asserts with, and the case is damaged and read in one JavaScript
+        turn so no repaint can slip between them. The context asks for reduced
+        motion because that is what makes the canvas hold still: on an agent
+        view the page's radar pulse redraws every 90ms (site/app.js, startPulse),
+        which silently restores a damaged band before the census can see it.
+        Each case is also read twice, 200ms apart, so a census taken over a
+        moving canvas fails here instead of passing by luck.
         """
         httpd, port = start_server()
         base = f"http://127.0.0.1:{port}/"
@@ -686,7 +850,8 @@ class TestDemoPageUI(unittest.TestCase):
                 browser = await p.chromium.launch()
                 try:
                     context = await browser.new_context(
-                        viewport={"width": 390, "height": 844})
+                        viewport={"width": 390, "height": 844},
+                        reduced_motion="reduce")
                     page = await context.new_page()
                     await page.goto(base + MEASURE_PARAMS, wait_until="networkidle")
                     await page.wait_for_function(
@@ -699,16 +864,7 @@ class TestDemoPageUI(unittest.TestCase):
                     self.assertTrue(moments, "the recording has no 'last known' moment")
                     view, tick = moments[0]
                     room = str(zone)
-
-                    async def census():
-                        px = await page.evaluate(ROOM_LABEL_PIXELS, room)
-                        return px
-
-                    async def judged():
-                        """The live verdict, from the predicate the sweep uses."""
-                        px = await census()
-                        held, detail = title_painted(px, FOG_TEXT_RGB, ROOM_TEXT_RGB)
-                        return held, detail, px
+                    where = f"control view {view}"
 
                     async def repaint():
                         # Each mis-paint is destructive, so every case starts
@@ -720,59 +876,79 @@ class TestDemoPageUI(unittest.TestCase):
                         await page.evaluate(SLIDE, tick)
                         await page.wait_for_function(wait_frame(tick, str(view)))
 
-                    # A correctly painted stale title is held, and the reason
-                    # has to be the cores: the fog cores clear the minimum and
-                    # there is not one lit core.
+                    async def damaged(mode):
+                        """Damage the band and census it in one turn, then prove
+                        the canvas did not move under the reading."""
+                        px = await page.evaluate(
+                            TITLE_CENSUS, mispaint_job(room, mode, ROOM_TEXT_RGB))
+                        held, detail = title_painted(px, FOG_TEXT_RGB, ROOM_TEXT_RGB, where)
+                        await page.wait_for_timeout(200)
+                        again = await page.evaluate(TITLE_CENSUS, mispaint_job(room))
+                        self.assertEqual(
+                            [tuple(p) for p in px["pixels"]],
+                            [tuple(p) for p in again["pixels"]],
+                            f"control: the canvas was repainted under the {mode} "
+                            f"census, so this case proves nothing")
+                        return held, detail, title_census(px, FOG_TEXT_RGB, ROOM_TEXT_RGB)
+
                     await page.locator(f'#perspective-chips .chip[data-id="{view}"]').click()
                     await page.evaluate(SLIDE, tick)
                     await page.wait_for_function(wait_frame(tick, str(view)))
-                    held, detail, px = await judged()
-                    minimum = min_title_cores(px["box"], px["label"])
+
+                    # A correctly painted stale title is held, and the reason has
+                    # to be the ink: it clears the floor, and none of it is the
+                    # lit colour.
+                    px = await page.evaluate(TITLE_CENSUS, mispaint_job(room))
+                    held, detail = title_painted(px, FOG_TEXT_RGB, ROOM_TEXT_RGB, where)
+                    good = title_census(px, FOG_TEXT_RGB, ROOM_TEXT_RGB)
+                    self.assertIsNotNone(good, "the control could not read the card fill")
                     self.assertTrue(held, f"control: a correct paint must be held: {detail}")
-                    self.assertGreaterEqual(count_near(px["counts"], FOG_TEXT_RGB), minimum)
-                    self.assertEqual(count_near(px["counts"], ROOM_TEXT_RGB), 0)
+                    self.assertGreaterEqual(good["own_ink"], good["ink_floor"], detail)
+                    self.assertEqual(good["other_ink"], 0, detail)
+                    self.assertEqual(good["dominance"], 1.0, detail)
 
-                    # The same title repainted in the lit colour. Rejected, and
-                    # for the right reason: the band is solid lit, so the
-                    # "none of the other colour" half is what rejects it.
+                    # One device row of the lit colour, added on top of the slack
+                    # above the glyphs. Every fog pixel survives, so the ink floor
+                    # is still met and only the colour claim can reject it --
+                    # which is what keeps that claim load-bearing.
                     await repaint()
-                    await page.evaluate(MISPAINT_TITLE, {"zoneId": room, "mode": "wrong-colour"})
-                    held, detail, px = await judged()
-                    self.assertGreater(
-                        count_near(px["counts"], ROOM_TEXT_RGB), 0,
-                        "a title repainted lit must census lit cores")
-                    self.assertFalse(held, f"a title repainted lit must be rejected: {detail}")
-
-                    # A band that keeps every fog core it had and gains a single
-                    # row of lit ones. The scaled minimum is satisfied, so the
-                    # "none of the other colour" half is the only thing that can
-                    # reject it — which is what keeps that half load-bearing
-                    # rather than redundant.
-                    await repaint()
-                    await page.evaluate(MISPAINT_TITLE, {"zoneId": room, "mode": "lit-edge"})
-                    held, detail, px = await judged()
+                    held, detail, census = await damaged("lit-row")
                     self.assertGreaterEqual(
-                        count_near(px["counts"], FOG_TEXT_RGB), minimum,
-                        f"the lit edge must not disturb the fog cores: {detail}")
+                        census["own_ink"], census["ink_floor"],
+                        f"the lit row must not disturb the fog ink: {detail}")
                     self.assertGreater(
-                        count_near(px["counts"], ROOM_TEXT_RGB), 0,
-                        "the lit edge must census lit cores")
+                        census["other_ink"], 0,
+                        "the lit row must ink some of the wrong colour")
+                    self.assertGreater(
+                        census["other_ink"], census["other_budget"],
+                        f"the lit row must break the colour budget: {detail}")
                     self.assertFalse(
-                        held, f"one lit row must be rejected: {detail}")
+                        held, f"one lit row with the fog glyphs kept must be "
+                              f"rejected: {detail}")
 
-                    # And a title painted in nothing at all: there is no other
-                    # colour to catch it, so the scaled minimum is the only
-                    # thing between a blank band and a pass.
+                    # The whole band repainted in the lit colour: no fog ink is
+                    # left at all, so the floor is the claim that rejects it.
                     await repaint()
-                    await page.evaluate(MISPAINT_TITLE, {"zoneId": room, "mode": "erase"})
-                    held, detail, px = await judged()
-                    self.assertEqual(
-                        (count_near(px["counts"], FOG_TEXT_RGB),
-                         count_near(px["counts"], ROOM_TEXT_RGB)), (0, 0),
-                        f"erased band: {detail}")
+                    held, detail, census = await damaged("band")
+                    self.assertEqual(census["own_ink"], 0, f"band: {detail}")
+                    self.assertGreater(
+                        census["other_ink"], census["other_budget"],
+                        f"band: {detail}")
                     self.assertFalse(
-                        held,
-                        f"an unpainted title must be rejected: {detail}")
+                        held, f"a title repainted lit must be rejected: {detail}")
+
+                    # And a title painted in nothing at all: the band is cleared
+                    # to the page behind the canvas, so there is no other colour
+                    # either and the ink floor is all that is left.
+                    await repaint()
+                    held, detail, census = await damaged("erase")
+                    self.assertEqual(census["own_ink"], 0, f"erased band: {detail}")
+                    self.assertEqual(census["other_ink"], 0, f"erased band: {detail}")
+                    self.assertEqual(
+                        census["cleared"], census["area"],
+                        f"the erase case must clear the whole box: {detail}")
+                    self.assertFalse(
+                        held, f"an unpainted title must be rejected: {detail}")
                     await context.close()
                 finally:
                     await browser.close()

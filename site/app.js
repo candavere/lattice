@@ -1089,9 +1089,14 @@
     ctx.translate(region.x, region.y);
 
     const map = traj.header.Map;
+    // Layer order, and it matters: the room card is an opaque fill in an
+    // observed room, so painting loot first buried every chest under the card
+    // it lives in — a claimed chest was never once visible, in any view.
+    // The card goes down first, then the loot sits on top of it. Nothing else
+    // changes: the same rows, the same bands, the same colours.
     drawEdges(ctx, map, frame, layout, fog);
-    drawResources(ctx, map, frame, layout, fog);
     drawZones(ctx, map, frame, layout, fog);
+    drawResources(ctx, map, frame, layout, fog);
     drawAgents(ctx, map, frame, layout, fog);
     if (fog) drawHorizonRing(ctx, map, frame, layout, fog);
 

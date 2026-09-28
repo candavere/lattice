@@ -2,7 +2,7 @@
      font-family="Helvetica, Arial, 'Liberation Sans', sans-serif" role="img"
      aria-labelledby="archTitle archDesc">
   <title id="archTitle">Lattice: recording, verification, and measurement</title>
-  <desc id="archDesc">A seeded lattice simulate run writes a schema 3 JSONL recording. Four readers
+  <desc id="archDesc">A seeded lattice simulate run writes a schema 4 JSONL recording. Four readers
   consume that recording: lattice replay --verify, lattice render, lattice analyze, and the site
   replay viewer. Independently, lattice benchmark writes a host-scoped throughput JSON and lattice
   evaluate writes an evaluation JSON. Seated instead of the in-process MCTS candidate,
@@ -99,7 +99,7 @@
   <g class="box art">
     <rect x="30" y="230" width="290" height="84"/>
     <text class="name" x="46" y="258">recording .jsonl</text>
-    <text class="body" x="46" y="280">schema 3 header, one line per</text>
+    <text class="body" x="46" y="280">schema 4 header, one line per</text>
     <text class="body" x="46" y="298">tick, then a final line</text>
   </g>
 

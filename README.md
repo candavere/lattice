@@ -350,23 +350,34 @@ disagree are called out below rather than resolved.
 
 Every command is seeded. Identical arguments produce identical per-step
 serialized output under the specified .NET 8 BCL runtime contract. The
-repository makes four distinct guarantees, documented in
+repository makes five distinct guarantees, documented in
 [`docs/SUPPORT_AND_REPRODUCIBILITY.md`](docs/SUPPORT_AND_REPRODUCIBILITY.md):
 engine transition determinism, per-step serialized `StepResult` replay
 equivalence, same-host normalized JSONL byte identity (narrow and explicit),
-and the per-tick canonical state digest — the last covering the state each tick
-produced, not a whole-episode hash tree. Raw file-byte
-identity across heterogeneous hosts is not asserted. The formal,
+the per-tick canonical state digest — the fourth covering the state each tick
+produced, not a whole-episode hash tree — and the recorded per-agent
+decision-time `Perceptions`, which equal what each agent's own
+`PerceptionFilter` produced inside its `Decide` call and are independently
+reprojected by `replay --verify`. Raw file-byte identity across heterogeneous
+hosts is not asserted. The first four are formalized as the formal,
 implementation-agnostic transition and perception laws, plus falsifiable
-challenge questions, are in
-[`docs/INVARIANT_SPECIFICATION.md`](docs/INVARIANT_SPECIFICATION.md).
+challenge questions, in
+[`docs/INVARIANT_SPECIFICATION.md`](docs/INVARIANT_SPECIFICATION.md); the fifth
+is replay-verified rather than an oracle law, because a filter's stale memory
+is per-agent internal state no independent party could rebuild from the world
+alone, and that document says so in §2.5.
 
 `replay --verify` is the contract that makes those claims checkable rather than
 asserted. It rebuilds a fresh simulation from the trajectory header, feeds each
 recorded turn of actions back through the engine, compares every re-serialized
 `StepResult` against the recorded one, recomputes each step's state digest and
-compares that, and re-computes the final summary line's aggregates field by
-field; exit code `0` means every tick and the final aggregates reproduced. That
+compares that, reprojects each recorded per-agent decision-time perception
+through a `PerceptionFilter` built from the header's `AgentVision` and compares
+that too (schema 4 and later only; an older file reports
+`no recorded perception: decision-time visibility not verified` rather than
+passing in silence), and re-computes the final summary line's aggregates field
+by field; exit code `0` means every tick, every recorded perception and the
+final aggregates reproduced. That
 is the same check the CI pipeline runs on the golden trajectory on Ubuntu,
 macOS, and Windows, and on every recording under `site/` in one further job.
 
@@ -615,7 +626,7 @@ Each committed artifact below is the exact file behind a claim on this page:
 
 | Artifact | What it is | Sub-claims it backs |
 | :--- | :--- | :--- |
-| [`docs/SUPPORT_AND_REPRODUCIBILITY.md`](docs/SUPPORT_AND_REPRODUCIBILITY.md) | The operational contract: what is supported, what is not, the four-equivalence vocabulary | Replay equivalence, determinism boundary, support matrix |
+| [`docs/SUPPORT_AND_REPRODUCIBILITY.md`](docs/SUPPORT_AND_REPRODUCIBILITY.md) | The operational contract: what is supported, what is not, the five-equivalence vocabulary | Replay equivalence, determinism boundary, support matrix |
 | [`docs/INVARIANT_SPECIFICATION.md`](docs/INVARIANT_SPECIFICATION.md) | Formal, implementation-agnostic transition and perception laws plus falsifiable challenge questions | Capacity gates, conflict resolution, perception boundary, replay contract |
 | [`benchmarks/mcts_evaluation_results.json`](benchmarks/mcts_evaluation_results.json) | Standard-map paired study, dev + held-out | Negative baseline, delta, CI, verdict |
 | [`benchmarks/bottleneck_evaluation_results.json`](benchmarks/bottleneck_evaluation_results.json) | Contention-bearing paired study, dev + held-out | Topology-dependent inversion |

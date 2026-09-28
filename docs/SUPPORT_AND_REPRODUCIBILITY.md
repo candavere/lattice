@@ -10,17 +10,22 @@ companion to the governing thesis in
 
 > **Release status: Research Preview — evaluation by maintainers and
 > collaborators.** The support contract in this document targets the published
-> **v2.3.2** release and its assets. The source tree is now at **3.0.0**; a
-> 3.0.0-scoped contract will be published from the v3.0.0 release assets, and
-> until then every `v2.3.2` reference below describes that release rather than
-> the current source.
-> Publishing that release does not by itself qualify Lattice for production
+> **v2.3.2** release and its assets. The current source tree is at **3.0.0**,
+> and the published **v3.0.0** release assets are what version 3.0.0 of the
+> binaries corresponds to. So the two are separate things, and every reference
+> below should be read against one of them: a `v2.3.2` reference describes the
+> v2.3.2 release and its assets, not the current source, while the trajectory
+> schema, perception and replay-verification sections describe what the source
+> tree does today. Where a `v2.3.2` statement and a current-source statement
+> differ, both are true of their own subject and the difference is the version
+> gap, not a contradiction.
+> Publishing v3.0.0 does not by itself qualify Lattice for production
 > use; it remains a research instrument until independent security review,
 > soak testing, and formal fuzzing are complete (see Section 2).
 
 ## Equivalence vocabulary
 
-Four distinct guarantees are used throughout this repository. They are never
+Five distinct guarantees are used throughout this repository. They are never
 interchangeable, and no document may upgrade one into another:
 
 1. **Engine transition determinism.** Under the stated runtime contract, the
@@ -58,13 +63,29 @@ interchangeable, and no document may upgrade one into another:
    benchmark harness's FNV-1a step digest is an unrelated internal repeatability
    check — it anchors one warm-up iteration and proves later iterations did not
    go off-script.
+5. **Recorded decision-time perception.** **Implemented (trajectory schema 4 and
+   later).** Each step line carries, per agent slot, the `PartialObservation`
+   that agent's own `PerceptionFilter` produced **inside** its `Decide` call, so
+   what the agent saw when it chose is a record rather than a reconstruction.
+   `replay --verify` reprojects every recorded perception independently through
+   a `PerceptionFilter` built from the header's `AgentVision` over the world the
+   step was decided from, and compares, naming the first offending tick and
+   agent slot. This is a narrow claim and is worded to match: it says the
+   recorded perceptions equal what the recorded agents' own filters produced
+   inside `Decide`, and that an independent replay reproduces them. It does
+   **not** say an independent party could have derived the same fog from the
+   world alone — the filter's stale memory is per-agent internal state, so the
+   fifth guarantee is replay-verified rather than an oracle law, and
+   [`INVARIANT_SPECIFICATION.md`](INVARIANT_SPECIFICATION.md) §2.5 states that
+   boundary explicitly.
 
-The four guarantees above are formalized as an implementation-agnostic,
+The first four guarantees are formalized as an implementation-agnostic,
 clean-room contract in
 [`INVARIANT_SPECIFICATION.md`](INVARIANT_SPECIFICATION.md) — the transition
 laws an independent oracle or checker in any language must reproduce, plus
 three falsifiable external challenge questions and the submission contract for
-oracle verification reports.
+oracle verification reports. The fifth is checked by `replay --verify` and is
+deliberately outside that contract; that document says why.
 
 ## 1. Target Support Matrix
 

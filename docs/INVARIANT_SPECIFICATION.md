@@ -27,6 +27,12 @@ Scope notes:
   specified is a single per-tick digest of the state, defined in Invariant 5
   below; there is no Merkle structure, no cross-recording root, and no
   cross-episode chaining claimed anywhere here.
+- This document formalizes the **first four** of the five guarantees in
+  `SUPPORT_AND_REPRODUCIBILITY.md`. The fifth — the recorded per-agent
+  decision-time `Perceptions` — is a replay-verified property rather than an
+  oracle law, because a filter's stale tier is per-agent internal state an
+  independent oracle cannot rebuild from the world alone. Section 2.5 states
+  that boundary and why.
 
 ---
 
@@ -442,6 +448,44 @@ carries. What it excludes is the demonstration-layer `Role` label on zones,
 resources and choke points, which the step contract never reads, and the
 header's `SimulationConfig` and `DynamicMapRuleSet` — so the digest attests to
 the state each tick produced, not to the whole episode configuration.
+
+**What this section formalizes, and the one guarantee it deliberately does
+not.** This specification formalizes the **first four** of the five guarantees
+in
+[`SUPPORT_AND_REPRODUCIBILITY.md`](SUPPORT_AND_REPRODUCIBILITY.md) §
+"Equivalence vocabulary": engine transition determinism, per-step serialized
+`StepResult` replay equivalence, same-host normalized JSONL byte identity, and
+the per-tick canonical state digest. Sections 2.1–2.4 are the transition and
+perception laws an independent oracle reproduces; this section is the replay
+contract that carries all four.
+
+The **fifth** guarantee — that each step line's recorded per-agent
+`Perceptions` equal what that agent's own `PerceptionFilter` produced inside
+its `Decide` call — is **not** formalized here, and is not an oracle law. The
+reason is structural, not a scoping convenience. A recorded perception is the
+output of one particular agent implementation's filter at one particular moment
+inside its own decision: the real-time tiers are a function of the world, so
+they are reproducible, but the *stale* tier is a function of that agent's own
+accumulated sighting history since the episode began. That history is
+per-agent internal state. An independent clean-room oracle reproduces the
+transition law and the perception *operator* of Section 2.4; it has no way to
+know, from a transition law and a world, what a particular agent had
+accumulated seen, and therefore cannot be required to reproduce a particular
+agent's fog. Demanding it would be demanding the oracle guess, and a check that
+can be satisfied by a guess attests to nothing.
+
+What the fifth guarantee is, precisely, is a **replay** property rather than an
+oracle property: it is checked by `replay --verify`, which reruns the
+recording's own agents and reprojects every recorded perception through a
+`PerceptionFilter` built from the header's `AgentVision` over the world the step
+was decided from, then compares. A reviewer who wants to falsify it needs the
+recording and a `replay --verify` run, not a clean-room reimplementation. An
+independent oracle can still falsify the *part* of it that is a law: that each
+recorded perception is consistent with the Section 2.4 operator applied to the
+world the step was decided from. That is the boundary, and it is why the
+fifth guarantee is worded in the support contract as "equal what each agent's
+own `PerceptionFilter` produced inside `Decide`, independently reprojected by
+`replay --verify`" and not as a claim about what an outsider can derive.
 
 Terminal states: an episode is terminal at the first tick where either (a)
 `|ρ| > 0` and every resource is claimed (`|R̲(t)| = |ρ|`), or (b)

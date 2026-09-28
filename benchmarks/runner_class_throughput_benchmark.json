@@ -1,0 +1,288 @@
+{
+  "Metadata": {
+    "Commit": "633ecf70c82e1b71255a6dac8e09bdca0b5b243b",
+    "Timestamp": "2026-09-28T19:07:07.9475550+00:00",
+    "Runtime": ".NET 10.0.12",
+    "Configuration": "Release",
+    "Os": "macOS 26.6.2",
+    "Cpu": "Apple M1 (Virtual)",
+    "Architecture": "Arm64",
+    "Cores": 3,
+    "RamBytes": 7516192768,
+    "GcMode": "Workstation",
+    "RunnerImage": "macos-26-arm64/20260907.0351"
+  },
+  "Workloads": [
+    {
+      "Name": "micro_raw_2agent",
+      "MapScale": "Micro",
+      "Agents": 2,
+      "DynamicTopology": false,
+      "MapShape": "3z/5c/8r",
+      "Iterations": 10,
+      "StepsPerIteration": 100000,
+      "ThroughputMetric": "steps",
+      "MedianThroughputPerSecond": 804362.1429205833,
+      "MeanThroughputPerSecond": 784818.4008253386,
+      "StdDevThroughputPerSecond": 136716.8708463807,
+      "MedianStepLatencyMicros": 0.9580000000000001,
+      "MeanStepLatencyMicros": 1.3116468600000226,
+      "P95StepLatencyMicros": 1.917,
+      "AllocationsPerStepBytes": 3221.570608,
+      "TotalGcGen0": 530,
+      "TotalGcGen1": 20,
+      "TotalGcGen2": 20
+    },
+    {
+      "Name": "facility_static_4agent",
+      "MapScale": "Medium",
+      "Agents": 4,
+      "DynamicTopology": false,
+      "MapShape": "10z/17c/20r",
+      "Iterations": 10,
+      "StepsPerIteration": 100000,
+      "ThroughputMetric": "steps",
+      "MedianThroughputPerSecond": 424021.99032242247,
+      "MeanThroughputPerSecond": 431899.11263641034,
+      "StdDevThroughputPerSecond": 66771.28991559641,
+      "MedianStepLatencyMicros": 1.542,
+      "MeanStepLatencyMicros": 2.3647409879998973,
+      "P95StepLatencyMicros": 4.208,
+      "AllocationsPerStepBytes": 4629.65528,
+      "TotalGcGen0": 750,
+      "TotalGcGen1": 20,
+      "TotalGcGen2": 20
+    },
+    {
+      "Name": "dynamic_contention_4agent",
+      "MapScale": "Medium",
+      "Agents": 4,
+      "DynamicTopology": true,
+      "MapShape": "10z/17c/20r",
+      "Iterations": 10,
+      "StepsPerIteration": 100000,
+      "ThroughputMetric": "steps",
+      "MedianThroughputPerSecond": 301024.658530786,
+      "MeanThroughputPerSecond": 301390.52210383525,
+      "StdDevThroughputPerSecond": 37417.272221527586,
+      "MedianStepLatencyMicros": 2.4170000000000003,
+      "MeanStepLatencyMicros": 3.364770526998473,
+      "P95StepLatencyMicros": 6.375,
+      "AllocationsPerStepBytes": 7096.93056,
+      "TotalGcGen0": 1150,
+      "TotalGcGen1": 20,
+      "TotalGcGen2": 20
+    },
+    {
+      "Name": "stress_topology_4agent",
+      "MapScale": "Large",
+      "Agents": 4,
+      "DynamicTopology": false,
+      "MapShape": "30z/58c/57r",
+      "Iterations": 10,
+      "StepsPerIteration": 100000,
+      "ThroughputMetric": "steps",
+      "MedianThroughputPerSecond": 10680.711238245363,
+      "MeanThroughputPerSecond": 10438.627845451407,
+      "StdDevThroughputPerSecond": 1647.7784116065857,
+      "MedianStepLatencyMicros": 73.458,
+      "MeanStepLatencyMicros": 98.0813962379995,
+      "P95StepLatencyMicros": 204.958,
+      "AllocationsPerStepBytes": 106308.64064,
+      "TotalGcGen0": 16960,
+      "TotalGcGen1": 269,
+      "TotalGcGen2": 20
+    },
+    {
+      "Name": "policy_lookahead_mcts_32",
+      "MapScale": "Micro",
+      "Agents": 2,
+      "DynamicTopology": false,
+      "MapShape": "3z/5c/8r",
+      "Iterations": 10,
+      "StepsPerIteration": 100,
+      "ThroughputMetric": "decisions",
+      "MedianThroughputPerSecond": 588.5824663519633,
+      "MeanThroughputPerSecond": 566.0695255409936,
+      "StdDevThroughputPerSecond": 59.323931833782126,
+      "MedianStepLatencyMicros": 3178.3340000000003,
+      "MeanStepLatencyMicros": 3571.8762100000017,
+      "P95StepLatencyMicros": 6040.125,
+      "AllocationsPerStepBytes": 11465776,
+      "TotalGcGen0": 1840,
+      "TotalGcGen1": 30,
+      "TotalGcGen2": 20
+    }
+  ],
+  "Provenance": {
+    "RecordKind": "runner-class reference (GitHub-hosted runner)",
+    "Note": "This record is a hosted-runner reference, recorded separately from the bare-metal research reference in benchmarks/throughput_benchmark.json. It is not a rewrite of that record and does not restate its numbers.",
+    "RunnerLabel": "macos-26",
+    "RunnerImage": "macos-26-arm64/20260907.0351",
+    "RunnerImageSource": "Transcribed from the representative run's own 'Image Release' log line. GitHub exposes no default environment variable carrying the image build, so a workflow cannot stamp it into a fresh artifact; the comparator therefore compares this field only when both sides carry one. See benchmarks/runner_class_summary.md.",
+    "SourceRevision": "633ecf70c82e1b71255a6dac8e09bdca0b5b243b",
+    "Protocol": {
+      "Runs": 10,
+      "Steps": 100000,
+      "Warmup": 50000,
+      "Note": "policy_lookahead_mcts_32 reports decisions/sec and runs 100 ticks per iteration by design, in the baseline record too."
+    },
+    "RepresentativeRun": 36469918606,
+    "RepresentativeRunUrl": "https://github.com/candavere/lattice/actions/runs/36469918606",
+    "RepresentativeSelection": "The session whose five workload medians, each divided by that workload's cross-run median, sit closest to the overall mean. This is the most typical session - explicitly neither the best of the samples nor a deliberately conservative low one.",
+    "SampleRuns": [
+      {
+        "RunId": 36469355765,
+        "Url": "https://github.com/candavere/lattice/actions/runs/36469355765",
+        "Trigger": "push",
+        "Timestamp": "2026-09-28T19:02:17.6664190+00:00",
+        "Artifact": "benchmarks/runner_class_samples/run_36469355765.json",
+        "MedianThroughputPerSecond": {
+          "micro_raw_2agent": 1028278.6398780339,
+          "facility_static_4agent": 588206.8812122142,
+          "dynamic_contention_4agent": 377131.55267730297,
+          "stress_topology_4agent": 15165.095391339019,
+          "policy_lookahead_mcts_32": 782.3874521754925
+        }
+      },
+      {
+        "RunId": 36469885628,
+        "Url": "https://github.com/candavere/lattice/actions/runs/36469885628",
+        "Trigger": "workflow_dispatch",
+        "Timestamp": "2026-09-28T19:06:58.2461490+00:00",
+        "Artifact": "benchmarks/runner_class_samples/run_36469885628.json",
+        "MedianThroughputPerSecond": {
+          "micro_raw_2agent": 666067.6182401279,
+          "facility_static_4agent": 435088.8687332721,
+          "dynamic_contention_4agent": 316355.12218290137,
+          "stress_topology_4agent": 10023.391885848701,
+          "policy_lookahead_mcts_32": 431.6181132813889
+        }
+      },
+      {
+        "RunId": 36469902164,
+        "Url": "https://github.com/candavere/lattice/actions/runs/36469902164",
+        "Trigger": "workflow_dispatch",
+        "Timestamp": "2026-09-28T19:06:58.7449770+00:00",
+        "Artifact": "benchmarks/runner_class_samples/run_36469902164.json",
+        "MedianThroughputPerSecond": {
+          "micro_raw_2agent": 729591.7130358637,
+          "facility_static_4agent": 457483.32970952056,
+          "dynamic_contention_4agent": 292944.4522506357,
+          "stress_topology_4agent": 9056.788205102795,
+          "policy_lookahead_mcts_32": 448.5505965151972
+        }
+      },
+      {
+        "RunId": 36469918606,
+        "Url": "https://github.com/candavere/lattice/actions/runs/36469918606",
+        "Trigger": "workflow_dispatch",
+        "Timestamp": "2026-09-28T19:07:07.9475550+00:00",
+        "Artifact": "benchmarks/runner_class_samples/run_36469918606.json",
+        "MedianThroughputPerSecond": {
+          "micro_raw_2agent": 804362.1429205833,
+          "facility_static_4agent": 424021.99032242247,
+          "dynamic_contention_4agent": 301024.658530786,
+          "stress_topology_4agent": 10680.711238245363,
+          "policy_lookahead_mcts_32": 588.5824663519633
+        }
+      },
+      {
+        "RunId": 36469934258,
+        "Url": "https://github.com/candavere/lattice/actions/runs/36469934258",
+        "Trigger": "workflow_dispatch",
+        "Timestamp": "2026-09-28T19:07:28.1645190+00:00",
+        "Artifact": "benchmarks/runner_class_samples/run_36469934258.json",
+        "MedianThroughputPerSecond": {
+          "micro_raw_2agent": 908525.6503903468,
+          "facility_static_4agent": 417160.7192376249,
+          "dynamic_contention_4agent": 253194.0653354979,
+          "stress_topology_4agent": 12905.213431682216,
+          "policy_lookahead_mcts_32": 633.9652962308587
+        }
+      }
+    ],
+    "Spread": {
+      "Samples": 5,
+      "Rule": "min_ratio = lowest sample median / cross-run median; allowed = min(0.95, 0.95 * min_ratio); a workload is armed only when 0.95 * min_ratio >= 0.75. The rule was fixed before the samples were inspected.",
+      "SafetyFactor": 0.95,
+      "ArmFloor": 0.75,
+      "ByWorkload": {
+        "micro_raw_2agent": {
+          "CrossRunMedian": 804362.1429205833,
+          "Min": 666067.6182401279,
+          "Max": 1028278.6398780339,
+          "MaxOverMin": 1.543805180913814,
+          "MinRatio": 0.8280693268602654,
+          "BetweenRunCv": 0.1557797310997441,
+          "MedianWithinRunCv": 0.16996930058141624,
+          "ArmTestValue": 0.7866658605172521,
+          "AllowedRatio": 0.7866658605172521,
+          "Armed": true,
+          "ShortfallVsArmFloor": 0.0
+        },
+        "facility_static_4agent": {
+          "CrossRunMedian": 435088.8687332721,
+          "Min": 417160.7192376249,
+          "Max": 588206.8812122142,
+          "MaxOverMin": 1.410024611826305,
+          "MinRatio": 0.9587942813893547,
+          "BetweenRunCv": 0.13651997302531668,
+          "MedianWithinRunCv": 0.1023906542906168,
+          "ArmTestValue": 0.910854567319887,
+          "AllowedRatio": 0.910854567319887,
+          "Armed": true,
+          "ShortfallVsArmFloor": 0.0
+        },
+        "dynamic_contention_4agent": {
+          "CrossRunMedian": 301024.658530786,
+          "Min": 253194.0653354979,
+          "Max": 377131.55267730297,
+          "MaxOverMin": 1.4894960202861793,
+          "MinRatio": 0.8411073915713904,
+          "BetweenRunCv": 0.1308490319373464,
+          "MedianWithinRunCv": 0.07568973930157191,
+          "ArmTestValue": 0.7990520219928208,
+          "AllowedRatio": 0.7990520219928208,
+          "Armed": true,
+          "ShortfallVsArmFloor": 0.0
+        },
+        "stress_topology_4agent": {
+          "CrossRunMedian": 10680.711238245363,
+          "Min": 9056.788205102795,
+          "Max": 15165.095391339019,
+          "MaxOverMin": 1.6744451838671315,
+          "MinRatio": 0.8479574068693437,
+          "BetweenRunCv": 0.1902342869375887,
+          "MedianWithinRunCv": 0.06718702688101971,
+          "ArmTestValue": 0.8055595365258765,
+          "AllowedRatio": 0.8055595365258765,
+          "Armed": true,
+          "ShortfallVsArmFloor": 0.0
+        },
+        "policy_lookahead_mcts_32": {
+          "CrossRunMedian": 588.5824663519633,
+          "Min": 431.6181132813889,
+          "Max": 782.3874521754925,
+          "MaxOverMin": 1.8126844729183624,
+          "MinRatio": 0.7333179935796591,
+          "BetweenRunCv": 0.22355319540120622,
+          "MedianWithinRunCv": 0.10079119787830602,
+          "ArmTestValue": 0.6966520939006761,
+          "AllowedRatio": 0.6966520939006761,
+          "Armed": false,
+          "ShortfallVsArmFloor": 0.05334790609932394
+        }
+      }
+    },
+    "ArmedWorkloads": [
+      "micro_raw_2agent",
+      "facility_static_4agent",
+      "dynamic_contention_4agent",
+      "stress_topology_4agent"
+    ],
+    "InformationalWorkloads": [
+      "policy_lookahead_mcts_32"
+    ]
+  }
+}

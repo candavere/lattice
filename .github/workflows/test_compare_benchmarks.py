@@ -38,22 +38,30 @@ BASELINE_ROWS = [
 ]
 
 
-def make_workloads(rows):
+def make_workloads(rows, protocol=None):
     output = []
     for name, median, stddev, latency, alloc in rows:
-        output.append({
+        entry = {
             "Name": name,
             "MedianThroughputPerSecond": median,
             "StdDevThroughputPerSecond": stddev,
             "MedianStepLatencyMicros": latency,
             "AllocationsPerStepBytes": alloc,
-        })
+        }
+        # protocol=None models a legacy artifact that records no budget at all,
+        # which is what the bare-metal-style fixtures above carry.
+        if protocol is not None:
+            entry["Iterations"] = 10
+            entry["StepsPerIteration"] = (protocol.get(name)
+                                          if isinstance(protocol, dict)
+                                          else protocol)
+        output.append(entry)
     return output
 
 
 def make_artifact(rows=None, os_="macOS 27.0.0", arch="Arm64",
                   runtime=".NET 10.0.10", ram=8_589_934_592, cores=8,
-                  cpu="Apple M1"):
+                  cpu="Apple M1", protocol=None, image=None):
     metadata = {
         "Commit": "deadbeef",
         "Timestamp": "2026-09-18T20:02:47",
@@ -66,10 +74,47 @@ def make_artifact(rows=None, os_="macOS 27.0.0", arch="Arm64",
     }
     if cpu is not None:  # cpu=None models an artifact missing the Cpu field
         metadata["Cpu"] = cpu
+    if image is not None:
+        metadata["RunnerImage"] = image
     return {
         "Metadata": metadata,
-        "Workloads": make_workloads(rows if rows is not None else BASELINE_ROWS),
+        "Workloads": make_workloads(
+            rows if rows is not None else BASELINE_ROWS, protocol),
     }
+
+
+# The runner class this repository's hosted gate actually measures: a pinned
+# arm64 GitHub-hosted image, a virtualized 3-core M1, and the full protocol.
+RUNNER_IMAGE = "macos-26-arm64/20260907.0351"
+RUNNER_PROTOCOL = {
+    "micro_raw_2agent": 100000,
+    "facility_static_4agent": 100000,
+    "dynamic_contention_4agent": 100000,
+    "stress_topology_4agent": 100000,
+    "policy_lookahead_mcts_32": 100,  # decisions metric: 100 ticks by design
+}
+
+
+def runner_artifact(rows=None, armed=None, os_="macOS 26.6.2",
+                    runtime=".NET 10.0.12", cores=3,
+                    cpu="Apple M1 (Virtual)", image=RUNNER_IMAGE,
+                    protocol=None, factor=1.0):
+    """A full-protocol artifact from the hosted runner class.
+
+    `armed` writes Provenance.ArmedWorkloads, the record's own statement of
+    which workloads the gate may adjudicate. `factor` scales the current
+    artifact's medians so a test can sit a known distance from the threshold.
+    """
+    if rows is None:
+        rows = [(name, median * factor, stddev, latency, alloc)
+                for name, median, stddev, latency, alloc in BASELINE_ROWS]
+    artifact = make_artifact(
+        rows=rows, os_=os_, arch="Arm64", runtime=runtime, cores=cores,
+        cpu=cpu, ram=7_519_192_768, image=image,
+        protocol=RUNNER_PROTOCOL if protocol is None else protocol)
+    if armed is not None:
+        artifact["Provenance"] = {"ArmedWorkloads": list(armed)}
+    return artifact
 
 
 def below_threshold_artifact(os_="macOS 27.0.0", arch="Arm64",
@@ -462,6 +507,205 @@ class SmokeClassificationTests(ComparatorTestCase):
         self.assertIn("Metadata.Cores", out)
         self.assertIn("Metadata.Os", out)
         self.assertIn("Metadata.Runtime", out)
+
+
+class RunnerClassGateTests(ComparatorTestCase):
+    """The runner-class reference: a hosted-runner baseline whose own record
+    declares the fingerprint, the protocol, and which workloads the gate may
+    adjudicate.
+
+    The bare-metal reference record stays a cross-host comparison for a hosted
+    runner, so this class covers the separate runner-class baseline and the
+    rules that keep a strict verdict from being manufactured across unlike
+    hosts, unlike images, unlike runtimes, or unlike measurement budgets.
+    """
+
+    # -- arming on a full fingerprint + protocol match --------------------
+
+    def test_matching_fingerprint_above_threshold_passes_strict(self):
+        rc, out, err = self.run_comparator(
+            runner_artifact(), runner_artifact(factor=2.0), "--strict-if-matching")
+        self.assertEqual(rc, 0)
+        self.assertIn("fingerprint match: True", out)
+        self.assertIn("strict comparison passed", out)
+        self.assertNotIn("::error::", out)
+
+    def test_matching_fingerprint_below_threshold_fails_strict(self):
+        rc, out, err = self.run_comparator(
+            runner_artifact(), runner_artifact(factor=0.5), "--strict-if-matching")
+        self.assertEqual(rc, 1)
+        self.assertIn("workload regression on a matching host", out)
+        self.assertIn("::error::", out)
+
+    def test_all_five_workloads_are_reported_when_present(self):
+        rc, out, err = self.run_comparator(
+            runner_artifact(), runner_artifact(), "--strict-if-matching")
+        self.assertEqual(rc, 0)
+        for name in CANONICAL_NAMES:
+            self.assertIn(name, out)
+
+    def test_a_missing_workload_still_fails_the_runner_class_gate(self):
+        rows = BASELINE_ROWS[:-1]
+        rc, out, err = self.run_comparator(
+            runner_artifact(),
+            runner_artifact(rows=[(n, m, s, la, a) for n, m, s, la, a in rows]),
+            "--strict-if-matching")
+        self.assertEqual(rc, 1)
+        self.assertIn("missing workloads", out)
+        self.assertIn("policy_lookahead_mcts_32", out)
+
+    # -- unlike host class stays informational ---------------------------
+
+    def test_missing_cores_is_cross_host_informational(self):
+        artifact = runner_artifact()
+        artifact["Metadata"].pop("Cores")
+        rc, out, err = self.run_comparator(
+            runner_artifact(), artifact, "--strict-if-matching")
+        self.assertEqual(rc, 0)
+        self.assertIn("cross-host comparison (informational)", out)
+        self.assertIn("current.Cores", out)
+
+    def test_missing_cpu_is_cross_host_informational(self):
+        rc, out, err = self.run_comparator(
+            runner_artifact(), runner_artifact(cpu=None), "--strict-if-matching")
+        self.assertEqual(rc, 0)
+        self.assertIn("cross-host comparison (informational)", out)
+        self.assertIn("current.Cpu", out)
+
+    def test_bare_metal_reference_against_a_runner_is_informational(self):
+        """The pre-existing reference record must stay a cross-host
+        comparison for a hosted runner - a runner-class baseline is a
+        separate file, not a rewrite of that one."""
+        rc, out, err = self.run_comparator(
+            make_artifact(), runner_artifact(factor=0.5), "--strict-if-matching")
+        self.assertEqual(rc, 0)
+        self.assertIn("cross-host comparison (informational)", out)
+
+    # -- unlike runner image --------------------------------------------
+
+    def test_different_runner_image_is_cross_host_informational(self):
+        rc, out, err = self.run_comparator(
+            runner_artifact(),
+            runner_artifact(image="macos-26-arm64/20261231.9999", factor=0.5),
+            "--strict-if-matching")
+        self.assertEqual(rc, 0)
+        self.assertIn("runner image differs", out)
+        self.assertIn("cross-host comparison (informational)", out)
+
+    def test_a_missing_runner_image_carries_no_constraint_either_way(self):
+        """Absence is not a mismatch: a record that predates the field must
+        neither arm nor disarm a gate it cannot speak to."""
+        for baseline_image, current_image in ((None, RUNNER_IMAGE),
+                                              (RUNNER_IMAGE, None),
+                                              (None, None)):
+            with self.subTest(baseline=baseline_image, current=current_image):
+                rc, out, err = self.run_comparator(
+                    runner_artifact(image=baseline_image),
+                    runner_artifact(image=current_image, factor=2.0),
+                    "--strict-if-matching")
+                self.assertEqual(rc, 0)
+                self.assertIn("fingerprint match: True", out)
+
+    # -- unlike runtime and unlike protocol ------------------------------
+
+    def test_different_runtime_is_cross_host_informational(self):
+        rc, out, err = self.run_comparator(
+            runner_artifact(),
+            runner_artifact(runtime=".NET 8.0.414", factor=0.5),
+            "--strict-if-matching")
+        self.assertEqual(rc, 0)
+        self.assertIn("runtime major differs", out)
+        self.assertIn("cross-host comparison (informational)", out)
+
+    def test_a_shortened_budget_is_cross_host_informational(self):
+        """A smoke pass must never be adjudicated against a full-protocol
+        baseline: a shorter budget is not a speed regression."""
+        rc, out, err = self.run_comparator(
+            runner_artifact(),
+            runner_artifact(protocol=10000, factor=0.5),
+            "--strict-if-matching")
+        self.assertEqual(rc, 0)
+        self.assertIn("recorded protocol does not match", out)
+        self.assertIn("cross-host comparison (informational)", out)
+
+    def test_an_incomplete_measurement_is_cross_host_informational(self):
+        artifact = runner_artifact(factor=0.5)
+        for workload in artifact["Workloads"]:
+            workload.pop("StepsPerIteration")
+        rc, out, err = self.run_comparator(
+            runner_artifact(), artifact, "--strict-if-matching")
+        self.assertEqual(rc, 0)
+        self.assertIn("omits StepsPerIteration", out)
+        self.assertIn("cross-host comparison (informational)", out)
+
+    # -- the record's own armed set --------------------------------------
+
+    def test_an_unarmed_workload_is_reported_but_never_fails(self):
+        """The whole point of the armed set: a workload whose measured spread
+        is too wide to gate on is still reported when it dips, but its dip
+        does not fail the build."""
+        armed = [n for n in CANONICAL_NAMES if n != "policy_lookahead_mcts_32"]
+        rows = [(name,
+                 median * (0.5 if name == "policy_lookahead_mcts_32" else 1.0),
+                 stddev, latency, alloc)
+                for name, median, stddev, latency, alloc in BASELINE_ROWS]
+        rc, out, err = self.run_comparator(
+            runner_artifact(armed=armed), runner_artifact(rows=rows),
+            "--strict-if-matching")
+        self.assertEqual(rc, 0)
+        self.assertIn("strict comparison passed", out)
+        self.assertIn("informational workloads", out)
+        self.assertIn("policy_lookahead_mcts_32", out)
+        self.assertIn("does not fail this gate", out)
+        self.assertNotIn("::error::", out)
+
+    def test_an_armed_workload_still_fails_while_others_are_unarmed(self):
+        armed = [n for n in CANONICAL_NAMES if n != "policy_lookahead_mcts_32"]
+        rc, out, err = self.run_comparator(
+            runner_artifact(armed=armed), runner_artifact(factor=0.5),
+            "--strict-if-matching")
+        self.assertEqual(rc, 1)
+        self.assertIn("workload regression on a matching host", out)
+        self.assertIn("micro_raw_2agent", out)
+        # the unarmed workload dips too, but it is not adjudicated, so it is
+        # never named in the failure list
+        self.assertNotIn("policy_lookahead_mcts_32: ", out)
+
+    def test_a_baseline_without_provenance_arms_every_workload(self):
+        """Back-compatibility: the bare-metal record declares no armed set, so
+        every workload in its matrix is still adjudicated."""
+        rc, out, err = self.run_comparator(
+            make_artifact(), below_threshold_artifact(), "--strict-if-matching")
+        self.assertEqual(rc, 1)
+        self.assertIn("workload regression on a matching host", out)
+        self.assertIn("policy_lookahead_mcts_32", out)
+
+    def test_an_armed_set_naming_an_unknown_workload_is_an_error(self):
+        rc, out, err = self.run_comparator(
+            runner_artifact(armed=CANONICAL_NAMES + ["not_a_workload"]),
+            runner_artifact(), "--strict-if-matching")
+        self.assertEqual(rc, 1)
+        self.assertIn("not_a_workload", out)
+        self.assertIn("::error::", out)
+
+    # -- malformed artifacts ---------------------------------------------
+
+    def test_a_malformed_artifact_is_rejected_not_scored(self):
+        baseline_path = self._write("baseline.json", runner_artifact())
+        broken_path = os.path.join(self._tmp.name, "broken.json")
+        with open(broken_path, "w", encoding="utf-8") as handle:
+            handle.write("{not json at all")
+        with self.assertRaises(json.JSONDecodeError):
+            with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                cb.main([baseline_path, broken_path, "--strict-if-matching"])
+
+    def test_an_artifact_missing_its_workload_matrix_is_rejected(self):
+        artifact = runner_artifact()
+        artifact["Workloads"] = []
+        rc, out, err = self.run_comparator(
+            runner_artifact(), artifact, "--strict-if-matching")
+        self.assertEqual(rc, 1)
+        self.assertIn("missing workloads", out)
 
 
 if __name__ == "__main__":

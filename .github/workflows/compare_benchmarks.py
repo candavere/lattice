@@ -122,19 +122,36 @@ def derive_allowed(base_work, cv_multiplier, cv_floor, cv_cap):
 
 FINGERPRINT_FIELDS = ("Os", "Architecture", "Runtime", "Cores", "Cpu")
 
+# A recorded budget is part of the fingerprint, not just the host: a smoke or
+# shortened pass is not comparable to a full-protocol baseline, so adjudicating
+# it would read a budget change as a speed regression.
+PROTOCOL_FIELDS = ("Iterations", "StepsPerIteration")
+
+# Compared only when BOTH sides carry the field. An artifact that predates the
+# field simply carries no constraint, so absence never disarms a gate that
+# would otherwise arm - but a genuine difference (e.g. a different runner
+# image build) is a mismatch, so a rolling label can never be treated as the
+# pinned image it is not.
+OPTIONAL_FINGERPRINT_FIELDS = ("RunnerImage",)
+
 
 def describe_fingerprint(meta) -> str:
     """One-line printable form of the strict fingerprint fields.
 
     Prints every field the strict gate compares - OS descriptor, architecture,
-    runtime, logical core count, CPU model - with '?' for a missing value, so
-    a mismatched host class is visible in the log on every run.
+    runtime, logical core count, CPU model, and the runner image when the
+    artifact records one - with '?' for a missing value, so a mismatched host
+    class is visible in the log on every run.
     """
     cores = meta.get("Cores")
     cpu = _string_component(meta, "Cpu")
-    return (f"{meta.get('Os') or '?'} / {meta.get('Architecture') or '?'} / "
+    text = (f"{meta.get('Os') or '?'} / {meta.get('Architecture') or '?'} / "
             f"{meta.get('Runtime') or '?'} / "
             f"{cores if cores is not None else '?'} cores / {cpu or '?'}")
+    image = _string_component(meta, "RunnerImage")
+    if image:
+        text += f" / image {image}"
+    return text
 
 
 def _string_component(meta, key):
@@ -154,6 +171,9 @@ class HostFingerprint:
     cores_matched: bool
     cpu_matched: bool
     missing_fields: tuple = ()
+    image_matched: bool = True
+    protocol_matched: bool = True
+    protocol_notes: tuple = ()
 
     @property
     def os_arch_matched(self) -> bool:
@@ -162,15 +182,81 @@ class HostFingerprint:
     @property
     def matched(self) -> bool:
         return (self.os_arch_matched and self.runtime_matched
-                and self.cores_matched and self.cpu_matched)
+                and self.cores_matched and self.cpu_matched
+                and self.image_matched and self.protocol_matched)
 
 
-def fingerprint(base_meta, curr_meta) -> HostFingerprint:
+def compare_optional_image(base_meta, curr_meta):
+    """Runner-image comparison, applied only when both sides record one.
+
+    Returns (matched, base_image, current_image). When either artifact omits
+    the field the constraint is skipped and matched is True, so a legacy
+    artifact neither arms nor disarms a gate it knows nothing about. Two
+    recorded images that differ are a genuine mismatch, which is what stops a
+    rolling image label from being compared as though it were the pinned one.
+    """
+    base = _string_component(base_meta, "RunnerImage")
+    curr = _string_component(curr_meta, "RunnerImage")
+    if base and curr:
+        return base.casefold() == curr.casefold(), base, curr
+    return True, base, curr
+
+
+def compare_protocol(base_work, curr_work):
+    """Full-protocol comparison of the recorded per-workload budget.
+
+    Returns (matched, notes). A budget field is a constraint only where the
+    baseline declares one: a workload whose current artifact then omits it is
+    an incomplete measurement and never arms. A baseline that predates the
+    field carries no constraint, so an older reference record compares exactly
+    as it did before. Only workloads present on both sides are compared - a
+    workload missing from the current matrix is already reported as a missing
+    workload before this runs.
+    """
+    notes = []
+    for name in sorted(set(base_work) & set(curr_work)):
+        for field in PROTOCOL_FIELDS:
+            base_value = base_work[name].get(field)
+            if base_value is None:
+                continue  # baseline predates the field: carries no constraint
+            curr_value = curr_work[name].get(field)
+            if curr_value is None:
+                notes.append(f"current.{name} omits {field}")
+            elif base_value != curr_value:
+                notes.append(f"{name} {field} {base_value!r} vs {curr_value!r}")
+    return (not notes), tuple(notes)
+
+
+def declared_armed_workloads(baseline):
+    """The arming decision as committed in the baseline record.
+
+    A baseline carrying `Provenance.ArmedWorkloads` names exactly the workloads
+    the strict gate may adjudicate; every other workload in the matrix is
+    reported with its ratio and never decides pass/fail. That is how a
+    workload whose measured host spread is too wide to separate a real
+    regression from runner jitter is carried honestly - recorded, visible, and
+    explicitly not enforcing.
+
+    A baseline with no such declaration arms every workload, which is the
+    behaviour the bare-metal reference record relies on.
+    """
+    provenance = baseline.get("Provenance")
+    if not isinstance(provenance, dict):
+        return None
+    names = provenance.get("ArmedWorkloads")
+    if names is None:
+        return None
+    return set(names)
+
+
+def fingerprint(base_meta, curr_meta, base_work=None,
+                curr_work=None) -> HostFingerprint:
     """Strict host fingerprint: OS family + architecture + .NET runtime major
-    + logical cores + CPU model string (trimmed, case-folded).
+    + logical cores + CPU model string (trimmed, case-folded), plus the runner
+    image and the recorded protocol when both sides declare them.
 
-    Every component must be present on BOTH sides and equal: a missing or
-    empty host field is a mismatch (cross-host classification), never a
+    Every required component must be present on BOTH sides and equal: a missing
+    or empty host field is a mismatch (cross-host classification), never a
     silent strict pass. The bare-metal baseline and a GitHub-hosted runner
     can share OS family + architecture, so the cores and CPU model components
     are what keep the strict gate from arming on an unlike host class.
@@ -208,8 +294,15 @@ def fingerprint(base_meta, curr_meta) -> HostFingerprint:
     cpu_matched = bool(base_cpu and curr_cpu) and \
         base_cpu.casefold() == curr_cpu.casefold()
 
+    image_matched, _, _ = compare_optional_image(base_meta, curr_meta)
+
+    protocol_matched, protocol_notes = True, ()
+    if base_work is not None and curr_work is not None:
+        protocol_matched, protocol_notes = compare_protocol(base_work, curr_work)
+
     return HostFingerprint(os_matched, arch_matched, runtime_matched,
-                           cores_matched, cpu_matched, tuple(missing))
+                           cores_matched, cpu_matched, tuple(missing),
+                           image_matched, protocol_matched, protocol_notes)
 
 
 @dataclass(frozen=True)
@@ -420,9 +513,18 @@ def main(argv=None) -> int:
     comparison = compare_throughput(
         base_work, curr_work, per_workload, derived, args.threshold)
 
-    fp = fingerprint(base_meta, curr_meta)
+    fp = fingerprint(base_meta, curr_meta, base_work, curr_work)
     matched = fp.matched
     strict = matched and args.strict_if_matching
+
+    armed = declared_armed_workloads(baseline)
+    if armed is not None:
+        unknown = armed - set(base_work)
+        if unknown:
+            emit_error(
+                "the baseline record arms workloads that are not in its own "
+                f"workload matrix: {sorted(unknown)}")
+            return 1
 
     print(f"baseline fingerprint: {describe_fingerprint(base_meta)}")
     print(f"current fingerprint : {describe_fingerprint(curr_meta)}")
@@ -448,23 +550,52 @@ def main(argv=None) -> int:
         print("fingerprint: CPU model differs from the baseline "
               f"({base_meta.get('Cpu')!r} vs {curr_meta.get('Cpu')!r}) - "
               "classified cross-host (informational)")
+    elif not fp.image_matched:
+        _, base_image, curr_image = compare_optional_image(base_meta, curr_meta)
+        print(f"fingerprint: runner image differs from the baseline "
+              f"({base_image!r} vs {curr_image!r}) - classified cross-host "
+              "(informational): a different image build is not a throughput "
+              "regression")
+    elif not fp.protocol_matched:
+        print("fingerprint: the recorded protocol does not match the baseline "
+              f"({'; '.join(fp.protocol_notes)}) - classified cross-host "
+              "(informational): a different measurement budget is not a "
+              "throughput regression")
     else:
         print(f"fingerprint match: {matched}  (strict gate armed: {strict})")
     if per_workload:
         print(f"per-workload thresholds: "
               f"{', '.join(f'{n}={v:g}' for n, v in sorted(per_workload.items()))}")
+    if armed is None:
+        print("armed workloads: all (the baseline record declares no "
+              "Provenance.ArmedWorkloads set)")
+    else:
+        informational = sorted(set(base_work) - armed)
+        print(f"armed workloads (from the baseline record's "
+              f"Provenance.ArmedWorkloads): {', '.join(sorted(armed))}")
+        if informational:
+            print(f"informational workloads (recorded, never adjudicated - "
+                  f"their measured host spread is too wide to separate a real "
+                  f"regression from runner jitter): {', '.join(informational)}")
     print()
 
     header = (f"{'workload':<28}{'baseline median':>16}"
-              f"{'current median':>16}{'ratio':>9}")
+              f"{'current median':>16}{'ratio':>9}{'verdict':>18}")
     print(header)
     failed = []
+    informational_failed = []
     for row in comparison.rows:
+        is_armed = armed is None or row.name in armed
+        verdict = "strict" if is_armed else "informational"
         print(f"{row.name:<28}{row.base_value:>16,.0f}"
-              f"{row.curr_value:>16,.0f}{row.ratio:>9.3f}")
+              f"{row.curr_value:>16,.0f}{row.ratio:>9.3f}{verdict:>18}")
         if row.failed:
-            failed.append((row.name, row.base_value, row.curr_value,
-                           row.ratio, row.threshold))
+            if is_armed:
+                failed.append((row.name, row.base_value, row.curr_value,
+                               row.ratio, row.threshold))
+            else:
+                informational_failed.append((row.name, row.curr_value,
+                                             row.ratio, row.threshold))
 
     if comparison.extra:
         for name in sorted(comparison.extra):
@@ -484,13 +615,18 @@ def main(argv=None) -> int:
                            f"{threshold:g}x)")
             return 1
         print()
-        print("strict comparison passed: no workload regressed beyond the "
-              "threshold.")
+        print("strict comparison passed: no armed workload regressed beyond "
+              "the threshold.")
+        for name, curr_value, ratio, threshold in informational_failed:
+            print(f"note: {name} is below its {threshold:g}x ratio "
+                  f"({curr_value:,.0f}, {ratio:.1%}) but is recorded as "
+                  "informational, so it does not fail this gate")
     else:
         print()
         print("cross-host comparison (informational): the strict gate needs "
               "a matching OS family + architecture + .NET runtime major + "
-              "logical cores + CPU model.")
+              "logical cores + CPU model, a matching runner image, and a "
+              "matching recorded protocol.")
     return 0
 
 

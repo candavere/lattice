@@ -343,6 +343,53 @@ counterpart (seed 42, 20 steps, per-agent vision `[2, 2]`), and
 `../site/demo.jsonl` remains a schema-3 recording with no perceptions, which is
 why the viewer labels its sightline a reconstruction rather than a record.
 
+### Viewer claim semantics
+
+The replay viewer's loot diamonds and the claim metric in its metrics panel are
+two readings of one question — *which resources does this view say are already
+taken* — so they are filled from one set and labelled by one decision. The
+count and the words that describe it are written together, because a number
+taken from one set under a label borrowed from another is the failure the
+pairing exists to prevent.
+
+| View | Counted set | Label | Basis |
+| --- | --- | --- | --- |
+| Ground truth | the world's claim list, `Result.Observations[].Claims` for the frame being painted | `claimed in world` | that is what the view is |
+| Agent view, schema 4 | that observer's own `VisibleClaims`, for the perception painted with it | `claims seen` | the recording's `Perceptions[i].VisibleClaims` |
+| Agent view, schema 3 | the world's claims **held to the rooms the derived sightline reached** | `claims in derived view` | this page's own derivation; nothing was recorded |
+| Agent view, no recorded perception for the frame | none reported (`—`) | `claims seen` | the view masks nothing and the file holds no per-agent claim set, so no count is invented |
+
+Three consequences are worth stating because they are the ones a reader is most
+likely to check:
+
+- **The terminal ego frame is not an exception.** The last frame has no
+  decision of its own, so the ego view paints the last decision-time
+  perception (`fresh: false`) over the world that decision was made from
+  (frame *last*−1). The metric counts the same perception's `VisibleClaims`, not
+  the post-step terminal world's claims. In
+  [`../site/infiltration.jsonl`](../site/infiltration.jsonl) those differ: at the
+  terminal frame the world has claims `[1, 2, 0]`, the Sentry's recorded
+  perception has `[1, 2]`, and the Infiltrator's has `[]`.
+- **A schema-3 ego view is a derivation and is never labelled "seen."** There is
+  no recorded per-agent claim set to narrow the world's list, so the page holds
+  it to the rooms its reconstructed 2-hop walk reached: a chest behind an
+  unexplored door stays unclaimed, exactly as the room around it is drawn. The
+  fog chip, the map caption, the canvas label, the provenance row and the metric
+  label all say "derived by this page" on that view; none of them claims a
+  recording.
+- **The zone table's loot column follows the same set.** The per-room
+  "unclaimed loot" counts are the same claim set the diamonds were filled from,
+  not the world's, so the panel cannot contradict the map above it.
+
+The diamonds themselves are drawn from the same sets, on top of the room card
+they live in. That layer order is load-bearing: a card is an opaque fill in an
+observed room, so painting loot first buries every chest under the card it is in
+and no chest is visible in any view, at any DPR. `ui_tests/test_loot_pixels.py`
+reads the actual canvas pixels with `getImageData` for one desktop frame of the
+schema-4 recording, on every perspective, and fails when a diamond is absent or
+in the wrong colour; `ui_tests/test_agent_view_honesty.py` covers the same claim
+semantics across every frame of every view from the geometry probe.
+
 ### Release immutability policy
 
 - **`immutable: true` is scoped to `v2.3.1`, `v2.3.2`, and `v3.0.0`, all

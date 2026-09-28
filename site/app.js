@@ -143,6 +143,7 @@
     dom.agentsBody = document.getElementById('agents-body');
     dom.zonesBody = document.getElementById('zones-body');
     dom.statClaimed = document.getElementById('stat-claimed');
+    dom.statClaimLabel = document.getElementById('stat-claim-label');
     dom.statSteps = document.getElementById('stat-steps');
     dom.statSeed = document.getElementById('stat-seed');
     dom.statAgents = document.getElementById('stat-agents');
@@ -690,6 +691,7 @@
     dom.zonesBody.innerHTML = '';
     dom.terminal.textContent = '';
     dom.tickReadout.textContent = '—';
+    if (dom.statClaimLabel) dom.statClaimLabel.textContent = 'claims';
     dom.statClaimed.textContent = '—';
     dom.statSteps.textContent = '—';
     dom.statSeed.textContent = '—';
@@ -1057,7 +1059,7 @@
     drawViewport(ctx, traj, frame, { x: 0, y: 0, w: w, h: h }, fog);
 
     renderStatus();
-    renderMetrics(frame);
+    renderMetrics(frame, fog);
     updateSentence(fog);
     updateMapCaption(fog);
     updateFogBadge(fog);
@@ -1412,19 +1414,27 @@
     const current = observedZones(map, egoZone(traj.frames[index]), vision);
     const zones = {};
     const resources = {};
-    // This reconstruction's own knowledge, which is the omniscient walk it
-    // has just made: there is no recorded per-agent claim set on a pre-schema-4
-    // file to narrow it, and the badge on this view already says the fog was
-    // derived by the page. The recorded path above is the one that must not
-    // guess, and it does not.
-    const claims = {};
-    traj.frames[index].claims.forEach(function (id) { claims[id] = true; });
     map.Zones.forEach(function (zone) {
       zones[zone.Id] = current[zone.Id] !== undefined
         ? 'observed'
         : lastSeenAt[zone.Id] !== undefined ? 'stale' : 'unknown';
     });
     map.Resources.forEach(function (res) { resources[res.Id] = zones[res.ZoneId]; });
+    // This reconstruction's own knowledge, which is the omniscient walk it has
+    // just made: there is no recorded per-agent claim set on a pre-schema-4
+    // file to narrow it. So the claims it may report are the world's, held to
+    // the rooms the walk actually reached — a chest behind an unexplored door
+    // stays amber, exactly as the room around it is drawn. Reporting it green
+    // would hand the observer a fact its own view could not have carried, and
+    // the badge and the metric label both say this fog was derived here, not
+    // recorded. The recorded path above never guesses, and does not reach this.
+    const claims = {};
+    const world = traj.frames[index].claims;
+    map.Resources.forEach(function (res) {
+      if (zones[res.ZoneId] !== 'unknown' && world.indexOf(res.Id) !== -1) {
+        claims[res.Id] = true;
+      }
+    });
 
     return {
       source: 'reconstructed',
@@ -1830,13 +1840,16 @@
     return counts;
   }
 
-  function zoneUnclaimed(map, frame) {
-    const claimed = {};
-    if (frame) frame.claims.forEach(function (id) { claimed[id] = true; });
+  // Loot left in a room, from the same claim set the diamonds and the metric
+  // were filled from: the world's in ground truth, the observer's own in an ego
+  // view. Counting the world's here while the map above showed the agent's own
+  // would be the same leak in a different place.
+  function zoneUnclaimed(map, frame, claims) {
+    if (!claims) claims = claimSet(frame);
     const left = {};
     map.Zones.forEach(function (z) { left[z.Id] = 0; });
     map.Resources.forEach(function (res) {
-      if (!claimed[res.Id]) left[res.ZoneId] = (left[res.ZoneId] || 0) + 1;
+      if (!claims[res.Id]) left[res.ZoneId] = (left[res.ZoneId] || 0) + 1;
     });
     return left;
   }
@@ -2251,11 +2264,58 @@
     }
   }
 
+  // What the claim metric counts, and the words it says it is counting. The two
+  // are decided together and written together, because a count taken from one
+  // set under a label borrowed from the other is the failure this pairing
+  // exists to prevent.
+  //
+  //   ground truth   the world's claim list, which is exactly what that view is
+  //   ego, recorded  the claims that observer's own PerceptionFilter reported —
+  //                  the same set the diamonds were filled from, on the same
+  //                  decision-time fog, at the terminal frame as everywhere else
+  //   ego, derived   this page's own derivation for a file that records no
+  //                  perception. Nothing there was ever seen by anyone, and a
+  //                  world count wearing the word "seen" would be a lie told
+  //                  in the metric rather than on the map
+  //   ego, no fog    nothing is masked and the file holds no per-agent claim
+  //                  set, so there is no count to report and none is invented
+  const CLAIM_LABEL_GROUND = 'claimed in world';
+  const CLAIM_LABEL_SEEN = 'claims seen';
+  const CLAIM_LABEL_DERIVED = 'claims in derived view';
+  const CLAIM_LABEL_UNKNOWN = 'claims seen';
+
+  // `fog` is the very object the canvas was painted from, so the metric and the
+  // diamonds cannot come from two different worlds.
+  function claimMetric(fog, frame, map) {
+    const total = map.Resources.length;
+    if (fog) {
+      const claims = fog.claims || {};
+      return {
+        label: fog.source === 'recorded' ? CLAIM_LABEL_SEEN : CLAIM_LABEL_DERIVED,
+        count: String(Object.keys(claims).length),
+        total: total,
+        claims: claims,
+      };
+    }
+    if (perspectiveIsAgent()) {
+      // Masked nothing, recorded nothing: the panel says so instead of
+      // borrowing the world's number. The zone table below still counts the
+      // world's claims, because that is the set the canvas painted them from.
+      return { label: CLAIM_LABEL_UNKNOWN, count: '—', total: null, claims: claimSet(frame) };
+    }
+    return {
+      label: CLAIM_LABEL_GROUND,
+      count: String(frame ? frame.claims.length : 0),
+      total: total,
+      claims: claimSet(frame),
+    };
+  }
+
   // The panel reads the same world the canvas was painted from, not the
   // scrubbed index: at the terminal frame in an ego view those differ, and a
   // count of claims taken from the post-step world beside a fog taken from the
   // decision-time one would be exactly the mix this is here to remove.
-  function renderMetrics(frame) {
+  function renderMetrics(frame, fog) {
     const traj = state.trajectory;
     if (!traj) return;
     if (!frame) frame = traj.frames[state.index];
@@ -2265,9 +2325,11 @@
     dom.statSeed.textContent = String(traj.header.Seed);
     dom.statAgents.textContent = String(map.Zones ? traj.header.SimulationConfig.AgentCount : 0);
 
-    let claimed = 0;
-    if (frame) claimed = frame.claims.length;
-    dom.statClaimed.textContent = frame ? claimed + ' / ' + map.Resources.length : '—';
+    const metric = claimMetric(fog, frame, map);
+    if (dom.statClaimLabel) dom.statClaimLabel.textContent = metric.label;
+    dom.statClaimed.textContent = metric.total === null
+      ? metric.count
+      : metric.count + ' / ' + metric.total;
     dom.statSteps.textContent = fin ? fin.TotalSteps + ' (limit ' + traj.header.SimulationConfig.MaxTicks + ')' : String(state.index);
 
     const crowd = zoneCounts(map, frame);
@@ -2286,7 +2348,7 @@
     map.Zones.slice().sort(function (a, b) { return a.Id - b.Id; }).forEach(function (zone) {
       const room = zone.Role ? spaceCamel(zone.Role) : 'Room ' + zone.Id;
       const present = crowd[zone.Id] || 0;
-      const loot = zoneUnclaimed(map, frame)[zone.Id] || 0;
+      const loot = zoneUnclaimed(map, frame, metric.claims)[zone.Id] || 0;
       zrows += '<tr><td class="k">' + room + '</td><td class="v">' +
         (present ? present + (present === 1 ? ' agent' : ' agents') : 'empty') +
         ' · ' + (loot ? loot + ' loot' : 'no loot') + '</td></tr>';

@@ -18,6 +18,13 @@ things are asserted here:
     Sentry's own perceptions carry [1] and [1, 2] at those ticks, so the two ego
     views must genuinely differ there — a viewer that leaked the world's claims
     would draw them identical.
+  * **The claim metric.** The count in the metrics panel is drawn from the same
+    set the diamonds are, and says which set it is: an ego view reports the
+    number of claims that observer's own `PerceptionFilter` reported, labelled
+    "claims seen", at the terminal frame as everywhere else; ground truth keeps
+    the omniscient world count under its own label. A schema-3 file records no
+    perception at all, so its ego view is a derivation by this page and is
+    labelled as one rather than as something an agent saw.
   * **Terminal frame mix.** At the last frame the fog is the last
     decision-time view (`fresh: false`), so the entity layer has to come from
     the world that decision was made from — frame last-1 — not from the
@@ -40,6 +47,7 @@ Run:  python3 -m unittest discover -s ui_tests -p 'test_*.py' -v
 """
 
 import asyncio
+import json
 import unittest
 
 from playwright.async_api import async_playwright
@@ -47,6 +55,7 @@ from playwright.async_api import async_playwright
 from test_demo_page_ui import (
     SLIDE,
     fetch_recording,
+    has_recorded_perception,
     perception_at,
     recorded_steps,
     start_server,
@@ -65,6 +74,18 @@ BENCH_PIN = "6463e486"
 CANVAS_LABEL = "(document.querySelector('#viewer-canvas')?.getAttribute('aria-label') ?? '')"
 MAP_CAPTION = "(document.querySelector('#map-caption')?.textContent ?? '')"
 CLAIMED_STAT = "(document.querySelector('#stat-claimed')?.textContent ?? '')"
+CLAIM_LABEL = "(document.querySelector('#stat-claim-label')?.textContent ?? '')"
+
+# What the claim metric has to say it is counting, which is a different question
+# in each view and the whole point of the label. Ground truth counts the
+# omniscient world list; an ego view on a recording that stores its perceptions
+# counts the set that observer's own filter reported, at the decision-time fog
+# the canvas painted with it; an ego view on a recording that stores no
+# perception counts what this page derived for itself and must never be called
+# "seen", because nothing was recorded for anyone to see.
+LABEL_GROUND = "claimed in world"
+LABEL_SEEN = "claims seen"
+LABEL_DERIVED = "claims in derived view"
 
 PROV_HREFS = """() => Array.from(document.querySelectorAll('#prov-open a'))
   .map((a) => a.getAttribute('href') ?? '')"""
@@ -221,10 +242,10 @@ async def show(page, tick, view):
 class TestAgentViewHonesty(unittest.TestCase):
     """Everything here drives the committed recording through the page."""
 
-    def _drive(self, body):
-        """Run `await body(page, recording, errors)` against the committed file
-        and return the console-error list it collected on the way, so each test
-        can assert the page was quiet as well as correct."""
+    def _drive(self, body, name="infiltration.jsonl"):
+        """Run `await body(page, recording, errors)` against the named committed
+        file and return the console-error list it collected on the way, so each
+        test can assert the page was quiet as well as correct."""
         httpd, port = start_server()
         base = f"http://127.0.0.1:{port}/"
         try:
@@ -242,11 +263,21 @@ class TestAgentViewHonesty(unittest.TestCase):
                         page.on("pageerror", lambda e: errors.append(str(e)))
                         # Reduced motion, so the agent view's radar pulse cannot
                         # redraw the canvas between a repaint and a read.
-                        await page.goto(base + "?measure=1&infiltration.jsonl",
+                        await page.goto(base + "?measure=1&" + name,
                                         wait_until="networkidle")
                         await page.wait_for_function(
                             "window.__latticeGeo && window.__latticeGeo.frame")
-                        recording = fetch_recording(base)
+                        # The page always opens the default preset, so a different
+                        # committed recording has to be selected through the chip
+                        # a visitor would use, not smuggled in on the query string.
+                        if name != "infiltration.jsonl":
+                            key = name.split(".")[0]
+                            await page.locator(
+                                f'#scenario-chips .chip[data-id="{key}"]').click()
+                            await page.wait_for_function(
+                                "() => document.querySelector('#source-label')"
+                                ".textContent === %s" % json.dumps(name))
+                        recording = fetch_recording(base, name)
                         return await body(page, recording, errors)
                     finally:
                         await browser.close()
@@ -380,6 +411,188 @@ class TestAgentViewHonesty(unittest.TestCase):
 
         self._no_console_errors(self._drive(body))
 
+    # -- the claim metric ---------------------------------------------------
+
+    def test_claim_metric_counts_what_the_selected_view_saw(self):
+        """The number in the metrics panel, and the label that says what it
+        counts, on every frame of every view.
+
+        The panel is a readout of the same world the canvas was painted from,
+        so in an ego view it has to be a readout of the *observer's* claim set
+        — the recording's `VisibleClaims` — and not of `frame.claims`, which is
+        the world's. The two disagree for much of this file, so a panel counting
+        the world would show a number no agent ever had, under a label that
+        claims an agent did. Ground truth keeps the world list, and says so in
+        its own words so the two numbers can never be read as the same figure.
+        """
+
+        async def body(page, recording, errors):
+            steps = recorded_steps(recording)
+            frames = frames_with_claims(recording)
+            total = len(recording[0]["Map"]["Resources"])
+
+            for ego in agent_ids(recording):
+                where = view_name(recording, ego)
+                for frame in range(len(steps) + 1):
+                    perception = perception_at(steps, frame, ego)
+                    if perception is None:
+                        continue
+                    await show(page, frame, str(ego))
+                    with self.subTest(view=where, frame=frame):
+                        self.assertEqual(
+                            await page.evaluate(CLAIM_LABEL), LABEL_SEEN,
+                            f"{where} at frame {frame}: the claim metric is not "
+                            "labelled as what the observer saw")
+                        self.assertEqual(
+                            await page.evaluate(CLAIMED_STAT),
+                            f"{len(recorded_claims(perception))} / {total}",
+                            f"{where} at frame {frame}: the claim metric is not "
+                            f"the count of VisibleClaims "
+                            f"{sorted(recorded_claims(perception))}")
+
+            for frame in range(len(steps) + 1):
+                await show(page, frame, "ground")
+                with self.subTest(view="ground", frame=frame):
+                    self.assertEqual(await page.evaluate(CLAIM_LABEL), LABEL_GROUND)
+                    self.assertEqual(await page.evaluate(CLAIMED_STAT),
+                                     f"{len(frames[frame]['claims'])} / {total}")
+            return errors
+
+        self._no_console_errors(self._drive(body))
+
+    def test_claim_metric_follows_perspective_and_scrubbing(self):
+        """Switching view and dragging the scrubber must not leave the previous
+        view's number or its label behind.
+
+        The metric and the label are two separate strings, so a page that
+        rewrote one and not the other would show, say, "claims seen 2 / 3" over
+        a ground-truth frame. Each step below ends on a frame whose two numbers
+        genuinely differ from the step before, and reads both strings
+        immediately after the repaint `wait_frame` has confirmed.
+        """
+
+        async def body(page, recording, errors):
+            steps = recorded_steps(recording)
+            frames = frames_with_claims(recording)
+            total = len(recording[0]["Map"]["Resources"])
+            ids = agent_ids(recording)
+            # Frames where the two ego views and ground truth really do disagree,
+            # so a stale readout is detectable rather than merely possible.
+            moments = [f for f in leak_frames(recording, ids[1]) if f > 0]
+            self.assertTrue(moments, "no frame distinguishes the views here")
+            frame = moments[-1]
+
+            expected = {
+                "ground": (LABEL_GROUND, f"{len(frames[frame]['claims'])} / {total}"),
+            }
+            for ego in ids:
+                expected[str(ego)] = (
+                    LABEL_SEEN,
+                    f"{len(recorded_claims(perception_at(steps, frame, ego)))} / {total}")
+
+            for view in ["ground"] + [str(e) for e in ids] + ["ground"] + [str(e) for e in ids]:
+                await show(page, frame, view)
+                with self.subTest(view=view, where="label"):
+                    self.assertEqual(await page.evaluate(CLAIM_LABEL),
+                                     expected[view][0],
+                                     f"{view} at frame {frame}: a stale claim label")
+                with self.subTest(view=view, where="count"):
+                    self.assertEqual(await page.evaluate(CLAIMED_STAT),
+                                     expected[view][1],
+                                     f"{view} at frame {frame}: a stale claim count")
+
+            # And the same while scrubbing across the recording, since the
+            # scrubber is the other way a frame changes under a live metric.
+            for tick in [0, frame, len(steps), 0]:
+                await show(page, tick, str(ids[0]))
+                with self.subTest(view=str(ids[0]), tick=tick, where="label"):
+                    self.assertEqual(await page.evaluate(CLAIM_LABEL), LABEL_SEEN)
+                want = perception_at(steps, tick, ids[0])
+                want = len(recorded_claims(want)) if want else None
+                with self.subTest(view=str(ids[0]), tick=tick, where="count"):
+                    self.assertEqual(await page.evaluate(CLAIMED_STAT),
+                                     f"{want} / {total}" if want is not None else "—")
+            return errors
+
+        self._no_console_errors(self._drive(body))
+
+    def test_reconstructed_ego_view_is_not_labelled_as_seen(self):
+        """`site/demo.jsonl` is schema v3: it records no perception, so its ego
+        view is a 2-hop sightline this page derived for itself. Nothing about it
+        was recorded, and nothing in it was ever seen by an agent.
+
+        The metric must say that in words — never "claims seen", never the
+        ground-truth label — and the number it shows must be the derivation's
+        own: the claims of the chests inside the derived sightline. Counting
+        every claim in the world under a derived label would still be a
+        spectator's number wearing the page's own clothes.
+        """
+
+        async def body(page, recording, errors):
+            self.assertFalse(has_recorded_perception(recording),
+                             "demo.jsonl now records perceptions, so it is no "
+                             "longer the reconstruction this asserts")
+            steps = recorded_steps(recording)
+            frames = frames_with_claims(recording)
+            total = len(recording[0]["Map"]["Resources"])
+            zones = {z["Id"]: z for z in recording[0]["Map"]["Zones"]}
+            adjacency = {z["Id"]: set() for z in zones.values()}
+            for c in recording[0]["Map"]["ChokePoints"]:
+                adjacency[c["FromZoneId"]].add(c["ToZoneId"])
+                adjacency[c["ToZoneId"]].add(c["FromZoneId"])
+
+            vision = 2  # the viewer's own fallback cone for a file that declares none
+
+            def within_vision(frame, ego):
+                """Zones within `vision` hops of `ego`, BFS — the same walk the
+                page makes, so the count is derived from the file rather than
+                from whatever the page happens to print."""
+                agent = next(a for a in frames[frame]["agents"] if a["AgentId"] == ego)
+                start = agent["Transit"]["ToZoneId"] if agent["Transit"] else agent["ZoneId"]
+                depth = {start: 0}
+                frontier = [start]
+                while frontier:
+                    here = frontier.pop(0)
+                    if depth[here] >= vision:
+                        continue
+                    for nxt in sorted(adjacency[here]):
+                        if nxt not in depth:
+                            depth[nxt] = depth[here] + 1
+                            frontier.append(nxt)
+                return set(depth)
+
+            resources = recording[0]["Map"]["Resources"]
+            ids = [a["AgentId"] for a in frames[0]["agents"]]
+            self.assertTrue(ids, "the recording has no agents")
+            checked = 0
+            for frame in range(len(steps) + 1):
+                world = set(frames[frame]["claims"])
+                if not world:
+                    continue
+                for ego in ids:
+                    in_sight = {r["Id"] for r in resources
+                                if r["ZoneId"] in within_vision(frame, ego)}
+                    await show(page, frame, str(ego))
+                    with self.subTest(view=str(ego), frame=frame):
+                        self.assertEqual(await page.evaluate(CLAIM_LABEL), LABEL_DERIVED,
+                                         f"ego {ego} at frame {frame}: a derived "
+                                         "sightline must not be labelled as seen")
+                        self.assertEqual(
+                            await page.evaluate(CLAIMED_STAT),
+                            f"{len(world & in_sight)} / {total}",
+                            f"ego {ego} at frame {frame}: the derived count must "
+                            "cover the world's claims inside the derived sightline")
+                    checked += 1
+            self.assertTrue(checked, "no frame in demo.jsonl has a claim to report")
+
+            await show(page, len(steps), "ground")
+            self.assertEqual(await page.evaluate(CLAIM_LABEL), LABEL_GROUND)
+            self.assertEqual(await page.evaluate(CLAIMED_STAT),
+                             f"{len(frames[len(steps)]['claims'])} / {total}")
+            return errors
+
+        self._no_console_errors(self._drive(body, "demo.jsonl"))
+
     # -- terminal frame -----------------------------------------------------
 
     def test_terminal_frame_paints_the_world_the_last_decision_came_from(self):
@@ -445,7 +658,9 @@ class TestAgentViewHonesty(unittest.TestCase):
                         if not painted[rid]["ghost"]:
                             self.assertEqual(score_of(painted[rid]["text"]), known["Score"])
 
-                # Claim colours and the metric come from the same pre-step world.
+                # Claim colours and the metric come from the same perception,
+                # and the metric says so: the terminal ego frame is no more
+                # entitled to the world's claim list than any other ego frame.
                 claims = (await page.evaluate(_CLAIMS_JS))["claimed"]
                 assert_paints_exactly(self, claims, perception,
                                       f"terminal frame, {where}")
@@ -454,7 +669,9 @@ class TestAgentViewHonesty(unittest.TestCase):
                     with self.subTest(view=where, subject="claim " + str(rid)):
                         self.assertEqual(is_claimed, rid in recorded_here)
                 with self.subTest(view=where, subject="metric"):
-                    self.assertEqual(await page.evaluate(CLAIMED_STAT), f"{len(pre['claims'])} / {total}")
+                    self.assertEqual(await page.evaluate(CLAIMED_STAT),
+                                     f"{len(recorded_here)} / {total}")
+                    self.assertEqual(await page.evaluate(CLAIM_LABEL), LABEL_SEEN)
 
                 # And the frame is still labelled as what it is.
                 with self.subTest(view=where, subject="caption"):
@@ -473,6 +690,7 @@ class TestAgentViewHonesty(unittest.TestCase):
                                      agent["Score"])
             with self.subTest(view="ground", subject="metric"):
                 self.assertEqual(await page.evaluate(CLAIMED_STAT), f"{len(post['claims'])} / {total}")
+                self.assertEqual(await page.evaluate(CLAIM_LABEL), LABEL_GROUND)
             with self.subTest(view="ground", subject="caption"):
                 self.assertIn("Ground truth", await page.evaluate(MAP_CAPTION))
             return errors

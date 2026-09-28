@@ -135,19 +135,25 @@ by single heavy decisions, and its iteration budget is small by design.
   The strict verdict needs the full fingerprint — OS family, architecture,
   .NET runtime major, logical cores, CPU model — **and** a matching recorded
   protocol, so a shortened or smoke budget can never be adjudicated against
-  it. Tolerances come from the *measured between-run* spread, not from
-  within-run sample dispersion, which on this host class reads 1.3–2.8× too
-  tight for four of the five workloads. Four workloads are armed; a genuine
-  drop of roughly 9–21% still trips them.
-  `policy_lookahead_mcts_32` is **recorded but never adjudicated**: at 1.81×
-  between-run spread no threshold wide enough to stop the gate false-firing on
-  jitter would still detect a real regression, so the record declares it
-  informational and the comparator reports its ratio without a verdict. The
-  bounded single retry is kept. See
+  it. Tolerances were derived from the *measured between-run* spread rather
+  than from within-run sample dispersion, which on this host class reads
+  1.3–2.8× too tight for four of the five workloads.
+  **This gate currently adjudicates nothing.** Five idle-dispatched samples
+  calibrated it and armed four workloads, but its first live run
+  ([36471478970](https://github.com/candavere/lattice/actions/runs/36471478970),
+  commit `4d05585`) came in below the five-sample minimum on **all five**
+  workloads, on both passes, with no measured code changed since the sampled
+  tree. The record's `Provenance.ArmedWorkloads` is therefore `[]`: the job
+  still measures, still prints the full fingerprint and a per-workload table,
+  still notes any sub-threshold ratio, and exits 0 — but no workload carries a
+  verdict. The cause of that run's slowdown is **unestablished**; hosted jobs
+  run on separate VMs, so concurrency with this repository's other jobs is not
+  offered as an explanation, and the slowdown was not reproduced.
+  The record was demoted, not re-thresholded. See
   [`benchmarks/runner_class_summary.md`](../benchmarks/runner_class_summary.md)
-  for the full spread analysis, the limits of a hosted-runner inference
-  (including that a pinned label is not a pinned image), and the
-  re-collection procedure.
+  for the full spread analysis, the failure evidence, the limits of a
+  hosted-runner inference (including that a pinned label is not a pinned
+  image), and what re-arming would require.
 - The committed baseline was **re-anchored** after the CI regression gate
   proved unstable against the earlier one (noisy micro/policy medians), and
   re-anchored again on 2026-09-26 for the runtime patch .NET 10.0.10 →
@@ -166,11 +172,16 @@ Throughput is hardware- and build-profile-scoped. Numbers vary with hardware,
 runtime version, and GC configuration; each committed record is one host
 class, one runtime, one protocol. No scaling or infrastructure claim is made.
 
-A hosted-runner gate is a narrower claim than a hardware one: it bounds
-throughput regressions **on the runner class that recorded it**, and its
+A hosted-runner gate would be a narrower claim than a hardware one: it
+bounds throughput **on the runner class that recorded it**, and its
 tolerances are wide because that class is noisy — between-run spread on the
-recorded tree was 1.41×–1.81× per workload. A wide gate here means a real
-regression must be large to be caught; it does not mean the runner is fast,
-stable, or representative of any other machine. The AC-power requirement
-above applies to a laptop host recording a reference; it does not apply to a
-hosted runner, which is the point of keeping the two records apart.
+recorded tree was 1.41×–1.81× per workload, and the first live run fell below
+that range entirely. While the runner-class record adjudicates nothing, the
+honest summary is that **CI enforces no throughput on GitHub-hosted runners**,
+and this repository has not yet established that a stable-enough hosted
+reference can be recorded. A future enforcing gate here would be a
+narrow, noisy-host claim: only large regressions would be detectable, and it
+would say nothing about the bare-metal host or about engine performance. The
+AC-power requirement above applies to a laptop host recording a reference; it
+does not apply to a hosted runner, which is the point of keeping the two
+records apart.

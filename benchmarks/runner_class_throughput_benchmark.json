@@ -218,8 +218,9 @@
           "MedianWithinRunCv": 0.16996930058141624,
           "ArmTestValue": 0.7866658605172521,
           "AllowedRatio": 0.7866658605172521,
-          "Armed": true,
-          "ShortfallVsArmFloor": 0.0
+          "ShortfallVsArmFloor": 0.0,
+          "ArmedByRule": true,
+          "ArmedInThisRecord": false
         },
         "facility_static_4agent": {
           "CrossRunMedian": 435088.8687332721,
@@ -231,8 +232,9 @@
           "MedianWithinRunCv": 0.1023906542906168,
           "ArmTestValue": 0.910854567319887,
           "AllowedRatio": 0.910854567319887,
-          "Armed": true,
-          "ShortfallVsArmFloor": 0.0
+          "ShortfallVsArmFloor": 0.0,
+          "ArmedByRule": true,
+          "ArmedInThisRecord": false
         },
         "dynamic_contention_4agent": {
           "CrossRunMedian": 301024.658530786,
@@ -244,8 +246,9 @@
           "MedianWithinRunCv": 0.07568973930157191,
           "ArmTestValue": 0.7990520219928208,
           "AllowedRatio": 0.7990520219928208,
-          "Armed": true,
-          "ShortfallVsArmFloor": 0.0
+          "ShortfallVsArmFloor": 0.0,
+          "ArmedByRule": true,
+          "ArmedInThisRecord": false
         },
         "stress_topology_4agent": {
           "CrossRunMedian": 10680.711238245363,
@@ -257,8 +260,9 @@
           "MedianWithinRunCv": 0.06718702688101971,
           "ArmTestValue": 0.8055595365258765,
           "AllowedRatio": 0.8055595365258765,
-          "Armed": true,
-          "ShortfallVsArmFloor": 0.0
+          "ShortfallVsArmFloor": 0.0,
+          "ArmedByRule": true,
+          "ArmedInThisRecord": false
         },
         "policy_lookahead_mcts_32": {
           "CrossRunMedian": 588.5824663519633,
@@ -270,19 +274,96 @@
           "MedianWithinRunCv": 0.10079119787830602,
           "ArmTestValue": 0.6966520939006761,
           "AllowedRatio": 0.6966520939006761,
-          "Armed": false,
-          "ShortfallVsArmFloor": 0.05334790609932394
+          "ShortfallVsArmFloor": 0.05334790609932394,
+          "ArmedByRule": false,
+          "ArmedInThisRecord": false
         }
-      }
+      },
+      "RewordedAfterFirstLiveRun": "The rule quoted above was applied to the five samples and produced the allowed ratios still recorded here. It is retained as the measured calibration, but it is no longer live: see Provenance.Demotion."
     },
-    "ArmedWorkloads": [
+    "ArmedWorkloads": [],
+    "InformationalWorkloads": [
       "micro_raw_2agent",
       "facility_static_4agent",
       "dynamic_contention_4agent",
-      "stress_topology_4agent"
-    ],
-    "InformationalWorkloads": [
+      "stress_topology_4agent",
       "policy_lookahead_mcts_32"
-    ]
+    ],
+    "Demotion": {
+      "Status": "The gate runs and reports every workload, but adjudicates nothing. All five workloads are informational.",
+      "Reason": "The first live run of the runner-class gate fell below the five-sample minimum on ALL FIVE workloads, on both of its passes. Five idle-dispatched samples therefore do not bound this host class. A strict gate calibrated on them failed a run that is not established to be a code regression, so the record is demoted to informational rather than re-thresholded.",
+      "ObservedRun": 36471478970,
+      "ObservedRunUrl": "https://github.com/candavere/lattice/actions/runs/36471478970",
+      "ObservedCommit": "4d05585b718a8c62ce3344a88dea53ed807db8ab",
+      "MeasuredCodeChangedBetweenSampleAndObservedRun": false,
+      "WorkloadsBelowFiveSampleMin": [
+        "micro_raw_2agent",
+        "facility_static_4agent",
+        "dynamic_contention_4agent",
+        "stress_topology_4agent",
+        "policy_lookahead_mcts_32"
+      ],
+      "WorkloadsBelowFiveSampleMinFirstPass": [
+        "micro_raw_2agent",
+        "facility_static_4agent",
+        "dynamic_contention_4agent",
+        "stress_topology_4agent",
+        "policy_lookahead_mcts_32"
+      ],
+      "Evidence": {
+        "micro_raw_2agent": {
+          "BaselineMedian": 804362.1429205833,
+          "FiveSampleMin": 666067.6182401279,
+          "FirstPassMedian": 609119,
+          "FirstPassRatioToBaseline": 0.7572696022071987,
+          "SecondPassMedian": 641848.1170068111,
+          "SecondPassRatioToBaseline": 0.7979591315378233,
+          "SecondPassVsFiveSampleMin": 0.9636380743184766
+        },
+        "facility_static_4agent": {
+          "BaselineMedian": 435088.8687332721,
+          "FiveSampleMin": 417160.7192376249,
+          "FirstPassMedian": 341660,
+          "FirstPassRatioToBaseline": 0.7852648609345417,
+          "SecondPassMedian": 335524.67167486076,
+          "SecondPassRatioToBaseline": 0.7711635387310991,
+          "SecondPassVsFiveSampleMin": 0.8043055259086792
+        },
+        "dynamic_contention_4agent": {
+          "BaselineMedian": 301024.658530786,
+          "FiveSampleMin": 253194.0653354979,
+          "FirstPassMedian": 216615,
+          "FirstPassRatioToBaseline": 0.7195922123364742,
+          "SecondPassMedian": 181670.8327286346,
+          "SecondPassRatioToBaseline": 0.6035081432043382,
+          "SecondPassVsFiveSampleMin": 0.7175161569759126
+        },
+        "stress_topology_4agent": {
+          "BaselineMedian": 10680.711238245363,
+          "FiveSampleMin": 9056.788205102795,
+          "FirstPassMedian": 8493,
+          "FirstPassRatioToBaseline": 0.7951717643660627,
+          "SecondPassMedian": 8744.8787557741,
+          "SecondPassRatioToBaseline": 0.8187543470382892,
+          "SecondPassVsFiveSampleMin": 0.9655606996359969
+        },
+        "policy_lookahead_mcts_32": {
+          "BaselineMedian": 588.5824663519633,
+          "FiveSampleMin": 431.6181132813889,
+          "FirstPassMedian": 355,
+          "FirstPassRatioToBaseline": 0.6031440287378786,
+          "SecondPassMedian": 371.9218222690509,
+          "SecondPassRatioToBaseline": 0.6318941584757426,
+          "SecondPassVsFiveSampleMin": 0.8616918772048391
+        }
+      },
+      "EvidenceSources": {
+        "SecondPass": "the run's uploaded artifact runner-class-macos-arm64",
+        "FirstPass": "the comparator's own result table in the run log of job 109094538649; the artifact upload holds the second pass only"
+      },
+      "Cause": "Unestablished. The run was uniformly slower than every recorded sample, which points to a whole-host difference rather than a workload-level one, but no evidence gathered here identifies its cause. Two candidates were considered and neither is supported: concurrency with this repository's other jobs (hosted jobs run on separate virtual machines, and no measurement of host contention was taken), and neighbouring tenants on the same runner fleet (plausible for a hosted VM, and not observable from inside the job). The slowdown was not reproduced, and no run has been dispatched to characterise it.",
+      "NotFoldedIntoCalibration": "This run is a different commit and is deliberately excluded from the five-sample spread, which remains a same-tree measurement.",
+      "PathBackToArming": "Re-collect a sample set that spans the conditions the gate actually meets, then re-derive the thresholds and restore ArmedWorkloads. Do not re-arm by widening thresholds against this record."
+    }
   }
 }

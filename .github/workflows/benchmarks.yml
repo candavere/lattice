@@ -38,7 +38,7 @@ jobs:
 
   regression-gate:
     name: Regression gate vs committed baseline (macOS arm64)
-    runs-on: macos-14
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v5
 
@@ -61,7 +61,7 @@ jobs:
             --out "$RUNNER_TEMP/throughput.json"
 
       # The committed baseline is recorded on a bare-metal Apple M1 (a
-      # conservative reference), while shared macos-14 runners virtualize the
+      # conservative reference), while shared macos-26 runners virtualize the
       # CPU and are subject to frequency-scaling and scheduler jitter - worst
       # on the sub-microsecond tight loop. Two safeguards keep the gate honest
       # without letting runner variance masquerade as a regression:

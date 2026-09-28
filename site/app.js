@@ -16,9 +16,17 @@
   // that has to fall back to a reconstruction and say so.
   const DEFAULT_TRAJECTORY = './infiltration.jsonl';
 
-  // Pinned revision the page's evidence links and result fetches target.
-  // The binary/JSON artifacts are immutable at this SHA.
+  // Pinned revision for the benchmark evidence links and result fetches. Those
+  // JSON artifacts were genuinely recorded at this commit and are immutable
+  // there, so the number a reader gets back is the number that was published.
+  // It is deliberately NOT used for the trajectory files below: those are
+  // re-recorded as the schema advances, and the page plays the copy on main, so
+  // a "view in repository" link has to resolve to the file that is playing.
   const PINNED_SHA = '6463e4865dd4831efe0952d64de0f8bfaf22f9a4';
+
+  // The trajectory the page is actually playing. Pages deploys from main, so
+  // main is the file on screen and main is the file the link must resolve to.
+  const REPO_TRAJECTORY_BLOB = 'https://github.com/candavere/lattice/blob/main/';
 
   const PRESETS = {
     infiltration: {
@@ -234,6 +242,7 @@
     captions: {},       // agentId -> {x,y,w,h,text}
     pills: {},          // zoneId -> {x,y,w,h,text,where}
     loot: {},           // zoneId -> {x,y,w,h} the unclaimed/claimed loot row
+    lootItems: {},      // zoneId -> [{id,x,y,claimed,color}] each painted diamond
     transit: {},        // agentId -> true (drawn on a corridor, not in a room)
   };
 
@@ -1026,10 +1035,10 @@
     measureProbe.captions = {};
     measureProbe.pills = {};
     measureProbe.loot = {};
+    measureProbe.lootItems = {};
     measureProbe.transit = {};
     if (!traj || !traj.frames.length) return;
 
-    const frame = traj.frames[state.index];
     const w = dom.canvas.clientWidth;
     const h = dom.canvas.clientHeight;
 
@@ -1038,10 +1047,17 @@
     const fog = perspectiveIsAgent()
       ? computePerception(traj, state.index, state.egoId)
       : null;
+    // The world this view is painted from, which is the scrubbed frame for
+    // ground truth and for every fresh recorded frame, and the frame the last
+    // decision was made from at the terminal frame. The fog and the entities
+    // then come from one world, so the page cannot show a decision-time
+    // perception painted on top of a world no agent ever saw.
+    const worldIndex = fog && fog.worldIndex !== undefined ? fog.worldIndex : state.index;
+    const frame = traj.frames[worldIndex];
     drawViewport(ctx, traj, frame, { x: 0, y: 0, w: w, h: h }, fog);
 
     renderStatus();
-    renderMetrics();
+    renderMetrics(frame);
     updateSentence(fog);
     updateMapCaption(fog);
     updateFogBadge(fog);
@@ -1263,17 +1279,23 @@
   // recorded for it. The last view that WAS decided on is shown, flagged
   // `fresh: false` so the caption can label it as the last decision-time view
   // rather than present it as a live reading of the terminal frame.
+  //
+  // `worldIndex` is the frame whose world the entity layer is painted from.
+  // On a fresh frame that is the scrubbed frame itself, because frame i is the
+  // world the tick i+1 decision was taken from. At the terminal frame it is
+  // the frame before, because that is the world the last decision was taken
+  // from — the post-step terminal world is one no agent ever saw.
   function perceptionAt(traj, index, egoId) {
     const recorded = traj.perceptions;
     if (!recorded || !recorded.length) return null;
     const step = index + 1;
     if (step <= recorded.length) {
       const row = recorded[step - 1];
-      return row ? { row: row, tick: step, fresh: true, egoId: egoId } : null;
+      return row ? { row: row, tick: step, fresh: true, egoId: egoId, worldIndex: index } : null;
     }
     if (index === recorded.length) {
       const row = recorded[recorded.length - 1];
-      return row ? { row: row, tick: recorded.length, fresh: false, egoId: egoId } : null;
+      return row ? { row: row, tick: recorded.length, fresh: false, egoId: egoId, worldIndex: index - 1 } : null;
     }
     return null;
   }
@@ -1303,6 +1325,13 @@
     const resources = {};
     const sightings = {};
     const ghosts = {};
+    // Which resources the observer's own filter reported as already claimed,
+    // and nothing else. Not the omniscient claim list: the recording states
+    // this per agent, and a chest an agent had no way of seeing is a chest it
+    // cannot paint green. Absent on a pre-schema-4 row, which then means
+    // "claimed none", not "claimed all".
+    const claims = {};
+    (me.VisibleClaims || []).forEach(function (id) { claims[id] = true; });
     (me.Zones || []).forEach(function (zone) {
       zones[zone.ZoneId] = KNOWLEDGE_NAME[zone.Status] || 'unknown';
     });
@@ -1331,6 +1360,8 @@
       egoId: view.egoId,
       tick: view.tick,
       fresh: view.fresh,
+      worldIndex: view.worldIndex,
+      claims: claims,
       zones: zones,
       resources: resources,
       sightings: sightings,
@@ -1376,6 +1407,13 @@
     const current = observedZones(map, egoZone(traj.frames[index]), vision);
     const zones = {};
     const resources = {};
+    // This reconstruction's own knowledge, which is the omniscient walk it
+    // has just made: there is no recorded per-agent claim set on a pre-schema-4
+    // file to narrow it, and the badge on this view already says the fog was
+    // derived by the page. The recorded path above is the one that must not
+    // guess, and it does not.
+    const claims = {};
+    traj.frames[index].claims.forEach(function (id) { claims[id] = true; });
     map.Zones.forEach(function (zone) {
       zones[zone.Id] = current[zone.Id] !== undefined
         ? 'observed'
@@ -1389,6 +1427,8 @@
       egoId: egoId,
       tick: index + 1,
       fresh: true,
+      worldIndex: index,
+      claims: claims,
       zones: zones,
       resources: resources,
       sightings: sightings,
@@ -1621,11 +1661,13 @@
     }
   }
 
-  // Loot sits inside its room; never floating in open canvas space. The
-  // caller passes the current claim set so claimed items dim to green.
+  // Loot sits inside its room; never floating in open canvas space. Whether a
+  // chest paints as claimed is the fog's answer, never the world's: with an
+  // ego view the only claim set that may be shown is the one that agent's own
+  // filter reported, so a chest it had no way of seeing stays amber. Ground
+  // truth (no fog) is the omniscient claim list, which is what it is labelled.
   function drawResources(ctx, map, frame, layout, fog) {
-    const claimed = {};
-    frame.claims.forEach(function (id) { claimed[id] = true; });
+    const claimed = fog ? fog.claims : claimSet(frame);
 
     const byZone = {};
     map.Resources.forEach(function (res) {
@@ -1656,8 +1698,26 @@
       if (measureProbe.on) {
         const endX = startX + (shown.length - 1) * spacing;
         measureProbe.loot[zone.Id] = { x: startX - 5, y: y - 5, w: endX - startX + 10, h: 10 };
+        // Per-diamond, with the colour actually filled: the harness needs to
+        // assert the claim state the page painted, not one it could have read
+        // off the recording for itself.
+        measureProbe.lootItems[zone.Id] = shown.map(function (res, i) {
+          return {
+            id: res.Id,
+            x: startX + i * spacing,
+            y: y,
+            claimed: !!claimed[res.Id],
+            color: claimed[res.Id] ? COLORS.claimed : COLORS.unclaimed,
+          };
+        });
       }
     });
+  }
+
+  function claimSet(frame) {
+    const claimed = {};
+    frame.claims.forEach(function (id) { claimed[id] = true; });
+    return claimed;
   }
 
   function drawDiamond(ctx, x, y, r, color) {
@@ -1863,10 +1923,27 @@
     return slots;
   }
 
+  // The agent states this view may paint. The ego is the world being painted;
+  // a rival is wherever the recording last knew it, and only a rival the
+  // recording marks observed is drawn live at all (a stale one is a ghost, an
+  // unknown one is hidden — see drawGhost). On a fresh frame this is a no-op,
+  // because the recorded LastKnownState of an observed rival is that frame's
+  // own world. At the terminal frame it is what keeps a rival off a position
+  // its observer never saw.
+  function paintedAgents(frame, fog) {
+    if (!fog) return frame.agents;
+    return frame.agents.map(function (agent) {
+      if (agent.AgentId === fog.egoId) return agent;
+      const sight = fog.sightings && fog.sightings[agent.AgentId];
+      if (sight && sight.status === 'observed' && sight.state) return sight.state;
+      return agent;
+    });
+  }
+
   function drawAgents(ctx, map, frame, layout, fog) {
     const roles = state.trajectory ? state.trajectory.header.AgentRoles : null;
     const cfg = state.trajectory ? state.trajectory.header.SimulationConfig : null;
-    const pool = frame.agents.slice().sort(function (a, b) { return a.AgentId - b.AgentId; });
+    const pool = paintedAgents(frame, fog).slice().sort(function (a, b) { return a.AgentId - b.AgentId; });
     const hopRadius = meanCorridorLength(map, layout) * 0.85;
     const nameSlots = planNames(ctx, pool, map, layout, fog, roles);
 
@@ -2169,10 +2246,14 @@
     }
   }
 
-  function renderMetrics() {
+  // The panel reads the same world the canvas was painted from, not the
+  // scrubbed index: at the terminal frame in an ego view those differ, and a
+  // count of claims taken from the post-step world beside a fog taken from the
+  // decision-time one would be exactly the mix this is here to remove.
+  function renderMetrics(frame) {
     const traj = state.trajectory;
     if (!traj) return;
-    const frame = traj.frames[state.index];
+    if (!frame) frame = traj.frames[state.index];
     const map = traj.header.Map;
     const fin = traj.final && traj.final.Metrics ? traj.final.Metrics : null;
 
@@ -2353,7 +2434,7 @@
     if (isBuiltIn) {
       const preset = PRESETS[presetKey];
       openHtml = '<a href="./' + preset.name + '">Open ' + preset.name + '</a> · ' +
-        '<a href="https://github.com/candavere/lattice/blob/' + PINNED_SHA + '/' + preset.repoPath + '">View in repository</a>';
+        '<a href="' + REPO_TRAJECTORY_BLOB + preset.repoPath + '">View in repository</a>';
       dom.provOpen.innerHTML = openHtml;
       dom.provRepro.textContent = preset.reproduce;
     } else {

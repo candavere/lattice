@@ -72,6 +72,7 @@ the descriptor narrows it:
 | :--- | :--- |
 | `standard` | The seeded `MapGenerator` family, built with the same configuration `generate --seed` uses |
 | `bottleneck` | The seeded capacity-1 contention family, the same one `evaluate --scenario bottleneck` plays |
+| `dungeon` | The fixed-topology dungeon whose rooms and gates are fixed and whose seed scales the treasury, the same one `simulate --scenario infiltration` plays |
 
 ```json
 {
@@ -91,6 +92,12 @@ two adjacent seeds still produce genuinely different topologies with the
 override applied. `scenarios/skeleton-with-override.json` is the worked
 example: it narrows one zone to single-occupancy and leaves everything else to
 the family.
+
+A built-in that varies by seed is a **family**, not a hand-authored graph. The
+infiltration dungeon is the case in point: its rooms and gates are fixed, but
+the seed scales the treasury between two and three chests. Authoring it as a
+`static` map would have frozen the chest count and stopped it being the built-in
+it re-expresses, so it is a `generated` scenario over the `dungeon` family.
 
 **Overrides** (`Map.Overrides.ZoneMaxOccupancy`) replace a field on an existing
 element, matched by id and applied in array order. **Additions**
@@ -204,6 +211,35 @@ The digest is also the recording's provenance anchor, and is distinct from the
 per-tick `SimulationStateHash` a trajectory carries: the one names the
 scenario *file*, the other names the simulation *state* at a tick. They are
 computed over different things and are never compared to each other.
+
+## Running a scenario
+
+A descriptor is an input to `simulate` and to `evaluate`:
+
+```sh
+# Record an episode from a descriptor.
+dotnet run -c Release --project Cli -- simulate --seed 42 \
+  --scenario scenarios/gated-vault-duel.json --out out.jsonl
+
+# Run the paired study on a descriptor's map.
+dotnet run -c Release --project Cli -- evaluate \
+  --scenario scenarios/bottleneck-contention.json --seed-set dev,heldout
+```
+
+`--scenario` takes **either** a built-in name **or** a path, told apart by a
+path separator rather than by a case-insensitive name match — so a file called
+`infiltration` stays a file, and a mistyped built-in name is reported as a name
+rather than as a missing file. The flag combinations that contradict a
+descriptor are refused with a stated reason instead of being resolved by
+precedence; the full table is in
+[`CLI.md`](CLI.md#simulate--record-an-episode-from-a-scenario-file).
+
+Every recording produced this way carries the descriptor's SHA-256 in its
+header, and every **built-in** invocation carries the digest of the committed
+descriptor it resolves through, so a built-in run names a file a reader can
+open. See
+[`SUPPORT_AND_REPRODUCIBILITY.md`](SUPPORT_AND_REPRODUCIBILITY.md#what-schema-5-adds)
+for the field's contract and why its absence is a notice rather than a failure.
 
 ## Determinism
 

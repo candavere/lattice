@@ -243,12 +243,18 @@ public class DecisionTimePerceptionTests
     // -- verify recomputes it, and an edit to it is caught --------------------
 
     [Fact]
-    public void UntamperedPerceptionRecording_VerifiesWithNoProblemsAndNoNotices()
+    public void UntamperedPerceptionRecording_VerifiesWithNoProblemsAndNoPerceptionNotice()
     {
         var report = TrajectoryReplay.VerifyDetailed(Recorded(Run()));
 
         Assert.Empty(report.Problems);
-        Assert.Empty(report.Notices);
+        // What this test is about is the perception half of the pass, so it
+        // asserts the absence of the perception notice specifically rather than
+        // of every notice. A recording built straight through the library has no
+        // scenario descriptor, so the schema-5 digest notice is expected and is
+        // asserted as the only notice present.
+        Assert.DoesNotContain(TrajectoryReplay.NoPerceptionNotice, report.Notices);
+        Assert.Equal([TrajectoryReplay.NoScenarioDigestNotice], report.Notices);
     }
 
     [Fact]

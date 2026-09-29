@@ -131,14 +131,19 @@ public class ExternalAgentDeterminismTests
                 // perceptions says so rather than passing in silence, and an
                 // external match is exactly that: the agents are another
                 // process, so there is no library-side PerceptionFilter whose
-                // output could have been recorded. The statement is true of this
-                // file, and the exit code is still 0. Any notice OTHER than that
-                // one means the pass was degraded somewhere it should not have
-                // been.
+                // output could have been recorded. Since schema 5 a recording
+                // with no scenario digest says so too, for the same reason: an
+                // external match is played under the evaluation protocol rather
+                // than from a descriptor file. Both statements are true of this
+                // file, and the exit code is still 0. Any notice OTHER than those
+                // two means the pass was degraded somewhere it should not have
+                // been, so the count is pinned rather than merely spot-checked.
                 Assert.Contains(
                     TrajectoryReplay.NoPerceptionNotice, stderr, StringComparison.Ordinal);
+                Assert.Contains(
+                    TrajectoryReplay.NoScenarioDigestNotice, stderr, StringComparison.Ordinal);
                 Assert.Equal(
-                    1,
+                    2,
                     stderr.Split("replay notice:", StringSplitOptions.None).Length - 1);
                 Assert.Equal(string.Empty, stdout);
             }

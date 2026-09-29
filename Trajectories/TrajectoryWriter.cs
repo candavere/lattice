@@ -41,6 +41,15 @@ public static class TrajectoryWriter
     /// byte-for-byte what a build without the field produced.
     /// </para>
     /// </summary>
+    /// <param name="scenarioSha256">
+    /// The SHA-256 digest, in lowercase hex, of the declarative scenario
+    /// descriptor this episode was produced from, taken over that file's exact
+    /// source bytes. It is provenance for the recording: it names the
+    /// declaration, not the simulation state (which <see cref="SimulationStateHash"/>
+    /// covers per tick, and which this digest is never compared to). Null writes
+    /// no digest field at all, so a caller that has no descriptor produces the
+    /// exact bytes it produced before the field existed.
+    /// </param>
     public static TrajectoryRecording Record(
         MapGraph map,
         SimulationConfig simulationConfig,
@@ -50,7 +59,8 @@ public static class TrajectoryWriter
         string? scenario = null,
         string[]? agentRoles = null,
         DynamicMapRuleSet? rules = null,
-        PartialObservation[][]? perceptions = null)
+        PartialObservation[][]? perceptions = null,
+        string? scenarioSha256 = null)
     {
         var effectiveRules = rules ?? DynamicMapRuleSet.None;
         // A static-map episode writes no rules at all: the header field is
@@ -69,7 +79,8 @@ public static class TrajectoryWriter
 
         sink.Write(Serialize(new HeaderLine(
             "header", seed, map, simulationConfig, serializedRules, TrajectorySchema.CurrentVersion,
-            Scenario: scenario, AgentRoles: agentRoles, AgentVision: agentVision)) + "\n");
+            Scenario: scenario, AgentRoles: agentRoles, AgentVision: agentVision,
+            ScenarioSha256: scenarioSha256)) + "\n");
 
         var steps = new List<TrajectoryStep>();
         Info? lastInfo = null;
@@ -104,7 +115,7 @@ public static class TrajectoryWriter
         return new TrajectoryRecording(
             new TrajectoryHeader(
                 seed, map, simulationConfig, serializedRules, TrajectorySchema.CurrentVersion,
-                scenario, agentRoles, agentVision),
+                scenario, agentRoles, agentVision, scenarioSha256),
             steps.ToArray(),
             final);
     }
@@ -136,7 +147,12 @@ public static class TrajectoryWriter
             recording.Header.SchemaVersion,
             Scenario: scenario ?? recording.Header.Scenario,
             AgentRoles: agentRoles ?? recording.Header.AgentRoles,
-            AgentVision: recording.Header.AgentVision)) + "\n");
+            AgentVision: recording.Header.AgentVision,
+            // Carried through verbatim from the recording, exactly as the schema
+            // version is: a rewrite must not add a digest a legacy file never
+            // had, and must not drop one a schema-5 file carries. A read/write
+            // round trip is byte-identical in both directions.
+            ScenarioSha256: recording.Header.ScenarioSha256)) + "\n");
 
         foreach (var step in recording.Steps)
         {
@@ -190,10 +206,11 @@ public static class TrajectoryWriter
         int SchemaVersion = 0,
         string? Scenario = null,
         string[]? AgentRoles = null,
-        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int[]? AgentVision = null)
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int[]? AgentVision = null,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ScenarioSha256 = null)
     {
         public TrajectoryHeader ToModel() =>
-            new(Seed, Map, SimulationConfig, DynamicRules, SchemaVersion, Scenario, AgentRoles, AgentVision);
+            new(Seed, Map, SimulationConfig, DynamicRules, SchemaVersion, Scenario, AgentRoles, AgentVision, ScenarioSha256);
     }
 
     internal sealed record StepLine(

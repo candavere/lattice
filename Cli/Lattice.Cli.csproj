@@ -18,4 +18,27 @@
     <ProjectReference Include="..\Visualization\Lattice.Visualization.csproj" />
   </ItemGroup>
 
+  <!--
+    The built-in scenarios are committed as ordinary descriptor files under
+    scenarios/, so they are reviewable and diffable in the tree, AND embedded
+    here so a built-in named invocation resolves the same bytes from any
+    working directory. The two copies are the same bytes; a test asserts that,
+    which is what lets a built-in recording's header carry a digest that
+    identifies a file a reader can actually open.
+
+    Linked rather than copied with a wildcard so a descriptor is embedded under
+    its own name, matching the resource prefix BuiltInScenarioCatalog looks up,
+    and so adding a descriptor is an explicit, reviewable line in this file.
+    (A wildcard include would also pick up descriptors that are examples only,
+    which are not built-ins and must not be resolvable by name.)
+  -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\scenarios\dungeon-infiltration.json"
+                      LogicalName="Lattice.Cli.scenarios.dungeon-infiltration.json" />
+    <EmbeddedResource Include="..\scenarios\collection-skirmish.json"
+                      LogicalName="Lattice.Cli.scenarios.collection-skirmish.json" />
+    <EmbeddedResource Include="..\scenarios\bottleneck-contention.json"
+                      LogicalName="Lattice.Cli.scenarios.bottleneck-contention.json" />
+  </ItemGroup>
+
 </Project>

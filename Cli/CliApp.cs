@@ -290,8 +290,20 @@ public static class CliApp
             var steps = flags.TryGetValue("--steps", out var stepsText)
                 ? ParsePositiveInt(stepsText, "--steps")
                 : DefaultSimulationSteps;
-            var scenario = flags.TryGetValue("--scenario", out var scenarioText)
-                ? scenarioText.ToLowerInvariant()
+
+            // A --scenario value is EITHER a path to a descriptor file or a
+            // built-in name — never both, and never guessed between. The test
+            // is a path separator, not a case-insensitive match against a name,
+            // so a file that happens to be called "infiltration" stays a file
+            // and a typo'd name is reported as a name rather than as a missing
+            // file.
+            if (flags.TryGetValue("--scenario", out var scenarioText) && LooksLikePath(scenarioText))
+            {
+                return SimulateScenarioFile(flags, scenarioText, seed, steps, quiet, stdout, stderr);
+            }
+
+            var scenario = flags.TryGetValue("--scenario", out var namedText)
+                ? namedText.ToLowerInvariant()
                 : "";
 
             if (scenario == InfiltrationScenario.ScenarioName)
@@ -302,7 +314,7 @@ public static class CliApp
             if (scenario.Length > 0)
             {
                 throw new ArgumentException(
-                    $"invalid --scenario '{scenarioText}' (expected 'infiltration').");
+                    $"invalid --scenario '{scenarioText}' (expected 'infiltration' or a path to a scenario file).");
             }
 
             var agent = flags.TryGetValue("--agent", out var agentText)
@@ -331,7 +343,9 @@ public static class CliApp
             var jsonl = new StringBuilder();
             using (var sink = new StringWriter(jsonl))
             {
-                TrajectoryWriter.Record(map, config, seed, scenarioResult.Turns, sink, rules: rules);
+                TrajectoryWriter.Record(
+                    map, config, seed, scenarioResult.Turns, sink, rules: rules,
+                    scenarioSha256: BuiltInScenarioDigest(BuiltInScenarioCatalog.Standard));
             }
 
             var lastInfo = scenarioResult.Results[^1].Info;
@@ -373,6 +387,169 @@ public static class CliApp
         {
             return Report(ex, stderr);
         }
+    }
+
+    /// <summary>
+    /// True when a <c>--scenario</c> value is a file path rather than a
+    /// built-in name. The test is a directory separator, on either platform's
+    /// convention, because that is what distinguishes them unambiguously: a
+    /// built-in name is a bare token, and a descriptor is a file. Deliberately
+    /// not a case-insensitive name comparison — that would make the two forms
+    /// ambiguous and could silently reinterpret a file as a name.
+    /// </summary>
+    private static bool LooksLikePath(string value) =>
+        value.Contains('/', StringComparison.Ordinal)
+        || value.Contains('\\', StringComparison.Ordinal);
+
+    /// <summary>
+    /// The SHA-256 of a built-in descriptor's exact committed bytes, which is
+    /// the provenance a built-in recording carries. Computed from the embedded
+    /// copy of the file; a test asserts the embedded bytes equal the committed
+    /// file's, so this digest identifies a file that is really in the tree.
+    /// </summary>
+    private static string BuiltInScenarioDigest(string id) =>
+        ScenarioLoader.ComputeDigest(BuiltInScenarioCatalog.Read(id));
+
+    /// <summary>
+    /// Records an episode from a declarative scenario descriptor: the file is
+    /// the authority for the map, the roster, the simulation config, and the
+    /// victory/scoring choice, and the recording carries the file's SHA-256 so
+    /// a reader can name the bytes behind it.
+    /// <para>
+    /// The descriptor's <c>StepLimit</c> and <c>--steps</c> are two statements
+    /// about the same thing, so the combination is stated rather than resolved
+    /// by precedence: passing both is refused, because either silently winning
+    /// would make the recorded budget different from the one the caller asked
+    /// for without saying so. <c>--agent</c> is likewise refused — the roster is
+    /// the descriptor's, and overriding one seat of a declared roster would make
+    /// the run something the file does not describe.
+    /// </para>
+    /// </summary>
+    private static int SimulateScenarioFile(
+        Dictionary<string, string> flags,
+        string path,
+        ulong seed,
+        int steps,
+        bool quiet,
+        TextWriter stdout,
+        TextWriter stderr)
+    {
+        if (flags.ContainsKey("--agent"))
+        {
+            throw new ArgumentException(
+                "--agent cannot be used with a scenario file: the roster is declared by the descriptor's 'Slots'.");
+        }
+
+        ScenarioDescriptor descriptor;
+        string digest;
+        try
+        {
+            (descriptor, digest) = ScenarioLoader.LoadFile(path);
+        }
+        catch (ScenarioValidationException ex)
+        {
+            foreach (var error in ex.Errors)
+            {
+                stderr.WriteLine($"scenario error: {error.FieldPath}: {error.Message}");
+            }
+
+            return Failure;
+        }
+
+        if (flags.ContainsKey("--steps"))
+        {
+            throw new ArgumentException(
+                $"--steps cannot be combined with a scenario file: the descriptor declares 'Simulation.StepLimit' " +
+                $"({descriptor.StepLimit}) and overriding it would make the recorded budget differ from the declared one.");
+        }
+
+        var config = new SimulationConfig(
+            descriptor.AgentCount, descriptor.StepLimit, TransitSpeed: descriptor.TransitSpeed);
+        var map = descriptor.BuildMap(seed);
+        var roster = BuildRoster(descriptor, config, seed, recordPerceptions: out var recordPerceptions);
+
+        var stopwatch = Stopwatch.StartNew();
+        var result = ScenarioRunner.Run(
+            map, config, roster, maxSteps: descriptor.StepLimit, recordPerceptions: recordPerceptions);
+        stopwatch.Stop();
+
+        var jsonl = new StringBuilder();
+        using (var sink = new StringWriter(jsonl))
+        {
+            TrajectoryWriter.Record(
+                map, config, seed, result.Turns, sink,
+                scenario: descriptor.Id,
+                agentRoles: descriptor.Slots.Select(slot => slot.Role ?? slot.Policy).ToArray(),
+                perceptions: result.Perceptions,
+                scenarioSha256: digest);
+        }
+
+        var lastInfo = result.Results[^1].Info;
+        stderr.WriteLine(
+            $"scenario {descriptor.Id} (sha256 {digest})");
+        stderr.WriteLine(
+            $"recorded {result.Metrics.TotalSteps} steps" +
+            $" ({(lastInfo.IsTerminal ? lastInfo.Reason : "budget-reached")}," +
+            $" winner: {(lastInfo.WinnerAgentId.HasValue ? $"agent {lastInfo.WinnerAgentId}" : "none")})");
+
+        var trajectory = jsonl.ToString().TrimEnd();
+        var exit = WriteOutput(flags, "--out", trajectory, stdout, stderr);
+        if (!quiet)
+        {
+            var rows = result.Metrics.Agents
+                .Select(metrics => new AgentScoreboardRow(
+                    metrics.AgentId,
+                    descriptor.Slots[metrics.AgentId].Role ?? descriptor.Slots[metrics.AgentId].Policy,
+                    roster[metrics.AgentId].GetType().Name,
+                    metrics.Score,
+                    GenericStatus(lastInfo, metrics.AgentId),
+                    metrics.Moves))
+                .ToArray();
+            RenderDashboard(
+                stderr, map, config, descriptor.Id, seed, result,
+                stopwatch.Elapsed.TotalMilliseconds, rows,
+                flags.TryGetValue("--out", out var outPath) ? outPath : null,
+                trajectory,
+                DynamicMapRuleSet.None);
+        }
+
+        return exit;
+    }
+
+    /// <summary>
+    /// Builds one agent per declared slot, in slot order, through each policy's
+    /// real constructor — so a descriptor cannot name a configuration the agent
+    /// does not have. Also reports whether the whole roster can carry
+    /// decision-time perceptions, which is all-or-nothing by the step contract
+    /// and is therefore a property of the roster rather than a per-slot choice.
+    /// </summary>
+    private static IAgent[] BuildRoster(
+        ScenarioDescriptor descriptor,
+        SimulationConfig config,
+        ulong seed,
+        out bool recordPerceptions)
+    {
+        var agents = new IAgent[descriptor.Slots.Count];
+        for (var i = 0; i < agents.Length; i++)
+        {
+            var slot = descriptor.Slots[i];
+            agents[i] = slot.Policy switch
+            {
+                "greedy" => new GreedyCollectorAgent(slot.Slot),
+                "random" => new RandomAgent(slot.Slot, new Rng(seed)),
+                "mcts" => new MctsAgent(slot.Slot, config, seed, new MctsSearchConfig()),
+                "scout" => new ScoutCollectorAgent(slot.Slot, slot.Vision),
+                "sentry" => new SentryPatrolAgent(slot.Slot, slot.RivalSlot!.Value, vision: slot.Vision),
+                "infiltrator" => new InfiltratorAgent(slot.Slot, slot.RivalSlot!.Value, vision: slot.Vision),
+                _ => throw new ArgumentException(
+                    $"scenario slot {slot.Slot} names policy '{slot.Policy}', which this build cannot construct."),
+            };
+        }
+
+        recordPerceptions = descriptor.Slots.All(
+            slot => ScenarioMechanics.PerceivingPolicies.Contains(slot.Policy, StringComparer.Ordinal));
+
+        return agents;
     }
 
     /// <summary>
@@ -418,7 +595,8 @@ public static class CliApp
                 sink,
                 scenario: InfiltrationScenario.ScenarioName,
                 agentRoles: new[] { InfiltrationScenario.SentryRole, InfiltrationScenario.InfiltratorRole },
-                perceptions: run.Base.Perceptions);
+                perceptions: run.Base.Perceptions,
+                scenarioSha256: BuiltInScenarioDigest(BuiltInScenarioCatalog.Infiltration));
         }
 
         var lastInfo = run.Base.Results[^1].Info;
@@ -940,12 +1118,24 @@ public static class CliApp
             var scenario = flags.TryGetValue("--scenario", out var scenarioText)
                 ? scenarioText.ToLowerInvariant()
                 : "standard";
+
+            // A --scenario value is EITHER a path to a descriptor or a built-in
+            // name, decided by the same separator test `simulate` uses, so the
+            // two forms are never confused. A file-loaded descriptor supplies
+            // the MAP for each seed; the study's roster and simulation protocol
+            // stay the study's, because a paired MCTS-vs-Scout number is only
+            // commensurable with other such numbers under that protocol.
+            if (LooksLikePath(scenario))
+            {
+                return EvaluateScenarioFile(flags, scenario, stdout, stderr);
+            }
+
             Func<ulong, MapGraph> mapFactory = scenario switch
             {
                 "standard" => seed => MapGenerator.Generate(seed, DefaultGeneratorConfig),
                 "bottleneck" => BottleneckScenario.ForSeed,
                 _ => throw new ArgumentException(
-                    $"invalid --scenario '{scenarioText}' (expected 'standard' and/or 'bottleneck')."),
+                    $"invalid --scenario '{scenarioText}' (expected 'standard' and/or 'bottleneck', or a path to a scenario file)."),
             };
 
             var search = new MctsSearchConfig(rolloutsPerAction: rollouts, maxDepth: 12);
@@ -976,6 +1166,103 @@ public static class CliApp
         {
             return Report(ex, stderr);
         }
+    }
+
+    /// <summary>
+    /// Runs the paired study on the map a declarative scenario descriptor
+    /// supplies, with the study's own protocol otherwise unchanged.
+    /// <para>
+    /// What the descriptor controls and what it does not is stated rather than
+    /// blurred. It supplies the <b>map</b> for every seed, and its SHA-256 is
+    /// printed so the run names the file it came from. It does <b>not</b>
+    /// supply the roster (the study is MCTS vs Scout, or an external candidate
+    /// in the MCTS seat) and does <b>not</b> supply the simulation config: a
+    /// paired delta is only commensurable with other paired deltas under the
+    /// same protocol, so silently adopting a descriptor's agent count or tick
+    /// budget would produce a number that looks like a published study and is
+    /// not one. A descriptor asking for something the protocol cannot honour —
+    /// anything other than two seats — is refused with the reason.
+    /// </para>
+    /// <para>
+    /// The artifact's field set is unchanged, because it is pinned to the
+    /// in-process shape by a golden fixture; the scenario digest goes to stderr
+    /// rather than into the JSON, so the published artifact format does not
+    /// move under a study that is otherwise identical to one already run.
+    /// </para>
+    /// </summary>
+    private static int EvaluateScenarioFile(
+        Dictionary<string, string> flags,
+        string path,
+        TextWriter stdout,
+        TextWriter stderr)
+    {
+        ScenarioDescriptor descriptor;
+        string digest;
+        try
+        {
+            (descriptor, digest) = ScenarioLoader.LoadFile(path);
+        }
+        catch (ScenarioValidationException ex)
+        {
+            foreach (var error in ex.Errors)
+            {
+                stderr.WriteLine($"scenario error: {error.FieldPath}: {error.Message}");
+            }
+
+            return Failure;
+        }
+
+        if (descriptor.AgentCount != EvaluationSimulationConfig.AgentCount)
+        {
+            throw new ArgumentException(
+                $"scenario '{descriptor.Id}' declares 'Simulation.AgentCount' = {descriptor.AgentCount}, but the paired " +
+                $"study is head-to-head and runs {EvaluationSimulationConfig.AgentCount} seats. A descriptor may supply the " +
+                "map for the study; the roster and the simulation protocol stay the study's, so that a paired delta stays " +
+                "commensurable with published studies.");
+        }
+
+        stderr.WriteLine($"scenario {descriptor.Id} (sha256 {digest}) supplies the study's map");
+
+        var suites = (flags.TryGetValue("--seed-set", out var setText)
+            ? setText.ToLowerInvariant()
+            : HeldOutSuite)
+            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        if (suites.Length == 0 || suites.Any(suite => suite is not (DevelopmentSuite or HeldOutSuite)))
+        {
+            throw new ArgumentException(
+                $"invalid --seed-set '{flags.GetValueOrDefault("--seed-set", HeldOutSuite)}' (expected '{DevelopmentSuite}' and/or '{HeldOutSuite}').");
+        }
+
+        var rollouts = flags.TryGetValue("--rollouts", out var rolloutsText)
+            ? ParsePositiveInt(rolloutsText, "--rollouts")
+            : DefaultEvaluationRollouts;
+        var seedCap = flags.TryGetValue("--seeds", out var capText)
+            ? ParsePositiveInt(capText, "--seeds")
+            : 50;
+
+        var search = new MctsSearchConfig(rolloutsPerAction: rollouts, maxDepth: 12);
+        var teams = new IAgentFactory[]
+        {
+            new MctsAgentFactory(EvaluationSimulationConfig, search, name: EvaluationTargetPolicy),
+            new ScoutCollectorAgentFactory(name: EvaluationBaselinePolicy),
+        };
+
+        var request = new EvaluateRequest(
+            suites,
+            rollouts,
+            seedCap,
+            flags.TryGetValue("--commit", out var commitText) ? commitText : null,
+            descriptor.Id,
+            descriptor.BuildMap,
+            teams,
+            flags.TryGetValue("--agent-cmd", out var commandText) ? commandText : null,
+            flags.TryGetValue("--agent-step-timeout-ms", out var stepText)
+                ? ParseAgentStepTimeoutMs(stepText)
+                : ExternalTimeLimits.DefaultStepTimeoutMs);
+
+        return request.AgentCommand is null
+            ? EvaluateInProcess(request, flags, stdout, stderr)
+            : EvaluateExternal(request, flags, stdout, stderr);
     }
 
     /// <summary>

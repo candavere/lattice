@@ -194,20 +194,53 @@ the generator:
 | `Map` | yes | The fully materialized map graph. |
 | `SimulationConfig` | yes | Configuration used to rebuild the environment. |
 | `DynamicRules` | no | The dynamic topology policy; omitted (null) for static maps. |
-| `SchemaVersion` | yes | Wire format stamp; the current version is `TrajectorySchema.CurrentVersion` (currently `4`). |
+| `SchemaVersion` | yes | Wire format stamp; the current version is `TrajectorySchema.CurrentVersion` (currently `5`). |
 | `Scenario` | no | Demonstration-layer metadata; ignored by the replay core. |
 | `AgentRoles` | no | Demonstration-layer roster metadata; ignored by the replay core. |
 | `AgentVision` | no | Schema 4: the perception cone, in graph hops, each agent's own filter was built with, indexed by agent slot. Present exactly when the step lines carry `Perceptions`, and omitted otherwise. |
+| `ScenarioSha256` | no | Schema 5: the SHA-256 digest, in lowercase hex, of the declarative scenario descriptor's exact source bytes. Written on every recording this build produces, and omitted on any recording made before schema 5. |
 
-Newly written files carry `TrajectorySchema.CurrentVersion` (currently `4`);
+Newly written files carry `TrajectorySchema.CurrentVersion` (currently `5`);
 this document cites that constant rather than a bare literal, so it cannot
 drift out of step with the code. Schema 2 introduced the episode's dynamic
 topology policy (`DynamicRules`, timed portcullises and event locks), which the
 current schema still records, so a replay recreates the exact choke-capacity
 schedule the recording was made under. Schema 4 adds the decision-time
-perceptions, described below. The simulation config is the required
+perceptions and schema 5 the scenario digest, both described below. The
+simulation config is the required
 second half of that contract: a replay with a different config is not a replay
 of the same episode.
+
+#### What schema 5 adds
+
+Schema 5 adds one optional header field, `ScenarioSha256`. It changes nothing
+else: the map, the config, the step lines, the per-tick state hashes, and the
+decision-time perceptions are all exactly as schema 4 left them.
+
+- **It names the declaration, not the world.** The digest is the SHA-256 of the
+  scenario descriptor file's exact source bytes, read once, displayed in
+  lowercase hex. It is **not** a `SimulationStateHash`, the two are computed
+  over different things, and they are never compared to each other.
+- **Every recording this build produces carries one.** A file-loaded run
+  carries the digest of the file it was given; a built-in named invocation
+  carries the digest of the committed descriptor that built-in resolves
+  through. The digest is therefore a value a reader can look up in the tree.
+- **It is provenance, not an assertion replay can check.** The recording stays
+  self-contained and never reopens the descriptor, so there is nothing for
+  replay to recompute the digest against. A schema-5 recording whose digest is
+  absent therefore verifies on every tick and reports
+  `no scenario digest: the recording does not name the descriptor that produced it`
+  as a **notice**. This is deliberately unlike the state hash, whose absence
+  from a schema-3-or-newer recording is a **problem**: the state hash is
+  something replay recomputes and compares, so stripping it could hide a
+  tampered state, whereas the scenario digest could not.
+- **A malformed digest is rejected at read time.** A `ScenarioSha256` that is
+  not 64 lowercase hex characters fails with a named error, rather than being
+  carried into a report that would print a value no reader could compare.
+- **Rewrites neither add nor drop it.** `TrajectoryWriter.Write` re-emits each
+  recording's own header version and its own digest, so rewriting a pre-schema-5
+  file cannot promote it to schema 5 with no digest present, and rewriting a
+  schema-5 file cannot lose the digest it carries.
 
 #### What schema 3 adds
 
@@ -317,7 +350,15 @@ check: what each agent actually saw when it chose.
 - **Backward compatibility.** Files written before the `DynamicRules` field
   existed read back as schema version `0` — the static-map contract — and are
   still accepted. The absence of `DynamicRules` is interpreted as "static map,
-  no dynamic rules", not as unknown data.
+  no dynamic rules", not as unknown data. **Schema 0 through 4 recordings
+  remain readable, replayable, and verifiable under schema 5 unchanged**: the
+  scenario digest is a new *optional* field, omitted when absent, so an older
+  recording is not rewritten or rejected by its absence — it simply has no
+  digest, the same way a pre-schema-3 recording has no state hash. The
+  committed schema-4 recording `../site/infiltration.jsonl` and the schema-3
+  recordings `../site/demo.jsonl` and the golden fixture are the standing
+  backward-compatibility evidence, and `Tests/Cli/ScenarioProvenanceTests.cs`
+  replays and verifies all three.
 - **Forward compatibility is refused, not guessed.** A header whose
   `SchemaVersion` is newer than the version this library writes is rejected with
   an explicit error. Version skew fails loudly rather than replaying under the
@@ -341,7 +382,12 @@ perception notice. The committed
 [`../site/infiltration.jsonl`](../site/infiltration.jsonl) is the schema-4
 counterpart (seed 42, 20 steps, per-agent vision `[2, 2]`), and
 `../site/demo.jsonl` remains a schema-3 recording with no perceptions, which is
-why the viewer labels its sightline a reconstruction rather than a record.
+why the viewer labels its sightline a reconstruction rather than a record. Both
+are **pre-schema-5 and stay that way on purpose**: they are the committed
+evidence that a recording without a scenario digest is still read, still
+verified, and reports no digest notice. Newly recorded artifacts carry schema
+5; these two are the legacy half of the compatibility contract, not stale
+files awaiting regeneration.
 
 ### Viewer claim semantics
 

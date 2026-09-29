@@ -2573,6 +2573,14 @@
       ['Scenario', hdr.Scenario ? hdr.Scenario : 'sampling run (no scenario)'],
       ['Agent roles', hdr.AgentRoles && hdr.AgentRoles.length ? hdr.AgentRoles.join(' vs ') : 'not recorded in the header'],
       ['Wire schema', 'v' + schema + (schema === 0 ? ' — recorded before the current v2 stamp' : '')],
+      ['Scenario digest', hdr.ScenarioSha256
+        ? hdr.ScenarioSha256
+        : 'not recorded — made before schema 5, so it names no descriptor'],
+      // The scenario digest identifies the descriptor FILE; the per-tick state
+      // hash identifies the simulation STATE. They are computed over different
+      // things, so the row says which is which rather than blending them.
+      ['Scenario digest is', 'the SHA-256 of the descriptor\'s exact bytes — the declaration, not the world state '
+        + '(per-tick state digests are a separate field)'],
       ['Ticks', String(Math.max(0, traj.frames.length - 1)) + ' recorded'],
       ['Config', 'agents ' + (cfg.AgentCount !== undefined ? cfg.AgentCount : '?') +
         ' · max ticks ' + (cfg.MaxTicks !== undefined ? cfg.MaxTicks : '?') +
@@ -2869,6 +2877,11 @@
       SchemaVersion: decoded[0].SchemaVersion,
       DynamicRules: decoded[0].DynamicRules || null,
       AgentVision: decoded[0].AgentVision || null,
+      // Schema 5 adds the SHA-256 of the scenario descriptor's exact source
+      // bytes. It is optional on the wire — every pre-schema-5 recording
+      // (including both committed site recordings) has none — so it resolves
+      // to null and the provenance panel says so rather than inventing a value.
+      ScenarioSha256: decoded[0].ScenarioSha256 || null,
     };
     const steps = [];
     // Schema 4 records, per step, what each agent's own perception filter

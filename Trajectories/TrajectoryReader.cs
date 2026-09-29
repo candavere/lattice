@@ -80,6 +80,17 @@ public static class TrajectoryReader
         PerceptionProjector.ReadVision(
             header.SimulationConfig.AgentCount, header.AgentVision, "header line");
 
+        // The scenario digest is optional on the wire too — a recording made
+        // before schema 5 legitimately has none — but a digest that is PRESENT
+        // must be well-formed. An unparseable one is rejected here rather than
+        // carried into a report that would print a value no reader could
+        // compare against a file.
+        if (header.ScenarioSha256 is { } scenarioSha && !IsSha256Hex(scenarioSha))
+        {
+            throw new InvalidDataException(
+                $"The header line has a 'ScenarioSha256' that is not 64 lowercase hex characters: '{scenarioSha}'.");
+        }
+
         if (header.SchemaVersion > TrajectorySchema.CurrentVersion)
         {
             throw new InvalidDataException(

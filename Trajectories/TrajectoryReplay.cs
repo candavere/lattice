@@ -66,6 +66,30 @@ public static class TrajectoryReplay
         "no recorded perception: decision-time visibility not verified";
 
     /// <summary>
+    /// The notice emitted when a recording carries no
+    /// <see cref="TrajectoryHeader.ScenarioSha256"/>, so the pass cannot say
+    /// which scenario descriptor produced the episode. The mirror of
+    /// <see cref="NoStateHashNotice"/> for provenance: a reader that did not
+    /// check the digest must not report a pass that reads as though it had.
+    /// A recording made before schema 5 predates the field and is not nagged
+    /// about it — the notice is for a schema-5 recording whose digest was
+    /// stripped, which is the case worth reporting.
+    /// </summary>
+    public const string NoScenarioDigestNotice =
+        "no scenario digest: the recording does not name the descriptor that produced it";
+
+    /// <summary>
+    /// The first schema version in which a recording is expected to carry a
+    /// <see cref="TrajectoryHeader.ScenarioSha256"/>. This is an
+    /// informational, not an adjudicating, version: a schema-5 recording
+    /// without the field verifies on everything else and says so, because the
+    /// digest is provenance about a file that replay never reopens (the
+    /// recording stays self-contained). There is nothing for replay to check
+    /// the digest against, and it does not pretend otherwise.
+    /// </summary>
+    public const int ScenarioDigestVersion = 5;
+
+    /// <summary>
     /// Replays the recorded actions from a fresh initial state and returns
     /// the resulting StepResults in order (stopping at the recorded terminal
     /// tick, like <see cref="SimulationDriver"/>). Purely for inspection;
@@ -221,6 +245,8 @@ public static class TrajectoryReplay
 
         AppendPerceptionProblems(problems, notices, recording, preStepStates, turns);
 
+        AppendScenarioDigestNotice(notices, recording);
+
         AppendFinalProblems(problems, recording.Final, TrajectoryWriter.BuildFinal(finalState, lastInfo));
 
         return new TrajectoryVerification(problems, notices);
@@ -336,6 +362,29 @@ public static class TrajectoryReplay
                         $"Step {step.StepNumber} perception diverges from replay for agent {agentId}.");
                 }
             }
+        }
+    }
+
+    /// <summary>
+    /// Reports, rather than adjudicates, the absence of a scenario digest.
+    /// <para>
+    /// This is a notice and never a problem, and the asymmetry with the state
+    /// hash is deliberate. The state hash is something replay <em>recomputes</em>
+    /// and compares, so its absence from a schema-3-or-newer recording is a
+    /// self-inconsistency worth failing. The scenario digest is something replay
+    /// cannot recompute: it identifies a file that a self-contained recording
+    /// deliberately does not reopen, so there is nothing to compare it against
+    /// and no way for stripping it to have hidden a tampered state. A
+    /// schema-5 recording without one therefore still verifies on every tick,
+    /// and says out loud that it could not name its descriptor.
+    /// </para>
+    /// </summary>
+    private static void AppendScenarioDigestNotice(List<string> notices, TrajectoryRecording recording)
+    {
+        if (recording.Header.ScenarioSha256 is null
+            && recording.Header.SchemaVersion >= ScenarioDigestVersion)
+        {
+            notices.Add(NoScenarioDigestNotice);
         }
     }
 

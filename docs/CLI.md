@@ -32,7 +32,7 @@ retry budget yields no fair map exits non-zero.
 | `--seed <ulong>` | Required RNG seed for map generation and agents |
 | `--steps <n>` | Tick budget; default 100. Episode ends on budget or when all resources are claimed |
 | `--agent <greedy\|random\|mcts>` | Policy for player 0 (default `greedy`); `mcts` selects the evaluation subject |
-| `--scenario <infiltration>` | Fixed Dungeon Infiltration & Sentry Patrol scenario; `--agent` is forbidden |
+| `--scenario <infiltration>` | Fixed Dungeon Infiltration & Sentry Patrol scenario; `--agent` is forbidden. A **path** to a scenario file is also accepted; see [above](#simulate--record-an-episode-from-a-scenario-file) |
 | `--rules <file>` | Load a JSON `DynamicMapRuleSet` into the episode |
 | `--out <file>` | Write trajectory to a file instead of stdout |
 
@@ -124,6 +124,69 @@ before each, per-step latency into one histogram, managed allocation via
 `GC.GetAllocatedBytesForCurrentThread`, and Gen0/1/2 collection-count deltas.
 Every measured iteration must reproduce the warm-up anchor's step digest —
 off-script runs fail loudly instead of reporting timings.
+
+## simulate — record an episode from a scenario file
+
+`--scenario` takes **either** a built-in name **or** a path to a descriptor
+file. The two are told apart by a path separator, never by a case-insensitive
+name match, so a file that happens to be called `infiltration` stays a file and
+a mistyped built-in name is reported as a name.
+
+```sh
+dotnet run --project Cli -- simulate --seed 42 --scenario scenarios/gated-vault-duel.json
+```
+
+```
+scenario gated-vault-duel (sha256 a483b1a5143c51e122449594d6aabbec48e507700afafaf5a53fcf6516cc2523)
+recorded 12 steps (resources-exhausted, winner: agent 0)
+```
+
+The descriptor is the authority: it supplies the map, the roster, the agent
+count, the tick budget, and the transit speed, and the recording's header
+carries the descriptor's SHA-256. A roster whose policies carry perception
+filters (a sentry/infiltrator pair) is recorded with decision-time
+perceptions; a roster that does not is recorded without them, because the
+recording is all-or-nothing across the roster.
+
+### Compatibility rules, stated rather than resolved
+
+Some flags state the same thing the descriptor does. When both are present the
+command **refuses**, because a silent precedence would make the recording
+disagree with what the caller asked for without saying so:
+
+| Combination | Behaviour |
+| :--- | :--- |
+| `--steps` with a scenario file | Refused. The descriptor's `Simulation.StepLimit` governs; passing both is a contradiction, and the error names the declared budget |
+| `--agent` with a scenario file | Refused. The roster is the descriptor's `Slots`; overriding one seat would make the run something the file does not describe |
+| `--rules` with a scenario file | Refused. Dynamic topology is not part of the descriptor schema in this release |
+
+## evaluate — a paired study on a scenario file's map
+
+`evaluate --scenario <path>` runs the mirrored-seat paired study on the map a
+descriptor supplies, with the study's protocol otherwise unchanged.
+
+```sh
+dotnet run --project Cli -- evaluate --scenario scenarios/bottleneck-contention.json \
+  --seed-set dev,heldout --seeds 30 --rollouts 32
+```
+
+What the descriptor controls and what it does not is deliberate:
+
+- It **supplies the map** for every seed, and its SHA-256 is printed so the run
+  names the file it came from.
+- It does **not** supply the roster — the study remains MCTS vs Scout, or an
+  external candidate in the MCTS seat under `--agent-cmd`.
+- It does **not** supply the simulation config. A paired delta is only
+  commensurable with other paired deltas under the same protocol, so adopting a
+  descriptor's agent count or tick budget would produce a number shaped like a
+  published study and not comparable to one. A descriptor declaring other than
+  **two seats** is refused, with the reason.
+
+The **artifact field set is unchanged** by a file-loaded study. It is pinned to
+the in-process shape by a golden fixture, and the scenario digest goes to stderr
+rather than into the JSON, so the published artifact format does not move under a
+study that is otherwise identical to one already run. A file-loaded bottleneck
+study produces the same per-seed rows and statistics as `--scenario bottleneck`.
 
 ## validate-scenario — check a declarative scenario descriptor
 
@@ -271,7 +334,7 @@ header. The contract is exact:
 | `--seed-set <dev\|heldout>` | Canonical suites: `dev` = 1001..1050, `heldout` = 2001..2050 |
 | `--rollouts <n>` | MCTS rollouts per action; default 32 |
 | `--seeds <n>` | Cap on seeds per suite (default 50; the decision rule needs ≥ 30) |
-| `--scenario <standard\|bottleneck>` | `standard` = generated maps; `bottleneck` = capacity-1 choke contention family |
+| `--scenario <standard\|bottleneck>` | `standard` = generated maps; `bottleneck` = capacity-1 choke contention family. A **path** to a scenario file is also accepted and supplies the study's map; see [above](#evaluate--a-paired-study-on-a-scenario-files-map) |
 | `--commit <sha>` | Source revision recorded in the artifact |
 | `--out <file>` | Write the JSON artifact to a file instead of stdout |
 | `--agent-cmd "<command line>"` | Score an external agent process as the candidate (see below) |

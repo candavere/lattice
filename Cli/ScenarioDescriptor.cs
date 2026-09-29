@@ -141,6 +141,7 @@ public abstract record ScenarioMapSpec
         {
             BuiltInScenarios.StandardFamily => MapGenerator.Generate(seed, BuiltInScenarios.DefaultGeneratorConfig),
             BuiltInScenarios.BottleneckFamily => BottleneckScenario.ForSeed(seed),
+            BuiltInScenarios.DungeonFamily => DungeonMapBuilder.Build(seed),
             _ => throw new InvalidOperationException($"Unknown generator family '{family}'."),
         };
 
@@ -188,6 +189,16 @@ public static class BuiltInScenarios
 
     /// <summary>The seeded capacity-1 contention family (<c>evaluate --scenario bottleneck</c>).</summary>
     public const string BottleneckFamily = "bottleneck";
+
+    /// <summary>
+    /// The seeded fixed-topology dungeon family
+    /// (<c>simulate --scenario infiltration</c>). The rooms and gates are fixed;
+    /// the seed scales the treasury, so adjacent seeds differ in how much there
+    /// is to steal. It is a family rather than a static map precisely because
+    /// of that variation: authoring the dungeon as a hand-authored graph would
+    /// freeze the chest count and stop it being the built-in it re-expresses.
+    /// </summary>
+    public const string DungeonFamily = "dungeon";
 
     /// <summary>
     /// The generator configuration the standard family is built with — the same
@@ -558,7 +569,7 @@ public static class ScenarioLoader
             generator,
             "Family",
             null,
-            [BuiltInScenarios.StandardFamily, BuiltInScenarios.BottleneckFamily],
+            [BuiltInScenarios.StandardFamily, BuiltInScenarios.BottleneckFamily, BuiltInScenarios.DungeonFamily],
             errors,
             prefix: "Map.Generator.");
 

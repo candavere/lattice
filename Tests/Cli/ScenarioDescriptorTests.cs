@@ -63,25 +63,42 @@ public class ScenarioDescriptorTests
 
         Assert.Equal(ScenarioLoader.CurrentSchemaVersion, descriptor.SchemaVersion);
         Assert.Matches("^[a-z0-9]+(-[a-z0-9]+)*$", descriptor.Id);
-        Assert.Equal(64, digest.Length);
         Assert.Matches("^[0-9a-f]{64}$", digest);
     }
 
     [Fact]
     public void AStaticMap_IsMaterializedExactlyAsAuthored()
     {
-        var (descriptor, _) = ScenarioLoader.LoadFile(Committed("scenarios/dungeon-infiltration.json"));
+        var (descriptor, _) = ScenarioLoader.LoadFile(Committed("scenarios/gated-vault-duel.json"));
 
         var map = Assert.IsType<ScenarioMapSpec.Static>(descriptor.Map).Map;
-        Assert.Equal(6, map.Zones.Length);
-        Assert.Equal(7, map.ChokePoints.Length);
+        Assert.Equal(2, map.Zones.Length);
+        Assert.Single(map.ChokePoints);
         Assert.Equal(3, map.Resources.Length);
         Assert.All(map.ChokePoints, choke => Assert.Equal(1, choke.MaxOccupancy));
 
         // A static map is the same graph for every seed, which is the point of
         // hand-authoring: the topology is in the file, not in a generator.
-        Assert.Equal(map, descriptor.BuildMap(1));
-        Assert.Equal(map, descriptor.BuildMap(999_999));
+        // Compared through the serialized form because MapGraph's arrays compare
+        // by reference.
+        var authored = System.Text.Json.JsonSerializer.Serialize(map);
+        Assert.Equal(authored, System.Text.Json.JsonSerializer.Serialize(descriptor.BuildMap(1)));
+        Assert.Equal(authored, System.Text.Json.JsonSerializer.Serialize(descriptor.BuildMap(999_999)));
+    }
+
+    [Fact]
+    public void TheDungeonFamily_VariesWithTheSeedLikeTheBuiltIn()
+    {
+        // The infiltration dungeon is a seeded family, not a static graph: its
+        // rooms and gates are fixed but the seed scales the treasury. Authoring
+        // it as `static` would have frozen the chest count and stopped it being
+        // the built-in it re-expresses.
+        var (descriptor, _) = ScenarioLoader.LoadFile(Committed("scenarios/dungeon-infiltration.json"));
+
+        Assert.IsType<ScenarioMapSpec.Generated>(descriptor.Map);
+        Assert.Equal(6, descriptor.BuildMap(42).Zones.Length);
+        Assert.Equal(7, descriptor.BuildMap(42).ChokePoints.Length);
+        Assert.InRange(descriptor.BuildMap(42).Resources.Length, 3, 4);
     }
 
     [Fact]

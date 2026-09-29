@@ -41,6 +41,66 @@ state; it creates no release and no tag. The `v3.0.0` narrative below and
   derived values. Engine, agent, CLI, protocol, and test sources are
   unchanged.
 
+### Changed
+
+- **Recordings moved to trajectory schema 5, which records the scenario
+  descriptor's SHA-256.** The trajectory header gains one optional field,
+  `ScenarioSha256`: the SHA-256, in lowercase hex, of the declarative scenario
+  descriptor a recording was produced from, taken over that file's exact source
+  bytes, read once. `TrajectorySchema.CurrentVersion` is now `5`.
+
+  **Every recording this build produces carries a digest** — a file-loaded run
+  carries the digest of the file it was given, and a built-in named invocation
+  carries the digest of the committed descriptor that built-in now resolves
+  through, so a built-in run names a file a reader can actually open. The
+  digest is **not** a per-tick `SimulationStateHash` and the two are never
+  compared: the scenario digest names the *declaration*, the state hash names
+  the *world* at one tick.
+
+  **Schema 0 through 4 recordings remain readable, replayable, and verifiable
+  unchanged.** The digest is a new optional field, omitted when absent, so an
+  older recording is not rewritten or rejected by its absence. The committed
+  `site/infiltration.jsonl` (schema 4) and `site/demo.jsonl` and the golden
+  fixture (schema 3) stay at their own versions **on purpose** — they are the
+  standing backward-compatibility evidence, and CI's site-recording gate
+  continues to replay them. A schema-5 recording whose digest is absent verifies
+  on every tick and reports
+  `no scenario digest: the recording does not name the descriptor that produced it`
+  as a *notice* — deliberately unlike the state hash, whose absence from a
+  schema-3-or-newer recording is a *problem*, because replay recomputes the
+  state hash and so can detect its removal, while it cannot recompute a digest
+  against a file a self-contained recording never reopens. A malformed digest
+  is rejected at read time.
+
+  **Legacy raw recording digests necessarily change, and the change is
+  reported honestly rather than papered over.** The new header field and the
+  version stamp are additive, so a pre-change recording and its post-change
+  counterpart are *not* byte-identical. Equivalence is claimed precisely
+  instead: for every built-in across several development and held-out seeds, the
+  post-change header equals the pre-change header after removing **only** the
+  `ScenarioSha256` and `SchemaVersion` fields, and every per-tick
+  `SimulationStateHash` is identical. A file-loaded equivalent of a built-in
+  matches the built-in line for line after removing only the digest and the two
+  presentation labels each form spells its own way.
+
+- **A scenario descriptor now drives `simulate` and `evaluate`.**
+  `simulate --scenario <path>` records an episode whose map, roster, agent
+  count, tick budget, and transit speed all come from the descriptor, and
+  `evaluate --scenario <path>` runs the paired study on a descriptor's map with
+  the study's protocol otherwise unchanged. `--scenario` distinguishes a file
+  from a built-in name by a path separator, never by a case-insensitive name
+  match, so a file called `infiltration` stays a file. Flag combinations that
+  contradict a descriptor — `--steps`, `--agent` — are **refused with a stated
+  reason** rather than resolved by a silent precedence, and an `evaluate` study
+  refuses a descriptor that does not declare two seats, so a paired delta stays
+  commensurable with published studies. A file-loaded study leaves the
+  evaluation artifact's field set unchanged, so the published artifact format
+  does not move.
+
+- **The site viewer shows the scenario digest.** The provenance panel reports
+  `ScenarioSha256` when a recording carries one and says plainly that a
+  pre-schema-5 recording names no descriptor, rather than inventing a value.
+
 ### Added
 
 - **Declarative scenario files, and a `validate-scenario` command.** An
@@ -82,9 +142,7 @@ state; it creates no release and no tag. The `v3.0.0` narrative below and
 
   `Cli/ScenarioDescriptor.cs`, `scenarios/*.json`,
   `Tests/fixtures/scenarios/invalid/`, `docs/SCENARIOS.md`, and the
-  `docs/CLI.md` / `README.md` references land together with the behaviour. This
-  stage adds the format and its validator; wiring a descriptor into `simulate`
-  and `evaluate` is a later stage and is not claimed here.
+  `docs/CLI.md` / `README.md` references land together with the behaviour.
 
 - **Ubuntu 26.04 compatibility probe (informational).** CI gains a distinctly
   named `ubuntu-26.04` job that restores, builds in Release, runs the golden

@@ -60,15 +60,24 @@ Where each box in that diagram is implemented, at this commit:
 | `lattice analyze` | `Cli/CliApp.cs:220`, over `Analytics/` |
 | `site/ replay viewer` | `site/app.js`, deployed by `.github/workflows/pages.yml` |
 | `lattice benchmark` | `Cli/CliApp.cs:222`; five workloads on fresh simulations, never on a recording |
-| `throughput JSON` | the regression gate arms only on a full host match, at `.github/workflows/compare_benchmarks.py:163-165` |
+| `throughput JSON` | the strict gate arms only on a full host match, at `.github/workflows/compare_benchmarks.py:518-543`; the hosted arm64 `runner-class-gate` record is currently disarmed (`ArmedWorkloads: []`) and so enforces nothing |
 | `lattice evaluate` | `Cli/CliApp.cs:223`; the pass/fail verdict is composed at `Agents/PairedEvaluation.cs:145-150` |
 | `lattice evaluate --agent-cmd` | the candidate seat, with the command line split without a shell at `Cli/CliApp.cs:808`; the child process is launched from `Agents/External/ExternalAgentLaunch.cs:84` |
-| `tests + fixtures` → `CI on 3 operating systems` | the golden-trajectory replay gate runs on every matrix OS at `.github/workflows/ci.yml:32` |
+| `tests + fixtures` → `CI on 3 operating systems` | the golden-trajectory replay gate runs on every matrix OS at `.github/workflows/ci.yml:42-43` |
 
 [Replay the infiltration recording in your browser](https://candavere.github.io/lattice/).
 The page replays committed recordings only: ground truth shows everything a
 recording carried, and an agent view dims what that agent could not have
 reached. Nothing is recomputed from a new simulation in your browser.
+
+The viewer reports what a recording actually supports, and distinguishes the
+three counts that are easy to conflate: `claimed in world`, the observer's own
+`claims seen` (schema 4), and `claims in derived view` where nothing was
+recorded. A frame with no recorded perception reports no count rather than
+inventing one, and zone-table presence follows the painted ego view. The
+detailed table of claim and presence semantics, and the pixel and geometry
+tests that pin them, are in
+[`docs/SUPPORT_AND_REPRODUCIBILITY.md`](docs/SUPPORT_AND_REPRODUCIBILITY.md#viewer-claim-semantics).
 
 ## Bring your own agent
 
@@ -146,17 +155,20 @@ in-process MCTS study shows in [Results](#results).
 Every claim on this page has a command you can run and a committed artifact it
 rests on. Unless a row names a revision, the output fragments below are
 verbatim from runs at the commit that introduced this page, on a macOS arm64
-host with .NET 10.0.12. A local run is evidence that the command worked on one
-machine, not that CI is green; the current per-OS CI counts are the CI
+host. Host metadata — CPU, cores, OS, and the exact .NET runtime build — is
+recorded in the committed artifacts rather than restated here as a standing
+fact; the `benchmarks/*.json` files are the authority for it. A local run is
+evidence that the command worked on one machine, not that CI is green; the
+current per-OS CI counts are the CI
 artifacts linked under [Test totals, as CI publishes them](#test-totals-as-ci-publishes-them).
 
 | Claim | Verify with | Rests on |
 | :--- | :--- | :--- |
-| Same seed, same arguments, same bytes. | `dotnet run -c Release --project Cli -- simulate --seed 42 --scenario infiltration --steps 100 --out a.jsonl` twice, then `shasum -a 256 a.jsonl b.jsonl` | Both runs hash to `fe213bd5…d57f3f5`, which is the committed [`site/infiltration.jsonl`](site/infiltration.jsonl). `--seed 43` hashes to `18994817…9e8cd`. |
+| Same seed, same arguments, same bytes. | `dotnet run -c Release --project Cli -- simulate --seed 42 --scenario infiltration --steps 100 --out a.jsonl`, then the same again with `--out b.jsonl`, then `shasum -a 256 a.jsonl b.jsonl` | Both runs hash to `22f9b0fe391fa7dd…abf4cfc`, which is the committed [`site/infiltration.jsonl`](site/infiltration.jsonl) (114,983 bytes, schema 4). Verified by running the command twice outside the repository on a macOS arm64 host at the current tree; both outputs matched the committed file byte for byte. Scoped to a macOS arm64 host on the .NET 10 runtime the artifacts record. |
 | Replay is hash-verified, not just re-run. | `dotnet run -c Release --project Cli -- replay Tests/fixtures/golden_trajectory.jsonl --verify` | `replay verified: 12 step(s) serialized-equivalent, 12 state hash(es) matched (seed 2024, schema v3).` Exit 0. Digest computed by [`Trajectories/SimulationStateHash.cs`](Trajectories/SimulationStateHash.cs), compared in [`Trajectories/TrajectoryReplay.cs`](Trajectories/TrajectoryReplay.cs). |
 | The same check runs on all three operating systems. | Read the `Build & test` matrix in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | The golden replay-verify step is a matrix step over `ubuntu-latest`, `windows-latest`, `macos-latest`; run [36302783294](https://github.com/candavere/lattice/actions/runs/36302783294) shows all three green. |
 | Every committed recording replays, not just the golden one. | `dotnet run -c Release --project Cli -- replay site/demo.jsonl --verify` and the same for `site/infiltration.jsonl` | `27 step(s) … 27 state hash(es) matched` and `20 step(s) … 20 state hash(es) matched`. A separate CI job replays every recording under `site/`. |
-| The suite has 711 tests. | `dotnet test Lattice.sln -c Release` | Historical: `Passed! - Failed: 0, Passed: 711, Skipped: 0, Total: 711`, recorded at `a8b2fc6` (the v3.0.0 release commit), not at the current head. 711 is the discovered test count, and it is not a claim that any given run passes 711 — see [flaky tests](#flaky-tests-are-known-and-listed) and the CI artifacts for the current per-OS counts. |
+| The suite had 711 tests at the v3.0.0 release commit. | `dotnet test Lattice.sln -c Release` | Historical: `Passed! - Failed: 0, Passed: 711, Skipped: 0, Total: 711`, recorded at `a8b2fc6` (the v3.0.0 release commit). It is **not** the current head count — schema-4 decision-time perception and other post-release work added tests after that revision. For today's totals, use the per-OS head-matched TRX summary artifacts, not this number: see [Test totals, as CI publishes them](#test-totals-as-ci-publishes-them). |
 | A paired study needs 30 seeds, and the rule is mean > 0 **and** CI lower > 0. | `dotnet run -c Release --project Cli -- evaluate --scenario standard --seed-set dev --seeds 29 --agent-cmd "python3 examples/python/lattice_agent.py"`, then the same with `--seeds 30` | `--seeds 29` → `Not graded: 29 seeds is below the 30-seed floor of the decision rule (the canonical suites run 50).` `--seeds 30` → `Fail: mean paired delta -0.383 and/or the 95% CI lower bound -0.672 did not clear 0 on 30 seeds.` The rule is [`Agents/PairedEvaluation.cs:144-145`](Agents/PairedEvaluation.cs): `graded = deltas.Length >= 30` and `passed = graded && mean > 0.0 && ciLower > 0.0`, with `ConfidenceLevel = 0.95` at line 74. |
 | Every protocol failure is a loss, never a retry. | `dotnet run -c Release --project Cli -- evaluate --scenario standard --seed-set dev --seeds 2 --agent-step-timeout-ms 300 --agent-cmd "python3 crash.py"`, where `crash.py` is `import sys; sys.exit(3)` | `"AgentFailures": {"agent_crashed": 4}`, `VoidRuns: 0`, wins/draws/losses `0/0/4` of 4. The reason set is the closed fourteen-code table at [`docs/EXTERNAL_AGENT_PROTOCOL.md` §8](docs/EXTERNAL_AGENT_PROTOCOL.md) and [`Protocol/ProtocolReasons.cs:17-30`](Protocol/ProtocolReasons.cs); thirteen are agent-attributable and one, `host_limit`, is host-attributable. |
 | A failed match forfeits: external side 0, opponent keeps its score, partials are diagnostic only. | An agent that plays normally, then `sys.exit(3)` at step 10, over 3 seeds | `AgentForfeits` rows read `"PartialScoreAtSlot0": 2, "PartialScoreAtSlot1": 3, "ScoredExternalScore": 0, "ScoredOpponentScore": 3` — the external side's 2 and 3 are recorded but not scored, and the opponent keeps 3 and 2. `AgentFailures: {"agent_crashed": 6}`, all 6 matches losses, mean delta −2.333. |
@@ -293,7 +305,7 @@ disagree are called out below rather than resolved.
   doc describes exactly this rule
   ([`docs/SUPPORT_AND_REPRODUCIBILITY.md`](docs/SUPPORT_AND_REPRODUCIBILITY.md),
   section 5), so doc and code agree here.
-- **Replay equivalence gate.** `.github/workflows/ci.yml:31-32` runs
+- **Replay equivalence gate.** `.github/workflows/ci.yml:42-43` runs
   `dotnet run -c Release --project Cli -- replay Tests/fixtures/golden_trajectory.jsonl --verify`
   on Ubuntu, macOS, and Windows. `Trajectories/TrajectoryReplay.cs`
   (`VerifyDetailed`) rebuilds a fresh simulation from the trajectory header,
@@ -315,12 +327,12 @@ disagree are called out below rather than resolved.
   thresholds in the workflow are 0.75 global, 0.6 for `micro_raw_2agent`, and
   0.85 for `policy_lookahead_mcts_32` (`benchmarks.yml:88-90`); otherwise the
   threshold is derived statistically from the baseline's own dispersion
-  (`.github/workflows/compare_benchmarks.py:96-112`), with the CLI default
-  floor at 0.8 (`compare_benchmarks.py:313`). The gate adjudicates only when
+  (`.github/workflows/compare_benchmarks.py:105-120`), with the CLI default
+  floor at 0.8 (`compare_benchmarks.py:406`). The gate adjudicates only when
   the host fingerprint (OS family + architecture + .NET runtime major +
   logical cores + CPU model, trimmed and case-folded; a missing or empty
   host field is also a mismatch) matches
-  (`compare_benchmarks.py:150-213`), and it re-measures once to rule
+  (`compare_benchmarks.py:167-186,252`), and it re-measures once to rule
   out shared-runner jitter (`benchmarks.yml:94-108`). GitHub-hosted runners
   are a different host class than the
   baseline record, so they get an informational cross-host
@@ -328,6 +340,23 @@ disagree are called out below rather than resolved.
   reserved for a matching host class. The measured artifact is uploaded with
   `if: always()` (`benchmarks.yml:111-119`) so runner numbers survive a
   failed gate without log access.
+  **Current state of the hosted arm64 job: it measures and adjudicates
+  nothing.** A separate `runner-class-gate` job runs on the pinned `macos-26`
+  arm64 label against its own hosted record
+  ([`benchmarks/runner_class_throughput_benchmark.json`](benchmarks/runner_class_throughput_benchmark.json)),
+  but that record's `Provenance.ArmedWorkloads` is `[]`, so no workload carries
+  a verdict. It still measures, still prints the full fingerprint and a
+  per-workload table, still notes any sub-threshold ratio, and exits 0. Its
+  green status therefore **enforces no hosted throughput**, and a green
+  Benchmarks workflow is not a performance claim. The first live run
+  ([36471478970](https://github.com/candavere/lattice/actions/runs/36471478970),
+  commit `4d05585`) fell below the five-sample minimum on all five workloads
+  with no measured code changed since the sampled tree; the cause of that
+  slowdown is **unestablished**, and the record was demoted rather than
+  re-thresholded. The bare-metal research reference above is a separate record
+  and is unaffected. Details:
+  [`docs/BENCHMARKING.md`](docs/BENCHMARKING.md) and
+  [`benchmarks/runner_class_summary.md`](benchmarks/runner_class_summary.md).
   **Doc-vs-code conflict:** this README previously described the gate as
   failing on "a >20% regression", and
   [`benchmarks/throughput_summary.md`](benchmarks/throughput_summary.md) still
@@ -502,6 +531,13 @@ Only claims the repository can back up are listed here.
   a `>20%` drop while this page describes the enforced ratios of 0.75, 0.6, and
   0.85. The conflict is recorded, not reconciled; the workflow and comparator
   are authoritative.
+- **The hosted arm64 `runner-class-gate` enforces no throughput.** Its record's
+  `Provenance.ArmedWorkloads` is `[]`, so the job measures, reports, and exits
+  0 without adjudicating any workload. A green Benchmarks workflow is not
+  evidence of hosted throughput stability, and the first live runner-class
+  run's slowdown cause is unestablished. See
+  [the gate section](#the-gates-and-where-the-code-is-authoritative) and
+  [`docs/BENCHMARKING.md`](docs/BENCHMARKING.md).
 - A small number of tests fail intermittently under the full parallel run and
   pass when run alone, so a green run is evidence, not a guarantee. See
   [Flaky tests are known and listed](#flaky-tests-are-known-and-listed).
@@ -601,9 +637,12 @@ and that the four counts match the job's log summary for that OS.
 
 ### Flaky tests are known and listed
 
-711 is the discovered test count. On the current head, five consecutive full
-`dotnet test Lattice.sln -c Release` runs on one macOS arm64 host gave 711/711
-twice, 709/711 once, 710/711 once, and 707/711 once. Every failure was in the
+The figures below are **historical**, recorded at `a8b2fc6` (the v3.0.0 release
+commit) on one macOS arm64 host. They are not a claim about the current head,
+which has since added tests including the schema-4 decision-time perception
+suite. Five consecutive full `dotnet test Lattice.sln -c Release` runs at that
+revision gave 711/711 twice, 709/711 once, 710/711 once, and 707/711 once.
+Every failure was in the
 external-agent and CLI-argument-fuzz areas, and all 20 of those tests pass when
 run on their own, so they race on shared temporary state under the parallel
 suite rather than being deterministically broken. The mutation summary at
@@ -626,7 +665,7 @@ Each committed artifact below is the exact file behind a claim on this page:
 
 | Artifact | What it is | Sub-claims it backs |
 | :--- | :--- | :--- |
-| [`docs/SUPPORT_AND_REPRODUCIBILITY.md`](docs/SUPPORT_AND_REPRODUCIBILITY.md) | The operational contract: what is supported, what is not, the five-equivalence vocabulary | Replay equivalence, determinism boundary, support matrix |
+| [`docs/SUPPORT_AND_REPRODUCIBILITY.md`](docs/SUPPORT_AND_REPRODUCIBILITY.md) | The operational contract: what is supported, what is not, the five-equivalence vocabulary, and the viewer's [claim](docs/SUPPORT_AND_REPRODUCIBILITY.md#viewer-claim-semantics) and [presence](docs/SUPPORT_AND_REPRODUCIBILITY.md#viewer-presence-semantics) semantics | Replay equivalence, determinism boundary, support matrix, what the viewer is allowed to report |
 | [`docs/INVARIANT_SPECIFICATION.md`](docs/INVARIANT_SPECIFICATION.md) | Formal, implementation-agnostic transition and perception laws plus falsifiable challenge questions | Capacity gates, conflict resolution, perception boundary, replay contract |
 | [`benchmarks/mcts_evaluation_results.json`](benchmarks/mcts_evaluation_results.json) | Standard-map paired study, dev + held-out | Negative baseline, delta, CI, verdict |
 | [`benchmarks/bottleneck_evaluation_results.json`](benchmarks/bottleneck_evaluation_results.json) | Contention-bearing paired study, dev + held-out | Topology-dependent inversion |

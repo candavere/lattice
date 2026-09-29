@@ -27,8 +27,16 @@ Four ideas govern every change:
 2. **Strict platform determinism.** The core guarantee is **same seed + same
    actions → deterministic transitions under the pure .NET 8 BCL runtime, and
    verified per-step serialized StepResult equivalence plus per-tick state-digest
-   equality on all supported CI
-   targets**: .NET 8 on Linux, macOS, and Windows, on x64 and ARM64. There is
+   equality on every operating system the CI matrix covers**: the
+   `Build & test` matrix runs `ubuntu-latest`, `windows-latest`, and
+   `macos-latest` (`.github/workflows/ci.yml`). Those are three rolling
+   **labels**, not a six-leg OS-by-architecture matrix — the matrix does not
+   vary architecture per leg, so "x64 and ARM64 across Linux, macOS and
+   Windows" overstates what is tested. The pinned `macos-26` arm64 label used
+   by the benchmark workflow is a separate, separately scoped measurement
+   runner, not part of this guarantee. Each per-OS test summary artifact records
+   the `runnerImage` a leg actually ran on, because a rolling label does not by
+   itself identify the image. There is
    no ambient randomness, no hidden mutable state, no `System.Random` without
    an explicit seeded instance, and no behavior that depends on `GetHashCode`,
    culture, or iteration order leaks. Determinism is tested, not assumed.
@@ -37,8 +45,13 @@ Four ideas govern every change:
    workload matrix (raw stepping, facility, dynamic topology, stress, MCTS
    policy — see `Analytics/Benchmarking` and `benchmarks/throughput_benchmark.json`
    for the host-scoped reference run) measures the pure
-   `Simulation.Step` core per case, e.g. ≈ 654k steps/s median for the 2-agent
-   micro case on a 2020 Apple M1 (see `benchmarks/throughput_benchmark.json`). Methodology: warm-up that anchors a step
+   `Simulation.Step` core per case. The committed dated artifact is the
+   authority for both the numbers and the host they were measured on: read
+   `Workloads[].MedianThroughputPerSecond` and the `Metadata` block from
+   [`benchmarks/throughput_benchmark.json`](benchmarks/throughput_benchmark.json)
+   rather than quoting a figure or a device specification from prose here.
+   Throughput is host- and build-scoped, so no number in this file is a general
+   speed claim. Methodology: warm-up that anchors a step
    digest, ≥10 measured iterations, per-step stopwatch + median/mean/std/p95,
    `GC.GetAllocatedBytesForCurrentThread`, and `GC.CollectionCount` for
    Gen0/1/2. Every measured iteration must reproduce the warm-up anchor's step
@@ -169,8 +182,9 @@ results in the PR description.
    cross-platform file-byte identity.
 
 2. **Per-step serialized StepResult equivalence across the CI matrix.**
-   `TrajectoryReplay.Verify` must pass on Ubuntu, macOS, and Windows (x64 and
-   ARM64) — that is serialized-result equivalence against the recorded
+   `TrajectoryReplay.Verify` must pass on every leg of the `Build & test`
+   matrix — `ubuntu-latest`, `windows-latest`, and `macos-latest` — that is
+   serialized-result equivalence against the recorded
    trajectory, not raw cross-platform file-byte identity, and for schema-3
    recordings it also requires the per-tick state digest to match. CI runs the
    suite on the full matrix; confirm it is green in your PR. If you cannot run

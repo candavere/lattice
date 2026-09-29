@@ -63,11 +63,38 @@ enforced by tests:
 ## Determinism, replay, and the boundary
 
 A recording stores the *full* observations (`StepResult`), which is what makes
-replay and analysis exact: any filter, run against the recorded bytes, must
-reproduce the exact projections a live agent saw. Fog is therefore a property
-of the module that consumes the raw state — a host can ship multiple observers
-(fog-of-war scouts, omniscient scoring rigs, heatmap analyzers) against one
-trajectory, all serialized-equivalent.
+replay and analysis exact. Fog is therefore a property of the module that
+consumes the raw state — a host can ship multiple observers (fog-of-war scouts,
+omniscient scoring rigs, heatmap analyzers) against one trajectory, all
+serialized-equivalent.
+
+What "reproduce the projections a live agent saw" means precisely depends on
+which of the two recording paths produced the file, and schema 4 made that
+distinction checkable.
+
+- **In-process recordings (schema 4).** The recording carries the specific
+  decision-time `Perceptions` each agent's own `PerceptionFilter` produced
+  inside its `Decide` call, plus the header's `AgentVision` (the vision radius
+  in graph hops each filter was built with). `replay --verify` reprojects from
+  the recorded header vision and checks those perceptions too, so the stored
+  views — not merely the stored step results — are verified. The
+  in-process demonstration recording `site/infiltration.jsonl` is such a file.
+  The still-valid consequence of the old claim survives in a narrower form: a
+  filter configured from the *same* `AgentVision` and replayed against the
+  recorded bytes reproduces those verified projections. An arbitrary later
+  filter is not thereby entitled to an agent's historical view — a different
+  `V`, or one that never saw a room, does not get the room back.
+- **External-agent recordings.** The agents are another process, so there is no
+  library-side `PerceptionFilter` whose output could have been recorded. These
+  files are legal schema-4 recordings with the perception fields absent, and
+  `replay --verify` reports `no recorded perception: decision-time visibility
+  not verified` on stderr. It is a notice, not a failure: the exit code is
+  still 0 and the verdict line still reads `replay verified`. Nothing is
+  invented in place of the missing data, and step-level verification is
+  unaffected.
+
+The core-versus-filter boundary is the same in both cases, and it is what makes
+fog-of-war a projection rather than a leak.
 
 The boundary rule is the load-bearing one: `Lattice.Environment` has no notion
 of vision at all (`SimulationConfig.Vision` only sizes the filter), and

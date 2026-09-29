@@ -4,6 +4,88 @@ All notable changes to Lattice are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Post-`v3.0.0` work on `main`. This section describes unversioned development
+state; it creates no release and no tag. The `v3.0.0` narrative below and
+[`CITATION.cff`](CITATION.cff) stay pinned to the released 3.0.0 identity.
+
+### Added
+
+- **Machine-readable per-OS test totals.** CI now writes VSTest TRX reports and
+  reduces them to one JSON summary per operating system, uploaded as
+  `dotnet-test-summary-ubuntu`, `-windows`, and `-macos` with the raw TRX files
+  alongside. Each summary carries `total`/`passed`/`failed`/`skipped`/`notRun`,
+  the head `commitSha` tested, `runnerOs`, `runnerImage`, and `dotnetVersion`.
+  The parser refuses rather than guesses: it exits non-zero and publishes no
+  JSON when reports are absent, malformed, duplicated, contradictory, or when
+  a run discovered zero tests. The three legs are never summed — a cross-OS
+  total would triple-count one suite and describe no real run. The parser's own
+  tests run in CI as the `Test summary parser unit tests` job.
+- **Decision-time perception recording (trajectory schema 4).** Step lines may
+  carry a `Perceptions` array with one `PartialObservation` per agent slot —
+  the masked, vision-bounded view that agent's own `PerceptionFilter` produced
+  inside its `Decide` call — and the header carries `AgentVision`, the vision
+  radius in graph hops each filter was built with. `replay --verify` reprojects
+  and checks these alongside the existing per-step `StepResult` equivalence and
+  per-tick state digest. Schema 3's state-hash contract is unchanged.
+
+### Changed
+
+- **The site viewer is honest about what a recording proves.** It distinguishes
+  world, recorded, and derived claims (`claimed in world` vs `claims seen` vs
+  `claims in derived view`), reports no count at all for frames with no
+  recorded perception rather than inventing one, paints loot above room cards,
+  scales the title census with font size, fixes room/label/caption layout
+  collisions, and makes zone-table presence follow the painted ego view. The
+  terminal ego frame is labelled as the last decision-time view, not presented
+  as a fresh one. The detailed truth and provenance table, and its pixel and
+  geometry tests, are in
+  [`docs/SUPPORT_AND_REPRODUCIBILITY.md`](docs/SUPPORT_AND_REPRODUCIBILITY.md).
+- **The hosted runner-class throughput record is demoted, not re-thresholded.**
+  The `runner-class-gate` job on the pinned `macos-26` arm64 label measures the
+  full protocol and prints the full fingerprint and a per-workload table, but
+  its record's `Provenance.ArmedWorkloads` is `[]`, so it adjudicates no
+  workload and exits 0. Its first live run
+  ([36471478970](https://github.com/candavere/lattice/actions/runs/36471478970))
+  fell below the five-sample minimum on all five workloads with no measured
+  code changed since the sampled tree; **the cause of that slowdown is
+  unestablished**, and the record was demoted rather than re-thresholded. The
+  bare-metal research record is a separate, untouched artifact. Consequence to
+  read honestly: **CI currently enforces no throughput on GitHub-hosted
+  runners.** See [`docs/BENCHMARKING.md`](docs/BENCHMARKING.md) and
+  [`benchmarks/runner_class_summary.md`](benchmarks/runner_class_summary.md).
+
+### Fixed
+
+- **README reproducibility proof row.** The landing page's proof row quoted the
+  pre-schema-4 recording digest for the currently committed
+  `site/infiltration.jsonl`, giving a false expected result. It now quotes the
+  committed digest, shows both output paths, and scopes the claim to the
+  runtime and host the artifacts record. An unverifiable seed-43 digest claim
+  was removed rather than restated.
+- **Platform-scope wording.** `CONTRIBUTING.md` described the determinism
+  guarantee as tested on "x64 and ARM64" across Linux, macOS and Windows; the
+  CI matrix is three rolling OS labels and does not vary architecture per leg.
+  A stale throughput figure and a personal device specification in
+  `CONTRIBUTING.md` prose were replaced with a pointer to the dated, host-scoped
+  artifact.
+- **Historical test counts.** The 711-test figure and the five-run flaky
+  distribution are now labelled historical at `a8b2fc6` (the v3.0.0 release
+  commit) rather than presented as the current head, and current totals are
+  referred to the per-OS head-matched TRX summary artifacts.
+- **Claim-matrix navigation.** `docs/CLAIM_CALIBRATION_MATRIX.md` referenced
+  README section names that no longer exist ("Key Mechanics", "Design
+  principles", "MCTS Empirical Evaluation"); references now resolve to current
+  headings and anchors, and host hardware specs were removed from matrix prose
+  in favour of the benchmark artifacts.
+
+### Not changed
+
+`docs/VALIDATION_PLAN.md` remains intentionally scoped to a v2.3.2-judged
+validation and is not restated here as a v3 independent-validation claim. No
+version is bumped and no tag is created by this section.
+
 ## [3.0.0] - 2026-09-27
 
 Source version 3.0.0. No release tag is created by this commit; the owner
@@ -128,4 +210,5 @@ releases are [`docs/reproduction_packet.md`](docs/reproduction_packet.md) and
 [`docs/VALIDATION_PLAN.md`](docs/VALIDATION_PLAN.md), both scoped to the
 `v2.3.2` release assets and checksums.
 
-[3.0.0]: https://github.com/candavere/lattice/compare/v2.3.2...HEAD
+[3.0.0]: https://github.com/candavere/lattice/compare/v2.3.2...v3.0.0
+[Unreleased]: https://github.com/candavere/lattice/compare/v3.0.0...HEAD

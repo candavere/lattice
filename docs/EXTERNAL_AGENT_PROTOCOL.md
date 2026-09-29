@@ -239,7 +239,7 @@ See §14, U-9.
 | :--- | :--- | :--- | :--- |
 | `type` | string | yes | Exactly `"hello"`. |
 | `protocol` | integer | yes | Exactly `1`. |
-| `scenario` | string | yes | The evaluation scenario family that selected the map. In 3.0.0 the closed set is `"standard"` and `"bottleneck"` (`Cli/CliApp.cs:845-851`). |
+| `scenario` | string | yes | The evaluation scenario family that selected the map. In the published v3.0.0 the closed set is `"standard"` and `"bottleneck"` (`Cli/CliApp.cs:845-851`). **In 3.1.0 the value space widened**: a study run from a scenario file carries that descriptor's `Id` instead (e.g. `"gated-vault-duel"`). An agent MUST treat this as an opaque label identifying the map family, and MUST NOT assume the two-value set. The field, its type, and protocol `1` are unchanged — only which strings can appear. |
 | `seed` | integer | yes | The run seed, an unsigned 64-bit value (`Agents/EvaluationHarness.cs:27`). MUST be a JSON number with no fraction, no exponent, no leading `+`, and no leading zeros. |
 | `agent_slot` | integer | yes | The agent slot this process plays, in `0..AgentCount-1` (`Environment/Simulation.cs:58-60`). In the `evaluate` path this is exactly `0` or `1`, because evaluation pairings are head-to-head (`Agents/EvaluationHarness.cs:112-117`). |
 | `max_ticks` | integer ≥ 1 | yes | The match's tick budget, from `SimulationConfig.MaxTicks` (`Environment/Simulation.cs:28`). It is the **same value** as `EvaluationSimulationConfig.MaxTicks`, which is the per-match `MaxSteps` the harness passes down (`Agents/EvaluationHarness.cs:147-148`). This is the horizon an agent plans against; §7's `match_timeout_ms ≥ step_timeout_ms × MaxTicks` constraint is computed from this number. |
@@ -277,10 +277,15 @@ Note that all three timeouts are measured on a **monotonic clock** and never on
 the wall clock, so a system time adjustment mid-match cannot manufacture or
 suppress a timeout. See §7, §14, U-2.
 
-`scenario` is the closed 3.0.0 set. The `infiltration` scenario is **not**
-reachable through the external-agent path in 3.0.0: it is a `simulate`-only
-roster and is explicitly separate from the `evaluate` path
-(`Cli/CliApp.cs:391-393`, `Cli/CliApp.cs:845-851`).
+`scenario` was a closed two-value set in the published v3.0.0. It is **not**
+closed in the 3.1.0 source tree: a study run from a scenario file carries that
+descriptor's `Id`, so a conforming agent MUST accept any label and MUST NOT
+branch on the two-value set. The `infiltration` scenario is still **not**
+reachable through the external-agent path — it remains a `simulate`-only roster
+and is explicitly separate from the `evaluate` path
+(`Cli/CliApp.cs:391-393`, `Cli/CliApp.cs:845-851`) — but *other* scenario ids
+now reach it, via a descriptor file. The scenario-file contract is in
+[`SCENARIOS.md`](SCENARIOS.md).
 
 `hello` carries **no map**. The map arrives with the first `observation` (§5.3),
 which is re-sent in full on every step. What `hello` does carry beyond its
@@ -1353,13 +1358,34 @@ the trajectory schema already uses
 
 ## 13. Non-goals for 3.0.0
 
+> **Scope of this section: the published v3.0.0 release.** It records the
+> non-goals as they stood at 3.0.0 and is kept for that historical record. It
+> is **not** a statement about the current source tree, which is at **3.1.0**,
+> and one of the non-goals below was lifted in 3.1.0 — the bullet is marked
+> where that happened. Read the current behaviour in §2 and §3, and the
+> scenario-file contract in [`SCENARIOS.md`](SCENARIOS.md).
+
 The following are explicitly **out of scope** and MUST NOT be added under
 protocol `1`:
 
-- **Custom scenario files.** Scenario selection in 3.0.0 is the existing
+- **Custom scenario files.** *(Lifted in 3.1.0 — see below.)* Scenario
+  selection in 3.0.0 is the existing
   `evaluate --scenario standard|bottleneck` switch
   (`Cli/CliApp.cs:845-851`). A user-authored scenario file is a later
   protocol.
+  - **In 3.1.0 scenario files shipped**, and the format is documented in
+    [`docs/SCENARIOS.md`](SCENARIOS.md) with the validator in
+    [`docs/CLI.md`](CLI.md#validate-scenario--check-a-declarative-scenario-descriptor).
+    A descriptor supplies the **map** for a study; the roster and the
+    simulation protocol stay the study's, so a paired delta stays
+    commensurable with published studies. `evaluate --scenario <path>` is
+    reachable by an external agent today — a file-loaded study with
+    `Tests/ExternalAgentStub` completes with `valid_seeds=1` and
+    `agent_failures=none`.
+  - **What did not change: the wire contract.** Protocol `1` is unchanged and
+    no new field was added. Only the **value space** of the existing
+    `scenario` field widened — see §2, where this is stated where a reader
+    meets the field.
 - **In-process plugins.** An `IAgent` loaded into the harness
   (`Agents/IAgent.cs:14-27`) is the existing path and is unchanged. The wire
   protocol is an addition, not a replacement.
@@ -1374,6 +1400,9 @@ protocol `1`:
   meaning — an in-process policy enum (`Cli/CliApp.cs:316-323`) — and MUST NOT
   grow an external-agent spelling. The external path is `evaluate
   --agent-cmd` only (§9.5). See §14, U-10.
+  - **Still true in 3.1.0.** `simulate` still takes no `--agent-cmd`, and
+    `simulate --scenario <file>` additionally **refuses** `--agent` outright,
+    because the descriptor owns the roster. This non-goal was not lifted.
 - **Network transports.** Loopback sockets, TCP, and shared memory are out.
   stdin/stdout is the transport.
 - **Sandboxing beyond process isolation plus limits.** See below.

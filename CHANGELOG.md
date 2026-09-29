@@ -116,6 +116,18 @@ state; it creates no release and no tag. The `v3.0.0` narrative below and
   evaluation artifact's field set unchanged, so the published artifact format
   does not move.
 
+- **The external-agent `hello` message's `scenario` field is no longer limited
+  to `standard` / `bottleneck`.** The field, its type, and the protocol version
+  are unchanged — `protocol` is still exactly `1`, and no field was added,
+  removed, or retyped — but the value is no longer a closed two-element set. It
+  carries the id of whichever scenario is running, so a study launched from a
+  declarative scenario file reports that file's `Id` (for example
+  `gated-vault-duel`) rather than one of the two built-in families. An external
+  agent that branched on the two-value set must accept any string and must treat
+  it as an opaque label identifying the map family. The field is specified in
+  [`docs/EXTERNAL_AGENT_PROTOCOL.md`](docs/EXTERNAL_AGENT_PROTOCOL.md) §3
+  (`hello`), under the version fixed at `1` by §2.
+
 - **The site viewer shows the scenario digest.** The provenance panel reports
   `ScenarioSha256` when a recording carries one and says plainly that a
   pre-schema-5 recording names no descriptor, rather than inventing a value.

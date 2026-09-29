@@ -10,13 +10,15 @@ companion to the governing thesis in
 
 > **Release status: Research Preview — evaluation by maintainers and
 > collaborators.** The support contract in this document targets the published
-> **v2.3.2** release and its assets. The current source tree is at **3.0.0**,
-> and the published **v3.0.0** release assets are what version 3.0.0 of the
-> binaries corresponds to. So the two are separate things, and every reference
-> below should be read against one of them: a `v2.3.2` reference describes the
-> v2.3.2 release and its assets, not the current source, while the trajectory
-> schema, perception and replay-verification sections describe what the source
-> tree does today. Where a `v2.3.2` statement and a current-source statement
+> **v2.3.2** release and its assets. **The current source version is 3.1.0**
+> (`--version` prints `3.1.0`, and every project `<Version>` matches); **the
+> latest published release is v3.0.0**, whose assets are pinned to the `v3.0.0`
+> tag and are unchanged. Those are two separate things — an unreleased source
+> version and a published release — and every reference below should be read
+> against one of them: a `v2.3.2` or `v3.0.0` reference describes that release
+> and its assets, not the current source, while the trajectory schema, scenario
+> file, perception and replay-verification sections describe what the source tree
+> does today at 3.1.0. Where a release statement and a current-source statement
 > differ, both are true of their own subject and the difference is the version
 > gap, not a contradiction.
 > Publishing v3.0.0 does not by itself qualify Lattice for production

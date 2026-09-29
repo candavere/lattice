@@ -30,8 +30,9 @@ untouched.
 > **Scope of the first packet below: the v2.3.2 release only.** Every tag,
 > commit, size, and SHA-256 in that section is a property of the published
 > **v2.3.2** assets and is deliberately left unchanged. The repository is now at
-> source version **3.0.0**, so `git describe`-style expectations and the
-> `v2.3.2` checksums do **not** describe the current source tree.
+> source version **3.1.0**, which is ahead of the latest published release,
+> **v3.0.0**, so `git describe`-style expectations and the `v2.3.2` checksums do
+> **not** describe the current source tree.
 >
 > **This document now also carries a v3.0.0 packet**, further down, anchored to
 > the published **v3.0.0** assets. The two sections are independent: read the

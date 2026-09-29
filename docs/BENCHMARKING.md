@@ -36,11 +36,14 @@ Numbers come from a single reference host; its full metadata (CPU, cores, OS, ru
 | --- | --- |
 | Runner label (pinned) | `macos-26` (newest GA arm64 macOS label) |
 | Runner image build | `macos-26-arm64/20260907.0351` |
-| Source revision (all 5 samples) | `633ecf70c82e1b71255a6dac8e09bdca0b5b243b` |
+| Source revision (all 20 samples) | `1b9426f5247e485343296e0d8863795084552535` |
+| Dispatch ref | temporary branch at exactly that commit, so the measured tree could not move |
 | Host | macOS 26.6.2, Arm64, Apple M1 (Virtual), 3 cores |
 | Runtime | .NET 10.0.12, Release, Workstation GC |
 | Protocol | `--runs 10 --steps 100000 --warmup 50000` |
-| Representative session | run `36469918606` (most typical of the five) |
+| Samples | 20 full-protocol sessions, 25 minutes apart across ~16.5 hours |
+| Image split | none — all 20 report `macos-26-arm64/20260907.0351` |
+| Baseline median | cross-run median of the 20 sessions (not any one session) |
 
 Both records are kept because they measure different host classes and neither
 substitutes for the other. The bare-metal record is untouched; the runner-class

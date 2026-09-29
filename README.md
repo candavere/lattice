@@ -70,7 +70,7 @@ Where each box in that diagram is implemented, at this commit:
 | `lattice analyze` | `Cli/CliApp.cs:220`, over `Analytics/` |
 | `site/ replay viewer` | `site/app.js`, deployed by `.github/workflows/pages.yml` |
 | `lattice benchmark` | `Cli/CliApp.cs:222`; five workloads on fresh simulations, never on a recording |
-| `throughput JSON` | the strict gate arms only on a full host match, at `.github/workflows/compare_benchmarks.py:518-543`; the hosted arm64 `runner-class-gate` record is currently disarmed (`ArmedWorkloads: []`) and so enforces nothing |
+| `throughput JSON` | the strict gate arms only on a full host match, at `.github/workflows/compare_benchmarks.py:518-543`; the hosted arm64 `runner-class-gate` arms 4 of its 5 workloads from a 20-session cohort, leaving `policy_lookahead_mcts_32` informational |
 | `lattice evaluate` | `Cli/CliApp.cs:223`; the pass/fail verdict is composed at `Agents/PairedEvaluation.cs:145-150` |
 | `lattice evaluate --agent-cmd` | the candidate seat, with the command line split without a shell at `Cli/CliApp.cs:808`; the child process is launched from `Agents/External/ExternalAgentLaunch.cs:84` |
 | `tests + fixtures` → `CI on 3 operating systems` | the golden-trajectory replay gate runs on every matrix OS at `.github/workflows/ci.yml:42-43` |
@@ -176,7 +176,7 @@ artifacts linked under [Test totals, as CI publishes them](#test-totals-as-ci-pu
 | :--- | :--- | :--- |
 | Same seed, same arguments, same bytes. | `dotnet run -c Release --project Cli -- simulate --seed 42 --scenario infiltration --steps 100 --out a.jsonl`, then the same again with `--out b.jsonl`, then `shasum -a 256 a.jsonl b.jsonl` | Both runs hash to `22f9b0fe391fa7dd…abf4cfc`, which is the committed [`site/infiltration.jsonl`](site/infiltration.jsonl) (114,983 bytes, schema 4). Verified by running the command twice outside the repository on a macOS arm64 host at the current tree; both outputs matched the committed file byte for byte. Scoped to a macOS arm64 host on the .NET 10 runtime the artifacts record. |
 | Replay is hash-verified, not just re-run. | `dotnet run -c Release --project Cli -- replay Tests/fixtures/golden_trajectory.jsonl --verify` | `replay verified: 12 step(s) serialized-equivalent, 12 state hash(es) matched (seed 2024, schema v3).` Exit 0. Digest computed by [`Trajectories/SimulationStateHash.cs`](Trajectories/SimulationStateHash.cs), compared in [`Trajectories/TrajectoryReplay.cs`](Trajectories/TrajectoryReplay.cs). |
-| The same check runs on all three operating systems. | Read the `Build & test` matrix in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | The golden replay-verify step is a matrix step over `ubuntu-24.04`, `windows-latest`, `macos-latest`. Run [36302783294](https://github.com/candavere/lattice/actions/runs/36302783294) shows all three legs green; that run predates the Ubuntu pin, so it attests the three-OS gate, not the 24.04 label specifically — for a run on the pinned labels, read the CI run at the current commit. The label is pinned to 24.04 on purpose so GitHub's rollout of `ubuntu-latest` to 26.04 cannot move this gate. A separate `ubuntu-26.04` job builds, golden-replays, and tests as a **non-gating** compatibility probe: it publishes no artifact, no other job depends on it, and it is not part of the three-OS equivalence contract — read its steps and logs, never infer 26.04 support from a green run. |
+| The same check runs on all three operating systems. | Read the `Build & test` matrix in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | The golden replay-verify step is a matrix step over `ubuntu-24.04`, `windows-latest`, `macos-latest`. Run [36622539217](https://github.com/candavere/lattice/actions/runs/36622539217) on commit `4035de6` shows all three legs green on the pinned labels, 738/738 tests passed on each: `Build & test (ubuntu-24.04)` 738 passed, `Build & test (macos-latest)` 738 passed, `Build & test (windows-latest)` 738 passed. The label is pinned to 24.04 on purpose so GitHub's rollout of `ubuntu-latest` to 26.04 cannot move this gate. A separate `ubuntu-26.04` job builds, golden-replays, and tests as a **non-gating** compatibility probe: on that run it reported `Total tests: 738` and concluded success, but it publishes no artifact, no other job depends on it, and it is not part of the three-OS equivalence contract — read its steps and logs, never infer 26.04 support from a green run. |
 | Every committed recording replays, not just the golden one. | `dotnet run -c Release --project Cli -- replay site/demo.jsonl --verify` and the same for `site/infiltration.jsonl` | `27 step(s) … 27 state hash(es) matched` and `20 step(s) … 20 state hash(es) matched`. A separate CI job replays every recording under `site/`. |
 | The suite had 711 tests at the v3.0.0 release commit. | `dotnet test Lattice.sln -c Release` | Historical: `Passed! - Failed: 0, Passed: 711, Skipped: 0, Total: 711`, recorded at `a8b2fc6` (the v3.0.0 release commit). It is **not** the current head count — schema-4 decision-time perception and other post-release work added tests after that revision. For today's totals, use the per-OS head-matched TRX summary artifacts, not this number: see [Test totals, as CI publishes them](#test-totals-as-ci-publishes-them). |
 | A paired study needs 30 seeds, and the rule is mean > 0 **and** CI lower > 0. | `dotnet run -c Release --project Cli -- evaluate --scenario standard --seed-set dev --seeds 29 --agent-cmd "python3 examples/python/lattice_agent.py"`, then the same with `--seeds 30` | `--seeds 29` → `Not graded: 29 seeds is below the 30-seed floor of the decision rule (the canonical suites run 50).` `--seeds 30` → `Fail: mean paired delta -0.383 and/or the 95% CI lower bound -0.672 did not clear 0 on 30 seeds.` The rule is [`Agents/PairedEvaluation.cs:144-145`](Agents/PairedEvaluation.cs): `graded = deltas.Length >= 30` and `passed = graded && mean > 0.0 && ciLower > 0.0`, with `ConfidenceLevel = 0.95` at line 74. |
@@ -350,21 +350,30 @@ disagree are called out below rather than resolved.
   reserved for a matching host class. The measured artifact is uploaded with
   `if: always()` (`benchmarks.yml:111-119`) so runner numbers survive a
   failed gate without log access.
-  **Current state of the hosted arm64 job: it measures and adjudicates
-  nothing.** A separate `runner-class-gate` job runs on the pinned `macos-26`
+  **Current state of the hosted arm64 job: it adjudicates 4 of its 5
+  workloads.** A separate `runner-class-gate` job runs on the pinned `macos-26`
   arm64 label against its own hosted record
   ([`benchmarks/runner_class_throughput_benchmark.json`](benchmarks/runner_class_throughput_benchmark.json)),
-  but that record's `Provenance.ArmedWorkloads` is `[]`, so no workload carries
-  a verdict. It still measures, still prints the full fingerprint and a
-  per-workload table, still notes any sub-threshold ratio, and exits 0. Its
-  green status therefore **enforces no hosted throughput**, and a green
-  Benchmarks workflow is not a performance claim. The first live run
+  calibrated from 20 full-protocol sessions on pinned commit `1b9426f5` and
+  armed by the pre-registered rule (allowed ratios 0.7804–0.8416:
+  `micro_raw_2agent`, `facility_static_4agent`, `dynamic_contention_4agent`,
+  `stress_topology_4agent`). `policy_lookahead_mcts_32` is **deliberately
+  excluded** — 20 sessions span 2.050× max/min on that search-bound workload,
+  so a dip there is not separable from runner jitter. It is measured, printed,
+  and compared but carries no verdict, and that is a recorded negative result
+  ([`FINDING-014`](docs/FINDINGS_LEDGER.md)), not a gap to be closed later by
+  widening a tolerance. A green Benchmarks workflow is therefore a **narrow,
+  noisy-host claim** — it bounds throughput on this runner class only, and
+  says nothing about the bare-metal host or about engine performance. The
+  record supersedes an earlier 5-session version that was published demoted
+  (`ArmedWorkloads: []`) after its first live run
   ([36471478970](https://github.com/candavere/lattice/actions/runs/36471478970),
   commit `4d05585`) fell below the five-sample minimum on all five workloads
-  with no measured code changed since the sampled tree; the cause of that
-  slowdown is **unestablished**, and the record was demoted rather than
-  re-thresholded. The bare-metal research reference above is a separate record
-  and is unaffected. Details:
+  with no measured code changed; five idle-dispatched samples did not bound
+  the host class. That run's slowdown cause remains **unestablished**, the
+  demotion is not withdrawn, and no threshold was widened against any record
+  or observed run. The bare-metal research reference above is a separate
+  record and is unaffected. Details:
   [`docs/BENCHMARKING.md`](docs/BENCHMARKING.md) and
   [`benchmarks/runner_class_summary.md`](benchmarks/runner_class_summary.md).
   **Doc-vs-code conflict:** this README previously described the gate as
@@ -541,11 +550,15 @@ Only claims the repository can back up are listed here.
   a `>20%` drop while this page describes the enforced ratios of 0.75, 0.6, and
   0.85. The conflict is recorded, not reconciled; the workflow and comparator
   are authoritative.
-- **The hosted arm64 `runner-class-gate` enforces no throughput.** Its record's
-  `Provenance.ArmedWorkloads` is `[]`, so the job measures, reports, and exits
-  0 without adjudicating any workload. A green Benchmarks workflow is not
-  evidence of hosted throughput stability, and the first live runner-class
-  run's slowdown cause is unestablished. See
+- **The hosted arm64 `runner-class-gate` enforces 4 of 5 workloads, on a noisy
+  host.** `policy_lookahead_mcts_32` carries no verdict by design
+  (`FINDING-014`): 20 sessions on one commit span 2.050× max/min there, too
+  wide to separate a real regression from runner jitter, so it is reported and
+  never adjudicated. The four armed ratios (0.7804–0.8416) are wide because
+  between-run spread across the cohort is 1.59×–2.05× per workload, so a green
+  Benchmarks workflow is a **narrow** claim on this runner class and is not
+  evidence of general hosted throughput stability. The first live
+  runner-class run's slowdown cause is unestablished. See
   [the gate section](#the-gates-and-where-the-code-is-authoritative) and
   [`docs/BENCHMARKING.md`](docs/BENCHMARKING.md).
 - A small number of tests fail intermittently under the full parallel run and

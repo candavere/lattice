@@ -7,11 +7,21 @@
 <p align="center"><strong>A deterministic multi-agent environment for auditable agent benchmarking.</strong></p>
 
 <p align="center">
-  <a href="https://github.com/candavere/lattice/actions/workflows/ci.yml"><img src="https://github.com/candavere/lattice/actions/workflows/ci.yml/badge.svg" alt="CI build status" /></a>
-  <a href="https://github.com/candavere/lattice/actions/workflows/benchmarks.yml"><img src="https://github.com/candavere/lattice/actions/workflows/benchmarks.yml/badge.svg" alt="Benchmarks workflow status" /></a>
-  <a href="https://github.com/candavere/lattice/actions/workflows/pages.yml"><img src="https://github.com/candavere/lattice/actions/workflows/pages.yml/badge.svg" alt="Pages deploy status" /></a>
-  <img src="https://img.shields.io/badge/status-research%20preview-orange" alt="status: research preview" />
+  <a href="https://github.com/candavere/lattice/actions/workflows/ci.yml"><img src="https://github.com/candavere/lattice/actions/workflows/ci.yml/badge.svg" alt="CI: latest build status" title="CI: latest build status" /></a>
+  <a href="https://github.com/candavere/lattice/actions/workflows/pages.yml"><img src="https://github.com/candavere/lattice/actions/workflows/pages.yml/badge.svg" alt="Pages: latest deploy status" title="Pages: latest deploy status" /></a>
+  <a href="https://github.com/candavere/lattice/actions/workflows/benchmarks.yml"><img src="https://github.com/candavere/lattice/actions/workflows/benchmarks.yml/badge.svg" alt="Benchmarks: latest run status" title="Benchmarks: latest run status" /></a>
+  <img src="https://img.shields.io/badge/status-research%20preview-orange" alt="Status: research preview" title="Status: research preview" />
+  <a href="https://github.com/candavere/lattice/releases/latest"><img src="https://img.shields.io/github/v/release/candavere/lattice" alt="Latest release" title="Latest release" /></a>
+  <a href="https://github.com/candavere/lattice/blob/main/docs/ECOSYSTEM.md"><img src="https://img.shields.io/badge/target%20framework-net8.0-512BD4?logo=dotnet&logoColor=white" alt="Target framework: net8.0" title="Target framework: net8.0" /></a>
+  <a href="https://github.com/candavere/lattice/blob/main/LICENSE"><img src="https://img.shields.io/github/license/candavere/lattice" alt="License: MIT" title="License: MIT" /></a>
+  <a href="https://github.com/candavere/lattice/blob/main/docs/ECOSYSTEM.md"><img src="https://img.shields.io/badge/production%20runtime%20deps-0-success" alt="Production runtime dependencies: 0" title="Production runtime dependencies: 0" /></a>
 </p>
+
+<p align="center"><sub>Every production assembly is pure .NET 8 BCL with zero external
+NuGet runtime packages. The test project and development tooling do use packages
+(<code>Microsoft.NET.Test.Sdk</code>, <code>xunit</code>,
+<code>xunit.runner.visualstudio</code>); the zero count is not a claim about the
+whole repository. See <a href="docs/ECOSYSTEM.md">docs/ECOSYSTEM.md</a>.</sub></p>
 
 <p align="center">
   <img src="docs/media/hero.gif" alt="Live replay viewer, Infiltrator view, of the recorded infiltration run: the Treasure Vault is recorded as last-known by the Infiltrator's own perception filter for a few ticks while ground truth keeps it observed, then the Infiltrator cuts across toward the armory. Captured live from the shipped viewer." />

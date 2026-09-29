@@ -125,35 +125,58 @@ by single heavy decisions, and its iteration budget is small by design.
   throughput against its **own** runner-class record, measured on the runner
   class it runs on: `macos-26` (pinned, not `macos-latest` — the newest GA
   arm64 macOS label), .NET 10, image `macos-26-arm64/20260907.0351`, recorded
-  as five full-protocol sessions on tree
-  `633ecf70c82e1b71255a6dac8e09bdca0b5b243b`
-  ([runs 36469355765](https://github.com/candavere/lattice/actions/runs/36469355765),
-  [36469885628](https://github.com/candavere/lattice/actions/runs/36469885628),
-  [36469902164](https://github.com/candavere/lattice/actions/runs/36469902164),
-  [36469918606](https://github.com/candavere/lattice/actions/runs/36469918606),
-  [36469934258](https://github.com/candavere/lattice/actions/runs/36469934258)).
+  as **20 full-protocol sessions** on pinned tree
+  `1b9426f5247e485343296e0d8863795084552535`, dispatched 25 minutes apart
+  across roughly 16.5 hours on a temporary branch ref so the measured commit
+  could not move (run IDs
+  [36485512323](https://github.com/candavere/lattice/actions/runs/36485512323)
+  through
+  [36577844146](https://github.com/candavere/lattice/actions/runs/36577844146);
+  all 20 pass all seven pre-registered inclusion rules, with no cohort split —
+  every run's own image-release line reads `macos-26-arm64/20260907.0351`).
   The strict verdict needs the full fingerprint — OS family, architecture,
   .NET runtime major, logical cores, CPU model — **and** a matching recorded
   protocol, so a shortened or smoke budget can never be adjudicated against
   it. Tolerances were derived from the *measured between-run* spread rather
   than from within-run sample dispersion, which on this host class reads
-  1.3–2.8× too tight for four of the five workloads.
-  **This gate currently adjudicates nothing.** Five idle-dispatched samples
-  calibrated it and armed four workloads, but its first live run
+  1.9–2.3× too tight for three of the five workloads.
+  **This gate adjudicates four of the five workloads.** The pre-registered
+  rule — `allowed = min(0.95, 0.95 × min_ratio)`, armed when
+  `0.95 × min_ratio >= 0.75`, with `min_ratio` the lowest session median over
+  the cross-run median — was applied unchanged to the 20 sessions:
+
+  | Workload | min / cross-run median | allowed ratio | armed |
+  | --- | ---: | ---: | --- |
+  | `micro_raw_2agent` | 0.8331 | 0.7914 | **yes** |
+  | `facility_static_4agent` | 0.8859 | 0.8416 | **yes** |
+  | `dynamic_contention_4agent` | 0.8214 | 0.7804 | **yes** |
+  | `stress_topology_4agent` | 0.8669 | 0.8236 | **yes** |
+  | `policy_lookahead_mcts_32` | 0.6753 | 0.6415 | no (0.1085 short) |
+
+  `policy_lookahead_mcts_32` spans 2.050× max/min across the 20 sessions and
+  is the search-bound case, so a dip there is not separable from runner
+  jitter: it is measured, printed, and compared but carries **no verdict**.
+  That is recorded as a negative result in
+  [`FINDINGS_LEDGER.md`](FINDINGS_LEDGER.md) (`FINDING-014`), not closed by
+  widening a tolerance. The record's `Provenance.ArmedWorkloads` is the
+  authoritative armed set; the workflow's per-workload thresholds are
+  byte-identical to the record's derived `AllowedRatio` values.
+  The record's per-workload median is the **cross-run median of the 20
+  sessions**, so the comparator divides by the same quantity the rule
+  divides by.
+  This supersedes the earlier five-session record, which was published
+  demoted after its first live run
   ([36471478970](https://github.com/candavere/lattice/actions/runs/36471478970),
-  commit `4d05585`) came in below the five-sample minimum on **all five**
-  workloads, on both passes, with no measured code changed since the sampled
-  tree. The record's `Provenance.ArmedWorkloads` is therefore `[]`: the job
-  still measures, still prints the full fingerprint and a per-workload table,
-  still notes any sub-threshold ratio, and exits 0 — but no workload carries a
-  verdict. The cause of that run's slowdown is **unestablished**; hosted jobs
-  run on separate VMs, so concurrency with this repository's other jobs is not
-  offered as an explanation, and the slowdown was not reproduced.
-  The record was demoted, not re-thresholded. See
+  commit `4d05585`) came in below the five-sample minimum on all five
+  workloads on both passes — five idle-dispatched samples dispatched within
+  about half a minute of each other did not bound this host class. That
+  record's cause remains **unestablished**. The demotion is not withdrawn;
+  what changed is that a cohort large enough to judge the host class now
+  exists. No threshold was widened against any record or observed run. See
   [`benchmarks/runner_class_summary.md`](../benchmarks/runner_class_summary.md)
   for the full spread analysis, the failure evidence, the limits of a
   hosted-runner inference (including that a pinned label is not a pinned
-  image), and what re-arming would require.
+  image), and the per-session evidence table.
 - The committed baseline was **re-anchored** after the CI regression gate
   proved unstable against the earlier one (noisy micro/policy medians), and
   re-anchored again on 2026-09-26 for the runtime patch .NET 10.0.10 →
@@ -172,16 +195,18 @@ Throughput is hardware- and build-profile-scoped. Numbers vary with hardware,
 runtime version, and GC configuration; each committed record is one host
 class, one runtime, one protocol. No scaling or infrastructure claim is made.
 
-A hosted-runner gate would be a narrower claim than a hardware one: it
+A hosted-runner gate is a narrower claim than a hardware one: it
 bounds throughput **on the runner class that recorded it**, and its
-tolerances are wide because that class is noisy — between-run spread on the
-recorded tree was 1.41×–1.81× per workload, and the first live run fell below
-that range entirely. While the runner-class record adjudicates nothing, the
-honest summary is that **CI enforces no throughput on GitHub-hosted runners**,
-and this repository has not yet established that a stable-enough hosted
-reference can be recorded. A future enforcing gate here would be a
-narrow, noisy-host claim: only large regressions would be detectable, and it
-would say nothing about the bare-metal host or about engine performance. The
+tolerances are wide because that class is noisy — between-run spread across
+the 20 recorded sessions is 1.59×–2.05× per workload, so an allowed ratio of
+0.7804–0.8416 is a real-regression signal and anything subtler is below this
+host class's noise floor. CI now enforces throughput on GitHub-hosted runners
+for four of the five workloads, and the fifth is a **permanent non-verdict**
+rather than a gap to be closed later by loosening a threshold. Even armed, the
+claim stays narrow: only large regressions are detectable, and it says nothing
+about the bare-metal host or about engine performance. A 20-session cohort is
+still a sample — the two extreme `micro_raw_2agent` sessions are 2.6× apart
+within it — so the tail of the distribution is not well characterised. The
 AC-power requirement above applies to a laptop host recording a reference; it
 does not apply to a hosted runner, which is the point of keeping the two
 records apart.

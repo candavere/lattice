@@ -10,6 +10,37 @@ Post-`v3.0.0` work on `main`. This section describes unversioned development
 state; it creates no release and no tag. The `v3.0.0` narrative below and
 [`CITATION.cff`](CITATION.cff) stay pinned to the released 3.0.0 identity.
 
+### Changed
+
+- **CI now enforces throughput on GitHub-hosted runners for four of five
+  workloads.** The hosted-runner reference
+  ([`benchmarks/runner_class_throughput_benchmark.json`](benchmarks/runner_class_throughput_benchmark.json))
+  was re-collected as 20 full-protocol sessions
+  (`--runs 10 --steps 100000 --warmup 50000`) on pinned commit `1b9426f5`,
+  dispatched 25 minutes apart across ~16.5 hours so the cohort spans the
+  conditions the gate actually meets. All 20 sessions pass all seven
+  inclusion rules fixed in advance; no session was excluded and there is no
+  image split. Applying the pre-registered rule unchanged
+  (`allowed = min(0.95, 0.95 × min_ratio)`, armed when
+  `0.95 × min_ratio >= 0.75`) arms `micro_raw_2agent` (0.7914),
+  `facility_static_4agent` (0.8416), `dynamic_contention_4agent` (0.7804) and
+  `stress_topology_4agent` (0.8236), and leaves `policy_lookahead_mcts_32`
+  informational. This replaces the earlier 5-session record, which was
+  published **demoted** (`ArmedWorkloads: []`) after its first live run fell
+  below the five-sample minimum on all five workloads — five idle-dispatched
+  samples did not bound the host class. The demotion is not withdrawn, and no
+  threshold was widened against any record or observed run.
+  `policy_lookahead_mcts_32` is recorded as a **negative result**
+  (`FINDING-014`): 20 sessions span 2.050× max/min on that search-bound
+  workload, so a dip there is not separable from runner jitter and it is
+  measured, printed, and compared but never adjudicated.
+  The record's per-workload median is the cross-run median of the 20
+  sessions, so the comparator divides by the same denominator the rule does;
+  the record's armed set lives in `Provenance.ArmedWorkloads`, and the
+  workflow's per-workload thresholds are byte-identical to the record's
+  derived values. Engine, agent, CLI, protocol, and test sources are
+  unchanged.
+
 ### Added
 
 - **Ubuntu 26.04 compatibility probe (informational).** CI gains a distinctly

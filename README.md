@@ -56,7 +56,7 @@ benchmark -> throughput JSON          evaluate -> evaluation JSON
 The full diagram is [`docs/architecture.svg`](docs/architecture.svg):
 
 <p align="center">
-  <img src="docs/architecture.svg" alt="Lattice architecture. A seeded lattice simulate run writes one schema 4 JSONL recording, and four readers consume it: replay --verify, render, analyze, and the site replay viewer. Independently of any recording, lattice benchmark writes a host-scoped throughput JSON and lattice evaluate writes an evaluation JSON; seated instead of the in-process MCTS candidate, evaluate --agent-cmd runs an external agent process that speaks protocol 1 over stdin and stdout. The test suite and the three-operating-system CI gates block a merge on the recording." />
+  <img src="docs/architecture.svg" alt="Lattice architecture. A seeded lattice simulate run writes one schema 5 JSONL recording, and four readers consume it: replay --verify, render, analyze, and the site replay viewer. Independently of any recording, lattice benchmark writes a host-scoped throughput JSON and lattice evaluate writes an evaluation JSON; seated instead of the in-process MCTS candidate, evaluate --agent-cmd runs an external agent process that speaks protocol 1 over stdin and stdout. The test suite and the three-operating-system CI gates block a merge on the recording." />
 </p>
 
 Where each box in that diagram is implemented, at this commit:
@@ -64,13 +64,13 @@ Where each box in that diagram is implemented, at this commit:
 | Box | Implementation |
 | --- | --- |
 | `lattice simulate` | `Cli/CliApp.cs:219`; the header is stamped with the current schema at `Trajectories/TrajectoryWriter.cs:71` |
-| `recording .jsonl` (schema 4) | `Trajectories/TrajectoryModel.cs:26`; one header line, one line per tick, one final line. Schema 4 adds the per-agent decision-time `Perceptions` and the header's `AgentVision`; schema 3's per-tick state hash is unchanged |
+| `recording .jsonl` (schema 5) | `Trajectories/TrajectoryModel.cs`; one header line, one line per tick, one final line. Schema 5 adds the header's `ScenarioSha256`, the digest of the scenario descriptor's exact bytes; schema 4's decision-time `Perceptions` and `AgentVision` and schema 3's per-tick state hash are unchanged |
 | `lattice replay --verify` | `Cli/CliApp.cs:222`; per-tick result, state-digest and decision-time perception comparison at `Trajectories/TrajectoryReplay.cs` |
 | `lattice render` | `Cli/CliApp.cs:220`, over `Visualization/` |
 | `lattice analyze` | `Cli/CliApp.cs:221`, over `Analytics/` |
 | `site/ replay viewer` | `site/app.js`, deployed by `.github/workflows/pages.yml` |
 | `lattice benchmark` | `Cli/CliApp.cs:223`; five workloads on fresh simulations, never on a recording |
-| `throughput JSON` | the strict gate arms only on a full host match, at `.github/workflows/compare_benchmarks.py:518-543`; the hosted arm64 `runner-class-gate` arms 4 of its 5 workloads from a 20-session cohort, leaving `policy_lookahead_mcts_32` informational |
+| `throughput JSON` | the strict gate arms only on a full host match, at `.github/workflows/compare_benchmarks.py:518-543`; which hosted-runner workloads are armed, and which is a permanent non-verdict, is stated once in [`FINDING-014`](docs/FINDINGS_LEDGER.md#finding-014--the-mcts-decision-throughput-case-cannot-be-gated-on-this-host-class-and-four-of-five-workloads-can) |
 | `lattice evaluate` | `Cli/CliApp.cs:224`; the pass/fail verdict is composed at `Agents/PairedEvaluation.cs:145-150` |
 | `lattice evaluate --agent-cmd` | the candidate seat, with the command line split without a shell at `Cli/CliApp.cs:1060`; the child process is launched from `Agents/External/ExternalAgentLaunch.cs:84` |
 | `tests + fixtures` → `CI on 3 operating systems` | the golden-trajectory replay gate runs on every matrix OS at `.github/workflows/ci.yml:42-43` |
@@ -174,7 +174,7 @@ artifacts linked under [Test totals, as CI publishes them](#test-totals-as-ci-pu
 
 | Claim | Verify with | Rests on |
 | :--- | :--- | :--- |
-| Same seed, same arguments, same bytes. | `dotnet run -c Release --project Cli -- simulate --seed 42 --scenario infiltration --steps 100 --out a.jsonl`, then the same again with `--out b.jsonl`, then `shasum -a 256 a.jsonl b.jsonl` | Both runs hash to `22f9b0fe391fa7dd…abf4cfc`, which is the committed [`site/infiltration.jsonl`](site/infiltration.jsonl) (114,983 bytes, schema 4). Verified by running the command twice outside the repository on a macOS arm64 host at the current tree; both outputs matched the committed file byte for byte. Scoped to a macOS arm64 host on the .NET 10 runtime the artifacts record. |
+| Same seed, same arguments, same bytes. | `dotnet run -c Release --project Cli -- simulate --seed 42 --scenario infiltration --steps 100 --out a.jsonl`, then the same again with `--out b.jsonl`, then `shasum -a 256 a.jsonl b.jsonl` | Both runs hash to `d557e80f02fb4783…6a7`, which is the committed [`site/infiltration.jsonl`](site/infiltration.jsonl) (115,067 bytes, schema 5). Verified by running the command twice outside the repository on a macOS arm64 host at the current tree; both outputs matched the committed file byte for byte. Scoped to a macOS arm64 host on the .NET 10 runtime the artifacts record. |
 | Replay is hash-verified, not just re-run. | `dotnet run -c Release --project Cli -- replay Tests/fixtures/golden_trajectory.jsonl --verify` | `replay verified: 12 step(s) serialized-equivalent, 12 state hash(es) matched (seed 2024, schema v3).` Exit 0. Digest computed by [`Trajectories/SimulationStateHash.cs`](Trajectories/SimulationStateHash.cs), compared in [`Trajectories/TrajectoryReplay.cs`](Trajectories/TrajectoryReplay.cs). |
 | The same check runs on all three operating systems. | Read the `Build & test` matrix in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | The golden replay-verify step is a matrix step over `ubuntu-24.04`, `windows-latest`, `macos-latest`. Run [36622539217](https://github.com/candavere/lattice/actions/runs/36622539217) on commit `4035de6` shows all three legs green on the pinned labels, 738/738 tests passed on each: `Build & test (ubuntu-24.04)` 738 passed, `Build & test (macos-latest)` 738 passed, `Build & test (windows-latest)` 738 passed. The label is pinned to 24.04 on purpose so GitHub's rollout of `ubuntu-latest` to 26.04 cannot move this gate. A separate `ubuntu-26.04` job builds, golden-replays, and tests as a **non-gating** compatibility probe: on that run it reported `Total tests: 738` and concluded success, but it publishes no artifact, no other job depends on it, and it is not part of the three-OS equivalence contract — read its steps and logs, never infer 26.04 support from a green run. |
 | Every committed recording replays, not just the golden one. | `dotnet run -c Release --project Cli -- replay site/demo.jsonl --verify` and the same for `site/infiltration.jsonl` | `27 step(s) … 27 state hash(es) matched` and `20 step(s) … 20 state hash(es) matched`. A separate CI job replays every recording under `site/`. |
@@ -448,7 +448,7 @@ Only claims the repository can back up are listed here.
   (`benchmarks/mcts_evaluation_results.json`). It is the baseline any future
   policy must beat under the identical protocol.
 - **What the site calls "fog" is now recorded, for the infiltration run.**
-  `site/infiltration.jsonl` is trajectory schema v4: every step line carries a
+  `site/infiltration.jsonl` is trajectory schema v5: every step line carries a
   `Perceptions` entry per agent, holding the masked view that agent's *own*
   `PerceptionFilter` produced inside its `Decide` call at that tick, and the
   header declares the cone each filter was built with (`AgentVision: [2, 2]`,
@@ -486,6 +486,27 @@ Only claims the repository can back up are listed here.
   `Tests/Trajectories/DecisionTimePerceptionTests.cs` pins by digest: the extra
   bytes are evidence, not a behavioural change to the run. Reproduce with
   `dotnet run --project Cli -- simulate --seed 42 --scenario infiltration --steps 100 --out site/infiltration.jsonl`.
+- **Schema 5 added one header field, and the pre-schema-5 file is kept.**
+  The current committed `site/infiltration.jsonl` is **115,067 bytes** (schema
+  v5, SHA-256 `d557e80f02fb4783866d77300916945ab2326501f85948dd9829e971836766a7`),
+  re-recorded from the same command. The **+84 bytes** over the schema-4 file
+  are the `ScenarioSha256` field and the version stamp, and nothing else: strip
+  those two fields and it is the schema-4 file byte for byte, which
+  `Tests/Cli/ScenarioProvenanceTests.cs` pins field by field. The pre-schema-5
+  artifacts are **not** discarded — they are committed under
+  [`Tests/fixtures/legacy/`](Tests/fixtures/legacy) and are the standing proof
+  that a schema 3 and a schema 4 recording still read, replay, and verify
+  under the schema-5 reader.
+- **`site/demo.jsonl` was deliberately NOT re-recorded.** It is **84,090 bytes**
+  (schema v3, SHA-256 `f6da7cc39e56783b210bb2c936b051bf8eea80f99053cf2c4aecab1550573981`).
+  It is **not reproducible from any committed command** at the current tree:
+  its 27-tick episode has agent 0 idle where a `greedy` collector collects, so
+  no current invocation regenerates it. Re-recording it at schema 5 would
+  therefore have *replaced the site's demo episode* rather than migrated it —
+  a behavioural change disguised as a schema change — so it stays at schema 3
+  and serves as the schema-3 half of the backward-compatibility evidence. This
+  is a known gap, recorded rather than papered over: the demo page's own
+  recording is older than the current engine's.
 - **Per-tick state hash.** `replay --verify` recomputes a SHA-256 digest of
   the full simulation state at every tick — zone and resource positions,
   occupancy, the per-tick choke capacities and derived edge load, scores,

@@ -271,10 +271,10 @@ public class ScenarioProvenanceTests
     [Fact]
     public void TheCommittedSchema4Fixture_StillReadsReplaysAndVerifies()
     {
-        // site/infiltration.jsonl is a schema-4 recording made before the
-        // scenario digest existed. It must remain readable, replayable, and
-        // verifiable, and must NOT be silently relabelled or acquire a digest.
-        var path = Committed("site", "infiltration.jsonl");
+        // A committed schema-4 recording made before the scenario digest
+        // existed. It must remain readable, replayable, and verifiable, and
+        // must NOT be silently relabelled or acquire a digest.
+        var path = Committed("Tests", "fixtures", "legacy", "infiltration_schema4.jsonl");
         var recording = TrajectoryReader.Read(new StringReader(File.ReadAllText(path)));
 
         Assert.Equal(4, recording.Header.SchemaVersion);
@@ -283,19 +283,54 @@ public class ScenarioProvenanceTests
     }
 
     [Fact]
-    public void TheCommittedSchema3Fixtures_StillVerifyWithNoDigestNotice()
+    public void EveryCommittedLegacyFixture_StillVerifiesUnderSchema5()
     {
-        foreach (var relative in new[] { "site/demo.jsonl", "Tests/fixtures/golden_trajectory.jsonl" })
+        // The backward-compatibility contract, as committed artifacts: schema 3
+        // and schema 4 recordings still read, replay, and verify with the
+        // current reader, and carry no scenario digest.
+        foreach (var relative in new[] { "infiltration_schema4.jsonl", "demo_schema3.jsonl" })
         {
-            var recording = TrajectoryReader.Read(new StringReader(File.ReadAllText(Committed(relative.Split('/')))));
+            var recording = TrajectoryReader.Read(new StringReader(
+                File.ReadAllText(Committed("Tests", "fixtures", "legacy", relative))));
             var report = TrajectoryReplay.VerifyDetailed(recording);
 
+            Assert.True(recording.Header.SchemaVersion < TrajectorySchema.CurrentVersion);
             Assert.Null(recording.Header.ScenarioSha256);
             Assert.Empty(report.Problems);
             // A pre-schema-5 recording predates the field, so it is not nagged
             // about a digest it never claimed to have.
             Assert.DoesNotContain(TrajectoryReplay.NoScenarioDigestNotice, report.Notices);
         }
+    }
+
+    [Fact]
+    public void TheCommittedSchema3SiteRecording_StillVerifiesWithNoDigestNotice()
+    {
+        foreach (var relative in new[] { "site/demo.jsonl", "Tests/fixtures/golden_trajectory.jsonl" })
+        {
+            var recording = TrajectoryReader.Read(new StringReader(File.ReadAllText(Committed(relative.Split('/')))));
+            var report = TrajectoryReplay.VerifyDetailed(recording);
+
+            Assert.Empty(report.Problems);
+            // A pre-schema-5 recording predates the field, so it is not nagged
+            // about a digest it never claimed to have.
+            Assert.DoesNotContain(TrajectoryReplay.NoScenarioDigestNotice, report.Notices);
+        }
+    }
+
+    [Fact]
+    public void ANewlyRecordedSiteArtifact_CarriesTheSchema5Digest()
+    {
+        // The regenerated site recording is the schema-5 half of the contract,
+        // so the two halves are both committed and both verified.
+        var recording = TrajectoryReader.Read(new StringReader(
+            File.ReadAllText(Committed("site", "infiltration.jsonl"))));
+
+        Assert.Equal(TrajectorySchema.CurrentVersion, recording.Header.SchemaVersion);
+        Assert.Equal(ScenarioLoader.ComputeDigest(
+            File.ReadAllBytes(Committed("scenarios", "dungeon-infiltration.json"))),
+            recording.Header.ScenarioSha256);
+        Assert.Empty(TrajectoryReplay.Verify(recording));
     }
 
     [Fact]

@@ -156,14 +156,15 @@ by single heavy decisions, and its iteration budget is small by design.
   | `stress_topology_4agent` | 0.8669 | 0.8236 | **yes** |
   | `policy_lookahead_mcts_32` | 0.6753 | 0.6415 | no (0.1085 short) |
 
-  `policy_lookahead_mcts_32` spans 2.050× max/min across the 20 sessions and
-  is the search-bound case, so a dip there is not separable from runner
-  jitter: it is measured, printed, and compared but carries **no verdict**.
-  That is recorded as a negative result in
-  [`FINDINGS_LEDGER.md`](FINDINGS_LEDGER.md) (`FINDING-014`), not closed by
-  widening a tolerance. The record's `Provenance.ArmedWorkloads` is the
-  authoritative armed set; the workflow's per-workload thresholds are
-  byte-identical to the record's derived `AllowedRatio` values.
+  `policy_lookahead_mcts_32` is the exception, and **why it is not armed is
+  stated once, in
+  [`FINDING-014`](FINDINGS_LEDGER.md#finding-014--the-mcts-decision-throughput-case-cannot-be-gated-on-this-host-class-and-four-of-five-workloads-can)**.
+  That finding is the canonical statement of the arming decision, the negative
+  result, and the per-workload figures; this page deliberately does not restate
+  them, so there is one place to correct if the record is ever re-derived. The
+  record's `Provenance.ArmedWorkloads` is the authoritative armed set; the
+  workflow's per-workload thresholds are byte-identical to the record's derived
+  `AllowedRatio` values.
   The record's per-workload median is the **cross-run median of the 20
   sessions**, so the comparator divides by the same quantity the rule
   divides by.
@@ -203,9 +204,11 @@ bounds throughput **on the runner class that recorded it**, and its
 tolerances are wide because that class is noisy — between-run spread across
 the 20 recorded sessions is 1.59×–2.05× per workload, so an allowed ratio of
 0.7804–0.8416 is a real-regression signal and anything subtler is below this
-host class's noise floor. CI now enforces throughput on GitHub-hosted runners
-for four of the five workloads, and the fifth is a **permanent non-verdict**
-rather than a gap to be closed later by loosening a threshold. Even armed, the
+host class's noise floor. Which workloads that covers, and why the remaining
+one is a **permanent non-verdict** rather than a gap to be closed later by
+loosening a threshold, is stated once in
+[`FINDING-014`](FINDINGS_LEDGER.md#finding-014--the-mcts-decision-throughput-case-cannot-be-gated-on-this-host-class-and-four-of-five-workloads-can).
+Even armed, the
 claim stays narrow: only large regressions are detectable, and it says nothing
 about the bare-metal host or about engine performance. A 20-session cohort is
 still a sample — the two extreme `micro_raw_2agent` sessions are 2.6× apart

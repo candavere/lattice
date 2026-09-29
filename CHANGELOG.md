@@ -15,33 +15,52 @@ state; it creates no release and no tag. The `v3.0.0` narrative below and
 - **CI now enforces throughput on GitHub-hosted runners for four of five
   workloads.** The hosted-runner reference
   ([`benchmarks/runner_class_throughput_benchmark.json`](benchmarks/runner_class_throughput_benchmark.json))
-  was re-collected as 20 full-protocol sessions
-  (`--runs 10 --steps 100000 --warmup 50000`) on pinned commit `1b9426f5`,
-  dispatched 25 minutes apart across ~16.5 hours so the cohort spans the
-  conditions the gate actually meets. All 20 sessions pass all seven
-  inclusion rules fixed in advance; no session was excluded and there is no
-  image split. Applying the pre-registered rule unchanged
-  (`allowed = min(0.95, 0.95 × min_ratio)`, armed when
-  `0.95 × min_ratio >= 0.75`) arms `micro_raw_2agent` (0.7914),
-  `facility_static_4agent` (0.8416), `dynamic_contention_4agent` (0.7804) and
-  `stress_topology_4agent` (0.8236), and leaves `policy_lookahead_mcts_32`
-  informational. This replaces the earlier 5-session record, which was
-  published **demoted** (`ArmedWorkloads: []`) after its first live run fell
-  below the five-sample minimum on all five workloads — five idle-dispatched
-  samples did not bound the host class. The demotion is not withdrawn, and no
-  threshold was widened against any record or observed run.
-  `policy_lookahead_mcts_32` is recorded as a **negative result**
-  (`FINDING-014`): 20 sessions span 2.050× max/min on that search-bound
-  workload, so a dip there is not separable from runner jitter and it is
-  measured, printed, and compared but never adjudicated.
-  The record's per-workload median is the cross-run median of the 20
-  sessions, so the comparator divides by the same denominator the rule does;
-  the record's armed set lives in `Provenance.ArmedWorkloads`, and the
-  workflow's per-workload thresholds are byte-identical to the record's
-  derived values. Engine, agent, CLI, protocol, and test sources are
-  unchanged.
+  was re-collected as 20 full-protocol sessions on pinned commit `1b9426f5`,
+  replacing the earlier 5-session record that was published **demoted**
+  (`ArmedWorkloads: []`). **Which workloads are armed, which is not, and why
+  the unarmed one is a permanent non-verdict rather than a gap to close, are
+  stated once in
+  [`FINDING-014`](docs/FINDINGS_LEDGER.md#finding-014--the-mcts-decision-throughput-case-cannot-be-gated-on-this-host-class-and-four-of-five-workloads-can)**
+  and are deliberately not restated here, so there is a single canonical
+  statement to correct if the record is ever re-derived. The demotion is not
+  withdrawn, and no threshold was widened against any record or observed run.
+  Engine, agent, CLI, protocol, and test sources are unchanged.
 
 ### Changed
+
+- **Version 3.1.0.** All nine project `<Version>` values and `CliApp.Version`
+  move to `3.1.0` together. `CITATION.cff` and the pinned v3.0.0 release record
+  are **left alone**: they describe the released 3.0.0 identity, and this work
+  is unreleased. No tag, release, or release asset is created here.
+
+- **`FINDING-014` is the single canonical statement of the runner-class arming
+  decision.** The MCTS workload's "informational / not armed" status was
+  restated in `README.md`, `docs/BENCHMARKING.md`, and this changelog. Those
+  restatements are replaced with one-line cross-references to the finding, which
+  now states the arming decision, the negative result, and the per-workload
+  figures in one place. No meaning changed and no benchmark number moved.
+
+- **The committed `site/infiltration.jsonl` is re-recorded at schema 5.** It
+  was regenerated from its committed command at the current tree and reproduces
+  its schema-4 predecessor exactly once the new `ScenarioSha256` field and the
+  version stamp are removed — the re-recording is a schema migration, not a
+  change of episode. The pre-schema-5 file is **not** discarded: it is
+  committed as `Tests/fixtures/legacy/infiltration_schema4.jsonl` and is the
+  standing proof that a schema-4 recording still reads, replays, and verifies
+  under the schema-5 reader.
+
+  **Two committed recordings were deliberately NOT re-recorded, and both
+  decisions are recorded rather than papered over.** `site/demo.jsonl` is not
+  reproducible from any committed command at the current tree: its 27-tick
+  episode has agent 0 idle where a `greedy` collector collects, so no current
+  invocation regenerates it, and re-recording it would have *replaced the site's
+  demo episode* rather than migrated it — a behavioural change disguised as a
+  schema change. `Tests/fixtures/golden_trajectory.jsonl` stays at schema v3
+  because that is its documented job: it is the cross-platform replay gate's
+  proof that a pre-perception recording is still read and still verified
+  without being nagged, and re-recording it would have destroyed the very
+  property it exists to hold. Together with the schema-4 legacy fixture, all
+  three schema versions are committed and all three verify.
 
 - **Recordings moved to trajectory schema 5, which records the scenario
   descriptor's SHA-256.** The trajectory header gains one optional field,

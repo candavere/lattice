@@ -2573,14 +2573,13 @@
       ['Scenario', hdr.Scenario ? hdr.Scenario : 'sampling run (no scenario)'],
       ['Agent roles', hdr.AgentRoles && hdr.AgentRoles.length ? hdr.AgentRoles.join(' vs ') : 'not recorded in the header'],
       ['Wire schema', 'v' + schema + (schema === 0 ? ' — recorded before the current v2 stamp' : '')],
-      ['Scenario digest', hdr.ScenarioSha256
-        ? hdr.ScenarioSha256
-        : 'not recorded — made before schema 5, so it names no descriptor'],
       // The scenario digest identifies the descriptor FILE; the per-tick state
       // hash identifies the simulation STATE. They are computed over different
-      // things, so the row says which is which rather than blending them.
-      ['Scenario digest is', 'the SHA-256 of the descriptor\'s exact bytes — the declaration, not the world state '
-        + '(per-tick state digests are a separate field)'],
+      // things, so the row says which is which inline rather than blending them
+      // or adding a glossary row the reader has to decode.
+      ['Scenario digest', hdr.ScenarioSha256
+        ? hdr.ScenarioSha256 + ' — the descriptor file\'s bytes, not the per-tick world state'
+        : 'not recorded — made before schema 5, so it names no descriptor'],
       ['Ticks', String(Math.max(0, traj.frames.length - 1)) + ' recorded'],
       ['Config', 'agents ' + (cfg.AgentCount !== undefined ? cfg.AgentCount : '?') +
         ' · max ticks ' + (cfg.MaxTicks !== undefined ? cfg.MaxTicks : '?') +

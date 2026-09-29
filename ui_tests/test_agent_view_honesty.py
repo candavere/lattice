@@ -36,6 +36,19 @@ things are asserted here:
   * **Split pins.** The playing recording's "View in repository" link must
     resolve to main, the branch the deployed file is on. The benchmark result
     JSONs were genuinely recorded at 6463e486 and must stay pinned there.
+  * **Presence leak.** The zone table's occupancy column and the badge painted
+    inside each room card are two more readings of one question — who is
+    standing here — and both used to be answered from the omniscient
+    `frame.agents` while the map above them was painted from the view's fog. A
+    room holding a rival the observer has not currently observed therefore read
+    "1 agent" under a painted ghost; a room the observer has never reached read
+    "empty"; and a mid-transit agent was counted in the room it had left while
+    its token was painted in the corridor. Every view now reports occupancy from
+    the same fog the canvas was painted from, under a label that says which view
+    it is counting, and a room it cannot see is reported as "last known" or
+    "unexplored" rather than counted. The assertions are made against the live
+    agent tokens read back out of the geometry probe, so a table that merely
+    agreed with the page's own counting helper could not pass them.
 
 Every expectation is derived from the recording the page loaded, never from a
 constant: the frames, the claim sets, the agent zones and the scores all move
@@ -48,6 +61,10 @@ Run:  python3 -m unittest discover -s ui_tests -p 'test_*.py' -v
 
 import asyncio
 import json
+import os
+import re
+import shutil
+import tempfile
 import unittest
 
 from playwright.async_api import async_playwright
@@ -125,6 +142,70 @@ _AGENTS_JS = """() => {
   }
   return out;
 }"""
+
+
+# The zone table's own wording, as a name/value pair per room, and the label
+# that says which view the occupancy column is counting.
+ZONE_ROWS_JS = """() => Array.from(document.querySelectorAll('#zones-body tr')).map((tr) => ({
+  room: tr.querySelector('.k')?.textContent ?? '',
+  value: tr.querySelector('.v')?.textContent ?? '' }))"""
+PRESENCE_LABEL = "(document.querySelector('#zone-presence-label')?.textContent ?? '')"
+ZONES_TABLE_ARIA = "(document.querySelector('#zones-table')?.getAttribute('aria-label') ?? '')"
+
+# Who is standing where, read off the probe's own ink rather than off any helper
+# the page uses to compute it. A live token is one the canvas drew this frame:
+# `tokens` holds its centre, `transit` the ones riding a corridor, `ghosts` the
+# remembered rivals that are deliberately *not* tokens, and `rooms` the box each
+# room card was painted into, so a token can be assigned to the room it is
+# physically inside. Tokens that land in no room are corridor travellers and
+# belong to no room's occupancy.
+PAINTED_PRESENCE_JS = """() => {
+  const g = window.__latticeGeo;
+  const rooms = g.rooms || {};
+  const counts = {};
+  const members = {};
+  for (const zid of Object.keys(rooms)) { counts[zid] = 0; members[zid] = []; }
+  const strays = [];
+  for (const [aid, t] of Object.entries(g.tokens || {})) {
+    let home = null;
+    for (const zid of Object.keys(rooms)) {
+      const r = rooms[zid];
+      if (t.x >= r.x && t.x <= r.x + r.w && t.y >= r.y && t.y <= r.y + r.h) { home = zid; break; }
+    }
+    if (home === null) { strays.push(Number(aid)); continue; }
+    counts[home] += 1;
+    members[home].push(Number(aid));
+  }
+  const pills = {};
+  for (const [zid, p] of Object.entries(g.pills || {})) pills[zid] = p.text;
+  return {
+    counts,
+    members,
+    strays,
+    pills,
+    ghosts: Object.keys(g.ghosts || {}).map(Number),
+    transit: Object.keys(g.transit || {}).map(Number),
+    status: g.statusByZone || {},
+  };
+}"""
+
+# What the zone occupancy column has to say it is counting. Which figure is
+# honest depends entirely on the selected view, and that difference is the whole
+# subject: ground truth may count the world, a recorded ego view may count only
+# what that observer's own perception places in the room, a reconstructed view is
+# this page's own derivation and must never borrow the word "seen", and a view
+# with no perception at all has no count to give.
+PRESENCE_GROUND = "agents present in world"
+PRESENCE_SEEN = "agents observed in this view"
+PRESENCE_DERIVED = "agents in derived view"
+PRESENCE_UNAVAILABLE = "presence unavailable"
+
+# The per-room word for a room this view does not currently observe. These are
+# the canvas's own words for the same two rooms ("last known" is drawn on a
+# stale card, "unexplored" on an unknown one), so the table cannot say a room is
+# empty when the card above it says it has never been looked at.
+WORD_STALE = "last known"
+WORD_UNKNOWN = "unexplored"
 
 
 def score_of(name_text):
@@ -227,6 +308,95 @@ def agent_ids(recording):
     return [p["AgentId"] for p in recorded_steps(recording)[0]["Perceptions"]]
 
 
+# --- what the zone table has to say ---------------------------------------
+
+def presence_of(cell):
+    """The occupant count a zone-table cell reports, or None when it declines.
+
+    Parsed from the page's own string so the check is about the wording a
+    reader sees, not about an integer handed back by the page. A cell reads
+    "<count> agent(s)", "empty", or "—" when the view has no count to give; any
+    other shape is returned as a marker so a failing assertion prints what was
+    actually painted instead of a bare mismatch.
+    """
+    head = str(cell).split("·")[0].strip()
+    if head == "empty":
+        return 0
+    if head in ("—", "-", "") or head in (WORD_STALE, WORD_UNKNOWN):
+        return None
+    if re.fullmatch(r"\d+ agents?", head):
+        return int(head.split()[0])
+    return "UNREADABLE:" + head
+
+
+def pill_of(text):
+    """The count a room card's occupancy pill shows, or None.
+
+    A capacity-capped room paints "present/max", so the left half is the count
+    and the right half is the room's limit, not a second number to compare.
+    """
+    if text is None:
+        return None
+    return int(str(text).split("/")[0].strip())
+
+
+def room_labels(recording):
+    """{zone id: the room name both the canvas and the table print}, mirroring
+    the page's own `roomLabel`, so table rows can be keyed by id instead of by
+    position — a row order that shifted would otherwise silently re-label every
+    expectation in the file."""
+    out = {}
+    for zone in recording[0]["Map"]["Zones"]:
+        out[zone["Id"]] = re.sub(r"([a-z])([A-Z])", r"\1 \2", zone["Role"]) if zone.get("Role") \
+            else "Room %s" % zone["Id"]
+    return out
+
+
+def world_index_of(steps, frame):
+    """Which frame the page's entity layer is painted from at scrubber `frame`.
+
+    The scrubbed world for a fresh decision-time view, and the last decision's
+    world at the terminal frame — the same pairing the fog carries in
+    `worldIndex`, so the two can be read side by side.
+    """
+    return frame if frame < len(steps) else len(steps) - 1
+
+
+def recorded_presence(steps, frame, ego_id, frame_agents, zone_ids):
+    """The occupancy a schema-4 observer's own perception supports, or None when
+    the file records no perception for that frame.
+
+    Counted from the recording and nothing else: the observer wherever the
+    painted world has it standing, and a rival only where its perception entry
+    reports it currently observed — a stale entry is a memory of a room, not an
+    occupant of it, and an unknown one is no occupant of anything. A room the
+    perception does not report as observed can hold nobody in this figure,
+    because the view does not know what is in it.
+    """
+    perception = perception_at(steps, frame, ego_id)
+    if perception is None:
+        return None
+    status = {z["ZoneId"]: z["Status"] for z in (perception.get("Zones") or [])}
+    counts = {z: 0 for z in zone_ids}
+    ego = frame_agents.get(ego_id)
+    if ego and not ego.get("Transit") and status.get(ego["ZoneId"]) == 0:
+        counts[ego["ZoneId"]] += 1
+    for entry in (perception.get("Agents") or []):
+        if entry["AgentId"] == ego_id or entry["Status"] != 0:
+            continue
+        last = entry.get("LastKnownState")
+        if not last or last.get("Transit"):
+            continue
+        if status.get(last["ZoneId"]) != 0:
+            continue
+        counts[last["ZoneId"]] = counts.get(last["ZoneId"], 0) + 1
+    return counts
+
+
+def frame_agent_map(frames, index):
+    return {a["AgentId"]: a for a in frames[index]["agents"]}
+
+
 async def show(page, tick, view):
     """Select the perspective, slide to `tick`, and wait for that frame painted.
 
@@ -289,6 +459,30 @@ class TestAgentViewHonesty(unittest.TestCase):
 
     def _no_console_errors(self, errors):
         self.assertEqual(errors, [], "the page logged errors")
+
+    async def _load_variant(self, page, lines, name):
+        """Hand the page a controlled variant of a committed recording, through
+        the file input a visitor would use.
+
+        Some states the viewer has to survive are absent from both committed
+        files — a schema-4 frame whose perceptions are missing, a rival the
+        observer has only a memory of, a rival it has never seen. Asserting on
+        them needs a recording that contains them, and the committed ones are
+        immutable evidence, so the variant is written to a temp file and the
+        temp directory is removed again. Nothing under site/ is touched.
+        """
+        tmp = tempfile.mkdtemp()
+        try:
+            path = os.path.join(tmp, name)
+            with open(path, "w", encoding="utf-8") as handle:
+                for line in lines:
+                    handle.write(json.dumps(line) + "\n")
+            await page.set_input_files("#file-input", path)
+            await page.wait_for_function(
+                "() => document.querySelector('#source-label').textContent === %s"
+                % json.dumps(name))
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
 
     # -- the moments this stage is about exist -------------------------------
 
@@ -724,6 +918,453 @@ class TestAgentViewHonesty(unittest.TestCase):
                         "a benchmark result JSON link lost its pin; that artifact "
                         "is immutable at 6463e486 and the number a reader gets back "
                         "has to be the published one")
+            return errors
+
+        self._no_console_errors(self._drive(body))
+
+    # -- zone-table presence must agree with the painted map ----------------
+
+    async def assert_presence_matches_paint(self, page, recording, where,
+                                            frame, view, expect_label=None,
+                                            expect_counts=None):
+        """One frame in one view, checked three ways at once.
+
+        The zone table, the occupancy badge painted inside each room card, and
+        the live agent tokens actually drawn on the canvas are three renderings
+        of the same fact. The tokens are the ground for this: they are read back
+        out of the probe's record of its own ink, and a token is assigned to the
+        room whose painted box contains it, so a table that disagreed with the
+        map would be caught even if the page's own counting helper agreed with
+        itself. `expect_counts`, when given, is the figure derived independently
+        from the recording, so the check is not merely self-consistent.
+        """
+        rows = await page.evaluate(ZONE_ROWS_JS)
+        painted = await page.evaluate(PAINTED_PRESENCE_JS)
+        labels = room_labels(recording)
+        self.assertEqual(len(rows), len(labels),
+                         f"{where}: the table has {len(rows)} rows for "
+                         f"{len(labels)} rooms")
+        table = {}
+        for row in rows:
+            zid = next((z for z, name in labels.items() if name == row["room"]), None)
+            self.assertIsNotNone(
+                zid, f"{where}: no room in the recording is named {row['room']!r}, "
+                     "so the table row cannot be keyed to a zone")
+            table[zid] = row["value"]
+
+        if expect_label is not None:
+            # Checked after the per-room comparisons below: whether the table
+            # agrees with the map is the invariant, and the label is the wording
+            # that has to go with it.
+            pass
+
+        for zid, cell in sorted(table.items()):
+            shown = presence_of(cell)
+            badge = pill_of(painted["pills"].get(str(zid)))
+            status = painted["status"].get(str(zid), "unknown")
+
+            if status != "observed":
+                # A room this view has not looked at carries no count at all, and
+                # the canvas draws no badge on it. The table must decline in the
+                # canvas's own words rather than call it empty.
+                with self.subTest(where=where, zone=zid, subject="unobserved room"):
+                    self.assertIsNone(
+                        shown,
+                        f"{where}: room {zid} ({labels[zid]}) is painted "
+                        f"{status!r} but the table reads {cell!r}, which claims "
+                        "something about a room the view cannot see")
+                    self.assertTrue(
+                        cell.startswith(
+                            WORD_STALE if status == "stale" else WORD_UNKNOWN),
+                        f"{where}: room {zid} reads {cell!r}, not the canvas's own "
+                        f"word for a {status!r} room")
+                self.assertIsNone(
+                    badge,
+                    f"{where}: room {zid} is painted {status!r} yet carries an "
+                    f"occupancy badge reading {painted['pills'].get(str(zid))!r}")
+                continue
+
+            with self.subTest(where=where, zone=zid, subject="table vs tokens"):
+                self.assertEqual(
+                    shown, painted["counts"].get(str(zid), 0),
+                    f"{where}: room {zid} ({labels[zid]}) reads {cell!r} but the "
+                    f"canvas painted {painted['counts'].get(str(zid), 0)} live "
+                    f"token(s) inside it (members {painted['members'].get(str(zid))}, "
+                    f"corridor travellers {painted['strays']}, ghosts "
+                    f"{painted['ghosts']})")
+            if expect_counts is not None:
+                with self.subTest(where=where, zone=zid, subject="table vs recording"):
+                    self.assertEqual(
+                        shown, expect_counts.get(zid, 0),
+                        f"{where}: room {zid} ({labels[zid]}) reads {cell!r}, not the "
+                        f"{expect_counts.get(zid, 0)} occupant(s) the recording puts "
+                        "in that room for this view")
+            if badge is not None:
+                with self.subTest(where=where, zone=zid, subject="badge vs tokens"):
+                    self.assertEqual(
+                        badge, painted["counts"].get(str(zid), 0),
+                        f"{where}: the occupancy badge on room {zid} shows "
+                        f"{painted['pills'].get(str(zid))!r} while the room holds "
+                        f"{painted['counts'].get(str(zid), 0)} painted token(s)")
+                if shown is not None:
+                    with self.subTest(where=where, zone=zid, subject="badge vs table"):
+                        self.assertEqual(badge, shown,
+                                         f"{where}: room {zid} has a badge saying "
+                                         f"{badge} and a table row saying {shown!r}")
+        if expect_label is not None:
+            self.assertEqual(await page.evaluate(PRESENCE_LABEL), expect_label,
+                             f"{where}: the zone table does not say which view it "
+                             "is counting")
+        return painted
+
+    def test_zone_table_presence_agrees_with_the_painted_tokens(self):
+        """The core honesty invariant, over both committed recordings, every
+        view and every frame.
+
+        `renderMetrics` used to take its occupancy column from
+        `zoneCounts(map, frame)` — the omniscient world — while the canvas above
+        it was painted from the view's fog. Any room holding a rival the
+        observer has not currently observed therefore read "1 agent" under a
+        painted ghost, or "empty" under a painted token. The table has to follow
+        the fog, and the two ego views have to be able to disagree.
+        """
+
+        async def body(page, recording, errors):
+            steps = recorded_steps(recording)
+            frames = frames_with_claims(recording)
+            ego_ids = agent_ids(recording) if has_recorded_perception(recording) \
+                else [a["AgentId"] for a in frames[0]["agents"]]
+            leaked = 0
+            for frame in range(len(steps) + 1):
+                for view in ["ground"] + [str(e) for e in ego_ids]:
+                    await show(page, frame, view)
+                    painted = await self.assert_presence_matches_paint(
+                        page, recording, f"{recording[0]['Scenario']} {view} f{frame}",
+                        frame, view)
+                    # A token that is not in any room is a corridor traveller, and
+                    # a ghost is a memory: neither may be counted as an occupant.
+                    self.assertTrue(
+                        set(painted["strays"]).issubset(set(painted["transit"])),
+                        f"a token was painted outside every room that is not in "
+                        f"transit: strays {painted['strays']}, transit "
+                        f"{painted['transit']}")
+            self.assertTrue(True, "presence agreement exercised")
+            return errors
+
+        self._no_console_errors(self._drive(body))
+        self._no_console_errors(self._drive(body, "demo.jsonl"))
+
+    def test_ground_truth_zone_table_counts_the_world_and_says_so(self):
+        """Ground truth is the one view allowed to count the world, and it has
+        to say that in words. The count is the world's own agents standing in
+        each room at that frame — an agent crossing a corridor is drawn between
+        rooms, so it is not an occupant of either, and its crossing is reported
+        in the agents table above with destination and countdown."""
+
+        async def body(page, recording, errors):
+            steps = recorded_steps(recording)
+            frames = frames_with_claims(recording)
+            zone_ids = [z["Id"] for z in recording[0]["Map"]["Zones"]]
+            checked = 0
+            for frame in range(len(steps) + 1):
+                world = {z: 0 for z in zone_ids}
+                for agent in frames[frame]["agents"]:
+                    if agent.get("Transit"):
+                        continue
+                    world[agent["ZoneId"]] = world.get(agent["ZoneId"], 0) + 1
+                await show(page, frame, "ground")
+                await self.assert_presence_matches_paint(
+                    page, recording, f"ground f{frame}", frame, "ground",
+                    expect_label=PRESENCE_GROUND, expect_counts=world)
+                checked += 1
+            self.assertTrue(checked, "no ground-truth frame was checked")
+            return errors
+
+        self._no_console_errors(self._drive(body))
+        self._no_console_errors(self._drive(body, "demo.jsonl"))
+
+    def test_recorded_ego_view_counts_only_what_the_perception_places(self):
+        """Both schema-4 ego views, every frame, counted from the file.
+
+        A recorded perception is a statement about what one observer knew at its
+        decision. The occupancy figure has to be read out of it — the observer
+        wherever the painted world has it, and a rival only where its entry
+        reports it currently observed — and never out of `frame.agents`.
+        """
+
+        async def body(page, recording, errors):
+            self.assertTrue(has_recorded_perception(recording),
+                            "infiltration.jsonl no longer records perceptions")
+            steps = recorded_steps(recording)
+            frames = frames_with_claims(recording)
+            zone_ids = [z["Id"] for z in recording[0]["Map"]["Zones"]]
+            crossing = False
+            for frame in range(len(steps) + 1):
+                index = world_index_of(steps, frame)
+                agents = frame_agent_map(frames, index)
+                for ego in agent_ids(recording):
+                    want = recorded_presence(steps, frame, ego, agents, zone_ids)
+                    self.assertIsNotNone(
+                        want, f"{view_name(recording, ego)} at frame {frame}: the "
+                              "file records no perception to count from")
+                    await show(page, frame, str(ego))
+                    await self.assert_presence_matches_paint(
+                        page, recording,
+                        f"{view_name(recording, ego)} f{frame}", frame, str(ego),
+                        expect_label=PRESENCE_SEEN, expect_counts=want)
+                    # Where the world and the recorded view genuinely differ, the
+                    # two ego views must not end up with the same figure.
+                    world = {z: 0 for z in zone_ids}
+                    for agent in frames[index]["agents"]:
+                        if not agent.get("Transit"):
+                            world[agent["ZoneId"]] = world.get(agent["ZoneId"], 0) + 1
+                    # This file's recorded placements agree with the world in
+                    # every frame, so the rule under repair is not "the two views
+                    # disagree" here — it is that an agent crossing a corridor
+                    # belongs to no room, which the world count gets wrong
+                    # whenever one is moving. Require such a frame to exist, or
+                    # the check above would pass without ever being tested.
+                    if any(agent.get("Transit") for agent in frames[index]["agents"]):
+                        crossing = True
+            self.assertTrue(
+                crossing,
+                "no frame in this recording has an agent crossing a corridor, so "
+                "the rule that a corridor traveller occupies no room was never "
+                "exercised")
+            return errors
+
+        self._no_console_errors(self._drive(body))
+
+    def test_a_remembered_ghost_is_not_counted_as_present(self):
+        """A rival the observer has only a memory of, and one it has never seen.
+
+        A remembered ghost is drawn as a faded age stamp in the room the rival
+        was last seen in. Counting it would claim an occupant the canvas
+        deliberately refused to draw as live; a rival the observer has never
+        seen is not drawn anywhere and must not be counted anywhere.
+
+        Neither committed recording contains a rival an observer has lost: in
+        `infiltration.jsonl` every recorded rival sighting is currently
+        observed, and `demo.jsonl`'s four rooms all sit inside the page's
+        two-hop cone, so no ghost is ever drawn. Asserting the rule needs a
+        recording that contains one, and the committed files are immutable
+        evidence, so the memory cases run on a controlled variant of the
+        schema-4 file: one step whose rival is reported stale with a last-known
+        position, and one whose rival is reported unknown with no position.
+        """
+
+        async def body(page, recording, errors):
+            steps = recorded_steps(recording)
+            frames = frames_with_claims(recording)
+            self.assertTrue(has_recorded_perception(recording),
+                            "infiltration.jsonl no longer records perceptions")
+            stale_at, unknown_at = 5, 15
+            ids = agent_ids(recording)
+            self.assertGreater(len(ids), 1, "this fixture needs a rival to hide")
+
+            lines = [recording[0]]
+            for i, step in enumerate(steps):
+                step = dict(step)
+                if i in (stale_at, unknown_at):
+                    step["Perceptions"] = [dict(p) for p in step["Perceptions"]]
+                    for perception in step["Perceptions"]:
+                        perception["Agents"] = [dict(a) for a in perception["Agents"]]
+                        for entry in perception["Agents"]:
+                            if entry["AgentId"] == perception["AgentId"]:
+                                continue
+                            if i == stale_at:
+                                entry["Status"] = 1      # last known, not live
+                                entry["LastSeenTick"] = 1
+                            else:
+                                entry["Status"] = 2      # never seen it at all
+                                entry["LastKnownState"] = None
+                                entry["LastSeenTick"] = 0
+                lines.append(step)
+            lines.append(recording[-1])
+            await self._load_variant(page, lines, "hidden_rivals.jsonl")
+
+            for frame, kind in ((stale_at, "stale ghost"),
+                                (unknown_at, "unknown rival")):
+                for ego in ids:
+                    # The world really does have that rival standing in a room,
+                    # or a table that counted it would not be detectably wrong.
+                    with self.subTest(subject=kind, view=str(ego), frame=frame,
+                                      where="fixture is meaningful"):
+                        rivals = [a for a in frames[frame]["agents"]
+                                  if a["AgentId"] != ego]
+                        self.assertTrue(
+                            any(not a.get("Transit") for a in rivals),
+                            f"at frame {frame} the world has no stationary rival, "
+                            "so a leaked count could not be detected here")
+                    await show(page, frame, str(ego))
+                    painted = await self.assert_presence_matches_paint(
+                        page, recording, f"{kind} ego {ego} f{frame}", frame,
+                        str(ego), expect_label=PRESENCE_SEEN)
+                    seated = {str(a) for ids_ in painted["members"].values()
+                              for a in ids_}
+                    with self.subTest(subject=kind, view=str(ego), frame=frame,
+                                      where="rival is not a live token"):
+                        for other in ids:
+                            if other == ego:
+                                continue
+                            self.assertNotIn(
+                                str(other), seated,
+                                f"{kind}: rival {other} was painted as a live "
+                                f"token; live tokens {sorted(seated)}")
+                    if kind == "stale ghost":
+                        with self.subTest(subject=kind, view=str(ego), frame=frame,
+                                          where="a ghost is drawn"):
+                            self.assertEqual(
+                                len(painted["ghosts"]), len(ids) - 1,
+                                "a rival reported stale with a last-known position "
+                                "must be drawn as a ghost; ghosts seen: "
+                                f"{painted['ghosts']}")
+                    else:
+                        with self.subTest(subject=kind, view=str(ego), frame=frame,
+                                          where="nothing is drawn"):
+                            self.assertEqual(
+                                painted["ghosts"], [],
+                                "a rival with no last-known position must not be "
+                                f"drawn at all; ghosts seen: {painted['ghosts']}")
+            return errors
+
+        self._no_console_errors(self._drive(body))
+
+    def test_stale_and_unexplored_rooms_decline_to_be_counted(self):
+        """The dimmer half of the same rule, driven off the committed files.
+
+        A stale room is drawn "last known" and an unexplored one "unexplored".
+        The table has to use the canvas's own words for them, must not put a
+        count against them — "empty" above all, which is a claim about a room
+        this view cannot see — and must not hang a badge on them.
+        """
+
+        async def body(page, recording, errors):
+            steps = recorded_steps(recording)
+            frames = frames_with_claims(recording)
+            recorded = has_recorded_perception(recording)
+            label = PRESENCE_SEEN if recorded else PRESENCE_DERIVED
+            ids = (agent_ids(recording) if recorded
+                   else [a["AgentId"] for a in frames[0]["agents"]])
+            zone_ids = [z["Id"] for z in recording[0]["Map"]["Zones"]]
+            dim = 0
+            for frame in range(len(steps) + 1):
+                index = world_index_of(steps, frame)
+                agents = frame_agent_map(frames, index)
+                for ego in ids:
+                    await show(page, frame, str(ego))
+                    want = (recorded_presence(steps, frame, ego, agents, zone_ids)
+                            if recorded else None)
+                    painted = await self.assert_presence_matches_paint(
+                        page, recording,
+                        f"{recording[0]['Scenario']} {ego} f{frame}", frame, str(ego),
+                        expect_label=label, expect_counts=want)
+                    for zone, status in painted["status"].items():
+                        if status == "observed":
+                            continue
+                        dim += 1
+                        with self.subTest(view=str(ego), frame=frame, zone=zone):
+                            self.assertNotIn(
+                                str(zone), painted["pills"],
+                                f"room {zone} is painted {status!r} but carries an "
+                                "occupancy badge "
+                                f"{painted['pills'].get(str(zone))!r}")
+            return errors, dim
+
+        seen = 0
+        for name in ("infiltration.jsonl", "demo.jsonl"):
+            errors, dim = self._drive(body, name)
+            self._no_console_errors(errors)
+            seen += dim
+        self.assertTrue(
+            seen, "no stale or unexplored room was ever painted, so the "
+            "decline-to-count rule was never exercised")
+
+    def test_terminal_frame_presence_comes_from_the_last_decision_world(self):
+        """The last frame, in an ego view, is the last decision-time view: the
+        occupancy column must come from the world that decision was made from
+        (frame last-1), not from the post-step terminal world that the canvas
+        did not paint."""
+
+        async def body(page, recording, errors):
+            steps = recorded_steps(recording)
+            frames = frames_with_claims(recording)
+            zone_ids = [z["Id"] for z in recording[0]["Map"]["Zones"]]
+            last = len(steps)
+            for ego in agent_ids(recording):
+                want = recorded_presence(
+                    steps, last, ego, frame_agent_map(frames, last - 1), zone_ids)
+                await show(page, last, str(ego))
+                await self.assert_presence_matches_paint(
+                    page, recording, f"{view_name(recording, ego)} terminal",
+                    last, str(ego), expect_label=PRESENCE_SEEN, expect_counts=want)
+            return errors
+
+        self._no_console_errors(self._drive(body))
+
+    def test_ego_view_with_no_recorded_perception_declines_to_count(self):
+        """A schema-4 file that is missing one step's perceptions.
+
+        The file still records perceptions, so the page must not silently
+        reconstruct a sightline for the missing frame and pass the guess off as
+        a record — and it must not fall back on `frame.agents` either, because
+        that is the world's. There is no honest count here, so the column has to
+        say so instead of inventing one.
+
+        The fixture is a copy of the committed recording with one step's
+        `Perceptions` removed, built in a temp directory and loaded through the
+        page's own file input. No committed recording is touched.
+        """
+
+        async def body(page, recording, errors):
+            steps = recorded_steps(recording)
+            zone_ids = [z["Id"] for z in recording[0]["Map"]["Zones"]]
+            frames = frames_with_claims(recording)
+            self.assertTrue(has_recorded_perception(recording),
+                            "infiltration.jsonl no longer records perceptions")
+
+            blind = 1
+            lines = [recording[0]]
+            doctored = []
+            for i, step in enumerate(steps):
+                step = dict(step)
+                if i == blind:
+                    step.pop("Perceptions", None)
+                doctored.append(step)
+                lines.append(step)
+            lines.append(recording[-1])
+            await self._load_variant(page, lines, "blind_frame.jsonl")
+
+            # The page shows `steps[f]` at scrubber position f, so blinding step
+            # index `blind` is what leaves that frame with no recorded perception.
+            # Checked against the variant that was actually loaded, not against
+            # the pristine file: the guard would otherwise pass while the page
+            # was still reading a perception that is not there.
+            frame = blind
+            self.assertIsNone(
+                perception_at(doctored, frame, 0),
+                "the variant still records a perception at the blind frame")
+            self.assertIsNotNone(
+                perception_at(steps, frame, 0),
+                "the committed file already lacked a perception here, so this "
+                "test is no longer exercising the missing-perception path")
+            await show(page, frame, "0")
+            rows = await page.evaluate(ZONE_ROWS_JS)
+            self.assertEqual(await page.evaluate(PRESENCE_LABEL), PRESENCE_UNAVAILABLE)
+            for row in rows:
+                with self.subTest(zone=row["room"]):
+                    self.assertIsNone(
+                        presence_of(row["value"]),
+                        f"{row['room']}: with no recorded perception this view has "
+                        f"no count to give, but the table says {row['value']!r}")
+            # And the world, which is right there in the file, was not borrowed.
+            world = {z: 0 for z in zone_ids}
+            for agent in frames[frame]["agents"]:
+                if not agent.get("Transit"):
+                    world[agent["ZoneId"]] = world.get(agent["ZoneId"], 0) + 1
+            self.assertTrue(any(world.values()),
+                            "the blind frame has no agents at all, so this test "
+                            "cannot detect a leaked world count")
             return errors
 
         self._no_console_errors(self._drive(body))

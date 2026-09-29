@@ -168,6 +168,8 @@
     dom.provGrid = document.getElementById('prov-grid');
     dom.provOpen = document.getElementById('prov-open');
     dom.provRepro = document.getElementById('prov-repro');
+    dom.zonePresenceLabel = document.getElementById('zone-presence-label');
+    dom.zonesTable = document.getElementById('zones-table');
 
     // Self-test geometry probe: with ?measure=1 the page records the exact
     // bounds of every drawn room label, agent token and door pill each frame
@@ -1747,7 +1749,11 @@
   }
 
   function drawZones(ctx, map, frame, layout, fog) {
-    const occupied = zoneCounts(map, frame);
+    // The badge counts what this view paints in the room, from the same fog
+    // object drawAgents is about to use — not the omniscient world. A badge
+    // that disagreed with the tokens inside its own room would be the same
+    // leak as the zone table, painted on the map itself.
+    const occupied = presenceCounts(map, frame, fog);
 
     map.Zones.forEach(function (zone) {
       const rect = roomRect(zone, layout);
@@ -1807,7 +1813,7 @@
       // not. It lives in the bottom-right corner, on the loot row the loot
       // never reaches, with the card's own padding all round.
       if (status === 'observed') {
-        const present = occupied[zone.Id] || 0;
+        const present = occupied.counts[zone.Id] || 0;
         const capped = zone.MaxOccupancy !== UNLIMITED && zone.MaxOccupancy < UNLIMITED;
         const occ = capped ? present + '/' + zone.MaxOccupancy : String(present);
         const pillH = 13 * layout.k;
@@ -1833,12 +1839,95 @@
     });
   }
 
-  function zoneCounts(map, frame) {
+  // Who is standing in each room, as *this* view actually paints it, together
+  // with the knowledge tier each room is drawn at. `fog` is the very object the
+  // canvas was painted from, so the zone table, the occupancy badge on a room
+  // card and the tokens on the map cannot come from two different worlds.
+  //
+  // Three rules, all of them the rules drawAgents already follows:
+  //
+  //   * A rival is a live occupant only while the fog reports it currently
+  //     observed. A stale rival is drawn as a ghost — a memory of a room, not
+  //     somebody standing in it — and one the observer has never reached is
+  //     not drawn at all, so neither may be counted.
+  //   * An agent crossing a corridor is drawn between rooms, so it occupies
+  //     neither. Its crossing is reported in the agents table above with
+  //     destination and countdown, which is where a crossing can be stated
+  //     without claiming a room it is not in.
+  //   * A room this view does not currently observe cannot be given a count at
+  //     all: the table reports "last known" or "unexplored" for it, which are
+  //     the canvas's own words for those two cards, rather than the "empty" the
+  //     world could have honestly claimed.
+  function presenceCounts(map, frame, fog) {
     const counts = {};
-    map.Zones.forEach(function (z) { counts[z.Id] = 0; });
-    if (frame) frame.agents.forEach(function (a) { counts[a.ZoneId] = (counts[a.ZoneId] || 0) + 1; });
-    return counts;
+    const status = {};
+    map.Zones.forEach(function (z) {
+      counts[z.Id] = 0;
+      status[z.Id] = zoneStatus(fog, z.Id);
+    });
+    if (!frame) return { counts: counts, status: status };
+    paintedAgents(frame, fog).forEach(function (agent) {
+      if (fog && agent.AgentId !== fog.egoId && rivalStatus(fog, agent) !== 'observed') return;
+      if (agent.Transit) return;
+      if (status[agent.ZoneId] !== 'observed') return;
+      counts[agent.ZoneId] = (counts[agent.ZoneId] || 0) + 1;
+    });
+    return { counts: counts, status: status };
   }
+
+  // The words each view has to use about the occupancy column. The count and
+  // the wording travel together for the same reason the claim metric's do: a
+  // number and a claim about where it came from are one statement, and a
+  // spectator's tally under an observer's words is the leak this whole stage
+  // exists to remove.
+  //
+  //   ego, recorded          the observer's own perception says who is in view
+  //   ego, reconstructed     this page's own sightline — never "seen"
+  //   ego, nothing recorded  no count exists; say so rather than invent one
+  //   ground truth           the world, under its own name
+  const PRESENCE_LABEL_GROUND = 'agents present in world';
+  const PRESENCE_LABEL_SEEN = 'agents observed in this view';
+  const PRESENCE_LABEL_DERIVED = 'agents in derived view';
+  const PRESENCE_LABEL_UNAVAILABLE = 'presence unavailable';
+
+  function presenceMetric(fog, frame, map) {
+    // An ego view with no fog: the file records perceptions but has none for
+    // this frame, so the page declined to reconstruct a sightline and pass the
+    // guess off as a record. `frame.agents` is the world's and is not a
+    // substitute. There is no honest count, so the panel reports none.
+    if (perspectiveIsAgent() && !fog) {
+      return {
+        available: false,
+        label: PRESENCE_LABEL_UNAVAILABLE,
+        counts: null,
+        status: null,
+      };
+    }
+    const view = presenceCounts(map, frame, fog);
+    return {
+      available: true,
+      label: !fog ? PRESENCE_LABEL_GROUND
+        : fog.source === 'recorded' ? PRESENCE_LABEL_SEEN : PRESENCE_LABEL_DERIVED,
+      counts: view.counts,
+      status: view.status,
+    };
+  }
+
+  // One room's occupancy cell, for the table. Returns the words rather than a
+  // number so an unobserved room is never rendered as an empty one.
+  function presenceCell(metric, zoneId, count) {
+    if (!metric.available) return '—';
+    if (metric.status[zoneId] !== 'observed') {
+      return metric.status[zoneId] === 'stale' ? 'last known' : 'unexplored';
+    }
+    return count ? count + (count === 1 ? ' agent' : ' agents') : 'empty';
+  }
+
+  // There is deliberately no omniscient "count everybody in the world" helper
+  // any more: the only occupancy figure the page can produce is
+  // presenceCounts(fog, frame, map), which is view-specific by construction.
+  // A single shared world count is exactly what let the zone table and the room
+  // badges contradict the tokens painted above them.
 
   // Loot left in a room, from the same claim set the diamonds and the metric
   // were filled from: the world's in ground truth, the observer's own in an ego
@@ -2332,7 +2421,12 @@
       : metric.count + ' / ' + metric.total;
     dom.statSteps.textContent = fin ? fin.TotalSteps + ' (limit ' + traj.header.SimulationConfig.MaxTicks + ')' : String(state.index);
 
-    const crowd = zoneCounts(map, frame);
+    const presence = presenceMetric(fog, frame, map);
+    if (dom.zonePresenceLabel) dom.zonePresenceLabel.textContent = presence.label;
+    if (dom.zonesTable) {
+      dom.zonesTable.setAttribute('aria-label',
+        'Zone occupancy: ' + presence.label + ', and unclaimed loot');
+    }
     const roles = traj.header.AgentRoles;
     let rows = '';
     frame.agents.slice().sort(function (a, b) { return a.AgentId - b.AgentId; }).forEach(function (agent) {
@@ -2347,11 +2441,11 @@
     let zrows = '';
     map.Zones.slice().sort(function (a, b) { return a.Id - b.Id; }).forEach(function (zone) {
       const room = zone.Role ? spaceCamel(zone.Role) : 'Room ' + zone.Id;
-      const present = crowd[zone.Id] || 0;
+      const shown = presenceCell(presence, zone.Id,
+        presence.counts ? (presence.counts[zone.Id] || 0) : 0);
       const loot = zoneUnclaimed(map, frame, metric.claims)[zone.Id] || 0;
       zrows += '<tr><td class="k">' + room + '</td><td class="v">' +
-        (present ? present + (present === 1 ? ' agent' : ' agents') : 'empty') +
-        ' · ' + (loot ? loot + ' loot' : 'no loot') + '</td></tr>';
+        shown + ' · ' + (loot ? loot + ' loot' : 'no loot') + '</td></tr>';
     });
     dom.zonesBody.innerHTML = zrows;
   }

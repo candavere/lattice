@@ -390,6 +390,55 @@ schema-4 recording, on every perspective, and fails when a diamond is absent or
 in the wrong colour; `ui_tests/test_agent_view_honesty.py` covers the same claim
 semantics across every frame of every view from the geometry probe.
 
+### Viewer presence semantics
+
+Who is standing in each room is a second such question, asked by the zone
+table's occupancy column and by the small badge painted in the bottom-right of
+every room card. Both are read out of the *same fog object the canvas was
+painted from*, so the table, the badge and the tokens on the map cannot describe
+two different worlds. The count and the words go together, as with the claim
+metric.
+
+| View | Counted occupants | Label | Basis |
+| --- | --- | --- | --- |
+| Ground truth | the world's agents, standing in rooms, in the world the map was painted from | `agents present in world` | that is what the view is |
+| Agent view, schema 4 | the observer, plus each rival only where that observer's recorded perception reports it **currently observed** | `agents observed in this view` | `Perceptions[i].Agents[].Status` |
+| Agent view, schema 3 | the observer, plus the rivals this page's derived sightline currently places in a room | `agents in derived view` | this page's own derivation; nothing was recorded |
+| Agent view, no recorded perception for the frame | none reported (`—` per room) | `presence unavailable` | the file records perceptions but has none for this frame, so no count is invented from `frame.agents` |
+
+Four consequences, each of which the tests above check against the painted
+tokens rather than against another helper:
+
+- **A remembered ghost is not an occupant.** A rival the observer has only a
+  memory of is drawn as a faded age stamp in the room it was last seen in, and a
+  rival it has never reached is not drawn at all. Neither is counted in any
+  room: counting a ghost would claim somebody standing in a room the canvas
+  deliberately declined to draw a token in.
+- **A corridor traveller occupies no room.** An agent mid-transit is painted
+  *between* rooms, so it is not an occupant of either. Its crossing is reported
+  in the agents table above the zone table, with destination and remaining
+  ticks. The world count this replaces did attribute a mid-transit agent to the
+  room it had left, which put "1 agent" under a room with no token in it.
+- **A room the view has not looked at is not "empty."** A stale room reads
+  `last known` and an unexplored one `unexplored` in the table — the canvas's own
+  words for those two cards — and carries no count and no badge. "empty" is a
+  claim about a room, and this view has made no claim about that one.
+- **The terminal ego frame is not an exception here either.** As with the claim
+  metric, the occupancy column is taken from the world the last decision was made
+  from (frame *last*−1), which is the world the tokens were painted from.
+
+`ui_tests/test_agent_view_honesty.py` asserts this three ways at once for every
+frame of every view of both committed recordings: the zone-table cell, the
+painted room badge, and the live agent tokens read back out of the geometry
+probe, with each token assigned to the room box that contains it. Neither
+committed file contains a rival an observer has lost — every recorded rival
+sighting in `infiltration.jsonl` is currently observed, and `demo.jsonl`'s four
+rooms all sit inside the page's two-hop cone — so the ghost and unknown-rival
+cases, and the missing-perception case, run on controlled variants of the
+schema-4 file written to a temp directory and loaded through the page's own file
+input. The committed recordings are immutable evidence and are not edited to
+make a test pass.
+
 ### Release immutability policy
 
 - **`immutable: true` is scoped to `v2.3.1`, `v2.3.2`, and `v3.0.0`, all

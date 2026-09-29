@@ -12,6 +12,14 @@ state; it creates no release and no tag. The `v3.0.0` narrative below and
 
 ### Added
 
+- **Ubuntu 26.04 compatibility probe (informational).** CI gains a distinctly
+  named `ubuntu-26.04` job that restores, builds in Release, runs the golden
+  replay verification, and runs the test suite under the same .NET 8 SDK as the
+  gated matrix. It is `continue-on-error` and non-gating: it publishes no
+  artifact, nothing depends on it, and it is not part of the three-OS
+  cross-platform equivalence contract, so its step results and logs must be read
+  directly rather than inferred from a green workflow.
+
 - **Machine-readable per-OS test totals.** CI now writes VSTest TRX reports and
   reduces them to one JSON summary per operating system, uploaded as
   `dotnet-test-summary-ubuntu`, `-windows`, and `-macos` with the raw TRX files
@@ -32,6 +40,14 @@ state; it creates no release and no tag. The `v3.0.0` narrative below and
 
 ### Changed
 
+- **Pinned the Ubuntu CI runner to 24.04.** Every active `ubuntu-latest` runner
+  choice in `ci.yml`, `pages.yml`, `release.yml`, and `benchmarks.yml` is now
+  `ubuntu-24.04`, so GitHub's staged migration of the `ubuntu-latest` label
+  from 24.04 to 26.04 (2026-10-19 to 2026-11-19) cannot move a gate or a
+  measurement under a merge. Windows and macOS labels, the `macos-26`
+  measurement jobs, action pins, artifacts, benchmark thresholds and baselines,
+  and release safeguards are unchanged. The gated three-OS matrix still covers
+  24.04, not 26.04.
 - **The site viewer is honest about what a recording proves.** It distinguishes
   world, recorded, and derived claims (`claimed in world` vs `claims seen` vs
   `claims in derived view`), reports no count at all for frames with no

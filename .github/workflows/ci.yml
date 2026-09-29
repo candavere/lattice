@@ -13,13 +13,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        # A stable per-OS slug for the artifact name. The runner labels above
-        # are rolling (ubuntu-latest moves), so the published artifact name
-        # should not move with them; the exact image the leg actually ran on is
-        # recorded inside the summary as runnerImage.
+        os: [ubuntu-24.04, windows-latest, macos-latest]
+        # A stable per-OS slug for the artifact name. The Windows and macOS
+        # labels above are rolling, and the Ubuntu label is deliberately pinned
+        # to 24.04, so the published artifact name should not move with them;
+        # the exact image the leg actually ran on is recorded inside the summary
+        # as runnerImage.
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             os_slug: ubuntu
           - os: windows-latest
             os_slug: windows
@@ -128,7 +129,7 @@ jobs:
   # its documented seed and config.
   site-recordings:
     name: Verify site recordings replay
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
 
@@ -166,7 +167,7 @@ jobs:
     # self-contradicting reports must all exit non-zero rather than publishing
     # an empty count. Same pattern as the comparator job in benchmarks.yml.
     name: Test summary parser unit tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
 
@@ -176,3 +177,56 @@ jobs:
           set -euo pipefail
           python3 -m unittest discover -s .github/workflows \
             -p 'test_summarize_test_results.py' -v
+
+  # Non-gating forward-compatibility probe. GitHub is moving `ubuntu-latest`
+  # from 24.04 to 26.04 between 2026-10-19 and 2026-11-19; the gated matrix
+  # above stays pinned to 24.04 so a runner-image change cannot move a gate
+  # under a merge. This job exists so we learn whether the engine, its golden
+  # replay, and the test suite behave on 26.04 *before* that label flips.
+  #
+  # It is deliberately `continue-on-error`. A step here may fail while the job
+  # and the workflow still report success, so a green CI run is NOT a claim
+  # that 26.04 passes: read this job's steps and logs directly. It publishes no
+  # summary artifact, contributes nothing to the three-OS equivalence contract,
+  # and no test count anywhere in this repository is derived from it.
+  ubuntu-2604-compat-probe:
+    name: Ubuntu 26.04 compatibility probe (informational, non-gating)
+    runs-on: ubuntu-26.04
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Probe report
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "os: $ImageOS $ImageVersion"
+            echo "runner.os: $RUNNER_OS"
+            echo "dotnet: $(dotnet --version)"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Restore
+        run: dotnet restore Lattice.sln
+
+      - name: Build
+        run: dotnet build Lattice.sln -c Release --no-restore
+
+      - name: Verify Golden Trajectory Replay Equivalence
+        run: dotnet run -c Release --project Cli -- replay Tests/fixtures/golden_trajectory.jsonl --verify
+
+      - name: Test
+        shell: bash
+        run: |
+          set -euo pipefail
+          RESULTS="$RUNNER_TEMP/probe-test-results"
+          mkdir -p "$RESULTS"
+          # No --logger trx: this leg publishes no summary artifact, and the
+          # published per-OS test counts must never be able to pick this up.
+          dotnet test Lattice.sln -c Release --no-build --verbosity normal \
+            --results-directory "$RESULTS"

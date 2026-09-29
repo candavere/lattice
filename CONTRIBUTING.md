@@ -28,11 +28,20 @@ Four ideas govern every change:
    actions → deterministic transitions under the pure .NET 8 BCL runtime, and
    verified per-step serialized StepResult equivalence plus per-tick state-digest
    equality on every operating system the CI matrix covers**: the
-   `Build & test` matrix runs `ubuntu-latest`, `windows-latest`, and
-   `macos-latest` (`.github/workflows/ci.yml`). Those are three rolling
-   **labels**, not a six-leg OS-by-architecture matrix — the matrix does not
-   vary architecture per leg, so "x64 and ARM64 across Linux, macOS and
-   Windows" overstates what is tested. The pinned `macos-26` arm64 label used
+   `Build & test` matrix runs `ubuntu-24.04`, `windows-latest`, and
+   `macos-latest` (`.github/workflows/ci.yml`). Those are three **labels**, not
+   a six-leg OS-by-architecture matrix — the matrix does not vary architecture
+   per leg, so "x64 and ARM64 across Linux, macOS and Windows" overstates what
+   is tested. The Ubuntu label is **pinned** to 24.04, deliberately, so
+   GitHub's staged migration of `ubuntu-latest` from 24.04 to 26.04 (announced
+   for 2026-10-19 to 2026-11-19) cannot move a gate under a merge; the Windows
+   and macOS labels remain rolling. A separate `ubuntu-26.04` job in
+   `ci.yml` builds, golden-replays, and tests on 26.04 under the same .NET 8
+   SDK, but it is `continue-on-error` and **non-gating**: it publishes no
+   artifact, nothing depends on it, and its result is not part of the
+   cross-OS equivalence contract. A green CI run therefore says nothing about
+   26.04 — read that job's steps and logs to see whether it actually passed.
+   The pinned `macos-26` arm64 label used
    by the benchmark workflow is a separate, separately scoped measurement
    runner, not part of this guarantee. Each per-OS test summary artifact records
    the `runnerImage` a leg actually ran on, because a rolling label does not by
@@ -183,11 +192,14 @@ results in the PR description.
 
 2. **Per-step serialized StepResult equivalence across the CI matrix.**
    `TrajectoryReplay.Verify` must pass on every leg of the `Build & test`
-   matrix — `ubuntu-latest`, `windows-latest`, and `macos-latest` — that is
+   matrix — `ubuntu-24.04`, `windows-latest`, and `macos-latest` — that is
    serialized-result equivalence against the recorded
    trajectory, not raw cross-platform file-byte identity, and for schema-3
    recordings it also requires the per-tick state digest to match. CI runs the
-   suite on the full matrix; confirm it is green in your PR. If you cannot run
+   suite on the full matrix; confirm it is green in your PR. The `ubuntu-26.04`
+   compatibility probe is outside this requirement: it is non-gating, so a red
+   probe step does not block a merge and a green workflow does not certify
+   26.04. If you cannot run
    all platforms locally, say so explicitly so reviewers know the matrix is the
    coverage.
 

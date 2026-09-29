@@ -27,7 +27,7 @@ jobs:
     # tolerances, per-workload overrides, exit codes, and the structural smoke
     # classification.
     name: Decision comparator unit tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
 
@@ -212,7 +212,7 @@ jobs:
     # matrix and positive medians but never adjudicates a throughput ratio, so
     # a cross-runtime delta can never masquerade as a regression.
     name: Cross-host structural smoke (ubuntu x64)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
 

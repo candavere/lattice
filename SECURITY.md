@@ -9,7 +9,7 @@
 
 ## Reporting a Vulnerability
 
-Lattice is a zero-dependency, headless multi-agent research and benchmarking environment designed for local execution and deterministic evaluation. It does not bind network sockets, expose web APIs, or store user credentials.
+Lattice is a headless multi-agent research and benchmarking environment designed for local execution and deterministic evaluation. All production assemblies reference only the .NET base class library and pull in zero external NuGet runtime packages; the test project and development tooling do use external packages, and those are out of scope here. It does not bind network sockets, expose web APIs, or store user credentials.
 
 If you identify a potential security issue (such as an uncontrolled memory allocation vector, parser denial-of-service via malformed JSONL trajectories, or algorithmic complexity vulnerabilities during graph verification):
 

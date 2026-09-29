@@ -12,16 +12,22 @@ ingestion contract for the permanent record in
 Its purpose is to make independent replication a first-class, auditable
 activity: a reviewer who follows it produces, in one artifact directory, the
 environment capture, raw transcripts, pass/fail judgments for the four
+experiments, and any discrepancies — all of which a second reviewer can
+re-check without trusting the first.
 
 > **Scope: the v2.3.2 release.** Every judged target, expected `--version`
 > string, and checksum in this plan belongs to the published **v2.3.2** assets
-> and is left unchanged. The source tree is now at **3.0.0**, where
-> `--version` prints `3.0.0`; a 3.0.0-scoped plan and packet will be published
-> from the v3.0.0 release assets. Experiment 2's wording below describes what
-> `replay --verify` checked in v2.3.2 and is not a statement about 3.0.0,
-> which additionally compares a canonical per-tick state digest.
-experiments, and any discrepancies — all of which a second reviewer can
-re-check without trusting the first.
+> and is left unchanged. **v3.0.0 shipped on 2026-09-27.** The source tree is
+> at 3.0.0, where `--version` prints `3.0.0`, and its turnkey challenge guide
+> is the second packet in [`reproduction_packet.md`](reproduction_packet.md).
+> That packet is a challenge guide, not a judged plan: nothing in this
+> document judges 3.0.0, and independent validation of 3.0.0 under this
+> protocol would require its own v3-scoped plan, with its own judged targets,
+> expected `--version` string and checksums, drawn from the v3.0.0 release
+> assets. No such plan has been published, so none is claimed here. Experiment
+> 2's wording below describes what `replay --verify` checked in v2.3.2 and is
+> not a statement about 3.0.0, which additionally compares a canonical
+> per-tick state digest.
 
 ## 1. Scope and status of validation evidence
 

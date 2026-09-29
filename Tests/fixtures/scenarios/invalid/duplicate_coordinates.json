@@ -1,0 +1,7 @@
+{ "SchemaVersion": 1, "Id": "x",
+  "Map": { "Source": "static",
+    "Zones": [ { "Id": 0, "X": 3, "Y": 3 }, { "Id": 1, "X": 3, "Y": 3 } ],
+    "ChokePoints": [ { "Id": 0, "FromZoneId": 0, "ToZoneId": 1 } ] },
+  "Simulation": { "AgentCount": 2, "StepLimit": 10, "TransitSpeed": 0 },
+  "Slots": [ { "Slot": 0, "Policy": "greedy" }, { "Slot": 1, "Policy": "greedy" } ],
+  "Victory": { "Condition": "first-of-either" }, "Scoring": { "Scheme": "resources-claimed" } }

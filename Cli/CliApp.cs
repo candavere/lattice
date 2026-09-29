@@ -19,8 +19,9 @@ namespace Lattice.Cli;
 /// <summary>
 /// The Lattice command-line driver: simulate, analyze, replay, render, and
 /// benchmark subcommands over the seedable environment.
-/// Turns plain `args` into one of seven subcommands — `generate`, `simulate`,
-/// `render`, `analyze`, `replay`, `benchmark`, `evaluate` — and routes all
+/// Turns plain `args` into one of eight subcommands — `generate`, `simulate`,
+/// `render`, `analyze`, `replay`, `benchmark`, `evaluate`, `validate-scenario`
+/// — and routes all
 /// I/O through caller-supplied writers so it stays a pure function of its
 /// inputs (no hidden state, no ambient reading of Console). The real entry
 /// point (Program.cs) just forwards <see cref="Console.Out"/>/<see cref="Console.Error"/>;
@@ -221,13 +222,14 @@ public static class CliApp
             "replay" => Replay(args[1..], stdout, stderr),
             "benchmark" => RunBenchmark(args[1..], stdout, stderr),
             "evaluate" => Evaluate(args[1..], stdout, stderr),
+            "validate-scenario" => ValidateScenario(args[1..], stdout, stderr),
             _ => UnknownCommand(args[0], stderr),
         };
     }
 
     private static bool IsKnownCommand(string command) =>
         command is "generate" or "simulate" or "render" or "analyze"
-            or "replay" or "benchmark" or "evaluate";
+            or "replay" or "benchmark" or "evaluate" or "validate-scenario";
 
     private static int Generate(string[] args, TextWriter stdout, TextWriter stderr)
     {
@@ -769,6 +771,94 @@ public static class CliApp
             return Report(ex, stderr);
         }
     }
+
+    /// <summary>
+    /// Checks a declarative scenario descriptor and reports what it declares,
+    /// without running an episode and without writing an artifact. The command
+    /// exists so an author can check a descriptor in isolation, and it is
+    /// deliberately side-effect free: it reads the file once (the same read the
+    /// SHA-256 is taken over), validates it, and prints. Nothing is simulated,
+    /// nothing is written, and no file is created even on the success path.
+    /// </summary>
+    private static int ValidateScenario(string[] args, TextWriter stdout, TextWriter stderr)
+    {
+        try
+        {
+            var (flags, positionals) = ParseFlags(args, "--out");
+
+            // Arity is settled before the path is read, so "you passed two
+            // paths" and "you passed none" are two different messages rather
+            // than both collapsing into "missing path" — a caller who passed an
+            // extra argument needs to be told which argument was extra.
+            var allowedPositionals = flags.ContainsKey("--out") ? 0 : 1;
+            if (positionals.Count > allowedPositionals)
+            {
+                throw new ArgumentException(
+                    $"unexpected argument '{positionals[allowedPositionals]}'.");
+            }
+
+            var path = flags.TryGetValue("--out", out var flagged)
+                ? flagged
+                : positionals.Count == 1 ? positionals[0] : null;
+            if (path is null)
+            {
+                throw new ArgumentException(
+                    "missing scenario path (pass a positional path or --out <file>).");
+            }
+
+            (ScenarioDescriptor descriptor, string digest) scenario;
+            try
+            {
+                scenario = ScenarioLoader.LoadFile(path);
+            }
+            catch (ScenarioValidationException ex)
+            {
+                foreach (var error in ex.Errors)
+                {
+                    stderr.WriteLine($"scenario error: {error.FieldPath}: {error.Message}");
+                }
+
+                return Failure;
+            }
+
+            var invariant = CultureInfo.InvariantCulture;
+            stderr.WriteLine($"scenario {scenario.descriptor.Id} is valid (schema v{scenario.descriptor.SchemaVersion.ToString(invariant)})");
+            stderr.WriteLine($"  sha256         {scenario.digest}");
+            stderr.WriteLine($"  map            {DescribeMap(scenario.descriptor.Map)}");
+            stderr.WriteLine(
+                $"  simulation     {scenario.descriptor.AgentCount.ToString(invariant)} agent(s), " +
+                $"step limit {scenario.descriptor.StepLimit.ToString(invariant)}, " +
+                $"transit speed {scenario.descriptor.TransitSpeed.ToString(invariant)}");
+            foreach (var slot in scenario.descriptor.Slots)
+            {
+                stderr.WriteLine(
+                    $"  slot {slot.Slot.ToString(invariant)}         {slot.Policy}" +
+                    (slot.Role is null ? string.Empty : $" ({slot.Role})"));
+            }
+
+            stderr.WriteLine(
+                $"  victory        {scenario.descriptor.VictoryCondition}   " +
+                $"scoring {scenario.descriptor.ScoringScheme}");
+            return Success;
+        }
+        catch (Exception ex)
+        {
+            return Report(ex, stderr);
+        }
+    }
+
+    /// <summary>
+    /// One line naming where the scenario's map comes from, so the reader can
+    /// tell a seeded family from a hand-authored graph without opening the
+    /// file. A generated map's concrete topology is not resolved here: that
+    /// needs a seed, and this command deliberately runs no simulation.
+    /// </summary>
+    private static string DescribeMap(ScenarioMapSpec map) => map switch
+    {
+        ScenarioMapSpec.Static => "hand-authored (static)",
+        ScenarioMapSpec.Generated generated => $"generated family '{generated.Family}'",
+        _ => "unknown",
+    };
 
     private static int RunBenchmark(string[] args, TextWriter stdout, TextWriter stderr)
     {
@@ -1482,6 +1572,13 @@ public static class CliApp
         sink.WriteLine("            with spaces must be quoted) and a program that cannot be run exits 2 with");
         sink.WriteLine("            nothing written. '--agent-step-timeout-ms' (default 5000) is the per-step");
         sink.WriteLine("            budget; the match budget is computed from it");
+        sink.WriteLine();
+        sink.WriteLine("  validate-scenario <file>");
+        sink.WriteLine("            Check a declarative scenario descriptor and report its id, SHA-256,");
+        sink.WriteLine("            map source, roster, victory and scoring. Reads the file once and");
+        sink.WriteLine("            validates it; runs no episode and writes no artifact. A rejected");
+        sink.WriteLine("            descriptor prints one 'scenario error: <field-path>: <reason>' line per");
+        sink.WriteLine("            fault and exits non-zero");
         sink.WriteLine();
         sink.WriteLine("  -h, --help                                    Show this help and exit");
         sink.WriteLine("  -v, --version                                 Print the version and exit");

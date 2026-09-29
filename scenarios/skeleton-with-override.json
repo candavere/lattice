@@ -1,0 +1,32 @@
+{
+  "SchemaVersion": 1,
+  "Id": "skeleton-with-override",
+  "Name": "Standard Skeleton, One Narrowed Gate",
+  "Description": "The generator-as-skeleton form: the standard seeded family supplies the topology, and the descriptor narrows a single declared zone's occupancy to 1 so agents queue rather than pile in. Every other zone, choke, and resource is the family's own seeded layout, so adjacent seeds still differ.",
+  "Map": {
+    "Source": "generated",
+    "Generator": {
+      "Family": "standard"
+    },
+    "Overrides": {
+      "ZoneMaxOccupancy": [
+        { "ZoneId": 0, "MaxOccupancy": 1 }
+      ]
+    }
+  },
+  "Simulation": {
+    "AgentCount": 2,
+    "StepLimit": 100,
+    "TransitSpeed": 0
+  },
+  "Slots": [
+    { "Slot": 0, "Policy": "greedy", "Role": "Collector" },
+    { "Slot": 1, "Policy": "random", "Role": "Opponent" }
+  ],
+  "Victory": {
+    "Condition": "first-of-either"
+  },
+  "Scoring": {
+    "Scheme": "resources-claimed"
+  }
+}

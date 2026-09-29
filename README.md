@@ -63,16 +63,16 @@ Where each box in that diagram is implemented, at this commit:
 
 | Box | Implementation |
 | --- | --- |
-| `lattice simulate` | `Cli/CliApp.cs:218`; the header is stamped with the current schema at `Trajectories/TrajectoryWriter.cs:47` |
+| `lattice simulate` | `Cli/CliApp.cs:219`; the header is stamped with the current schema at `Trajectories/TrajectoryWriter.cs:71` |
 | `recording .jsonl` (schema 4) | `Trajectories/TrajectoryModel.cs:26`; one header line, one line per tick, one final line. Schema 4 adds the per-agent decision-time `Perceptions` and the header's `AgentVision`; schema 3's per-tick state hash is unchanged |
-| `lattice replay --verify` | `Cli/CliApp.cs:221`; per-tick result, state-digest and decision-time perception comparison at `Trajectories/TrajectoryReplay.cs` |
-| `lattice render` | `Cli/CliApp.cs:219`, over `Visualization/` |
-| `lattice analyze` | `Cli/CliApp.cs:220`, over `Analytics/` |
+| `lattice replay --verify` | `Cli/CliApp.cs:222`; per-tick result, state-digest and decision-time perception comparison at `Trajectories/TrajectoryReplay.cs` |
+| `lattice render` | `Cli/CliApp.cs:220`, over `Visualization/` |
+| `lattice analyze` | `Cli/CliApp.cs:221`, over `Analytics/` |
 | `site/ replay viewer` | `site/app.js`, deployed by `.github/workflows/pages.yml` |
-| `lattice benchmark` | `Cli/CliApp.cs:222`; five workloads on fresh simulations, never on a recording |
+| `lattice benchmark` | `Cli/CliApp.cs:223`; five workloads on fresh simulations, never on a recording |
 | `throughput JSON` | the strict gate arms only on a full host match, at `.github/workflows/compare_benchmarks.py:518-543`; the hosted arm64 `runner-class-gate` arms 4 of its 5 workloads from a 20-session cohort, leaving `policy_lookahead_mcts_32` informational |
-| `lattice evaluate` | `Cli/CliApp.cs:223`; the pass/fail verdict is composed at `Agents/PairedEvaluation.cs:145-150` |
-| `lattice evaluate --agent-cmd` | the candidate seat, with the command line split without a shell at `Cli/CliApp.cs:808`; the child process is launched from `Agents/External/ExternalAgentLaunch.cs:84` |
+| `lattice evaluate` | `Cli/CliApp.cs:224`; the pass/fail verdict is composed at `Agents/PairedEvaluation.cs:145-150` |
+| `lattice evaluate --agent-cmd` | the candidate seat, with the command line split without a shell at `Cli/CliApp.cs:1060`; the child process is launched from `Agents/External/ExternalAgentLaunch.cs:84` |
 | `tests + fixtures` → `CI on 3 operating systems` | the golden-trajectory replay gate runs on every matrix OS at `.github/workflows/ci.yml:42-43` |
 
 [Replay the infiltration recording in your browser](https://candavere.github.io/lattice/).
@@ -182,7 +182,7 @@ artifacts linked under [Test totals, as CI publishes them](#test-totals-as-ci-pu
 | A paired study needs 30 seeds, and the rule is mean > 0 **and** CI lower > 0. | `dotnet run -c Release --project Cli -- evaluate --scenario standard --seed-set dev --seeds 29 --agent-cmd "python3 examples/python/lattice_agent.py"`, then the same with `--seeds 30` | `--seeds 29` → `Not graded: 29 seeds is below the 30-seed floor of the decision rule (the canonical suites run 50).` `--seeds 30` → `Fail: mean paired delta -0.383 and/or the 95% CI lower bound -0.672 did not clear 0 on 30 seeds.` The rule is [`Agents/PairedEvaluation.cs:144-145`](Agents/PairedEvaluation.cs): `graded = deltas.Length >= 30` and `passed = graded && mean > 0.0 && ciLower > 0.0`, with `ConfidenceLevel = 0.95` at line 74. |
 | Every protocol failure is a loss, never a retry. | `dotnet run -c Release --project Cli -- evaluate --scenario standard --seed-set dev --seeds 2 --agent-step-timeout-ms 300 --agent-cmd "python3 crash.py"`, where `crash.py` is `import sys; sys.exit(3)` | `"AgentFailures": {"agent_crashed": 4}`, `VoidRuns: 0`, wins/draws/losses `0/0/4` of 4. The reason set is the closed fourteen-code table at [`docs/EXTERNAL_AGENT_PROTOCOL.md` §8](docs/EXTERNAL_AGENT_PROTOCOL.md) and [`Protocol/ProtocolReasons.cs:17-30`](Protocol/ProtocolReasons.cs); thirteen are agent-attributable and one, `host_limit`, is host-attributable. |
 | A failed match forfeits: external side 0, opponent keeps its score, partials are diagnostic only. | An agent that plays normally, then `sys.exit(3)` at step 10, over 3 seeds | `AgentForfeits` rows read `"PartialScoreAtSlot0": 2, "PartialScoreAtSlot1": 3, "ScoredExternalScore": 0, "ScoredOpponentScore": 3` — the external side's 2 and 3 are recorded but not scored, and the opponent keeps 3 and 2. `AgentFailures: {"agent_crashed": 6}`, all 6 matches losses, mean delta −2.333. |
-| A bad `--agent-cmd` is a usage error, not a lost result. | `dotnet run -c Release --project Cli -- evaluate --scenario standard --seed-set dev --seeds 2 --agent-cmd "definitely-not-a-real-binary-xyz"` | Exit **2**, `error: --agent-cmd could not be run: 'definitely-not-a-real-binary-xyz' was not found on PATH.` [`Cli/UsageError.cs:29`](Cli/UsageError.cs) sets `ExitCode = 2`, mapped at [`Cli/CliApp.cs:1326`](Cli/CliApp.cs). |
+| A bad `--agent-cmd` is a usage error, not a lost result. | `dotnet run -c Release --project Cli -- evaluate --scenario standard --seed-set dev --seeds 2 --agent-cmd "definitely-not-a-real-binary-xyz"` | Exit **2**, `error: --agent-cmd could not be run: 'definitely-not-a-real-binary-xyz' was not found on PATH.` [`Cli/UsageError.cs:29`](Cli/UsageError.cs) sets `ExitCode = 2`, mapped at [`Cli/CliApp.cs:1424`](Cli/CliApp.cs). |
 | The published negative result is negative. | `python3 -c "import json;print(json.load(open('benchmarks/mcts_evaluation_results.json'))['Studies'][0]['Statistics'])"` | dev: mean −1.12, CI [−1.37, −0.87], 50 seeds, `Passed: false`. held-out: mean −1.25, CI [−1.54, −0.96], `Passed: false`. Committed at source revision `5783ca1`, .NET 10.0.10. |
 
 The four gates the code actually enforces are spelled out with file and line in
@@ -597,7 +597,7 @@ enforcement tests are in [`docs/MECHANICS.md`](docs/MECHANICS.md).
 
 ## Reference
 
-`Lattice.Cli` exposes seven commands (`Cli/CliApp.cs`). Run any of them with
+`Lattice.Cli` exposes eight commands (`Cli/CliApp.cs`). Run any of them with
 `dotnet run --project Cli -- <command> ...`; the binary name is `lattice`.
 Every command is seeded, and exit status is 0 on success, non-zero on a bad
 argument or runtime error.
@@ -611,6 +611,7 @@ argument or runtime error.
 | `replay` | Replay and optionally verify per-step serialized equivalence and the final summary line | `<file>`, `--verify`, `--out` |
 | `benchmark` | Run the five-case workload matrix | `--runs`, `--warmup`, `--commit`, `--cpu`, `--out` |
 | `evaluate` | Mirror-seated paired MCTS study, or an external agent process | `--seed-set`, `--rollouts`, `--seeds`, `--scenario`, `--out`, `--agent-cmd`, `--agent-step-timeout-ms` |
+| `validate-scenario` | Check a declarative scenario descriptor and print its SHA-256; runs no episode and writes no artifact | `<file>` or `--out <file>` |
 
 `evaluate --agent-cmd "<command line>"` scores an external agent process in place
 of the in-process MCTS candidate, under the same seeds, budget, and statistics;
@@ -622,6 +623,52 @@ everywhere else.
 
 The flag-by-flag reference, every flag, its semantics, and worked examples,
 lives in [`docs/CLI.md`](docs/CLI.md).
+
+## Declarative scenario files
+
+An experiment setup can be written down as a **scenario file**: a declarative,
+closed-schema JSON document describing the environment, the roster, the tick
+budget, and which existing win and scoring rules apply. Scenario files are data
+only — no scripts, no expressions, no reflection, no dynamic loading, no
+external commands, and no environment-variable-dependent behaviour.
+
+A map is declared one of two ways, and both are first class. A scenario can
+name one of the engine's **seeded generator families as a skeleton** and then
+narrow it with ordered overrides and additions — topology, obstacles,
+resources, roster, step limit, and victory/scoring are all under the file's
+control, while the family's own seed variation is preserved. Or it can be
+**hand-authored outright** with no generator at all.
+
+```sh
+dotnet run -c Release --project Cli -- validate-scenario scenarios/dungeon-infiltration.json
+```
+
+```
+scenario dungeon-infiltration is valid (schema v1)
+  sha256         b062ac6ed3987494e63051fe57928d90d26a812f8a48f7124d5b78442b65e6d9
+  map            hand-authored (static)
+  simulation     2 agent(s), step limit 100, transit speed 4
+  slot 0         sentry (Sentry)
+  slot 1         infiltrator (Infiltrator)
+  victory        first-of-either   scoring resources-claimed
+```
+
+Unknown fields and unrecognised enum strings are **rejected, not ignored**, and
+each fault is reported with the offending field's JSON path — all of them in one
+pass, so a hand-written file can be fixed in one run. Obstacles use the engine's
+own capacity semantics (a zone or choke with `MaxOccupancy: 0` is impassable)
+rather than a wall mechanic invented for the format.
+
+The digest is the SHA-256 of the descriptor's **exact source bytes, read once**,
+in lowercase hex. It identifies the *file*, not the meaning: two descriptors
+that differ only in whitespace hash differently, on purpose. It is distinct
+from a recording's per-tick `SimulationStateHash`, which names the simulation
+*state* at a tick; the two are computed over different things and are never
+compared.
+
+The format contract, both map forms, every validation rule, and worked examples
+are in [`docs/SCENARIOS.md`](docs/SCENARIOS.md); committed descriptors live in
+[`scenarios/`](scenarios).
 
 ## Test totals, as CI publishes them
 

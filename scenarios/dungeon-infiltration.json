@@ -1,0 +1,46 @@
+{
+  "SchemaVersion": 1,
+  "Id": "dungeon-infiltration",
+  "Name": "Dungeon Infiltration & Sentry Patrol",
+  "Description": "A hand-authored six-room capacity-gated dungeon: a sentry walks the outer loop while an infiltrator slips through the interior gates to the treasure vault. Both seats decide from their own two-hop perception filter, so the recording carries decision-time fog.",
+  "Map": {
+    "Source": "static",
+    "Zones": [
+      { "Id": 0, "X": 1, "Y": 1, "Role": "SentryPost" },
+      { "Id": 1, "X": 4, "Y": 1, "Role": "EntryHall" },
+      { "Id": 2, "X": 7, "Y": 1, "Role": "Corridor" },
+      { "Id": 3, "X": 7, "Y": 5, "Role": "Armory" },
+      { "Id": 4, "X": 4, "Y": 5, "Role": "ChokeDoorway" },
+      { "Id": 5, "X": 1, "Y": 5, "Role": "TreasureVault" }
+    ],
+    "ChokePoints": [
+      { "Id": 0, "FromZoneId": 0, "ToZoneId": 1, "MaxOccupancy": 1, "Role": "Portcullis" },
+      { "Id": 1, "FromZoneId": 1, "ToZoneId": 2, "MaxOccupancy": 1, "Role": "Portcullis" },
+      { "Id": 2, "FromZoneId": 2, "ToZoneId": 3, "MaxOccupancy": 1, "Role": "AirLockDoorway" },
+      { "Id": 3, "FromZoneId": 3, "ToZoneId": 4, "MaxOccupancy": 1, "Role": "AirLockDoorway" },
+      { "Id": 4, "FromZoneId": 4, "ToZoneId": 5, "MaxOccupancy": 1, "Role": "Portcullis" },
+      { "Id": 5, "FromZoneId": 2, "ToZoneId": 4, "MaxOccupancy": 1, "Role": "AirLockDoorway" },
+      { "Id": 6, "FromZoneId": 0, "ToZoneId": 3, "MaxOccupancy": 1, "Role": "Portcullis" }
+    ],
+    "Resources": [
+      { "Id": 0, "ZoneId": 1, "X": 5, "Y": 1, "Role": "ObjectiveExtraction" },
+      { "Id": 1, "ZoneId": 5, "X": 2, "Y": 4, "Role": "TreasureChest" },
+      { "Id": 2, "ZoneId": 5, "X": 3, "Y": 5, "Role": "TreasureChest" }
+    ]
+  },
+  "Simulation": {
+    "AgentCount": 2,
+    "StepLimit": 100,
+    "TransitSpeed": 4
+  },
+  "Slots": [
+    { "Slot": 0, "Policy": "sentry", "Role": "Sentry", "RivalSlot": 1, "Vision": 2 },
+    { "Slot": 1, "Policy": "infiltrator", "Role": "Infiltrator", "RivalSlot": 0, "Vision": 2 }
+  ],
+  "Victory": {
+    "Condition": "first-of-either"
+  },
+  "Scoring": {
+    "Scheme": "resources-claimed"
+  }
+}

@@ -1,0 +1,4 @@
+{ "SchemaVersion": 1, "Id": "x", "Map": { "Source": "static", "Zones": [{ "Id": 0, "X": 0, "Y": 0 }] },
+  "Simulation": { "AgentCount": 2, "StepLimit": 10, "TransitSpeed": 0 },
+  "Slots": [ { "Slot": 0, "Policy": "sentry", "Vision": 2 }, { "Slot": 1, "Policy": "infiltrator", "RivalSlot": 0, "Vision": 2 } ],
+  "Victory": { "Condition": "first-of-either" }, "Scoring": { "Scheme": "resources-claimed" } }

@@ -1,0 +1,6 @@
+{ "SchemaVersion": 1, "Id": "x",
+  "Map": { "Source": "static", "Zones": [{ "Id": 0, "X": 0, "Y": 0 }],
+    "Generator": { "Family": "standard" } },
+  "Simulation": { "AgentCount": 2, "StepLimit": 10, "TransitSpeed": 0 },
+  "Slots": [ { "Slot": 0, "Policy": "greedy" }, { "Slot": 1, "Policy": "greedy" } ],
+  "Victory": { "Condition": "first-of-either" }, "Scoring": { "Scheme": "resources-claimed" } }

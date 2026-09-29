@@ -43,6 +43,49 @@ state; it creates no release and no tag. The `v3.0.0` narrative below and
 
 ### Added
 
+- **Declarative scenario files, and a `validate-scenario` command.** An
+  experiment setup can now be written as a declarative, closed-schema JSON
+  document describing the environment, the roster, the tick budget, and which
+  existing win and scoring rules apply. Scenario files are data only: no
+  scripts, no expressions, no reflection, no dynamic type loading, no external
+  commands, and no environment-variable-dependent behaviour, and a file can only
+  select mechanics the engine already implements.
+
+  A map is declared one of two ways, and both are first class. A scenario can
+  name one of the seeded generator families (`standard` or `bottleneck`) **as a
+  skeleton** and narrow it with ordered, explicit overrides and additions —
+  topology, obstacles, resources, roster, step limit, and victory/scoring are
+  all under the file's control, while the family's own seed variation is
+  preserved untouched. Or a scenario can be **hand-authored outright** with no
+  generator at all.
+
+  `lattice validate-scenario <file>` checks a descriptor and reports its id,
+  SHA-256, map source, roster, and victory/scoring. It runs **no episode and
+  writes no artifact**, so it is safe in a pre-commit or CI check. Unknown
+  fields and unrecognised enum strings are rejected rather than ignored, and
+  every fault is reported with the offending field's JSON path — all in one
+  pass. Obstacles use the engine's own capacity semantics (a zone or choke with
+  `MaxOccupancy: 0` is impassable) rather than a wall mechanic invented for the
+  format, so "inaccessible resource" is a real unreachable claim under the step
+  contract. Bounds (1 MiB per file, checked before parsing; 256 zones, 4096
+  resources, 8192 choke points, 100000 ticks) prevent a descriptor from
+  requesting a pathological allocation.
+
+  The digest is the SHA-256 of the descriptor's **exact source bytes, read
+  once**, in lowercase hex — never over a re-serialization, the path, or an
+  mtime. It identifies the **file**, not the meaning, so two descriptors that
+  differ only in whitespace or line endings hash differently on purpose;
+  semantic equivalence and digest equality are deliberately separate properties.
+  It is also distinct from a recording's per-tick `SimulationStateHash`, which
+  names the simulation *state* at a tick; the two are computed over different
+  things and are never compared to each other.
+
+  `Cli/ScenarioDescriptor.cs`, `scenarios/*.json`,
+  `Tests/fixtures/scenarios/invalid/`, `docs/SCENARIOS.md`, and the
+  `docs/CLI.md` / `README.md` references land together with the behaviour. This
+  stage adds the format and its validator; wiring a descriptor into `simulate`
+  and `evaluate` is a later stage and is not claimed here.
+
 - **Ubuntu 26.04 compatibility probe (informational).** CI gains a distinctly
   named `ubuntu-26.04` job that restores, builds in Release, runs the golden
   replay verification, and runs the test suite under the same .NET 8 SDK as the

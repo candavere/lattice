@@ -1,6 +1,6 @@
 # Lattice.Cli reference
 
-`Lattice.Cli` exposes seven commands. Run any of them with
+`Lattice.Cli` exposes eight commands. Run any of them with
 `dotnet run --project Cli -- <command> ...`; the binary name is `lattice`.
 Every command is seeded, and exit status is `0` on success, non-zero on a bad
 argument or runtime error. This page is the full flag-by-flag reference; the
@@ -124,6 +124,145 @@ before each, per-step latency into one histogram, managed allocation via
 `GC.GetAllocatedBytesForCurrentThread`, and Gen0/1/2 collection-count deltas.
 Every measured iteration must reproduce the warm-up anchor's step digest —
 off-script runs fail loudly instead of reporting timings.
+
+## validate-scenario — check a declarative scenario descriptor
+
+| Argument | Description |
+| :--- | :--- |
+| `<file>` (positional) or `--out <file>` | Required path to a scenario descriptor; both spellings are accepted |
+
+```sh
+dotnet run --project Cli -- validate-scenario scenarios/collection-skirmish.json
+dotnet run --project Cli -- validate-scenario --out scenarios/gated-vault-duel.json
+```
+
+The command reads the descriptor **once**, validates it, and reports what it
+declares on stderr:
+
+```
+scenario collection-skirmish is valid (schema v1)
+  sha256         a63e5e05fd0dbd11a83d1cbca36d89ea1f55bc78afee3acd6be9a56e49ab4fbb
+  map            generated family 'standard'
+  simulation     2 agent(s), step limit 100, transit speed 0
+  slot 0         greedy (Collector)
+  slot 1         random (Opponent)
+  victory        first-of-either   scoring resources-claimed
+```
+
+It has **no simulation or write side effect**: it runs no episode, emits no
+trajectory on stdout, and creates no file even on the success path. That makes
+it safe to run in a pre-commit or CI check.
+
+A rejected descriptor prints one `scenario error: <field-path>: <reason>` line
+per fault and exits non-zero, naming the offending field by its JSON path:
+
+```
+$ dotnet run --project Cli -- validate-scenario bad.json
+scenario error: Map.ChokePoints[].ToZoneId: choke 0 ends at zone 9, which is not declared.
+scenario error: Slots[0].RivalSlot: is required by policy 'sentry', which decides against a named opponent slot.
+```
+
+Every fault in the document is reported in one pass rather than only the first,
+so an author fixing a hand-written descriptor sees the whole list at once.
+
+### The descriptor format
+
+A scenario descriptor is a **declarative, closed-schema JSON document**. It
+contains data only: there are no scripts, no expressions, no reflection, no
+dynamic type loading, no external commands, and no environment-variable-driven
+behaviour. A descriptor can only select from mechanics the engine already
+implements — it cannot introduce a new one.
+
+The top-level fields are:
+
+| Field | Required | Meaning |
+| :--- | :--- | :--- |
+| `SchemaVersion` | yes | Must be `1`, the only version this build accepts. A different value is rejected rather than interpreted |
+| `Id` | yes | Lower-case kebab-case name (`a-z`, `0-9`, single dashes). This is the scenario's name in reports and provenance |
+| `Name` | no | Human-readable display name |
+| `Description` | no | Prose describing the scenario's intent |
+| `Map` | yes | Where the topology comes from — see below |
+| `Simulation` | yes | `AgentCount`, `StepLimit`, `TransitSpeed` |
+| `Slots` | yes | The ordered agent roster, one entry per slot |
+| `Victory` | yes | `Condition`, from the closed win-condition menu |
+| `Scoring` | yes | `Scheme`, from the closed scoring menu |
+
+**Unknown fields are rejected, not ignored.** A descriptor carrying a field the
+schema does not define is an error naming both the field and the fields that
+are known there, so a typo like `"StepLimit "` cannot silently fall back to a
+default.
+
+#### `Map` — a generated skeleton, a hand-authored graph, or both
+
+`Map.Source` is `generated` or `static`, and the two forms are mutually
+exclusive. Each is described in [Scenario files](SCENARIOS.md), which is the
+full contract: the field-by-field schema, the closed menus, every validation
+rule, and worked examples of both forms.
+
+In short: `static` declares the whole topology in the file; `generated` names
+one of the seeded families the engine already ships (`standard` or
+`bottleneck`) and may narrow it with ordered overrides and additions, so a
+descriptor can be a skeleton with full control over specific parts of it
+without giving up the family's seed variation.
+
+#### `Simulation`
+
+| Field | Range | Meaning |
+| :--- | :--- | :--- |
+| `AgentCount` | 2–4 | Number of agent seats; the range `SimulationConfig` itself accepts |
+| `StepLimit` | 1–100000 | Tick budget. The episode ends on budget or when all resources are claimed |
+| `TransitSpeed` | 0 or ≥ 1 | `0` is instantaneous transit (the default); a positive value is distance-units per tick |
+
+#### `Slots` — the ordered roster
+
+`Slots` is an **ordered array**, and a slot's `Slot` must equal its position in
+the array. Roster order is therefore explicit and total rather than implied by
+a map or a set, so the seat each policy plays is never a guess.
+
+| Field | Required | Meaning |
+| :--- | :--- | :--- |
+| `Slot` | yes | Must equal the entry's index in the array, `0..AgentCount-1` |
+| `Policy` | yes | One of the closed menu: `greedy`, `random`, `mcts`, `scout`, `sentry`, `infiltrator` |
+| `Role` | no | Display label for the seat (e.g. `"Sentry"`) |
+| `RivalSlot` | policy-dependent | The opponent slot. **Required** by `sentry` and `infiltrator`, which decide against a named opponent; **rejected** on every other policy, which decides from the full observation |
+| `Vision` | policy-dependent | The decision-time perception cone in graph hops, or `-1` for unbounded. **Accepted** by `scout`, `sentry`, `infiltrator`; **rejected** on every other policy |
+
+Rejecting a field the policy does not use is deliberate: a `Vision` on
+`greedy` would be a field the engine never reads, and accepting it would let a
+descriptor assert a fog the run does not have.
+
+#### `Victory` and `Scoring` — closed menus
+
+These are **closed, documented menus of mechanics that already exist**. There is
+no way to name a rule the engine does not implement, because an unrecognised
+string is rejected with the menu quoted.
+
+- `Victory.Condition` ∈ `resources-exhausted`, `step-limit`, `first-of-either`.
+  Each names one of the two terminal reasons `Simulation.Step` actually raises,
+  or the engine's real behaviour (whichever arrives first). Declaring a
+  condition states which terminal reason the scenario is about; a recorded run
+  always reports the reason that actually fired.
+- `Scoring.Scheme` ∈ `resources-claimed`. This is the only scoring the engine
+  has: `Simulation.Step` adds exactly 1 per successfully claimed resource, and
+  the winner is the highest score with ties going to the lowest slot.
+
+#### The SHA-256 digest
+
+`validate-scenario` prints the descriptor's **SHA-256 digest, in lowercase hex**,
+and the same digest is what a recording made from that file carries in its
+header. The contract is exact:
+
+- The digest is computed over the **exact raw source bytes of the file, read
+  once** — never over a re-serialization, a canonicalized form, the file path,
+  or an mtime.
+- It is **lowercase hex**, 64 characters.
+- **Whitespace and line endings are significant to the digest.** Two
+  descriptors that are *semantically* identical but differ by a single byte of
+  indentation, or by CRLF versus LF, hash differently. The digest identifies
+  the **file**, not the meaning — which is the point: a reader holding a
+  recording can name the exact bytes that produced it. Semantic equivalence and
+  digest equality are deliberately separate properties, and this command
+  reports the second while validating the first.
 
 ## evaluate — mirrored-seat MCTS evidence
 

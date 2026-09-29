@@ -1,0 +1,27 @@
+{
+  "SchemaVersion": 1,
+  "Id": "bottleneck-contention",
+  "Name": "Bottleneck Contention",
+  "Description": "The seeded capacity-1 contention family: two mirrored spawn arms converge on a shared antechamber and a single-lane vault gate, so transit denials and claim races occur by construction.",
+  "Map": {
+    "Source": "generated",
+    "Generator": {
+      "Family": "bottleneck"
+    }
+  },
+  "Simulation": {
+    "AgentCount": 2,
+    "StepLimit": 200,
+    "TransitSpeed": 4
+  },
+  "Slots": [
+    { "Slot": 0, "Policy": "mcts", "Role": "Challenger" },
+    { "Slot": 1, "Policy": "scout", "Role": "Scout", "Vision": 2 }
+  ],
+  "Victory": {
+    "Condition": "first-of-either"
+  },
+  "Scoring": {
+    "Scheme": "resources-claimed"
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "SchemaVersion": 1,
+  "Id": "gated-vault-duel",
+  "Name": "Gated Vault Duel",
+  "Description": "A hand-authored two-room map that shows the full-control form of a scenario: no generator at all, two rooms joined by one capacity-1 gate, resources placed on either side of it. Use it as the starting point for a new environment.",
+  "Map": {
+    "Source": "static",
+    "Zones": [
+      { "Id": 0, "X": 0, "Y": 0, "Role": "EntryHall" },
+      { "Id": 1, "X": 6, "Y": 0, "Role": "TreasureVault" }
+    ],
+    "ChokePoints": [
+      { "Id": 0, "FromZoneId": 0, "ToZoneId": 1, "MaxOccupancy": 1, "Role": "Portcullis" }
+    ],
+    "Resources": [
+      { "Id": 0, "ZoneId": 0, "X": 1, "Y": 0 },
+      { "Id": 1, "ZoneId": 1, "X": 5, "Y": 0 },
+      { "Id": 2, "ZoneId": 1, "X": 7, "Y": 0 }
+    ]
+  },
+  "Simulation": {
+    "AgentCount": 2,
+    "StepLimit": 40,
+    "TransitSpeed": 2
+  },
+  "Slots": [
+    { "Slot": 0, "Policy": "greedy", "Role": "Collector" },
+    { "Slot": 1, "Policy": "scout", "Role": "Scout", "Vision": 1 }
+  ],
+  "Victory": {
+    "Condition": "first-of-either"
+  },
+  "Scoring": {
+    "Scheme": "resources-claimed"
+  }
+}

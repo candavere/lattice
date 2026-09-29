@@ -1,0 +1,27 @@
+{
+  "SchemaVersion": 1,
+  "Id": "collection-skirmish",
+  "Name": "Collection Skirmish",
+  "Description": "The default two-agent collection match on the standard seeded map family: a greedy collector against a seeded random opponent.",
+  "Map": {
+    "Source": "generated",
+    "Generator": {
+      "Family": "standard"
+    }
+  },
+  "Simulation": {
+    "AgentCount": 2,
+    "StepLimit": 100,
+    "TransitSpeed": 0
+  },
+  "Slots": [
+    { "Slot": 0, "Policy": "greedy", "Role": "Collector" },
+    { "Slot": 1, "Policy": "random", "Role": "Opponent" }
+  ],
+  "Victory": {
+    "Condition": "first-of-either"
+  },
+  "Scoring": {
+    "Scheme": "resources-claimed"
+  }
+}

@@ -1,7 +1,7 @@
 {
   "Metadata": {
-    "Commit": "633ecf70c82e1b71255a6dac8e09bdca0b5b243b",
-    "Timestamp": "2026-09-28T19:07:07.9475550+00:00",
+    "Commit": "1b9426f5247e485343296e0d8863795084552535",
+    "Timestamp": "2026-09-29T13:21:03.4841640+00:00",
     "Runtime": ".NET 10.0.12",
     "Configuration": "Release",
     "Os": "macOS 26.6.2",
@@ -10,7 +10,8 @@
     "Cores": 3,
     "RamBytes": 7516192768,
     "GcMode": "Workstation",
-    "RunnerImage": "macos-26-arm64/20260907.0351"
+    "RunnerImage": "macos-26-arm64/20260907.0351",
+    "BaselineMedianSource": "cross-run median of 20 accepted sessions on 1b9426f5247e485343296e0d8863795084552535"
   },
   "Workloads": [
     {
@@ -22,16 +23,22 @@
       "Iterations": 10,
       "StepsPerIteration": 100000,
       "ThroughputMetric": "steps",
-      "MedianThroughputPerSecond": 804362.1429205833,
-      "MeanThroughputPerSecond": 784818.4008253386,
-      "StdDevThroughputPerSecond": 136716.8708463807,
-      "MedianStepLatencyMicros": 0.9580000000000001,
-      "MeanStepLatencyMicros": 1.3116468600000226,
-      "P95StepLatencyMicros": 1.917,
-      "AllocationsPerStepBytes": 3221.570608,
+      "MedianThroughputPerSecond": 765358.6455020322,
+      "MeanThroughputPerSecond": 731930.6650220429,
+      "StdDevThroughputPerSecond": 42978.09291761549,
+      "MedianStepLatencyMicros": 0.917,
+      "MeanStepLatencyMicros": 1.3704488159995543,
+      "P95StepLatencyMicros": 2.541,
+      "AllocationsPerStepBytes": 3213.17736,
       "TotalGcGen0": 530,
       "TotalGcGen1": 20,
-      "TotalGcGen2": 20
+      "TotalGcGen2": 20,
+      "RepresentativeRunMedian": 731680.1911909037,
+      "CohortMin": 637589.9897918433,
+      "CohortMax": 1015043.4042055034,
+      "CohortP5": 643205.6854836207,
+      "CohortP95": 964313.3948772938,
+      "CohortBetweenRunCv": 0.13268208918949537
     },
     {
       "Name": "facility_static_4agent",
@@ -42,16 +49,22 @@
       "Iterations": 10,
       "StepsPerIteration": 100000,
       "ThroughputMetric": "steps",
-      "MedianThroughputPerSecond": 424021.99032242247,
-      "MeanThroughputPerSecond": 431899.11263641034,
-      "StdDevThroughputPerSecond": 66771.28991559641,
-      "MedianStepLatencyMicros": 1.542,
-      "MeanStepLatencyMicros": 2.3647409879998973,
-      "P95StepLatencyMicros": 4.208,
-      "AllocationsPerStepBytes": 4629.65528,
+      "MedianThroughputPerSecond": 426987.3530999819,
+      "MeanThroughputPerSecond": 433709.6657534153,
+      "StdDevThroughputPerSecond": 28724.61025340606,
+      "MedianStepLatencyMicros": 1.583,
+      "MeanStepLatencyMicros": 2.3151801749998655,
+      "P95StepLatencyMicros": 4.125,
+      "AllocationsPerStepBytes": 4629.64368,
       "TotalGcGen0": 750,
       "TotalGcGen1": 20,
-      "TotalGcGen2": 20
+      "TotalGcGen2": 20,
+      "RepresentativeRunMedian": 428552.7708603495,
+      "CohortMin": 378270.3315799194,
+      "CohortMax": 610433.8445669499,
+      "CohortP5": 382124.9686122775,
+      "CohortP95": 600019.143488035,
+      "CohortBetweenRunCv": 0.15876983814300544
     },
     {
       "Name": "dynamic_contention_4agent",
@@ -62,16 +75,22 @@
       "Iterations": 10,
       "StepsPerIteration": 100000,
       "ThroughputMetric": "steps",
-      "MedianThroughputPerSecond": 301024.658530786,
-      "MeanThroughputPerSecond": 301390.52210383525,
-      "StdDevThroughputPerSecond": 37417.272221527586,
-      "MedianStepLatencyMicros": 2.4170000000000003,
-      "MeanStepLatencyMicros": 3.364770526998473,
-      "P95StepLatencyMicros": 6.375,
+      "MedianThroughputPerSecond": 289594.1510640337,
+      "MeanThroughputPerSecond": 321376.4529735668,
+      "StdDevThroughputPerSecond": 26761.64733648772,
+      "MedianStepLatencyMicros": 2.458,
+      "MeanStepLatencyMicros": 3.1312531880039174,
+      "P95StepLatencyMicros": 4.875,
       "AllocationsPerStepBytes": 7096.93056,
       "TotalGcGen0": 1150,
       "TotalGcGen1": 20,
-      "TotalGcGen2": 20
+      "TotalGcGen2": 20,
+      "RepresentativeRunMedian": 319980.9371083367,
+      "CohortMin": 237879.12482311195,
+      "CohortMax": 393846.38890823553,
+      "CohortP5": 242336.4399339145,
+      "CohortP95": 388477.8497978308,
+      "CohortBetweenRunCv": 0.1656560570598672
     },
     {
       "Name": "stress_topology_4agent",
@@ -82,16 +101,22 @@
       "Iterations": 10,
       "StepsPerIteration": 100000,
       "ThroughputMetric": "steps",
-      "MedianThroughputPerSecond": 10680.711238245363,
-      "MeanThroughputPerSecond": 10438.627845451407,
-      "StdDevThroughputPerSecond": 1647.7784116065857,
-      "MedianStepLatencyMicros": 73.458,
-      "MeanStepLatencyMicros": 98.0813962379995,
-      "P95StepLatencyMicros": 204.958,
+      "MedianThroughputPerSecond": 10814.954733739538,
+      "MeanThroughputPerSecond": 11021.074339370345,
+      "StdDevThroughputPerSecond": 902.7041645341524,
+      "MedianStepLatencyMicros": 70,
+      "MeanStepLatencyMicros": 91.26751963999386,
+      "P95StepLatencyMicros": 191.209,
       "AllocationsPerStepBytes": 106308.64064,
       "TotalGcGen0": 16960,
-      "TotalGcGen1": 269,
-      "TotalGcGen2": 20
+      "TotalGcGen1": 268,
+      "TotalGcGen2": 20,
+      "RepresentativeRunMedian": 10746.848895482579,
+      "CohortMin": 9375.819763023,
+      "CohortMax": 15570.980126579008,
+      "CohortP5": 9525.069675484163,
+      "CohortP95": 14468.063854234404,
+      "CohortBetweenRunCv": 0.14739987598548188
     },
     {
       "Name": "policy_lookahead_mcts_32",
@@ -102,268 +127,521 @@
       "Iterations": 10,
       "StepsPerIteration": 100,
       "ThroughputMetric": "decisions",
-      "MedianThroughputPerSecond": 588.5824663519633,
-      "MeanThroughputPerSecond": 566.0695255409936,
-      "StdDevThroughputPerSecond": 59.323931833782126,
-      "MedianStepLatencyMicros": 3178.3340000000003,
-      "MeanStepLatencyMicros": 3571.8762100000017,
-      "P95StepLatencyMicros": 6040.125,
+      "MedianThroughputPerSecond": 557.0557161851262,
+      "MeanThroughputPerSecond": 556.5856948651717,
+      "StdDevThroughputPerSecond": 76.49942850163171,
+      "MedianStepLatencyMicros": 3279.5,
+      "MeanStepLatencyMicros": 3653.105291,
+      "P95StepLatencyMicros": 6038.834,
       "AllocationsPerStepBytes": 11465776,
       "TotalGcGen0": 1840,
       "TotalGcGen1": 30,
-      "TotalGcGen2": 20
+      "TotalGcGen2": 20,
+      "RepresentativeRunMedian": 564.0927593349911,
+      "CohortMin": 376.1703008699621,
+      "CohortMax": 771.2641246406706,
+      "CohortP5": 421.24714706150263,
+      "CohortP95": 770.8585213311911,
+      "CohortBetweenRunCv": 0.1947349270949391
     }
   ],
   "Provenance": {
     "RecordKind": "runner-class reference (GitHub-hosted runner)",
-    "Note": "This record is a hosted-runner reference, recorded separately from the bare-metal research reference in benchmarks/throughput_benchmark.json. It is not a rewrite of that record and does not restate its numbers.",
+    "Note": "This record is a hosted-runner reference, recorded separately from the bare-metal research reference in benchmarks/throughput_benchmark.json. It is not a rewrite of that record and does not restate its numbers. Re-derived from a 20-session cohort on a single pinned commit; it supersedes the five-session record and its demotion.",
     "RunnerLabel": "macos-26",
     "RunnerImage": "macos-26-arm64/20260907.0351",
-    "RunnerImageSource": "Transcribed from the representative run's own 'Image Release' log line. GitHub exposes no default environment variable carrying the image build, so a workflow cannot stamp it into a fresh artifact; the comparator therefore compares this field only when both sides carry one. See benchmarks/runner_class_summary.md.",
-    "SourceRevision": "633ecf70c82e1b71255a6dac8e09bdca0b5b243b",
+    "RunnerImageSource": "Transcribed from each of the 20 cohort runs' own 'Image Release' log line. All 20 report the same build, so the cohort has no image split. GitHub exposes no default environment variable carrying the image build, so a workflow cannot stamp it into a fresh artifact; the comparator therefore compares this field only when both sides carry one. See benchmarks/runner_class_summary.md.",
+    "SourceRevision": "1b9426f5247e485343296e0d8863795084552535",
     "Protocol": {
       "Runs": 10,
       "Steps": 100000,
       "Warmup": 50000,
-      "Note": "policy_lookahead_mcts_32 reports decisions/sec and runs 100 ticks per iteration by design, in the baseline record too."
+      "Note": "policy_lookahead_mcts_32 reports decisions/sec and runs 100 ticks per iteration by design, as in every prior record."
     },
-    "RepresentativeRun": 36469918606,
-    "RepresentativeRunUrl": "https://github.com/candavere/lattice/actions/runs/36469918606",
-    "RepresentativeSelection": "The session whose five workload medians, each divided by that workload's cross-run median, sit closest to the overall mean. This is the most typical session - explicitly neither the best of the samples nor a deliberately conservative low one.",
+    "Cohort": {
+      "Sessions": 20,
+      "Target": 20,
+      "Ref": "refs/heads/runner-class-calibration-2026-09-29, pushed at exactly SourceRevision; every dispatch targeted this branch ref, not main, so the measured ref could not move during collection",
+      "DispatchSpacing": "25 minutes between dispatches, at differing minutes-of-hour",
+      "Window": "2026-09-28T21:21:09Z to 2026-09-29T13:48:30Z",
+      "AllSessionsIncluded": true,
+      "ExcludedSessions": [],
+      "ImageSplit": false,
+      "MeasuredCodeChangedDuringCollection": false,
+      "InclusionRules": "benchmarks/runner_class_collection_manifest.md, rules 1-7, fixed before collection. All 20 sessions pass all seven rules; no session was excluded and no run was re-dispatched."
+    },
+    "RepresentativeRun": 36574344509,
+    "RepresentativeRunUrl": "https://github.com/candavere/lattice/actions/runs/36574344509",
+    "RepresentativeSelection": "The session whose five workload medians, each divided by that workload's cross-run median over all 20 accepted sessions, sit closest to the overall mean. This is the most typical session - explicitly neither the best of the samples nor a deliberately conservative low one. Mean absolute ratio deviation 0.0343.",
     "SampleRuns": [
       {
-        "RunId": 36469355765,
-        "Url": "https://github.com/candavere/lattice/actions/runs/36469355765",
-        "Trigger": "push",
-        "Timestamp": "2026-09-28T19:02:17.6664190+00:00",
-        "Artifact": "benchmarks/runner_class_samples/run_36469355765.json",
+        "RunId": 36485512323,
+        "Url": "https://github.com/candavere/lattice/actions/runs/36485512323",
+        "Trigger": "workflow_dispatch",
+        "Timestamp": "2026-09-28T21:21:56.0759840+00:00",
+        "Artifact": "benchmarks/runner_class_raw/36485512323.json",
+        "ArtifactSha256": "88813b7a19074a2bff1200dd7e5712b9e57e2831dfbae8301b7b45b9eb2028f6",
+        "ImageRelease": "macos-26-arm64/20260907.0351",
         "MedianThroughputPerSecond": {
-          "micro_raw_2agent": 1028278.6398780339,
-          "facility_static_4agent": 588206.8812122142,
-          "dynamic_contention_4agent": 377131.55267730297,
-          "stress_topology_4agent": 15165.095391339019,
-          "policy_lookahead_mcts_32": 782.3874521754925
+          "micro_raw_2agent": 800731.148374643,
+          "facility_static_4agent": 428687.9732258113,
+          "dynamic_contention_4agent": 237879.12482311195,
+          "stress_topology_4agent": 10775.207510297734,
+          "policy_lookahead_mcts_32": 423.61961265053105
         }
       },
       {
-        "RunId": 36469885628,
-        "Url": "https://github.com/candavere/lattice/actions/runs/36469885628",
+        "RunId": 36485904887,
+        "Url": "https://github.com/candavere/lattice/actions/runs/36485904887",
         "Trigger": "workflow_dispatch",
-        "Timestamp": "2026-09-28T19:06:58.2461490+00:00",
-        "Artifact": "benchmarks/runner_class_samples/run_36469885628.json",
+        "Timestamp": "2026-09-28T21:25:25.0934310+00:00",
+        "Artifact": "benchmarks/runner_class_raw/36485904887.json",
+        "ArtifactSha256": "ccf841428a3961cb7ddda6489189c466b8ccf1b277d53b31a5c21bcd8a887df4",
+        "ImageRelease": "macos-26-arm64/20260907.0351",
         "MedianThroughputPerSecond": {
-          "micro_raw_2agent": 666067.6182401279,
-          "facility_static_4agent": 435088.8687332721,
-          "dynamic_contention_4agent": 316355.12218290137,
-          "stress_topology_4agent": 10023.391885848701,
-          "policy_lookahead_mcts_32": 431.6181132813889
+          "micro_raw_2agent": 728157.5734815054,
+          "facility_static_4agent": 472416.0331500099,
+          "dynamic_contention_4agent": 311719.5773757193,
+          "stress_topology_4agent": 11550.907056798886,
+          "policy_lookahead_mcts_32": 485.83496091592474
         }
       },
       {
-        "RunId": 36469902164,
-        "Url": "https://github.com/candavere/lattice/actions/runs/36469902164",
+        "RunId": 36489039586,
+        "Url": "https://github.com/candavere/lattice/actions/runs/36489039586",
         "Trigger": "workflow_dispatch",
-        "Timestamp": "2026-09-28T19:06:58.7449770+00:00",
-        "Artifact": "benchmarks/runner_class_samples/run_36469902164.json",
+        "Timestamp": "2026-09-28T21:54:12.4183750+00:00",
+        "Artifact": "benchmarks/runner_class_raw/36489039586.json",
+        "ArtifactSha256": "80633957d010669df8e199476f7c63ba7100803c5914a7d7888c5ea15b0d48b9",
+        "ImageRelease": "macos-26-arm64/20260907.0351",
         "MedianThroughputPerSecond": {
-          "micro_raw_2agent": 729591.7130358637,
-          "facility_static_4agent": 457483.32970952056,
-          "dynamic_contention_4agent": 292944.4522506357,
-          "stress_topology_4agent": 9056.788205102795,
-          "policy_lookahead_mcts_32": 448.5505965151972
+          "micro_raw_2agent": 830974.4453588461,
+          "facility_static_4agent": 417515.4315880771,
+          "dynamic_contention_4agent": 322898.1932895058,
+          "stress_topology_4agent": 10592.004628854462,
+          "policy_lookahead_mcts_32": 644.3232683371623
         }
       },
       {
-        "RunId": 36469918606,
-        "Url": "https://github.com/candavere/lattice/actions/runs/36469918606",
+        "RunId": 36491926155,
+        "Url": "https://github.com/candavere/lattice/actions/runs/36491926155",
         "Trigger": "workflow_dispatch",
-        "Timestamp": "2026-09-28T19:07:07.9475550+00:00",
-        "Artifact": "benchmarks/runner_class_samples/run_36469918606.json",
+        "Timestamp": "2026-09-28T22:22:31.1193240+00:00",
+        "Artifact": "benchmarks/runner_class_raw/36491926155.json",
+        "ArtifactSha256": "e17b0907e4fc3eda1fb237b0c94665f1fca60d6a8be47659c6ae24e4bcee78ed",
+        "ImageRelease": "macos-26-arm64/20260907.0351",
         "MedianThroughputPerSecond": {
-          "micro_raw_2agent": 804362.1429205833,
-          "facility_static_4agent": 424021.99032242247,
-          "dynamic_contention_4agent": 301024.658530786,
-          "stress_topology_4agent": 10680.711238245363,
-          "policy_lookahead_mcts_32": 588.5824663519633
+          "micro_raw_2agent": 791043.0642173404,
+          "facility_static_4agent": 419521.6514590032,
+          "dynamic_contention_4agent": 274314.9668285982,
+          "stress_topology_4agent": 9532.92493403475,
+          "policy_lookahead_mcts_32": 477.868537979451
         }
       },
       {
-        "RunId": 36469934258,
-        "Url": "https://github.com/candavere/lattice/actions/runs/36469934258",
+        "RunId": 36532339243,
+        "Url": "https://github.com/candavere/lattice/actions/runs/36532339243",
         "Trigger": "workflow_dispatch",
-        "Timestamp": "2026-09-28T19:07:28.1645190+00:00",
-        "Artifact": "benchmarks/runner_class_samples/run_36469934258.json",
+        "Timestamp": "2026-09-29T06:41:44.5920150+00:00",
+        "Artifact": "benchmarks/runner_class_raw/36532339243.json",
+        "ArtifactSha256": "6a7c70deace42e326e04b49c449ac4918790e71da7e3a5f5e781180fcddbd55c",
+        "ImageRelease": "macos-26-arm64/20260907.0351",
         "MedianThroughputPerSecond": {
-          "micro_raw_2agent": 908525.6503903468,
-          "facility_static_4agent": 417160.7192376249,
-          "dynamic_contention_4agent": 253194.0653354979,
-          "stress_topology_4agent": 12905.213431682216,
-          "policy_lookahead_mcts_32": 633.9652962308587
+          "micro_raw_2agent": 659477.2363603561,
+          "facility_static_4agent": 402912.49333434465,
+          "dynamic_contention_4agent": 268968.5196782679,
+          "stress_topology_4agent": 9375.819763023,
+          "policy_lookahead_mcts_32": 436.4457557062722
+        }
+      },
+      {
+        "RunId": 36535002867,
+        "Url": "https://github.com/candavere/lattice/actions/runs/36535002867",
+        "Trigger": "workflow_dispatch",
+        "Timestamp": "2026-09-29T07:10:10.1886360+00:00",
+        "Artifact": "benchmarks/runner_class_raw/36535002867.json",
+        "ArtifactSha256": "dd30f28cfb7b0d03815910f1e47963cf0da21e090aa2bade7737924fa5c551a7",
+        "ImageRelease": "macos-26-arm64/20260907.0351",
+        "MedianThroughputPerSecond": {
+          "micro_raw_2agent": 801500.2515967393,
+          "facility_static_4agent": 537859.6361735364,
+          "dynamic_contention_4agent": 388195.2951078095,
+          "stress_topology_4agent": 12769.71570169096,
+          "policy_lookahead_mcts_32": 662.1797486793041
+        }
+      },
+      {
+        "RunId": 36537836695,
+        "Url": "https://github.com/candavere/lattice/actions/runs/36537836695",
+        "Trigger": "workflow_dispatch",
+        "Timestamp": "2026-09-29T07:39:09.6999250+00:00",
+        "Artifact": "benchmarks/runner_class_raw/36537836695.json",
+        "ArtifactSha256": "fb71f05bd640504035fb230faf4c3121290233372c2423505093773f32ce9329",
+        "ImageRelease": "macos-26-arm64/20260907.0351",
+        "MedianThroughputPerSecond": {
+          "micro_raw_2agent": 701368.6204707783,
+          "facility_static_4agent": 463824.51573207567,
+          "dynamic_contention_4agent": 349502.1258928834,
+          "stress_topology_4agent": 13827.195788863446,
+          "policy_lookahead_mcts_32": 710.1468481612158
+        }
+      },
+      {
+        "RunId": 36540673750,
+        "Url": "https://github.com/candavere/lattice/actions/runs/36540673750",
+        "Trigger": "workflow_dispatch",
+        "Timestamp": "2026-09-29T08:07:15.9387710+00:00",
+        "Artifact": "benchmarks/runner_class_raw/36540673750.json",
+        "ArtifactSha256": "b22102c08c5101e4bfea5b18a771cbefd59df534bc3ff24e8835d89e5e6623ad",
+        "ImageRelease": "macos-26-arm64/20260907.0351",
+        "MedianThroughputPerSecond": {
+          "micro_raw_2agent": 643501.248414767,
+          "facility_static_4agent": 382327.8442455595,
+          "dynamic_contention_4agent": 304788.3494463667,
+          "stress_topology_4agent": 10161.564691204385,
+          "policy_lookahead_mcts_32": 489.171396655362
+        }
+      },
+      {
+        "RunId": 36543622754,
+        "Url": "https://github.com/candavere/lattice/actions/runs/36543622754",
+        "Trigger": "workflow_dispatch",
+        "Timestamp": "2026-09-29T08:35:43.1030930+00:00",
+        "Artifact": "benchmarks/runner_class_raw/36543622754.json",
+        "ArtifactSha256": "3877acd005e005adf76d37b5c5490a6567725e3e7861898aca2de55c87ab3367",
+        "ImageRelease": "macos-26-arm64/20260907.0351",
+        "MedianThroughputPerSecond": {
+          "micro_raw_2agent": 884924.2158098419,
+          "facility_static_4agent": 463002.87254959485,
+          "dynamic_contention_4agent": 267745.60537803825,
+          "stress_topology_4agent": 9904.330210714037,
+          "policy_lookahead_mcts_32": 526.6330149047458
+        }
+      },
+      {
+        "RunId": 36546690090,
+        "Url": "https://github.com/candavere/lattice/actions/runs/36546690090",
+        "Trigger": "workflow_dispatch",
+        "Timestamp": "2026-09-29T09:04:11.2731760+00:00",
+        "Artifact": "benchmarks/runner_class_raw/36546690090.json",
+        "ArtifactSha256": "fa44f2bf15ffe5b737263dca03b5eb0c76fef1c88e48ca5920000584eebd93b8",
+        "ImageRelease": "macos-26-arm64/20260907.0351",
+        "MedianThroughputPerSecond": {
+          "micro_raw_2agent": 961643.3943863354,
+          "facility_static_4agent": 389451.0783803243,
+          "dynamic_contention_4agent": 284031.2313527748,
+          "stress_topology_4agent": 11810.51171882463,
+          "policy_lookahead_mcts_32": 537.5599342698313
+        }
+      },
+      {
+        "RunId": 36549765862,
+        "Url": "https://github.com/candavere/lattice/actions/runs/36549765862",
+        "Trigger": "workflow_dispatch",
+        "Timestamp": "2026-09-29T09:32:36.6418210+00:00",
+        "Artifact": "benchmarks/runner_class_raw/36549765862.json",
+        "ArtifactSha256": "aa43af24ff65133c4d30a08ba18b12f15d8f337d291cd737aa7eba09a1cb63d9",
+        "ImageRelease": "macos-26-arm64/20260907.0351",
+        "MedianThroughputPerSecond": {
+          "micro_raw_2agent": 637589.9897918433,
+          "facility_static_4agent": 392204.3719662514,
+          "dynamic_contention_4agent": 247370.1292086166,
+          "stress_topology_4agent": 10018.99765814306,
+          "policy_lookahead_mcts_32": 550.0186730352614
+        }
+      },
+      {
+        "RunId": 36552908013,
+        "Url": "https://github.com/candavere/lattice/actions/runs/36552908013",
+        "Trigger": "workflow_dispatch",
+        "Timestamp": "2026-09-29T10:01:56.4113040+00:00",
+        "Artifact": "benchmarks/runner_class_raw/36552908013.json",
+        "ArtifactSha256": "9b2809ef24f02b18ae1305dd7f137815af29a5322a9e1c975a3db595d545f948",
+        "ImageRelease": "macos-26-arm64/20260907.0351",
+        "MedianThroughputPerSecond": {
+          "micro_raw_2agent": 841260.9524237548,
+          "facility_static_4agent": 413832.4389993069,
+          "dynamic_contention_4agent": 256038.2157700733,
+          "stress_topology_4agent": 13980.262960830507,
+          "policy_lookahead_mcts_32": 770.8371737885869
+        }
+      },
+      {
+        "RunId": 36555874290,
+        "Url": "https://github.com/candavere/lattice/actions/runs/36555874290",
+        "Trigger": "workflow_dispatch",
+        "Timestamp": "2026-09-29T10:30:11.1744510+00:00",
+        "Artifact": "benchmarks/runner_class_raw/36555874290.json",
+        "ArtifactSha256": "d101e060c5c515e14993475dc87cd1b98d851f281381613921714036ad38e021",
+        "ImageRelease": "macos-26-arm64/20260907.0351",
+        "MedianThroughputPerSecond": {
+          "micro_raw_2agent": 701022.8514190001,
+          "facility_static_4agent": 445371.1390530822,
+          "dynamic_contention_4agent": 242790.0964680874,
+          "stress_topology_4agent": 11350.97790608572,
+          "policy_lookahead_mcts_32": 376.1703008699621
+        }
+      },
+      {
+        "RunId": 36558772911,
+        "Url": "https://github.com/candavere/lattice/actions/runs/36558772911",
+        "Trigger": "workflow_dispatch",
+        "Timestamp": "2026-09-29T10:58:22.6542570+00:00",
+        "Artifact": "benchmarks/runner_class_raw/36558772911.json",
+        "ArtifactSha256": "d095a438289c0878ab0bd4522714687dc3bb89b6ef1d1e517d5af579cbadf3f8",
+        "ImageRelease": "macos-26-arm64/20260907.0351",
+        "MedianThroughputPerSecond": {
+          "micro_raw_2agent": 715054.3532430184,
+          "facility_static_4agent": 378270.3315799194,
+          "dynamic_contention_4agent": 250544.00799913116,
+          "stress_topology_4agent": 10454.392649507112,
+          "policy_lookahead_mcts_32": 496.6955020431377
+        }
+      },
+      {
+        "RunId": 36561735364,
+        "Url": "https://github.com/candavere/lattice/actions/runs/36561735364",
+        "Trigger": "workflow_dispatch",
+        "Timestamp": "2026-09-29T11:27:05.5846500+00:00",
+        "Artifact": "benchmarks/runner_class_raw/36561735364.json",
+        "ArtifactSha256": "28fa3adb77f2cf383d1c4b384621228146a267168e8e0d4305f6477f15d6fac0",
+        "ImageRelease": "macos-26-arm64/20260907.0351",
+        "MedianThroughputPerSecond": {
+          "micro_raw_2agent": 751625.3933494983,
+          "facility_static_4agent": 398632.84490273154,
+          "dynamic_contention_4agent": 242571.035466062,
+          "stress_topology_4agent": 10640.871722579828,
+          "policy_lookahead_mcts_32": 609.5512630270068
+        }
+      },
+      {
+        "RunId": 36564719815,
+        "Url": "https://github.com/candavere/lattice/actions/runs/36564719815",
+        "Trigger": "workflow_dispatch",
+        "Timestamp": "2026-09-29T11:55:35.2228540+00:00",
+        "Artifact": "benchmarks/runner_class_raw/36564719815.json",
+        "ArtifactSha256": "23e6abfd57c4c076b0815e3cc839e65ff0a6868a82598781591cc361b9e6eefc",
+        "ImageRelease": "macos-26-arm64/20260907.0351",
+        "MedianThroughputPerSecond": {
+          "micro_raw_2agent": 779091.8976545662,
+          "facility_static_4agent": 610433.8445669499,
+          "dynamic_contention_4agent": 393846.38890823553,
+          "stress_topology_4agent": 10854.70195718134,
+          "policy_lookahead_mcts_32": 591.582288843899
+        }
+      },
+      {
+        "RunId": 36567818281,
+        "Url": "https://github.com/candavere/lattice/actions/runs/36567818281",
+        "Trigger": "workflow_dispatch",
+        "Timestamp": "2026-09-29T12:24:15.2946450+00:00",
+        "Artifact": "benchmarks/runner_class_raw/36567818281.json",
+        "ArtifactSha256": "77327a3406b4cd6cd729beb01b0d91da8514bf96ef6220856ba2f034e417eeea",
+        "ImageRelease": "macos-26-arm64/20260907.0351",
+        "MedianThroughputPerSecond": {
+          "micro_raw_2agent": 1015043.4042055034,
+          "facility_static_4agent": 599471.0013259868,
+          "dynamic_contention_4agent": 374300.8353254767,
+          "stress_topology_4agent": 15570.980126579008,
+          "policy_lookahead_mcts_32": 771.2641246406706
+        }
+      },
+      {
+        "RunId": 36571007131,
+        "Url": "https://github.com/candavere/lattice/actions/runs/36571007131",
+        "Trigger": "workflow_dispatch",
+        "Timestamp": "2026-09-29T12:52:39.3226050+00:00",
+        "Artifact": "benchmarks/runner_class_raw/36571007131.json",
+        "ArtifactSha256": "ae520eeb78a2a1dd1c09e94896e592778fff6fe1bdddd053453a6bbd8cf61568",
+        "ImageRelease": "macos-26-arm64/20260907.0351",
+        "MedianThroughputPerSecond": {
+          "micro_raw_2agent": 715212.9313436103,
+          "facility_static_4agent": 425421.9353396142,
+          "dynamic_contention_4agent": 295157.0707752926,
+          "stress_topology_4agent": 11915.75366204058,
+          "policy_lookahead_mcts_32": 581.1232658239633
+        }
+      },
+      {
+        "RunId": 36574344509,
+        "Url": "https://github.com/candavere/lattice/actions/runs/36574344509",
+        "Trigger": "workflow_dispatch",
+        "Timestamp": "2026-09-29T13:21:03.4841640+00:00",
+        "Artifact": "benchmarks/runner_class_raw/36574344509.json",
+        "ArtifactSha256": "98fbc0dced15f131e2e35b72a3377010a22f22109a526f51d31be92293e239e0",
+        "ImageRelease": "macos-26-arm64/20260907.0351",
+        "MedianThroughputPerSecond": {
+          "micro_raw_2agent": 731680.1911909037,
+          "facility_static_4agent": 428552.7708603495,
+          "dynamic_contention_4agent": 319980.9371083367,
+          "stress_topology_4agent": 10746.848895482579,
+          "policy_lookahead_mcts_32": 564.0927593349911
+        }
+      },
+      {
+        "RunId": 36577844146,
+        "Url": "https://github.com/candavere/lattice/actions/runs/36577844146",
+        "Trigger": "workflow_dispatch",
+        "Timestamp": "2026-09-29T13:49:02.5645320+00:00",
+        "Artifact": "benchmarks/runner_class_raw/36577844146.json",
+        "ArtifactSha256": "96f115ea9e904badfe11e229ee76c3e0b3755f26477472bd12c05f17a74512b1",
+        "ImageRelease": "macos-26-arm64/20260907.0351",
+        "MedianThroughputPerSecond": {
+          "micro_raw_2agent": 949363.5712125308,
+          "facility_static_4agent": 593720.5762470872,
+          "dynamic_contention_4agent": 355151.5744068228,
+          "stress_topology_4agent": 14410.01562937416,
+          "policy_lookahead_mcts_32": 722.7073963720311
         }
       }
     ],
     "Spread": {
-      "Samples": 5,
-      "Rule": "min_ratio = lowest sample median / cross-run median; allowed = min(0.95, 0.95 * min_ratio); a workload is armed only when 0.95 * min_ratio >= 0.75. The rule was fixed before the samples were inspected.",
+      "Samples": 20,
+      "Rule": "min_ratio = lowest sample median / cross-run median; allowed = min(0.95, 0.95 * min_ratio); a workload is armed only when 0.95 * min_ratio >= 0.75. The rule was fixed in the pre-registered manifest before collection and is applied here unchanged to the 20-session cohort.",
       "SafetyFactor": 0.95,
       "ArmFloor": 0.75,
+      "QuantileMethod": "p5/p95 by linear interpolation between order statistics (numpy-style, q*(n-1) index)",
+      "CvMethod": "BetweenRunCv is the population standard deviation (ddof = 0) over the mean; BetweenRunCvSampleDdof1 reports the sample (ddof = 1) value alongside it. MedianWithinRunCv is the median across the 20 sessions of within-run StdDev/Median.",
       "ByWorkload": {
         "micro_raw_2agent": {
-          "CrossRunMedian": 804362.1429205833,
-          "Min": 666067.6182401279,
-          "Max": 1028278.6398780339,
-          "MaxOverMin": 1.543805180913814,
-          "MinRatio": 0.8280693268602654,
-          "BetweenRunCv": 0.1557797310997441,
-          "MedianWithinRunCv": 0.16996930058141624,
-          "ArmTestValue": 0.7866658605172521,
-          "AllowedRatio": 0.7866658605172521,
+          "CrossRunMedian": 765358.6455020322,
+          "Min": 637589.9897918433,
+          "Max": 1015043.4042055034,
+          "MaxOverMin": 1.5920002202934347,
+          "MinRatio": 0.8330604136229756,
+          "P5": 643205.6854836207,
+          "P95": 964313.3948772938,
+          "BetweenRunCv": 0.13268208918949537,
+          "BetweenRunCvSampleDdof1": 0.1361289512178539,
+          "MedianWithinRunCv": 0.16478715083036483,
+          "ArmTestValue": 0.7914073929418267,
+          "AllowedRatio": 0.7914,
           "ShortfallVsArmFloor": 0.0,
           "ArmedByRule": true,
-          "ArmedInThisRecord": false
+          "ArmedInThisRecord": true,
+          "ArmTestValueFullPrecision": 0.7914073929418267,
+          "AllowedRatioPrecision": "ArmTestValue carried at 4 decimal places. ArmTestValue is the rule's own output 0.95 * min_ratio at full float precision and is retained above; AllowedRatio is that value as enforced by .github/workflows/benchmarks.yml, matched exactly with no further rounding, so the gate and this record cannot drift apart."
         },
         "facility_static_4agent": {
-          "CrossRunMedian": 435088.8687332721,
-          "Min": 417160.7192376249,
-          "Max": 588206.8812122142,
-          "MaxOverMin": 1.410024611826305,
-          "MinRatio": 0.9587942813893547,
-          "BetweenRunCv": 0.13651997302531668,
-          "MedianWithinRunCv": 0.1023906542906168,
-          "ArmTestValue": 0.910854567319887,
-          "AllowedRatio": 0.910854567319887,
+          "CrossRunMedian": 426987.3530999819,
+          "Min": 378270.3315799194,
+          "Max": 610433.8445669499,
+          "MaxOverMin": 1.6137502563771116,
+          "MinRatio": 0.8859052354446313,
+          "P5": 382124.9686122775,
+          "P95": 600019.143488035,
+          "BetweenRunCv": 0.15876983814300544,
+          "BetweenRunCvSampleDdof1": 0.16289441689878736,
+          "MedianWithinRunCv": 0.08407146113792281,
+          "ArmTestValue": 0.8416099736723996,
+          "AllowedRatio": 0.8416,
           "ShortfallVsArmFloor": 0.0,
           "ArmedByRule": true,
-          "ArmedInThisRecord": false
+          "ArmedInThisRecord": true,
+          "ArmTestValueFullPrecision": 0.8416099736723996,
+          "AllowedRatioPrecision": "ArmTestValue carried at 4 decimal places. ArmTestValue is the rule's own output 0.95 * min_ratio at full float precision and is retained above; AllowedRatio is that value as enforced by .github/workflows/benchmarks.yml, matched exactly with no further rounding, so the gate and this record cannot drift apart."
         },
         "dynamic_contention_4agent": {
-          "CrossRunMedian": 301024.658530786,
-          "Min": 253194.0653354979,
-          "Max": 377131.55267730297,
-          "MaxOverMin": 1.4894960202861793,
-          "MinRatio": 0.8411073915713904,
-          "BetweenRunCv": 0.1308490319373464,
-          "MedianWithinRunCv": 0.07568973930157191,
-          "ArmTestValue": 0.7990520219928208,
-          "AllowedRatio": 0.7990520219928208,
+          "CrossRunMedian": 289594.1510640337,
+          "Min": 237879.12482311195,
+          "Max": 393846.38890823553,
+          "MaxOverMin": 1.6556576336872837,
+          "MinRatio": 0.8214224077008836,
+          "P5": 242336.4399339145,
+          "P95": 388477.8497978308,
+          "BetweenRunCv": 0.1656560570598672,
+          "BetweenRunCvSampleDdof1": 0.16995952843520679,
+          "MedianWithinRunCv": 0.07621424540529789,
+          "ArmTestValue": 0.7803512873158394,
+          "AllowedRatio": 0.7804,
           "ShortfallVsArmFloor": 0.0,
           "ArmedByRule": true,
-          "ArmedInThisRecord": false
+          "ArmedInThisRecord": true,
+          "ArmTestValueFullPrecision": 0.7803512873158394,
+          "AllowedRatioPrecision": "ArmTestValue carried at 4 decimal places. ArmTestValue is the rule's own output 0.95 * min_ratio at full float precision and is retained above; AllowedRatio is that value as enforced by .github/workflows/benchmarks.yml, matched exactly with no further rounding, so the gate and this record cannot drift apart."
         },
         "stress_topology_4agent": {
-          "CrossRunMedian": 10680.711238245363,
-          "Min": 9056.788205102795,
-          "Max": 15165.095391339019,
-          "MaxOverMin": 1.6744451838671315,
-          "MinRatio": 0.8479574068693437,
-          "BetweenRunCv": 0.1902342869375887,
-          "MedianWithinRunCv": 0.06718702688101971,
-          "ArmTestValue": 0.8055595365258765,
-          "AllowedRatio": 0.8055595365258765,
+          "CrossRunMedian": 10814.954733739538,
+          "Min": 9375.819763023,
+          "Max": 15570.980126579008,
+          "MaxOverMin": 1.6607593277324832,
+          "MinRatio": 0.8669310222606063,
+          "P5": 9525.069675484163,
+          "P95": 14468.063854234404,
+          "BetweenRunCv": 0.14739987598548188,
+          "BetweenRunCvSampleDdof1": 0.15122908186114078,
+          "MedianWithinRunCv": 0.06398572648537672,
+          "ArmTestValue": 0.8235844711475759,
+          "AllowedRatio": 0.8236,
           "ShortfallVsArmFloor": 0.0,
           "ArmedByRule": true,
-          "ArmedInThisRecord": false
+          "ArmedInThisRecord": true,
+          "ArmTestValueFullPrecision": 0.8235844711475759,
+          "AllowedRatioPrecision": "ArmTestValue carried at 4 decimal places. ArmTestValue is the rule's own output 0.95 * min_ratio at full float precision and is retained above; AllowedRatio is that value as enforced by .github/workflows/benchmarks.yml, matched exactly with no further rounding, so the gate and this record cannot drift apart."
         },
         "policy_lookahead_mcts_32": {
-          "CrossRunMedian": 588.5824663519633,
-          "Min": 431.6181132813889,
-          "Max": 782.3874521754925,
-          "MaxOverMin": 1.8126844729183624,
-          "MinRatio": 0.7333179935796591,
-          "BetweenRunCv": 0.22355319540120622,
-          "MedianWithinRunCv": 0.10079119787830602,
-          "ArmTestValue": 0.6966520939006761,
-          "AllowedRatio": 0.6966520939006761,
-          "ShortfallVsArmFloor": 0.05334790609932394,
+          "CrossRunMedian": 557.0557161851262,
+          "Min": 376.1703008699621,
+          "Max": 771.2641246406706,
+          "MaxOverMin": 2.050305733485558,
+          "MinRatio": 0.675283081997761,
+          "P5": 421.24714706150263,
+          "P95": 770.8585213311911,
+          "BetweenRunCv": 0.1947349270949391,
+          "BetweenRunCvSampleDdof1": 0.1997938195942882,
+          "MedianWithinRunCv": 0.07876951870830717,
+          "ArmTestValue": 0.6415189278978729,
+          "AllowedRatio": 0.6415189278978729,
+          "ShortfallVsArmFloor": 0.1084810721021271,
           "ArmedByRule": false,
           "ArmedInThisRecord": false
         }
-      },
-      "RewordedAfterFirstLiveRun": "The rule quoted above was applied to the five samples and produced the allowed ratios still recorded here. It is retained as the measured calibration, but it is no longer live: see Provenance.Demotion."
+      }
     },
-    "ArmedWorkloads": [],
-    "InformationalWorkloads": [
+    "ArmedWorkloads": [
       "micro_raw_2agent",
       "facility_static_4agent",
       "dynamic_contention_4agent",
-      "stress_topology_4agent",
+      "stress_topology_4agent"
+    ],
+    "InformationalWorkloads": [
       "policy_lookahead_mcts_32"
     ],
-    "Demotion": {
-      "Status": "The gate runs and reports every workload, but adjudicates nothing. All five workloads are informational.",
-      "Reason": "The first live run of the runner-class gate fell below the five-sample minimum on ALL FIVE workloads, on both of its passes. Five idle-dispatched samples therefore do not bound this host class. A strict gate calibrated on them failed a run that is not established to be a code regression, so the record is demoted to informational rather than re-thresholded.",
+    "Arming": {
+      "Status": "Four of five workloads are armed. policy_lookahead_mcts_32 is measured, printed and compared, but never adjudicated.",
+      "Basis": "The pre-registered rule applied to the 20-session cohort. This is the re-arming path FINDING-013 named: a fresh sample set spanning the conditions the gate actually meets, with thresholds re-derived from that set. The thresholds were not widened against any record or any observed run.",
+      "ArmedValues": {
+        "micro_raw_2agent": 0.7914,
+        "facility_static_4agent": 0.8416,
+        "dynamic_contention_4agent": 0.7804,
+        "stress_topology_4agent": 0.8236
+      },
+      "NotArmed": {
+        "policy_lookahead_mcts_32": {
+          "MinRatio": 0.675283081997761,
+          "ArmTestValue": 0.6415189278978729,
+          "ArmFloor": 0.75,
+          "ShortfallVsArmFloor": 0.1084810721021271,
+          "MaxOverMin": 2.050305733485558,
+          "Reason": "20 sessions on one commit span 2.050x max/min and 0.6753 of the cross-run median, so 0.95 * min_ratio = 0.6415 falls 0.1085 below the 0.75 arm floor. Its between-run CV (0.1947) is the highest of the five, and it is the search-bound case, so a dip there is not separable from runner jitter. Recorded as a negative result in docs/FINDINGS_LEDGER.md rather than armed on a widened tolerance."
+        }
+      },
+      "ThresholdPrecision": "The four --per-workload-threshold values in .github/workflows/benchmarks.yml are byte-identical to Provenance.Spread.ByWorkload[*].AllowedRatio. AllowedRatio is ArmTestValue at 4 decimal places; ArmTestValueFullPrecision retains the rule's unrounded output for audit. No threshold was rounded in the workflow or widened against any record."
+    },
+    "Supersedes": {
+      "SourceRevision": "633ecf70c82e1b71255a6dac8e09bdca0b5b243b",
+      "Samples": 5,
+      "Status": "DEMOTED - all five workloads informational, ArmedWorkloads []",
+      "Reason": "The five-session record armed four workloads and its first live run fell below the five-sample minimum on all five workloads, on both passes. Five idle-dispatched sessions sampled one narrow set of conditions and did not bound the host class.",
       "ObservedRun": 36471478970,
       "ObservedRunUrl": "https://github.com/candavere/lattice/actions/runs/36471478970",
       "ObservedCommit": "4d05585b718a8c62ce3344a88dea53ed807db8ab",
-      "MeasuredCodeChangedBetweenSampleAndObservedRun": false,
-      "WorkloadsBelowFiveSampleMin": [
-        "micro_raw_2agent",
-        "facility_static_4agent",
-        "dynamic_contention_4agent",
-        "stress_topology_4agent",
-        "policy_lookahead_mcts_32"
-      ],
-      "WorkloadsBelowFiveSampleMinFirstPass": [
-        "micro_raw_2agent",
-        "facility_static_4agent",
-        "dynamic_contention_4agent",
-        "stress_topology_4agent",
-        "policy_lookahead_mcts_32"
-      ],
-      "Evidence": {
-        "micro_raw_2agent": {
-          "BaselineMedian": 804362.1429205833,
-          "FiveSampleMin": 666067.6182401279,
-          "FirstPassMedian": 609119,
-          "FirstPassRatioToBaseline": 0.7572696022071987,
-          "SecondPassMedian": 641848.1170068111,
-          "SecondPassRatioToBaseline": 0.7979591315378233,
-          "SecondPassVsFiveSampleMin": 0.9636380743184766
-        },
-        "facility_static_4agent": {
-          "BaselineMedian": 435088.8687332721,
-          "FiveSampleMin": 417160.7192376249,
-          "FirstPassMedian": 341660,
-          "FirstPassRatioToBaseline": 0.7852648609345417,
-          "SecondPassMedian": 335524.67167486076,
-          "SecondPassRatioToBaseline": 0.7711635387310991,
-          "SecondPassVsFiveSampleMin": 0.8043055259086792
-        },
-        "dynamic_contention_4agent": {
-          "BaselineMedian": 301024.658530786,
-          "FiveSampleMin": 253194.0653354979,
-          "FirstPassMedian": 216615,
-          "FirstPassRatioToBaseline": 0.7195922123364742,
-          "SecondPassMedian": 181670.8327286346,
-          "SecondPassRatioToBaseline": 0.6035081432043382,
-          "SecondPassVsFiveSampleMin": 0.7175161569759126
-        },
-        "stress_topology_4agent": {
-          "BaselineMedian": 10680.711238245363,
-          "FiveSampleMin": 9056.788205102795,
-          "FirstPassMedian": 8493,
-          "FirstPassRatioToBaseline": 0.7951717643660627,
-          "SecondPassMedian": 8744.8787557741,
-          "SecondPassRatioToBaseline": 0.8187543470382892,
-          "SecondPassVsFiveSampleMin": 0.9655606996359969
-        },
-        "policy_lookahead_mcts_32": {
-          "BaselineMedian": 588.5824663519633,
-          "FiveSampleMin": 431.6181132813889,
-          "FirstPassMedian": 355,
-          "FirstPassRatioToBaseline": 0.6031440287378786,
-          "SecondPassMedian": 371.9218222690509,
-          "SecondPassRatioToBaseline": 0.6318941584757426,
-          "SecondPassVsFiveSampleMin": 0.8616918772048391
-        }
-      },
-      "EvidenceSources": {
-        "SecondPass": "the run's uploaded artifact runner-class-macos-arm64",
-        "FirstPass": "the comparator's own result table in the run log of job 109094538649; the artifact upload holds the second pass only"
-      },
-      "Cause": "Unestablished. The run was uniformly slower than every recorded sample, which points to a whole-host difference rather than a workload-level one, but no evidence gathered here identifies its cause. Two candidates were considered and neither is supported: concurrency with this repository's other jobs (hosted jobs run on separate virtual machines, and no measurement of host contention was taken), and neighbouring tenants on the same runner fleet (plausible for a hosted VM, and not observable from inside the job). The slowdown was not reproduced, and no run has been dispatched to characterise it.",
-      "NotFoldedIntoCalibration": "This run is a different commit and is deliberately excluded from the five-sample spread, which remains a same-tree measurement.",
-      "PathBackToArming": "Re-collect a sample set that spans the conditions the gate actually meets, then re-derive the thresholds and restore ArmedWorkloads. Do not re-arm by widening thresholds against this record."
-    }
+      "Reason20SessionsResolveIt": "The re-collection is 20 full-protocol sessions spread across roughly 16.5 hours at 25-minute spacing, replacing the five sessions dispatched within about half a minute of each other. On that cohort the lowest observed session sits at 0.82-0.89 of the cross-run median for the four armed workloads - wide enough that the old record's failing run (0.60-0.80 of the old baseline) is far below the new cohort's own minimum, which is the shape of a real host difference rather than spread the record failed to see. The MCTS case is the one the wider cohort shows was never separable: 2.050x between-run spread on the search-bound workload.",
+      "TreatmentOfHistoricalFive": "The five originals on 633ecf70 remain on file as historical evidence. They are not pooled into the 20-session primary analysis: same image build and same measured code, but a different commit. Eligible only for a clearly-labelled same-image / measured-code-equivalent sensitivity check.",
+      "TreatmentOfFailingRun": "The 36471478970 artifact is the second pass only. Its first-pass figures stay comparator-table observations, never a downloaded JSON or an independent session. Neither is folded into the calibration above.",
+      "Note": "The demotion is not withdrawn by the re-arming. It stands as the record of why five samples were insufficient; what changed is that a cohort large enough to judge the host class now exists, and the rule was applied to it as pre-registered."
+    },
+    "BaselineBasis": "MedianThroughputPerSecond on each workload is the cross-run median of the 20 accepted sessions, not any single session's figure. The pre-registered rule derives its allowed ratio as 0.95 * (lowest session median / cross-run median), and the comparator computes its ratio as current / this record's median, so both sides must divide by the same quantity. A representative session's median is not that quantity - on this cohort it differs by up to 10.5% (dynamic_contention_4agent), and using it as the baseline silently tightened the effective tolerance below the derived value and failed 4 of the 20 cohort's own sessions. The record's median is therefore the cross-run median, and the most typical session is retained as RepresentativeRun for reference.",
+    "RepresentativeRunNote": "Most typical session, kept for reference. It is NOT the baseline the gate compares against; see BaselineBasis."
   }
 }

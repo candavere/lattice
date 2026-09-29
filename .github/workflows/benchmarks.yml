@@ -120,16 +120,21 @@ jobs:
     # The hosted-runner reference is its own record, measured on this runner
     # class, because the bare-metal record is a different host class and can
     # only ever be an informational cross-host comparison here. The record
-    # benchmarks/runner_class_throughput_benchmark.json was collected as five
-    # full-protocol sessions on the same tree; its Provenance block carries
-    # the measured between-run spread and the per-workload allowed ratios
-    # derived from it, so the tolerances below are read from that evidence
-    # rather than from a within-run sample dispersion that understates hosted
-    # jitter by roughly 4x.
+    # benchmarks/runner_class_throughput_benchmark.json was collected as 20
+    # full-protocol sessions on one pinned commit over ~16.5 hours; its
+    # Provenance block carries the measured between-run spread and the
+    # per-workload allowed ratios derived from it, so the tolerances below are
+    # read from that evidence rather than from a within-run sample dispersion
+    # that understates hosted jitter by roughly 4x. The four thresholds here
+    # are the derived AllowedRatio values (0.95 * min_ratio, min_ratio = lowest
+    # of 20 session medians / cross-run median), carried at full precision so
+    # they match Provenance.Spread exactly with no rounding anywhere.
     #
-    # The record also declares Provenance.ArmedWorkloads: policy_lookahead_mcts_32
-    # measured a 1.81x between-run spread, too wide to separate a real
-    # regression from runner jitter, so it is reported and never adjudicated.
+    # The record also declares Provenance.ArmedWorkloads: the four named below.
+    # policy_lookahead_mcts_32 is deliberately absent - 20 sessions span 2.050x
+    # max/min there, too wide to separate a real regression from runner jitter,
+    # so it is reported and never adjudicated. Recorded as a negative result in
+    # docs/FINDINGS_LEDGER.md.
     # The gate arms only on a full fingerprint match (OS family, architecture,
     # .NET runtime major, logical cores, CPU model) and a matching recorded
     # protocol; anything else degrades to an informational cross-host table.
@@ -173,10 +178,10 @@ jobs:
             python3 .github/workflows/compare_benchmarks.py \
               benchmarks/runner_class_throughput_benchmark.json \
               "$RUNNER_TEMP/runner-class.json" \
-              --per-workload-threshold micro_raw_2agent=0.787 \
-              --per-workload-threshold facility_static_4agent=0.911 \
-              --per-workload-threshold dynamic_contention_4agent=0.799 \
-              --per-workload-threshold stress_topology_4agent=0.806 \
+              --per-workload-threshold micro_raw_2agent=0.7914 \
+              --per-workload-threshold facility_static_4agent=0.8416 \
+              --per-workload-threshold dynamic_contention_4agent=0.7804 \
+              --per-workload-threshold stress_topology_4agent=0.8236 \
               --no-annotations \
               --strict-if-matching
           }

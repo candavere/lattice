@@ -102,6 +102,51 @@ public class SimulateScenarioFileTests
     }
 
     [Fact]
+    public void AScenarioPathContainingUppercase_IsNotCaseFolded()
+    {
+        // The case fold belongs to the built-in token, never to a path. Asserted
+        // through the diagnostic, whose echoed path shows the argument's casing
+        // on every filesystem — a resolve-based assertion would pass on a
+        // case-insensitive one with the bug still live.
+        var absent = Path.Combine(
+            Path.GetTempPath(), $"LatticeUpperCase-{Guid.NewGuid():N}", "GatedVaultDuel.json");
+
+        var (exit, _, stderr) = Run("simulate", "--seed", "42", "--scenario", absent);
+
+        Assert.NotEqual(0, exit);
+        Assert.Contains("GatedVaultDuel.json", stderr, StringComparison.Ordinal);
+        Assert.DoesNotContain("gatedvaultduel.json", stderr, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ARealScenarioPathContainingUppercase_Resolves()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"LatticeUpperCase-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var path = OutputPath();
+        try
+        {
+            var descriptor = Path.Combine(directory, "GatedVaultDuel.json");
+            File.WriteAllText(descriptor, File.ReadAllText(Committed("scenarios", "gated-vault-duel.json")));
+
+            var (exit, _, stderr) = Run(
+                "simulate", "--seed", "42", "--quiet", "--scenario", descriptor, "--out", path);
+
+            Assert.Equal(0, exit);
+            Assert.Contains("scenario gated-vault-duel", stderr, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void AnAbsentDescriptor_ExitsNonZero()
     {
         var (exit, _, stderr) = Run(

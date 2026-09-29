@@ -38,7 +38,7 @@ public static class CliApp
     /// The CLI's reported version. Kept in lockstep with the project
     /// <c>&lt;Version&gt;</c> elements by the release workflow's tag-parity gate.
     /// </summary>
-    public const string Version = "3.0.0";
+    public const string Version = "3.1.0";
 
     private static readonly GeneratorConfig DefaultGeneratorConfig = new(3, 5, 1, 1, 3, GeneratorConfig.DefaultRetryCap);
     private const int DefaultSimulationSteps = 100;
@@ -1115,27 +1115,30 @@ public static class CliApp
                 : 50;
             var commit = flags.TryGetValue("--commit", out var commitText) ? commitText : null;
 
-            var scenario = flags.TryGetValue("--scenario", out var scenarioText)
-                ? scenarioText.ToLowerInvariant()
-                : "standard";
+            var scenarioText2 = flags.GetValueOrDefault("--scenario") ?? "standard";
 
             // A --scenario value is EITHER a path to a descriptor or a built-in
             // name, decided by the same separator test `simulate` uses, so the
-            // two forms are never confused. A file-loaded descriptor supplies
-            // the MAP for each seed; the study's roster and simulation protocol
-            // stay the study's, because a paired MCTS-vs-Scout number is only
-            // commensurable with other such numbers under that protocol.
-            if (LooksLikePath(scenario))
+            // two forms are never confused. The case fold applies ONLY to the
+            // built-in token: folding a path would rewrite it, and a checkout
+            // containing an uppercase directory name would then resolve to
+            // nothing on a case-sensitive filesystem. A file-loaded descriptor
+            // supplies the MAP for each seed; the study's roster and simulation
+            // protocol stay the study's, because a paired MCTS-vs-Scout number
+            // is only commensurable with other such numbers under that
+            // protocol.
+            if (LooksLikePath(scenarioText2))
             {
-                return EvaluateScenarioFile(flags, scenario, stdout, stderr);
+                return EvaluateScenarioFile(flags, scenarioText2, stdout, stderr);
             }
 
+            var scenario = scenarioText2.ToLowerInvariant();
             Func<ulong, MapGraph> mapFactory = scenario switch
             {
                 "standard" => seed => MapGenerator.Generate(seed, DefaultGeneratorConfig),
                 "bottleneck" => BottleneckScenario.ForSeed,
                 _ => throw new ArgumentException(
-                    $"invalid --scenario '{scenarioText}' (expected 'standard' and/or 'bottleneck', or a path to a scenario file)."),
+                    $"invalid --scenario '{scenarioText2}' (expected 'standard' and/or 'bottleneck', or a path to a scenario file)."),
             };
 
             var search = new MctsSearchConfig(rolloutsPerAction: rollouts, maxDepth: 12);

@@ -214,6 +214,54 @@ public class EvaluateScenarioFileTests
     }
 
     [Fact]
+    public void AScenarioPathContainingUppercase_IsNotCaseFolded()
+    {
+        // Regression: `evaluate` used to case-fold the whole --scenario value,
+        // which rewrote a PATH. It passed on a developer machine whose checkout
+        // path happened to be all lower-case and failed on a case-sensitive CI
+        // filesystem, where "Tests/..." became "tests/..." and resolved to
+        // nothing. The case fold belongs to the built-in token only.
+        //
+        // Asserted through the DIAGNOSTIC rather than through whether the file
+        // resolves, because whether a folded path resolves depends on the
+        // filesystem: on a case-insensitive one it still opens, and a
+        // resolve-based assertion would pass there while the bug was live. The
+        // error message echoes the path it tried, so its casing shows exactly
+        // what the command did with the argument on every filesystem.
+        var absent = Path.Combine(
+            Path.GetTempPath(), $"LatticeUpperCase-{Guid.NewGuid():N}", "GatedVaultDuel.json");
+
+        var (exit, _, stderr) = Run(
+            "evaluate", "--scenario", absent, "--seed-set", "dev", "--seeds", "2", "--rollouts", "2");
+
+        Assert.NotEqual(0, exit);
+        Assert.Contains("GatedVaultDuel.json", stderr, StringComparison.Ordinal);
+        Assert.DoesNotContain("gatedvaultduel.json", stderr, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ARealScenarioPathContainingUppercase_Resolves()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"LatticeUpperCase-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var descriptor = Path.Combine(directory, "GatedVaultDuel.json");
+            File.WriteAllText(descriptor, File.ReadAllText(Committed("scenarios", "gated-vault-duel.json")));
+
+            var (exit, _, stderr) = Run(
+                "evaluate", "--scenario", descriptor, "--seed-set", "dev", "--seeds", "2", "--rollouts", "2");
+
+            Assert.Equal(0, exit);
+            Assert.Contains("scenario gated-vault-duel", stderr, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void ABuiltInScenarioName_StillWorks()
     {
         var (exit, _, stderr) = Run("evaluate", "--scenario", "bottleneck", "--seed-set", "dev", "--seeds", "2", "--rollouts", "2");

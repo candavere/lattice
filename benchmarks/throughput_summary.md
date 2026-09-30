@@ -28,8 +28,11 @@ Numbers come from a single reference host; its full metadata (CPU, cores, OS, ru
 > +93% shift across all five workloads including search-bound MCTS (the
 > generated maps carry only unlimited-capacity chokes, so trajectories are
 > unchanged). This is **not an engine speedup** and must not be read as one.
-> A matching-host pass still has real headroom and a genuine >20% drop still
-> trips the strict gate.
+> A matching-host pass still has real headroom, and the gate that checks it is a
+> ratio contract rather than one 20% figure: 0.75 for the engine-stepping
+> matrix, 0.6 for the jitter-dominated micro loop, 0.85 for the long-loop
+> rollout-search workload, a ratio derived from this record's own dispersion for
+> every other workload, and one re-measure before a dip is believed.
 
 ## Protocol
 
@@ -106,10 +109,32 @@ Full per-run dispersion (std-dev of per-iteration throughput) is in the JSON.
 - Full reference run: `dotnet run -c Release --project Cli -- benchmark --out benchmarks/throughput_benchmark.json`
 - Quick smoke: `dotnet run -c Release --project Cli -- benchmark --runs 2 --warmup 1000 --steps 20000`
 - CI gate (`.github/workflows/benchmarks.yml`): re-benchmarks the matrix and
-  fails on a >20% regression against this record only when the host
+  fails when a current workload median falls below its allowed ratio times this
+  record's median. The allowed ratios are pinned in the workflow
+  (`benchmarks.yml:88-90`): **0.75** for the engine-stepping matrix, **0.6** for
+  `micro_raw_2agent`, and **0.85** for `policy_lookahead_mcts_32`. The
+  calibration behind the three is stated in the workflow itself
+  (`benchmarks.yml:73-76`): 0.75x is the 25% drop that is the actionable floor
+  on a virtualized host, 0.6x is what the jitter-dominated micro loop needs, and
+  0.85x is the stricter, deliberately *tighter* bound for the long-loop
+  rollout-search workload, which amortizes host noise across a ~5 ms decision.
+  Every other workload's ratio is **derived from this record's own dispersion**
+  rather than chosen: `1 - k * (StdDev / Median)`, clamped to
+  `[cv_floor, cv_cap]`, with `k = 3.0`, `cv_floor = 0.55` and `cv_cap = 0.95` by
+  default (`compare_benchmarks.py:104-120,411-428`), so a stable matrix workload
+  keeps a tight gate and a noisy one is relaxed in proportion to its own
+  recorded spread. A `--per-workload-threshold` override wins over the derived
+  value, and `--threshold` (default `0.8`) is the fallback for a workload whose
+  baseline carries no dispersion at all
+  (`compare_benchmarks.py:342,406-410`). The gate adjudicates only when the host
   fingerprint matches this record's host class: **OS family + architecture +
   .NET runtime major + logical cores + CPU model** (trimmed, case-folded; a
-  missing or empty host field is also a mismatch). GitHub-hosted runners
+  missing or empty host field is also a mismatch), and the recorded measurement
+  budget has to match as well so a shortened pass is never adjudicated against a
+  full-protocol record (`--strict-if-matching`). A sub-threshold dip is
+  **re-measured once** before the gate believes it (`benchmarks.yml:94-108`): a
+  transient jitter spike clears on the retry pass, a real regression fails both.
+  GitHub-hosted runners
   are a different host class than the reference record, so they get an
   informational cross-host comparison plus
   the structural checks — CI does not enforce throughput on them until a

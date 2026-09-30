@@ -307,8 +307,9 @@ evaluation artifacts is documented in
 ### The gates, and where the code is authoritative
 
 Where this page describes a gate, the code is authoritative and the reference
-below is exact (file and line). Two places where a committed doc and the code
-disagree are called out below rather than resolved.
+below is exact (file and line). Where a committed doc used to disagree with the
+code, the doc was corrected rather than the code, and the gate below now
+matches what CI enforces.
 
 - **Evaluation verdict gate.** A paired study passes only when both conditions
   hold: the mean paired delta is strictly positive **and** the lower bound of
@@ -382,12 +383,6 @@ disagree are called out below rather than resolved.
   record and is unaffected. Details:
   [`docs/BENCHMARKING.md`](docs/BENCHMARKING.md) and
   [`benchmarks/runner_class_summary.md`](benchmarks/runner_class_summary.md).
-  **Doc-vs-code conflict:** this README previously described the gate as
-  failing on "a >20% regression", and
-  [`benchmarks/throughput_summary.md`](benchmarks/throughput_summary.md) still
-  does. The enforced ratios above are 0.75, 0.6, and 0.85 plus per-workload
-  derived tolerances, which do not all equal a 20% drop. Both statements are
-  recorded here; the workflow and comparator are the authority.
 - **Mutation gate.** `stryker-config.json:22-26` sets Stryker thresholds
   `high: 80`, `low: 60`, `break: 0`. The only threshold the tool enforces is
   `break`, so the committed gate fails only at a 0% score; `high`/`low` are
@@ -572,17 +567,26 @@ Only claims the repository can back up are listed here.
   318px wide, so the cards are scaled to fit rather than overlapped: every
   title and agent name is complete, inside its room, and legible, but small.
   Wider viewports render the same map at the full 11px.
-- A seed with one completed match and one void refuses the study: there is no
-  drop-and-count yet. `Agents/PairedEvaluation.cs:100-105` throws when a seed is
-  missing one side of the mirrored pair, and a void run produces no match row
-  at all.
+- A seed with one completed match and one void refuses the study:
+  `Agents/PairedEvaluation.cs:100-105` throws when a seed is missing one side of
+  the mirrored pair, and a void run produces no match row at all. Dropping the
+  one-sided seed and counting it, so the grading floor is read on completed
+  pairs only and the drops are reported beside them, is planned for v3.2. It is
+  not a one-line change: the drop count has to reach the report, and
+  `docs/EXTERNAL_AGENT_PROTOCOL.md` §9.3 requires an in-process study's
+  `evaluate` artifact to be byte-for-byte unchanged, so the report surface and
+  that promise have to be settled together.
 - Replay verifies the recorded environment actions; it cannot reproduce a
   nondeterministic external agent's decisions. Such an agent yields a different
   trajectory from the same seed on every run, and `replay --verify` still
   succeeds on each one.
-- Exit code 2 is reserved for `--agent-cmd` usage errors. An unknown flag on
-  `evaluate` still exits 1, like every other command and every other usage
-  error, so the two are not the same channel.
+- Exit code 2 means the command line was not runnable — an unknown command, an
+  unknown/duplicated/valueless flag, a missing required flag, a malformed value,
+  an unexpected argument — and nothing ran. Exit code 1 means it was runnable
+  and the work failed: a missing or unreadable file, a rejected descriptor, a
+  replay divergence. A descriptor that names a policy this build cannot
+  construct, or a seat count the study cannot run, is the second kind, not the
+  first: the command line was fine and the file it named was not usable.
 - Timing bounds are calibrated on an Apple M1 and are far from binding: the
   default step budget is 5000 ms and the whole-match budget is
   `5000 × max_ticks + 30000` ms. They were not measured on slower runners.
@@ -590,10 +594,6 @@ Only claims the repository can back up are listed here.
   file, so a refused delete is not a test failure. Real handle leaks are caught
   directly, by asserting the exclusive-open property, in
   `ExternalAgentFileHandleTests`.
-- `benchmarks/throughput_summary.md` describes the regression gate as failing on
-  a `>20%` drop while this page describes the enforced ratios of 0.75, 0.6, and
-  0.85. The conflict is recorded, not reconciled; the workflow and comparator
-  are authoritative.
 - **The hosted arm64 `runner-class-gate` enforces 4 of 5 workloads, on a noisy
   host.** `policy_lookahead_mcts_32` carries no verdict by design
   (`FINDING-014`): 20 sessions on one commit span 2.050× max/min there, too

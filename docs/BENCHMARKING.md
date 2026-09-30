@@ -110,13 +110,37 @@ by single heavy decisions, and its iteration budget is small by design.
 - Quick smoke:
   `dotnet run -c Release --project Cli -- benchmark --runs 2 --warmup 1000 --steps 20000`
 - CI gate (`.github/workflows/benchmarks.yml`): re-benchmarks the matrix and
-  fails on a **>20% regression** against this record only when the host
-  fingerprint matches this record's host class: **OS family + architecture +
-  .NET runtime major + logical cores + CPU model** (trimmed, case-folded; a
-  missing or empty host field is also a mismatch). GitHub-hosted runners
+  fails when a current workload median falls below its **allowed ratio** times
+  this record's median. The ratios are pinned in the workflow
+  (`benchmarks.yml:88-90`): **0.75** global for the engine-stepping matrix,
+  **0.6** for `micro_raw_2agent`, and **0.85** for
+  `policy_lookahead_mcts_32`. The workflow carries its own calibration for the
+  three (`benchmarks.yml:73-76`): 0.75x is the 25% drop that is the actionable
+  floor on a virtualized host, 0.6x is what the jitter-dominated sub-microsecond
+  micro loop needs, and 0.85x is the deliberately *stricter* bound for the
+  long-loop rollout-search workload, which amortizes host noise across a ~5 ms
+  decision. A workload with no pinned ratio gets one **derived from this
+  record's own dispersion** rather than chosen: `1 - k * (StdDev / Median)`,
+  clamped to `[cv_floor, cv_cap]`, with `k = 3.0`, `cv_floor = 0.55` and
+  `cv_cap = 0.95` by default (`compare_benchmarks.py:104-120,411-428`). So a
+  stable matrix workload keeps a tight gate and a noisy one is relaxed in
+  proportion to its own recorded spread. A `--per-workload-threshold` override
+  wins over the derived value; `--threshold`, default `0.8`, is the fallback for
+  a workload whose baseline carries no dispersion data at all
+  (`compare_benchmarks.py:342,406-410`). **There is no single 20% figure
+  anywhere in the enforced contract**, and any page that describes one is
+  describing a rule the workflow does not run.
+- The gate adjudicates only on a **matching host fingerprint** — OS family +
+  architecture + .NET runtime major + logical cores + CPU model (trimmed,
+  case-folded; a missing or empty host field is also a mismatch) — and only
+  under a matching recorded measurement budget, so a shortened or smoke pass is
+  never adjudicated against a full-protocol record
+  (`--strict-if-matching`). A **sub-threshold dip is re-measured once** before
+  the gate believes it (`benchmarks.yml:94-108`): a transient jitter spike
+  clears on the retry pass, a real regression fails both. GitHub-hosted runners
   are a different host class than the reference record, so they
   get an informational cross-host comparison plus the structural checks, not
-  a throughput verdict. It installs the same .NET 10 runtime the baseline was
+  a throughput verdict. The gate installs the same .NET 10 runtime the baseline was
   recorded under, so a cross-runtime delta is never misread as a regression;
   on any mismatch it prints a cross-host comparison table instead of failing.
   The cross-host smoke pass (ubuntu x64, .NET 10) is classified structurally
@@ -194,8 +218,10 @@ by single heavy decisions, and its iteration budget is small by design.
   previous record is environmental, not an engine change — identical configs
   and protocol, effectively identical GC counters and allocations, and a
   uniform +63% to +93% shift across all five workloads including
-  search-bound MCTS — so a matching-host pass has real headroom and a
-  genuine >20% drop still trips the gate.
+  search-bound MCTS — so a matching-host pass has real headroom, and what
+  checks it is the ratio contract described above: 0.75 / 0.6 / 0.85 with
+  dispersion-derived tolerances elsewhere, adjudicated only on a matching host
+  and re-measured once on a sub-threshold dip.
 
 ## Boundaries
 

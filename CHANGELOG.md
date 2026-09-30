@@ -7,10 +7,67 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 Post-`v3.0.0` work on `main`. This section describes unversioned development
-state; it creates no release and no tag. The `v3.0.0` narrative below and
-[`CITATION.cff`](CITATION.cff) stay pinned to the released 3.0.0 identity.
+state; it creates no release and no tag. The `v3.0.0` narrative below is
+unchanged, and [`CITATION.cff`](CITATION.cff) now tracks the in-development
+version in lockstep with the project files rather than pinning itself to the
+last released one — its `version` moves with `main`, while its `date-released`
+stays at `2026-09-27`, the day `v3.0.0` was tagged, and updates only when the
+next tag ships.
 
 ### Changed
+
+- **The benchmark-gate docs now describe the gate that is actually enforced.**
+  `benchmarks/throughput_summary.md` and `docs/BENCHMARKING.md` both claimed the
+  regression gate "fails on a >20% regression", which no committed artifact
+  implements. Both are rewritten to the contract the workflow and comparator
+  really run: allowed ratios of **0.75** global, **0.6** for
+  `micro_raw_2agent` and **0.85** for `policy_lookahead_mcts_32`
+  (`benchmarks.yml:88-90`, calibrated in the comment at `benchmarks.yml:73-76`);
+  every other workload's ratio **derived from the baseline's own dispersion** as
+  `1 - k * (StdDev / Median)` clamped to `[cv_floor, cv_cap]`
+  (`compare_benchmarks.py:104-120`, defaults `k = 3.0`, `0.55`, `0.95`), with
+  `--threshold` (default `0.8`) as the no-dispersion fallback; adjudication only
+  on a **matching host fingerprint** (OS family + architecture + .NET runtime
+  major + logical cores + CPU model) under a matching recorded protocol budget;
+  and **one re-measure** on a sub-threshold dip before the gate believes it
+  (`benchmarks.yml:94-108`). The README's "Doc-vs-code conflict" paragraph and
+  the Known-limitations bullet that said the conflict was "recorded, not
+  reconciled" are both deleted, so no page claims a 20% rule the gate does not
+  run. **No threshold, baseline, comparator or workflow line was changed** — the
+  code was already right and the prose was not; every number above is quoted
+  from the committed `benchmarks.yml` and `compare_benchmarks.py`.
+
+- **`SECURITY.md`'s supported-versions table names the current release line.**
+  It still listed `2.x` as the only supported line, which stopped being true
+  when `v3.0.0` shipped on 2026-09-27. The table now reads `3.x` supported,
+  `2.x` and `1.x` unsupported, verified against `git tag -l` (newest tag
+  `v3.0.0`) and this changelog. It describes **release lines**, so it makes no
+  claim about 3.1.0, which exists only as the unreleased version on `main`. The
+  reporting policy and the zero-external-runtime-packages paragraph are
+  untouched.
+
+- **`CITATION.cff` tracks the in-development version.** Its `version` moves
+  from `3.0.0` to `3.1.0`, matching the project files and `CliApp.Version`, so
+  version, changelog and README agree at all times as the repo's own rule
+  requires. `date-released` stays `"2026-09-27"` — that date records the
+  `v3.0.0` release and updates only when the `v3.1.0` tag ships, which this
+  stage does not do. No other field changed.
+
+- **A one-sided paired-evaluation seed stays a refusal, deliberately, until
+  v3.2.** The Known-limitations bullet that said "there is no drop-and-count
+  yet" is rewritten to say drop-and-count is *planned* for v3.2, and to say why
+  it is not a one-line change: dropping a one-sided seed and counting it means
+  the drop count has to reach the report, and
+  `docs/EXTERNAL_AGENT_PROTOCOL.md` §9.3 requires an in-process study's
+  `evaluate` artifact to be byte-for-byte unchanged — so the report surface and
+  that promise have to be settled together, not in one file. The implementation
+  criterion for this stage was "confined to `Agents/PairedEvaluation.cs` and its
+  report surface", and adding a field to `PairedStudyReport` would change every
+  serialized study, which fails it. Nothing in `Agents/PairedEvaluation.cs`
+  changed: `Agents/PairedEvaluation.cs:100-105` still throws, and the graded-seed
+  floor at `Agents/PairedEvaluation.cs:144-145` is still `deltas.Length >= 30`
+  over completed pairs, because today a one-sided seed refuses the study rather
+  than reaching it.
 
 - **The solution now targets .NET 10 (`net10.0`).** All ten versioned projects,
   including the external-agent stub, move from `net8.0` to `net10.0`, and the

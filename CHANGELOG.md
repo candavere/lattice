@@ -12,6 +12,22 @@ state; it creates no release and no tag. The `v3.0.0` narrative below and
 
 ### Changed
 
+- **The solution now targets .NET 10 (`net10.0`).** All ten versioned projects,
+  including the external-agent stub, move from `net8.0` to `net10.0`, and the
+  CI, release, and benchmark workflows install the .NET 10 SDK alongside them.
+  The ubuntu x64 structural smoke in `benchmarks.yml` moves to the .NET 10
+  baseline runtime with it; it stays classified `--smoke`, so it still never
+  adjudicates a throughput ratio, because what separates it from the committed
+  record is the host class and the shortened budget, not the runtime. No
+  benchmark baseline, recorded artifact, or threshold was changed, and no
+  `global.json` pin was added: `10.0.x` already tracks the SDK the workflows
+  install. `docs/reproduction_packet.md` is deliberately left alone, because its
+  `.NET 8` statements describe the immutable `v2.3.2` and `v3.0.0` release
+  assets rather than the current tree.
+
+- **The CRLF example test now asserts the framing contract specifically, plus an
+  inverse test proving CR emission is caught.**
+
 - **CI now enforces throughput on GitHub-hosted runners for four of five
   workloads.** The hosted-runner reference
   ([`benchmarks/runner_class_throughput_benchmark.json`](benchmarks/runner_class_throughput_benchmark.json))
@@ -25,8 +41,6 @@ state; it creates no release and no tag. The `v3.0.0` narrative below and
   statement to correct if the record is ever re-derived. The demotion is not
   withdrawn, and no threshold was widened against any record or observed run.
   Engine, agent, CLI, protocol, and test sources are unchanged.
-
-### Changed
 
 - **Version 3.1.0.** All nine project `<Version>` values and `CliApp.Version`
   move to `3.1.0` together. `CITATION.cff` and the pinned v3.0.0 release record

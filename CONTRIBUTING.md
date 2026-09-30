@@ -17,7 +17,7 @@ Four ideas govern every change:
 
 1. **Zero external runtime dependencies.** `Lattice.Environment`,
    `Lattice.Generator`, `Lattice.Trajectories`, `Lattice.Agents`, and
-   `Lattice.Analytics` are pure .NET 8 BCL with no NuGet packages, no game
+   `Lattice.Analytics` are pure .NET 10 BCL with no NuGet packages, no game
    engine references, no Newtonsoft.Json, no serialization frameworks — the
    production dependency graph is the standard library alone. `Visualization`
    and `Cli` may reference the core only through the public step-contract /
@@ -25,7 +25,7 @@ Four ideas govern every change:
    packages, exclusively `Microsoft.NET.Test.Sdk` and `xUnit`/`xunit.runner`.
 
 2. **Strict platform determinism.** The core guarantee is **same seed + same
-   actions → deterministic transitions under the pure .NET 8 BCL runtime, and
+   actions → deterministic transitions under the pure .NET 10 BCL runtime, and
    verified per-step serialized StepResult equivalence plus per-tick state-digest
    equality on every operating system the CI matrix covers**: the
    `Build & test` matrix runs `ubuntu-24.04`, `windows-latest`, and
@@ -36,7 +36,7 @@ Four ideas govern every change:
    GitHub's staged migration of `ubuntu-latest` from 24.04 to 26.04 (announced
    for 2026-10-19 to 2026-11-19) cannot move a gate under a merge; the Windows
    and macOS labels remain rolling. A separate `ubuntu-26.04` job in
-   `ci.yml` builds, golden-replays, and tests on 26.04 under the same .NET 8
+   `ci.yml` builds, golden-replays, and tests on 26.04 under the same .NET 10
    SDK, but it is `continue-on-error` and **non-gating**: it publishes no
    artifact, nothing depends on it, and its result is not part of the
    cross-OS equivalence contract. A green CI run therefore says nothing about
@@ -102,7 +102,7 @@ The evidentiary standard makes three things mandatory for PRs:
    clearing the rule, not by a narrative.
 3. **Equivalence claims name their level.** Claims of state or replay
    equivalence must specify which of these standards they assert:
-   - **Engine transition determinism:** under the stated .NET 8 BCL runtime
+   - **Engine transition determinism:** under the stated .NET 10 BCL runtime
      contract, same state + same actions → same next state.
    - **Per-step serialized StepResult equivalence:** `TrajectoryReplay.Verify`
      passes against the canonical golden trajectory across the supported CI
@@ -142,7 +142,7 @@ independent third-party validation.
 
 ## Development Environment & Prerequisites
 
-- a recent [.NET 8.0 SDK](https://dotnet.microsoft.com/download) (the solution
+- a recent [.NET 10.0 SDK](https://dotnet.microsoft.com/download) (the solution
   also runs on later majors via `RollForward=LatestMajor`).
 - no other tooling is required; there is no formatter, linter, or
   code-generator step. Everything compiles and tests with the SDK alone.
@@ -280,7 +280,7 @@ rationale, is not mergeable.
 - **No new external packages in production assemblies.** Every production
   project (`Lattice.Environment`, `Lattice.Generator`, `Lattice.Trajectories`,
   `Lattice.Agents`, `Lattice.Analytics`, `Lattice.Visualization`,
-  `Lattice.Cli`) remains pure .NET 8 BCL. Dependency proposals for the core
+  `Lattice.Cli`) remains pure .NET 10 BCL. Dependency proposals for the core
   are a design decision, not a merge decision — raise them in an issue first.
   Development and test projects may only add `Microsoft.NET.Test.Sdk` or
   `xUnit` packages; anything else is a design decision too.

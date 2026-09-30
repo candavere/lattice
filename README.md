@@ -12,12 +12,12 @@
   <a href="https://github.com/candavere/lattice/actions/workflows/benchmarks.yml"><img src="https://github.com/candavere/lattice/actions/workflows/benchmarks.yml/badge.svg" alt="Benchmarks: latest run status" title="Benchmarks: latest run status" /></a>
   <img src="https://img.shields.io/badge/status-research%20preview-orange" alt="Status: research preview" title="Status: research preview" />
   <a href="https://github.com/candavere/lattice/releases/latest"><img src="https://img.shields.io/github/v/release/candavere/lattice" alt="Latest release" title="Latest release" /></a>
-  <a href="https://github.com/candavere/lattice/blob/main/docs/ECOSYSTEM.md"><img src="https://img.shields.io/badge/target%20framework-net8.0-512BD4?logo=dotnet&logoColor=white" alt="Target framework: net8.0" title="Target framework: net8.0" /></a>
+  <a href="https://github.com/candavere/lattice/blob/main/docs/ECOSYSTEM.md"><img src="https://img.shields.io/badge/target%20framework-net10.0-512BD4?logo=dotnet&logoColor=white" alt="Target framework: net10.0" title="Target framework: net10.0" /></a>
   <a href="https://github.com/candavere/lattice/blob/main/LICENSE"><img src="https://img.shields.io/github/license/candavere/lattice" alt="License: MIT" title="License: MIT" /></a>
   <a href="https://github.com/candavere/lattice/blob/main/docs/ECOSYSTEM.md"><img src="https://img.shields.io/badge/production%20runtime%20deps-0-success" alt="Production runtime dependencies: 0" title="Production runtime dependencies: 0" /></a>
 </p>
 
-<p align="center"><sub>Every production assembly is pure .NET 8 BCL with zero external
+<p align="center"><sub>Every production assembly is pure .NET 10 BCL with zero external
 NuGet runtime packages. The test project and development tooling do use packages
 (<code>Microsoft.NET.Test.Sdk</code>, <code>xunit</code>,
 <code>xunit.runner.visualstudio</code>); the zero count is not a claim about the
@@ -31,7 +31,7 @@ whole repository. See <a href="docs/ECOSYSTEM.md">docs/ECOSYSTEM.md</a>.</sub></
 
 Multi-agent claims live on a spectrum between "we ran it once somewhere" and
 "here is the run, the seed, and the reproducible harness". Lattice is built for
-the second end. It is a headless .NET 8 environment for deterministic
+the second end. It is a headless .NET 10 environment for deterministic
 Dec-POMDP-style experiments under partial observability, dynamic topology, and
 resource contention: a run is a pure step contract, each tick a function of the
 prior state and the recorded actions, with no hidden state, no singletons, and
@@ -269,10 +269,10 @@ build profile.
 
 ## Verify everything yourself
 
-All commands run from a clean checkout at the repository root with the .NET 8
+All commands run from a clean checkout at the repository root with the .NET 10
 SDK installed, and require no network access once dependencies are restored.
-You need the [.NET 8 SDK](https://dotnet.microsoft.com/download); Lattice also
-runs on .NET 9/10 via `RollForward=LatestMajor`.
+You need the [.NET 10 SDK](https://dotnet.microsoft.com/download); Lattice also
+runs on later .NET majors via `RollForward=LatestMajor`.
 
 ```sh
 ./setup.sh              # macOS/Linux: verify SDK, restore, build, test,
@@ -397,7 +397,7 @@ disagree are called out below rather than resolved.
 ### Determinism and seeds
 
 Every command is seeded. Identical arguments produce identical per-step
-serialized output under the specified .NET 8 BCL runtime contract. The
+serialized output under the specified .NET 10 BCL runtime contract. The
 repository makes five distinct guarantees, documented in
 [`docs/SUPPORT_AND_REPRODUCIBILITY.md`](docs/SUPPORT_AND_REPRODUCIBILITY.md):
 engine transition determinism, per-step serialized `StepResult` replay

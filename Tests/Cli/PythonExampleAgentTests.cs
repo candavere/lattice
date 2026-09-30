@@ -171,13 +171,108 @@ public class PythonExampleAgentTests
             Assert.Equal(0, exit);
             Assert.Equal(string.Empty, stdout);
 
-            // The whole point: a CR anywhere in a line is malformed_json (spec
-            // section 1), so inheriting the host's CRLF default fails every match
-            // before the first observation is ever answered.
-            Assert.Contains("agent_failures=none", stderr, StringComparison.Ordinal);
+            // Scoped to the framing contract, not to "nothing went wrong": only a CR can break this
+            // newline and it surfaces as malformed_json, so a one-match host stall is a runner fact.
+            Assert.DoesNotContain("malformed_json", stderr, StringComparison.Ordinal);
 
             using var document = JsonDocument.Parse(File.ReadAllText(path));
-            Assert.Empty(document.RootElement.GetProperty("AgentFailures").EnumerateObject());
+            var failures = document.RootElement.GetProperty("AgentFailures");
+
+            // The whole point: a CR anywhere in a line is malformed_json (spec section 1), so an
+            // agent that inherits the host's CRLF default fails before the first observation.
+            Assert.False(
+                failures.TryGetProperty("malformed_json", out _),
+                $"the agent wrote a CR-terminated line, so it did not pin its own newline: {failures}");
+
+            // One seed mirrored is two matches and a match records at most one fault, so the summed
+            // count is how many matches failed: a dead or broken agent fails both and is caught
+            // here, while a single-match stall is let through.
+            var failedMatches = failures.EnumerateObject().Sum(failure => failure.Value.GetInt32());
+            Assert.True(
+                failedMatches < 2,
+                $"both matches failed, which is a broken agent rather than a single-match host stall: {failures}");
+        }
+        finally
+        {
+            File.Delete(path);
+            File.Delete(wrapper);
+        }
+    }
+
+    /// <summary>
+    /// The inverse of the test above: an agent that does <em>not</em> pin its own newline must be
+    /// caught, so the test above cannot pass merely by being blind to framing.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The shipped script runs unmodified. The generated wrapper only swaps <c>sys.stdout</c> for a
+    /// stand-in whose <c>reconfigure</c> is inert, so the script keeps writing through a stream that
+    /// translates to CRLF -- the state an agent written before the pin existed would have been in on
+    /// Windows. Both mirrored matches then end as <c>malformed_json</c>, which is the code the test
+    /// above now keys on.
+    /// </para>
+    /// <para>
+    /// This is what keeps that assertion honest: a reader who made the reader tolerate a CR would
+    /// leave the test above green on its happy path while quietly accepting a broken agent.
+    /// </para>
+    /// </remarks>
+    [Fact(Timeout = TestTimeoutMs)]
+    public async Task An_Agent_That_Inherits_The_Host_Newline_Is_Caught_As_Malformed_Json()
+    {
+        var python = ResolvePython();
+        if (python is null)
+        {
+            _output.WriteLine(
+                "SKIPPED: no Python interpreter on PATH on this machine, so the CRLF detection path cannot " +
+                "be exercised here. Lattice's own framing check is what this test is about.");
+            return;
+        }
+
+        var script = ExampleScript();
+        var wrapper = Path.Combine(
+            Path.GetTempPath(), $"lattice-crlf-inherit-{Guid.NewGuid():N}.py");
+        var path = Path.Combine(Path.GetTempPath(), $"lattice-crlf-inherit-{Guid.NewGuid():N}.json");
+
+        File.WriteAllText(
+            wrapper,
+            "import runpy, sys\n"
+            + "sys.stdout.reconfigure(encoding='utf-8', newline='\\r\\n')\n"
+            + "sys.stdin.reconfigure(encoding='utf-8', newline=None)\n"
+            + "class _InheritedCrlfStdout:\n"
+            + "    def __init__(self, inner):\n"
+            + "        self._inner = inner\n"
+            + "    def reconfigure(self, *args, **kwargs):\n"
+            + "        return None\n"
+            + "    def write(self, text):\n"
+            + "        return self._inner.write(text)\n"
+            + "    def flush(self):\n"
+            + "        return self._inner.flush()\n"
+            + "sys.stdout = _InheritedCrlfStdout(sys.stdout)\n"
+            + "sys.argv = [sys.argv[1]]\n"
+            + "runpy.run_path(sys.argv[0], run_name='__main__')\n");
+
+        try
+        {
+            var (exit, stdout, stderr) = await Task.Run(() => Run(
+                "evaluate",
+                "--scenario", "standard",
+                "--seed-set", "dev",
+                "--seeds", "1",
+                "--agent-step-timeout-ms", "5000",
+                "--agent-cmd", $"\"{python}\" \"{wrapper}\" \"{script}\"",
+                "--out", path));
+
+            Assert.Equal(0, exit);
+            Assert.Equal(string.Empty, stdout);
+
+            // Every match must be refused, and refused as a framing failure: an agent emitting CR is
+            // exactly the condition the test above exists to keep working.
+            Assert.Contains("malformed_json", stderr, StringComparison.Ordinal);
+            Assert.DoesNotContain("agent_failures=none", stderr, StringComparison.Ordinal);
+
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            var failures = document.RootElement.GetProperty("AgentFailures");
+            Assert.Equal(2, failures.GetProperty("malformed_json").GetInt32());
         }
         finally
         {

@@ -209,22 +209,32 @@ jobs:
           if-no-files-found: warn
 
   cross-host-structure:
-    # Deliberately on .NET 8 / ubuntu x64: this job is a structural smoke. Its
-    # runtime differs from the committed baseline, and it runs a bounded smoke
-    # pass (3 runs / 10k steps), so its throughput is NOT comparable to the
-    # full-protocol .NET 10 baseline. The comparison is therefore reclassified
-    # as a structural smoke (--smoke): the comparator verifies the workload
-    # matrix and positive medians but never adjudicates a throughput ratio, so
-    # a cross-runtime delta can never masquerade as a regression.
+    # A structural smoke, and deliberately classified as one. It runs on a shared
+    # ubuntu x64 runner against a baseline recorded on a bare-metal Apple M1, and
+    # it runs a bounded smoke pass (3 runs / 10k steps). Both facts mean its
+    # throughput is NOT comparable to the committed full-protocol baseline, and
+    # the runtime is no longer a reason: the baseline and this job now share the
+    # .NET 10 baseline runtime. What still separates them is the host class and
+    # the shortened measurement budget, so the comparison stays reclassified as a
+    # structural smoke (--smoke): the comparator verifies the workload matrix and
+    # positive medians but never adjudicates a throughput ratio, so a cross-host
+    # delta can never masquerade as a regression.
+    #
+    # There is no hosted-runner reference for this leg: the runner-class record
+    # (benchmarks/runner_class_throughput_benchmark.json) was collected on
+    # macos-26 arm64 and arms only on that fingerprint. So this job reports an
+    # informational table against the committed baseline and gates on structure
+    # alone. Lifting it to a ratio would need a runner-class record collected on
+    # ubuntu x64, not a relaxed threshold.
     name: Cross-host structural smoke (ubuntu x64)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
 
-      - name: Setup .NET 8
+      - name: Setup .NET 10 (baseline runtime)
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: "10.0.x"
 
       - name: Build
         run: dotnet build Cli/Lattice.Cli.csproj -c Release

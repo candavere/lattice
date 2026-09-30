@@ -108,8 +108,8 @@ Ubuntu, macOS, and Windows, and the benchmark regression workflow is
 ### Runtime baseline
 
 Every production assembly — `Environment`, `Generator`, `Agents`,
-`Trajectories`, `Analytics`, `Visualization`, and `Cli` — targets `net8.0` and
-depends only on the .NET 8 LTS base class library. There are no third-party
+`Trajectories`, `Analytics`, `Visualization`, and `Cli` — targets `net10.0` and
+depends only on the .NET 10 LTS base class library. There are no third-party
 runtime package references anywhere in the production graph; assemblies
 reference each other only through `ProjectReference`. The `Cli` and `Analytics`
 assemblies set `RollForward=LatestMajor`, so the same binary can run on a newer
@@ -555,7 +555,7 @@ Two companion records keep the audit chain honest:
   documented boundary, and wording status.
 
 All commands run from a clean checkout of `candavere/lattice` at the repository
-root, with the .NET 8 SDK installed. They are Release-configuration runs and
+root, with the .NET 10 SDK installed. They are Release-configuration runs and
 require no network access once the SDK and dependencies are restored.
 
 ### Full test suite

@@ -19,10 +19,10 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
-      - name: Setup .NET 8
+      - name: Setup .NET 10
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '10.0.x'
 
       - name: Assert tag version == every project <Version> == CLI --version
         shell: bash
@@ -103,10 +103,10 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
-      - name: Setup .NET 8
+      - name: Setup .NET 10
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '10.0.x'
 
       - name: Publish self-contained single-file binary
         # NB: no -p:AssemblyName here. Command-line overrides of AssemblyName
@@ -220,10 +220,10 @@ jobs:
           sha256sum -c lattice-linux-x64.sha256 lattice-win-x64.exe.sha256 lattice-osx-arm64.sha256
           echo "all downloaded artifacts match their smoke-tested checksums"
 
-      - name: Setup .NET 8
+      - name: Setup .NET 10
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '10.0.x'
 
       - name: Restore (for SBOM dependency graph)
         run: dotnet restore Lattice.sln
@@ -256,16 +256,16 @@ jobs:
           - Status: Research Preview — evaluation by maintainers and collaborators.
 
           ## Compatibility & schema
-          - Pure .NET 8 (net8.0) BCL runtime; no external native dependencies.
+          - Pure .NET 10 (net10.0) BCL runtime; no external native dependencies.
           - Trajectory schema version \`3\` — \`golden_trajectory.jsonl\` (header \`SchemaVersion: 3\`).
           - Determinism is scoped to serialized \`StepResult\` equivalence plus schema 3's per-tick state hash: \`replay --verify\` re-serializes each \`StepResult\` and recomputes the SHA-256 digest of each tick's end-of-tick simulation state; see docs/SUPPORT_AND_REPRODUCIBILITY.md.
 
           ## Supported matrix
           | Asset | OS | Architecture | Runtime |
           | --- | --- | --- | --- |
-          | \`lattice-linux-x64\` | Linux | x64 | .NET 8 self-contained |
-          | \`lattice-osx-arm64\` | macOS | arm64 | .NET 8 self-contained |
-          | \`lattice-win-x64.exe\` | Windows | x64 | .NET 8 self-contained |
+          | \`lattice-linux-x64\` | Linux | x64 | .NET 10 self-contained |
+          | \`lattice-osx-arm64\` | macOS | arm64 | .NET 10 self-contained |
+          | \`lattice-win-x64.exe\` | Windows | x64 | .NET 10 self-contained |
 
           ## Assets
           - Binaries (smoke-tested on their native runners): \`lattice-linux-x64\`, \`lattice-osx-arm64\`, \`lattice-win-x64.exe\`
@@ -287,7 +287,7 @@ jobs:
           $(cd artifacts && sha256sum lattice-linux-x64 lattice-win-x64.exe lattice-osx-arm64)
           \`\`\`
 
-          SBOM (\`sbom.json\`) enumerates the .NET 8 dependency graph; verify every artifact against \`SHA256SUMS.txt\` before use.
+          SBOM (\`sbom.json\`) enumerates the .NET 10 dependency graph; verify every artifact against \`SHA256SUMS.txt\` before use.
           EOF
           cat RELEASE_NOTES.md
 

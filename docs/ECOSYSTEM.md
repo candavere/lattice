@@ -75,7 +75,7 @@ service, or daemon layer to provision; a batch run is a shell loop.
 
 The step-contract surface maps almost one-to-one onto the classic RL loop:
 
-| Lattice (.NET 8 C#) | Gymnasium / PettingZoo Concept | Architectural Role |
+| Lattice (.NET 10 C#) | Gymnasium / PettingZoo Concept | Architectural Role |
 | :--- | :--- | :--- |
 | `Simulation.Step(actions)` | `env.step(actions)` | Advances active simulation state by exactly one tick |
 | `Observation` | `observation` | Agent's egocentric, hop-bounded partial sensor horizon |
@@ -96,7 +96,7 @@ everywhere in this repository:
 - **awesome-game-ai / tactical-ai:** a deterministic, seedable tactical
   substrate with fog-of-war perception, capacity-gated terrain, and MCTS —
   the environment, not agents, is the product.
-- **awesome-dotnet:** C# / .NET 8, nullable enabled, zero external *runtime*
+- **awesome-dotnet:** C# / .NET 10, nullable enabled, zero external *runtime*
   dependencies across every production assembly (pure BCL; only the test
   project references packages — `Microsoft.NET.Test.Sdk` and `xUnit`); step
   contracts are plain records.

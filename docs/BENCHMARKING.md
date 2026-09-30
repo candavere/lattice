@@ -119,10 +119,14 @@ by single heavy decisions, and its iteration budget is small by design.
   a throughput verdict. It installs the same .NET 10 runtime the baseline was
   recorded under, so a cross-runtime delta is never misread as a regression;
   on any mismatch it prints a cross-host comparison table instead of failing.
-  The cross-host smoke pass (ubuntu x64, .NET 8) is classified structurally
+  The cross-host smoke pass (ubuntu x64, .NET 10) is classified structurally
   with `--smoke`: workloads present and medians positive, never a
-  throughput-ratio adjudication from a shortened-budget run. The reference
-  record remains the research reference.
+  throughput-ratio adjudication from a shortened-budget run. Its runtime now
+  matches the baseline, so the runtime is no longer what separates it — the
+  shared-runner host class and the shortened budget are, and a ratio across
+  them would mean nothing. There is no runner-class record for ubuntu x64, so
+  lifting this leg to a verdict would mean collecting one there, not relaxing a
+  threshold. The reference record remains the research reference.
 - **CI throughput gate (hosted runner, `runner-class-gate`).** A hosted
   runner is a different host class from the reference record, so CI enforces
   throughput against its **own** runner-class record, measured on the runner

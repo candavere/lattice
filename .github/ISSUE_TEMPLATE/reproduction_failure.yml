@@ -1,0 +1,86 @@
+name: Reproduction failure
+description: A published claim, recorded artifact, or benchmark number did not reproduce.
+title: "[repro] "
+labels: ["reproduction"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form when a **claim or committed artifact failed to reproduce** — a
+        replay verification that went red, a benchmark that moved outside its stated
+        envelope, a committed recording that no longer matches its documented
+        command, or a viewer that disagrees with the file it is playing.
+
+        This is not the form for a plain behavioural bug; use the bug report for that.
+
+  - type: textarea
+    id: claim
+    attributes:
+      label: Claim or artifact that failed
+      description: >
+        What was being reproduced, and where it is written down. Quote the sentence
+        or name the file, and link it.
+      placeholder: >
+        docs/BENCHMARKING.md — the throughput gate only adjudicates on a full host
+        fingerprint match
+    validations:
+      required: true
+
+  - type: input
+    id: artifact
+    attributes:
+      label: Artifact path or run link
+      description: The committed file or CI run involved, if there is one.
+      placeholder: "site/infiltration.jsonl"
+    validations:
+      required: true
+
+  - type: input
+    id: commit-sha
+    attributes:
+      label: Commit SHA
+      description: The revision you reproduced on. `git rev-parse HEAD`.
+    validations:
+      required: true
+
+  - type: textarea
+    id: command
+    attributes:
+      label: Exact command
+      description: The command from the docs, quoted as you ran it.
+      render: shell
+      placeholder: "dotnet run --project Cli -- replay site/infiltration.jsonl --verify"
+    validations:
+      required: true
+
+  - type: textarea
+    id: host
+    attributes:
+      label: Host
+      description: >
+        OS, architecture, `dotnet --version`, CPU model, logical cores, RAM, and
+        whether the machine was on AC power. Benchmark claims are host-scoped, so
+        the host is part of the claim.
+    validations:
+      required: true
+
+  - type: textarea
+    id: diff
+    attributes:
+      label: Output diff
+      description: >
+        The actual output against the expected output, pasted verbatim. For a
+        benchmark, give the per-workload medians rather than a summary.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: >
+        A negative result is a real result here. If something did not reproduce and
+        you cannot say why, say that instead of guessing — Lattice's changelog
+        already records at least one case where the cause was unestablished and the
+        honest move was to report it rather than re-baseline.

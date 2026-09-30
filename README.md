@@ -805,7 +805,7 @@ match the other.
   product thesis and evidentiary standards, graph-over-grid maps, the
   two-phase step resolution plus perception/transit/forking addenda, mirrored-
   seat spawn fairness, and the external-agent wire contract.
-- **Related.** [Contributing](CONTRIBUTING.md) · [License](LICENSE) ·
+- **Related.** [Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [License](LICENSE) ·
   [Security](SECURITY.md) · [Live demo](https://candavere.github.io/lattice/).
 
 ## Citation

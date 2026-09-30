@@ -25,6 +25,13 @@ state; it creates no release and no tag. The `v3.0.0` narrative below and
   `.NET 8` statements describe the immutable `v2.3.2` and `v3.0.0` release
   assets rather than the current tree.
 
+- **Lattice accepts outside pull requests.** `CONTRIBUTING.md` now says so
+  explicitly and gains the `replay --verify` step it was missing; a Contributor
+  Covenant 2.1 `CODE_OF_CONDUCT.md`, three issue forms, and a pull request
+  template carry the same bar as the prose, and blank issues are disabled in
+  favour of those forms. No workflow, label automation, or bot is added, and
+  `SECURITY.md` remains the only route for vulnerability reports.
+
 - **The architecture diagram's legend names Lattice's own roles.** The generic
   `Frontend` / `Backend` / `Database` / `Security` / `External` categories are
   replaced with *CLI command*, *artifact on disk*, *site viewer*,

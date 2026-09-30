@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/candavere/lattice/blob/main/SECURITY.md
+    about: Report a suspected vulnerability privately. Do not open a public issue.
+  - name: Code of Conduct report
+    url: https://github.com/candavere/lattice/blob/main/CODE_OF_CONDUCT.md
+    about: Harassment or unacceptable behaviour, reported confidentially to the enforcement contact.
+  - name: Question or usage help
+    url: https://github.com/candavere/lattice/discussions
+    about: Usage questions and "how do I…". Bug reports belong in the bug form so they carry a command and a revision.

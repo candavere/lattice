@@ -1,0 +1,98 @@
+name: Bug report
+description: Something in Lattice behaves differently from what the committed evidence says it should.
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. Lattice's bar is that every documented claim is
+        reproducible from a committed command, so the most useful report is one that
+        names the command, the revision, and the exact difference you saw.
+
+        Not a security issue? Please use the private route in
+        [SECURITY.md](https://github.com/candavere/lattice/blob/main/SECURITY.md) instead.
+
+  - type: input
+    id: lattice-version
+    attributes:
+      label: Lattice version
+      description: The `lattice --version` output, or the release tag you are on.
+      placeholder: "3.0.0"
+    validations:
+      required: true
+
+  - type: input
+    id: commit-sha
+    attributes:
+      label: Commit SHA
+      description: The exact revision you ran. `git rev-parse HEAD`.
+      placeholder: "e4e2f539ea40af8e2746b6af21334fb857c997bb"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Ubuntu
+        - Windows
+        - macOS
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: dotnet-sdk
+    attributes:
+      label: .NET SDK
+      description: Output of `dotnet --version`. Lattice targets `net10.0`.
+      options:
+        - "10.0.x"
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: command
+    attributes:
+      label: Exact command
+      description: The full command line, quoted as you ran it, with every flag.
+      render: shell
+      placeholder: "dotnet run --project Cli -- simulate --seed 42 --scenario infiltration --steps 100 --out out.jsonl"
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+      description: What the docs, the spec, or the committed artifact says should happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+      description: What you saw instead. Include the full stderr, not a summary.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: artifacts
+    attributes:
+      label: Recording or artifact
+      description: >
+        If the run produced a `.jsonl` recording, a benchmark JSON, or an evaluation
+        JSON, paste it or link it. `replay --verify` on it is usually the fastest way
+        to tell a real defect from a usage error.
+      render: shell
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Host details, unusual flags, or a link to a discussion.

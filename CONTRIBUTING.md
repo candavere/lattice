@@ -6,6 +6,12 @@ agent harness. This guide documents the engineering contract every change must
 honor so the repository keeps reading as a coherent product rather than an
 accumulation of patches.
 
+Lattice accepts outside pull requests. There is no CLA, no assignment, and no
+sign-off ritual: open an issue describing the problem, branch from `main`, and
+send the pull request. Participation is governed by the
+[`Code of Conduct`](CODE_OF_CONDUCT.md); a suspected vulnerability is a security
+matter and goes through [`SECURITY.md`](SECURITY.md) instead.
+
 Before anything else: read the project's engineering contract; it is the
 source of truth for design principles and non-negotiable constraints. Work is
 only *done* when the tests that pin the requested behavior pass, no principle
@@ -164,6 +170,16 @@ Run the full test suite (unit, determinism, replay, benchmark):
 
 ```sh
 dotnet test Lattice.sln
+```
+
+Verify a specific committed recording replays tick-for-tick. This is the check
+that matters most before a pull request touching action resolution, transit
+bookkeeping, capacity triage, or agent heuristics, because it is the one that
+catches a silently re-tilted trajectory:
+
+```sh
+dotnet run -c Release --project Cli -- replay Tests/fixtures/golden_trajectory.jsonl --verify
+dotnet run -c Release --project Cli -- replay site/infiltration.jsonl --verify
 ```
 
 A green build with a green suite in Release is the baseline bar for any merge.

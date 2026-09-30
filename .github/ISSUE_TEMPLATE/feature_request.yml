@@ -1,0 +1,83 @@
+name: Feature request
+description: Propose a change, and say what committed evidence would show it works.
+title: "[feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Lattice is an evidence instrument, so a feature request is strongest when it
+        names the problem first and the artifact that would prove the fix.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: >
+        The concrete obstacle, not the solution. What are you unable to measure,
+        reproduce, or express today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: >
+        What you would like to happen, and roughly where it would live. If it touches
+        the step contract, the protocol, or the trajectory schema, say so — those are
+        versioned surfaces and changing one is a design decision, not a merge decision.
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: What would show this works?
+      description: >
+        The committed artifact or benchmark that would demonstrate it. A new test
+        that fails today, a schema field a recording would then carry, a benchmark
+        workload whose median should move, or a viewer state that becomes visible.
+        "It would be nicer" is not evidence.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Which surface does this touch?
+      multiple: true
+      options:
+        - Engine / step contract
+        - Generator
+        - Agents / protocol
+        - Analytics / evaluation
+        - Visualization
+        - CLI
+        - Site / viewer
+        - Benchmarks
+        - Docs only
+        - Not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: dependencies
+    attributes:
+      label: Would this need a new dependency?
+      description: >
+        Production assemblies are pure .NET 10 BCL with zero external runtime
+        packages. A dependency proposal is a design decision and is discussed in an
+        issue before it is written.
+      options:
+        - "No"
+        - "Yes, and I understand it needs prior discussion"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+      description: Including "do nothing", if that is genuinely defensible.

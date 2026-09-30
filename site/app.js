@@ -37,7 +37,7 @@
       staticName: 'infiltration.svg',
       chipLabel: 'Infiltration',
       scenarioOrder: 0,
-      caption: 'Seed 42, Dungeon Infiltration & Sentry Patrol: the Infiltrator raids the Treasure Vault under a patrolling Sentry. Recorded with lattice simulate --seed 42 --scenario infiltration --steps 100 and rendered as an animated SVG with lattice render --format svg.',
+      caption: 'Seed 42, Dungeon Infiltration & Sentry Patrol, schema v5: the Infiltrator raids the Treasure Vault under a patrolling Sentry. Every step line carries that agent\'s own recorded perception at its decision tick. Recorded with lattice simulate --seed 42 --scenario infiltration --steps 100 — or re-derive both recordings at once with ./scripts/regenerate-site-demos.sh — and rendered with lattice render --format svg.',
       reproduce: 'dotnet run --project Cli -- simulate --seed 42 --scenario infiltration --steps 100 --out infiltration.jsonl',
     },
     demo: {
@@ -48,7 +48,7 @@
       staticName: 'demo.svg',
       chipLabel: 'Benchmark',
       scenarioOrder: 1,
-      caption: 'Seed 42, MCTS (agent 0) vs Random (agent 1), 27 ticks. Recorded with lattice simulate --seed 42 --agent mcts --steps 30 and rendered as a dependency-free CSS-animated SVG with lattice render --format svg.',
+      caption: 'Seed 42, MCTS (agent 0) vs Random (agent 1), 27 ticks, pinned at schema v3 because it predates the perception field: it records none, so its agent view is a reconstruction by this page, not a recorded one. Its 27 step lines are byte-identical to a fresh lattice simulate --seed 42 --agent mcts --steps 30; it is pinned so the reader does not flag it, so that file is verified and never rewritten by ./scripts/regenerate-site-demos.sh.',
       reproduce: 'dotnet run --project Cli -- simulate --seed 42 --agent mcts --steps 30 --out demo.jsonl',
     },
   };
@@ -184,6 +184,27 @@
     dom.playBtn.addEventListener('click', togglePlay);
     dom.stepBackBtn.addEventListener('click', function () { pause(); stepBy(-1); });
     dom.stepFwdBtn.addEventListener('click', function () { pause(); stepBy(+1); });
+
+    // The canvas carries tabindex="0" and role="img", so it is reachable by
+    // keyboard and must respond when it is. Arrow keys step, Home/End jump to
+    // the ends, Space toggles playback, PageUp/PageDown move ten ticks. The
+    // transport buttons above stay the discoverable path; this is the same
+    // behaviour for anyone already focused on the map.
+    dom.canvas.addEventListener('keydown', function (event) {
+      if (!state.trajectory || !state.trajectory.frames.length) return;
+      var handled = true;
+      switch (event.key) {
+        case 'ArrowRight': pause(); stepBy(+1); break;
+        case 'ArrowLeft': pause(); stepBy(-1); break;
+        case 'PageUp': pause(); stepBy(-10); break;
+        case 'PageDown': pause(); stepBy(+10); break;
+        case 'Home': pause(); setIndex(0); break;
+        case 'End': pause(); setIndex(state.trajectory.frames.length - 1); break;
+        case ' ': case 'Spacebar': togglePlay(); break;
+        default: handled = false;
+      }
+      if (handled) event.preventDefault();
+    });
     dom.slider.addEventListener('input', function () { pause(); setIndex(Number(dom.slider.value)); });
     dom.fileInput.addEventListener('change', handleFileChoice);
     document.addEventListener('dragover', preventDefaultFileDrop);

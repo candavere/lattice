@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="A testing lab for multi-agent AI: replay recorded experiments, compare what each agent could see, and audit the committed evidence behind the result.">
   <title>Lattice</title>
+  <!-- Inline icon: the browser's automatic /favicon.ico request is the one request
+       this page would otherwise 404 on. A data URI keeps it dependency-free and
+       adds no file. -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230f172a'/%3E%3Cpath d='M9 23V9M9 16h14M23 9v14' stroke='%2360a5fa' stroke-width='2.5' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='9' cy='9' r='3.4' fill='%2334d399'/%3E%3Ccircle cx='23' cy='23' r='3.4' fill='%23e0af68'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="./style.css">
   <script src="./app.js" defer></script>
 </head>
@@ -14,67 +18,19 @@
   <header class="app-header">
     <h1>Audit AI decisions, not just outcomes.</h1>
     <p class="subtitle">
-      Lattice is a testing lab for AI decision-making. Run a seeded experiment,
-      replay what happened, compare what each agent could see, and audit the
-      evidence — rather than trusting a black box.
+      A seeded multi-agent experiment, replayed from a committed recording. Compare
+      what each agent could actually see against what really happened, and check
+      the evidence rather than trusting a black box.
     </p>
-    <p class="guiding-question">What can one agent know, and why does the result change?</p>
-    <details class="honest-fog" open>
-      <summary>About the &ldquo;fog&rdquo; on this page</summary>
-      <p>
-        <code>infiltration.jsonl</code> is recorded at trajectory schema v5, which stores what each
-        agent&rsquo;s own perception filter produced <strong>at the moment it chose its action</strong>
-        &mdash; one <code>Perceptions</code> entry per agent per tick, plus the cone each filter used
-        (<code>AgentVision: [2, 2]</code>, two graph hops apiece). The agent view here draws that
-        record and nothing else, and labels it &ldquo;recorded perception&rdquo;. The core&rsquo;s
-        <code>Vision</code> stays unbounded by design: the fog is the agents&rsquo;, not the
-        simulation&rsquo;s.
-      </p>
-      <p>
-        <code>demo.jsonl</code> predates the field, so it carries no fog at all. For that recording
-        the agent view falls back to a <strong>reconstruction by this page</strong>, computed from
-        recorded positions with a 2-hop rule, and says so: the chip reads &ldquo;reconstructed
-        sightline&rdquo;, never &ldquo;recorded perception&rdquo;. One page, two recordings, two
-        different answers &mdash; each labelled with where it came from.
-      </p>
-      <p>
-        The final frame is the one case a scrubber can get wrong. The episode ended there, so no
-        agent ever decided from that world and no perception was recorded for it. The map shows the
-        <strong>last decision-time view</strong> it did act on and says which tick that was, rather
-        than passing step 20&rsquo;s fog off as a fresh reading of the terminal frame.
-      </p>
-    </details>
     <p class="recorded-note">
       This page <strong>replays recorded evidence</strong>. Every frame below is read from a
-      committed recording; your browser does not run a new simulation.
+      file committed to the repository; your browser never runs a new simulation. Both
+      recordings are checked in CI on every push &mdash; <code>replay --verify</code> re-simulates
+      each tick, and a drift gate re-derives the regenerable one from its documented command and
+      byte-compares the result &mdash; so a recording that stopped matching the engine would fail
+      the build rather than sit here quietly.
     </p>
-    <aside class="moment-callout" aria-label="The moment to watch">
-      <h3 class="moment-label">The moment to watch &mdash; ticks 9, 19 and 20</h3>
-      <p>
-        On the <em>Infiltrator</em> view chip the Treasure Vault is recorded as &ldquo;last
-        known&rdquo; at <strong>ticks 9, 19 and 20</strong>, while ground truth keeps it fully lit:
-        at tick 9 the Infiltrator is back in the Entry Hall, three hops from the vault; at tick 19
-        it has looted both chests and the room goes last known again, and tick 20 &mdash; the last
-        decision-time view in the file &mdash; still shows it dimmed. Step to tick 9, select the
-        <em>Infiltrator</em> view chip above the map, and watch the room dim on one map while it
-        stays lit on ground truth. The explanation sentence follows the same line.
-      </p>
-      <p>
-        The <em>Sentry</em> view is the mirror image, and worth stepping to as well: the guard
-        records its own post and the entry hall as &ldquo;last known&rdquo; at <strong>ticks 15 and
-        16</strong>, and at its final decision-time view (tick 20) it records every room as
-        observed. The vault it has not seen since the opening two frames.
-      </p>
-      <p class="moment-honest" id="moment-arena">
-        Honest framing: on <code>infiltration.jsonl</code> these tiers are the agent&rsquo;s own
-        recorded perception, and <code>lattice replay --verify</code> recomputes all 20 of them and
-        fails if one is edited. On <code>demo.jsonl</code> the same tiers are this page&rsquo;s
-        2-hop reconstruction, because that file records no fog &mdash; so &ldquo;drops out of
-        sight&rdquo; there always means &ldquo;out of the reconstructed 2-hop sightline&rdquo;,
-        never &ldquo;the engine could not see it&rdquo;. The chip on the map tells you which
-        recording you are looking at.
-      </p>
-    </aside>
+    <p class="guiding-question">What can one agent know, and why does the result change?</p>
     <div class="badges" aria-label="Repository information">
       <span class="badge"><a href="https://github.com/candavere/lattice">github.com/candavere/lattice</a></span>
       <span class="badge">net10.0 · BCL only</span>
@@ -229,6 +185,63 @@
       <div id="message" role="status"></div>
     </section>
 
+    <section class="card reading">
+      <h2>How to read what you are looking at</h2>
+      <details class="honest-fog">
+        <summary>Recorded perception vs. reconstructed sightline</summary>
+      <p>
+        <code>infiltration.jsonl</code> is recorded at trajectory schema v5, which stores what each
+        agent&rsquo;s own perception filter produced <strong>at the moment it chose its action</strong>
+        &mdash; one <code>Perceptions</code> entry per agent per tick, plus the cone each filter used
+        (<code>AgentVision: [2, 2]</code>, two graph hops apiece). The agent view here draws that
+        record and nothing else, and labels it &ldquo;recorded perception&rdquo;. The core&rsquo;s
+        <code>Vision</code> stays unbounded by design: the fog is the agents&rsquo;, not the
+        simulation&rsquo;s.
+      </p>
+      <p>
+        <code>demo.jsonl</code> is pinned at schema v3, which predates the field, so it carries no
+        fog at all. For that recording the agent view falls back to a
+        <strong>reconstruction by this page</strong>, computed from recorded positions with a 2-hop
+        rule, and says so: the chip reads &ldquo;reconstructed sightline&rdquo;, never &ldquo;recorded
+        perception&rdquo;. One page, two recordings, two different answers &mdash; each labelled with
+        where it came from, and neither presented as the other.
+      </p>
+      <p>
+        The final frame is the one case a scrubber can get wrong. The episode ended there, so no
+        agent ever decided from that world and no perception was recorded for it. The map shows the
+        <strong>last decision-time view</strong> it did act on and says which tick that was, rather
+        than passing step 20&rsquo;s fog off as a fresh reading of the terminal frame.
+      </p>
+      </details>
+      <aside class="moment-callout" aria-label="The moment to watch">
+        <h3 class="moment-label">The moment to watch &mdash; ticks 9, 19 and 20</h3>
+        <p>
+          On the <em>Infiltrator</em> view chip the Treasure Vault is recorded as &ldquo;last
+          known&rdquo; at <strong>ticks 9, 19 and 20</strong>, while ground truth keeps it fully lit:
+          at tick 9 the Infiltrator is back in the Entry Hall, three hops from the vault; at tick 19
+          it has looted both chests and the room goes last known again, and tick 20 &mdash; the last
+          decision-time view in the file &mdash; still shows it dimmed. Step to tick 9, select the
+          <em>Infiltrator</em> view chip above the map, and watch the room dim on one map while it
+          stays lit on ground truth. The explanation sentence follows the same line.
+        </p>
+        <p>
+          The <em>Sentry</em> view is the mirror image, and worth stepping to as well: the guard
+          records its own post and the entry hall as &ldquo;last known&rdquo; at <strong>ticks 15 and
+          16</strong>, and at its final decision-time view (tick 20) it records every room as
+          observed. The vault it has not seen since the opening two frames.
+        </p>
+        <p class="moment-honest" id="moment-arena">
+          Honest framing: on <code>infiltration.jsonl</code> these tiers are the agent&rsquo;s own
+          recorded perception, and <code>lattice replay --verify</code> recomputes all 20 of them and
+          fails if one is edited. On <code>demo.jsonl</code> the same tiers are this page&rsquo;s
+          2-hop reconstruction, because that file records no perceptions &mdash; so &ldquo;drops out of
+          sight&rdquo; there always means &ldquo;out of the reconstructed 2-hop sightline&rdquo;,
+          never &ldquo;the engine could not see it&rdquo;. The chip on the map tells you which
+          recording you are looking at.
+        </p>
+      </aside>
+    </section>
+
     <section class="card" aria-labelledby="results-title">
       <h2 id="results-title">What the committed results say</h2>
       <p class="card-note">
@@ -302,15 +315,26 @@
 
     <section class="card">
       <h2>Reproduce an experiment or verify a recording</h2>
+      <p class="card-note">
+        One committed script owns the seed, scenario, tick budget and policy of the
+        recording that can be regenerated, and <code>--check</code> proves the committed bytes
+        are still what those settings produce &mdash; that is the drift gate CI runs. The other
+        recording is deliberately pinned at an older schema and is verified but never
+        rewritten; the script header says why.
+      </p>
       <ul class="plain">
         <li>
-          Record the infiltration scenario (Sentry vs Infiltrator) — the fixed-content demo
-          <pre class="cli"><code>dotnet run --project Cli -- simulate --seed 42 --scenario infiltration --steps 100 --out infiltration.jsonl</code></pre>
+          Re-derive the regenerable recording and both rendered SVGs, and verify the pinned one
+          (add <code>--check</code> to verify without writing)
+          <pre class="cli"><code>./scripts/regenerate-site-demos.sh</code></pre>
         </li>
         <li>
-          Or the classic sampling scenario (agent 0 = MCTS; see <code>--agent</code> in
+          The <code>simulate</code> line it runs for the regenerable recording &mdash; the
+          infiltration scenario (Sentry vs Infiltrator). The sampling scenario (agent 0 = MCTS;
+          see <code>--agent</code> in
           <a href="https://github.com/candavere/lattice/blob/6463e4865dd4831efe0952d64de0f8bfaf22f9a4/docs/CLI.md">docs/CLI.md</a>)
-          <pre class="cli"><code>dotnet run --project Cli -- simulate --seed 42 --agent mcts --steps 30 --out demo.jsonl</code></pre>
+          <pre class="cli"><code>dotnet run --project Cli -- simulate --seed 42 --scenario infiltration --steps 100 --out infiltration.jsonl
+dotnet run --project Cli -- simulate --seed 42 --agent mcts --steps 30 --out demo.jsonl</code></pre>
         </li>
         <li>
           Render any recorded trajectory as an animated SVG
@@ -327,12 +351,13 @@
       </ul>
       <p class="card-note">
         Every command is seeded and deterministic under the current engine: the same command and
-        engine re-create the same file. The committed recordings on this page were re-recorded with
-        these commands on the engine that ships in this repository, and
-        <code>replay --verify</code> re-simulates both of them tick by tick &mdash; including each
-        tick&rsquo;s state hash &mdash; in CI, so a recording that stopped matching this engine
-        would fail the build rather than sit here quietly. The viewer always shows the committed
-        file exactly as it was recorded.
+        engine re-create the same file, byte for byte. That is how
+        <code>infiltration.jsonl</code> is proven current in CI;
+        <code>demo.jsonl</code> is pinned at schema v3 on purpose and is verified instead of
+        regenerated. <code>replay --verify</code> re-simulates both tick by tick &mdash; including
+        each tick&rsquo;s state hash &mdash; so a recording that stopped matching this engine would
+        fail the build rather than sit here quietly. The viewer always shows the committed file
+        exactly as it was recorded.
       </p>
     </section>
   </main>

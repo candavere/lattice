@@ -715,6 +715,13 @@ class TestAgentViewHonesty(unittest.TestCase):
         view is a 2-hop sightline this page derived for itself. Nothing about it
         was recorded, and nothing in it was ever seen by an agent.
 
+        The file is pinned at v3 on purpose: `NoPerceptionNotice` fires for a
+        recording at schema 4 or later that records no perception, so migrating
+        it would turn this example of a *silently* read pre-perception recording
+        into one the reader is obliged to flag. The assertion therefore checks
+        the field rather than the version, so it keeps protecting the property
+        even if the pin is ever revisited.
+
         The metric must say that in words — never "claims seen", never the
         ground-truth label — and the number it shows must be the derivation's
         own: the claims of the chests inside the derived sightline. Counting

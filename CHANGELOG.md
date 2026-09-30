@@ -25,6 +25,27 @@ state; it creates no release and no tag. The `v3.0.0` narrative below and
   `.NET 8` statements describe the immutable `v2.3.2` and `v3.0.0` release
   assets rather than the current tree.
 
+- **The site recordings gain a drift gate that knows the difference between the
+  two of them.** `scripts/regenerate-site-demos.sh --check` re-derives the
+  regenerable pair (`site/infiltration.jsonl` and its SVG) and byte-compares
+  them, renders `demo.svg` from the committed recording, and asserts the pinned
+  `site/demo.jsonl` still replays with **no** notice — and it never rewrites
+  anything. CI runs it because `replay --verify` cannot catch drift on its own: a
+  stale recording replays cleanly forever. The script refuses to pretend the two
+  recordings are interchangeable, because they are not: `demo.jsonl` is pinned at
+  schema v3 to hold the no-notice contract, and regenerating it would break six
+  tests that exist precisely to protect that.
+
+- **The Pages site leads with the evidence.** The long explanation of the fog
+  and the moment-to-watch callout moved out of the hero into a disclosure that
+  follows the replay viewer, so the page opens on the recorded run rather than a
+  wall of prose. Two faults are fixed: the browser's automatic `/favicon.ico`
+  request no longer 404s (an inline data-URI icon, no new file), and the
+  `tabindex="0"` viewer canvas is now actually keyboard-operable — arrows step,
+  Home/End jump to the ends, Space toggles playback — instead of being focusable
+  and inert. The `.NET 10` badge, both reproduce affordances and the provenance
+  panel are unchanged in substance.
+
 - **Lattice accepts outside pull requests.** `CONTRIBUTING.md` now says so
   explicitly and gains the `replay --verify` step it was missing; a Contributor
   Covenant 2.1 `CODE_OF_CONDUCT.md`, three issue forms, and a pull request
@@ -98,12 +119,19 @@ state; it creates no release and no tag. The `v3.0.0` narrative below and
   under the schema-5 reader.
 
   **Two committed recordings were deliberately NOT re-recorded, and both
-  decisions are recorded rather than papered over.** `site/demo.jsonl` is not
-  reproducible from any committed command at the current tree: its 27-tick
-  episode has agent 0 idle where a `greedy` collector collects, so no current
-  invocation regenerates it, and re-recording it would have *replaced the site's
-  demo episode* rather than migrated it — a behavioural change disguised as a
-  schema change. `Tests/fixtures/golden_trajectory.jsonl` stays at schema v3
+  decisions are recorded rather than papered over.** `site/demo.jsonl` is
+  deliberately pinned at trajectory schema v3: it is the committed proof that a
+  pre-perception recording is read, replayed and verified *without* the reader
+  nagging it, and because `NoPerceptionNotice` is gated on
+  `DecisionTimePerceptionVersion = 4`, re-recording it at the current schema
+  would make it a current-schema recording with no perception, which the reader
+  is required to flag. **Corrected 2026-09-30:** an earlier version of this
+  entry also claimed the file "has agent 0 idle where a `greedy` collector
+  collects" and that "no current invocation regenerates it". Both are wrong —
+  all 27 step lines and the final metrics line are byte-identical to a fresh
+  `simulate --seed 42 --agent mcts --steps 30`. The *episode* was always
+  reproducible; the file is pinned for the notice contract above, not because it
+  drifted. `Tests/fixtures/golden_trajectory.jsonl` stays at schema v3
   because that is its documented job: it is the cross-platform replay gate's
   proof that a pre-perception recording is still read and still verified
   without being nagged, and re-recording it would have destroyed the very

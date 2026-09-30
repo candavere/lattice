@@ -892,6 +892,14 @@ footer.app-footer {
 
 footer.app-footer .fine { margin-top: 6px; font-size: 0.78rem; opacity: 0.8; }
 
+/* The reading guide. It used to sit in the hero, which pushed the replay itself
+   below a wall of prose; it now follows the viewer and collapses by default, so
+   the page leads with the evidence and the explanation is one click away.
+   The disclosure is un-centred here so it lines up with the callout under it. */
+.card.reading h2 { margin-bottom: 10px; }
+.card.reading .honest-fog { max-width: none; margin: 0 0 14px; }
+.card.reading .moment-callout { margin: 0; }
+
 @media (max-width: 640px) {
   header.app-header {
     padding: 16px 16px 12px;

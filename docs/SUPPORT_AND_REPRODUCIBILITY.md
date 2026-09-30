@@ -317,9 +317,11 @@ check: what each agent actually saw when it chose.
   match is exactly that — but it is never silence, because a reader that did
   not check the fog must not be able to report a pass that reads as though it
   had. A recording from **before** schema 4 is not nagged: the field never
-  existed, so there is nothing it failed to carry. The committed
-  `demo.jsonl` and the golden fixture are in that position and verify as they
-  always did.
+  existed, so there is nothing it failed to carry. A recording at schema 4 or
+  later that declares neither recorded perceptions nor a per-agent vision **is**
+  nagged, because that is the case the check exists for. The committed
+  `demo.jsonl` and the golden fixture are both in the un-nagged position and
+  verify as they always did.
 - **A recording without the fields is byte-identical to one written before
   them.** Both new fields are nullable and omitted when absent
   (`JsonIgnoreCondition.WhenWritingNull`), so the schema-4 writer's output for a
@@ -390,6 +392,13 @@ evidence that a recording without a scenario digest is still read, still
 verified, and reports no digest notice. Newly recorded artifacts carry schema
 5; these two are the legacy half of the compatibility contract, not stale
 files awaiting regeneration.
+
+`demo.jsonl` is pinned for a second, sharper reason: `NoPerceptionNotice` fires
+for any recording at `DecisionTimePerceptionVersion` (4) or later that declares
+no perception, and stays silent below it. Migrating this file to schema 5 would
+therefore turn the committed example of a *silently* read pre-perception
+recording into one the reader is obliged to flag. That is why
+`scripts/regenerate-site-demos.sh` verifies it and never rewrites it.
 
 ### Viewer claim semantics
 

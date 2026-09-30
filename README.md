@@ -462,10 +462,11 @@ Only claims the repository can back up are listed here.
   perception", and `replay --verify` reprojects all 20 of them and fails on any
   edit. The core's `Vision` stays unbounded (`Vision = -1` in the header) by
   design — the fog belongs to the agents, not the simulation.
-  The older recordings still have no fog field: `site/demo.jsonl` is schema v3,
-  so the viewer reconstructs its sightline from recorded positions with a 2-hop
-  rule and labels that "reconstructed sightline" instead. The two chips are the
-  honest answer to "where did this come from?" on a page that shows both.
+  The older recording still has no fog field, because it is pinned at schema v3:
+  `site/demo.jsonl` predates the perception field, so the viewer reconstructs its
+  sightline from recorded positions with a 2-hop rule and labels that "reconstructed
+  sightline" instead. The two chips are the honest answer to "where did this come
+  from?" on a page that shows both.
 - **The recorded fog's own tick disclosures.** Derived from
   `site/infiltration.jsonl` (seed 42, 20 steps, `AgentVision [2, 2]`), reading
   `Perceptions` and nothing else. On the Infiltrator's view the Treasure Vault
@@ -503,16 +504,32 @@ Only claims the repository can back up are listed here.
   [`Tests/fixtures/legacy/`](Tests/fixtures/legacy) and are the standing proof
   that a schema 3 and a schema 4 recording still read, replay, and verify
   under the schema-5 reader.
-- **`site/demo.jsonl` was deliberately NOT re-recorded.** It is **84,090 bytes**
-  (schema v3, SHA-256 `f6da7cc39e56783b210bb2c936b051bf8eea80f99053cf2c4aecab1550573981`).
-  It is **not reproducible from any committed command** at the current tree:
-  its 27-tick episode has agent 0 idle where a `greedy` collector collects, so
-  no current invocation regenerates it. Re-recording it at schema 5 would
-  therefore have *replaced the site's demo episode* rather than migrated it —
-  a behavioural change disguised as a schema change — so it stays at schema 3
-  and serves as the schema-3 half of the backward-compatibility evidence. This
-  is a known gap, recorded rather than papered over: the demo page's own
-  recording is older than the current engine's.
+- **`site/demo.jsonl` is deliberately pinned at trajectory schema v3, and that
+  is load-bearing.** It is **84,090 bytes**, SHA-256
+  `f6da7cc39e56783b210bb2c936b051bf8eea80f99053cf2c4aecab1550573981`. It stays
+  at v3 because it is the committed proof that a **pre-perception** recording is
+  read, replayed and verified *without* the reader nagging it about fields that
+  did not exist yet: `TrajectoryReplay.NoPerceptionNotice` is gated on
+  `DecisionTimePerceptionVersion = 4`, so a current-schema recording that
+  records no perception is *required* to be flagged, and re-recording this one
+  would make it exactly that. Re-recording it would replace a contract test with
+  a nagged file, which is a regression dressed as tidying.
+
+  It is also **not** true, as an earlier version of this file claimed, that no
+  current invocation regenerates it. Measured against the file, every one of its
+  27 step lines and its final metrics line are byte-identical to a fresh
+  `simulate --seed 42 --agent mcts --steps 30`; only the header differs, by the
+  `ScenarioSha256` and `SchemaVersion` that migration would add. The *episode*
+  was always reproducible. It is pinned for the reason above, not because it
+  drifted.
+
+  [`scripts/regenerate-site-demos.sh`](scripts/regenerate-site-demos.sh) encodes
+  exactly that split. `--check` re-derives the regenerable pair
+  (`site/infiltration.jsonl` and its SVG) into a scratch directory and
+  byte-compares them, renders `demo.svg` from the committed recording, and
+  asserts the pinned `demo.jsonl` still replays with **no** notice — **without
+  rewriting anything**. CI runs it, because `replay --verify` alone cannot catch
+  drift: a stale recording replays cleanly forever.
 - **Per-tick state hash.** `replay --verify` recomputes a SHA-256 digest of
   the full simulation state at every tick — zone and resource positions,
   occupancy, the per-tick choke capacities and derived edge load, scores,

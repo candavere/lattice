@@ -56,6 +56,72 @@ jobs:
             --logger trx \
             --results-directory "$RESULTS"
 
+      # The CLI is also packaged as a .NET global tool, so `lattice <command>`
+      # is a second way to run the exact same binary. The launcher and the
+      # project are the same compiled artifact, so this arm does not test new
+      # behaviour: it proves the *packaging* still works on every OS, because
+      # pack-as-tool is the one thing `dotnet run` never exercises. A pack that
+      # breaks, or a tool install that resolves a different artifact, would
+      # otherwise stay invisible until a user tried it.
+      #
+      # The version is read back out of the produced .nupkg rather than
+      # hardcoded, so this step cannot drift from the project files, and
+      # `--version` pins resolution to the package just built. The local
+      # `--add-source` is still queried alongside the default sources, so the
+      # pin is what keeps a same-named package published elsewhere from
+      # satisfying the install instead of this build.
+      - name: Pack the CLI as a global tool
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet pack Cli -c Release --no-build
+          ls -1 Cli/bin/Release/*.nupkg
+
+      # `--tool-path` only, never `-g`/`--global`: this must not touch the
+      # runner's or any user's tool store. The install target is scoped to
+      # $RUNNER_TEMP so the whole tree goes away with the runner.
+      - name: Install the packed tool to a throwaway tool path
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOOL_DIR="$RUNNER_TEMP/lattice-tool"
+          PKG_ID="lattice"
+          NUPKG="$(ls -1 Cli/bin/Release/"$PKG_ID".*.nupkg | head -1)"
+          if [ -z "$NUPKG" ]; then
+            echo "no $PKG_ID nupkg was produced by the pack step" >&2
+            exit 1
+          fi
+          VER="${NUPKG##*/$PKG_ID.}"
+          VER="${VER%.nupkg}"
+          echo "installing $PKG_ID $VER from $NUPKG into $TOOL_DIR"
+          dotnet tool install --tool-path "$TOOL_DIR" \
+            --add-source "$PWD/Cli/bin/Release" --version "$VER" "$PKG_ID"
+
+      # Both entry points must produce the same bytes for the golden recording,
+      # so a difference fails the step. The only tolerated difference is the
+      # invocation name in usage text, and `replay --verify` prints no usage,
+      # so this compares the two outputs exactly. `--no-build` keeps MSBuild
+      # chatter out of the `dotnet run` side of the comparison.
+      - name: Verify the tool launcher matches dotnet run
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOOL_DIR="$RUNNER_TEMP/lattice-tool"
+          if [ -x "$TOOL_DIR/lattice.exe" ]; then
+            LATTICE="$TOOL_DIR/lattice.exe"
+          else
+            LATTICE="$TOOL_DIR/lattice"
+          fi
+          RECORDING="Tests/fixtures/golden_trajectory.jsonl"
+          "$LATTICE" replay "$RECORDING" --verify | tee "$RUNNER_TEMP/tool-replay.txt"
+          dotnet run -c Release --project Cli --no-build -- \
+            replay "$RECORDING" --verify | tee "$RUNNER_TEMP/run-replay.txt"
+          if ! diff -u "$RUNNER_TEMP/run-replay.txt" "$RUNNER_TEMP/tool-replay.txt"; then
+            echo "::error::the installed lattice launcher and dotnet run disagree on replay --verify" >&2
+            exit 1
+          fi
+          echo "tool launcher and dotnet run produced identical output"
+
       # Reduces the TRX reports to one small JSON document carrying the counts
       # next to the commit they came from. `if: always()` so a failing run
       # still publishes its real numbers for inspection, and so a publishable

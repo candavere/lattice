@@ -8,6 +8,8 @@
     <Nullable>enable</Nullable>
     <RollForward>LatestMajor</RollForward>
     <AssemblyName>lattice</AssemblyName>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>lattice</ToolCommandName>
   </PropertyGroup>
 
   <ItemGroup>

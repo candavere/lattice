@@ -79,7 +79,7 @@ Where each box in that diagram is implemented, at this commit:
 | `evaluation JSON` | the per-seed rows and statistics are written at `Cli/CliApp.cs:1450`; an external agent's failures are tallied per reason code at `Cli/CliApp.cs:1416` |
 | `lattice evaluate --agent-cmd` | the candidate seat, with the command line split without a shell at `Cli/AgentCommandLine.cs:49`; the child process is launched from `Agents/External/ExternalAgentLaunch.cs:84` |
 | `your agent, any language` | a separate OS process reached only over protocol 1; a CR anywhere in a line is refused as `malformed_json` at `Protocol/ProtocolFraming.cs:65` |
-| `tests + golden fixture` → `CI on 3 operating systems` | the golden-trajectory replay gate runs on every matrix OS at `.github/workflows/ci.yml:42-43`; every committed `site/*.jsonl` is re-verified by the gate at `.github/workflows/ci.yml:130-162` |
+| `tests + golden fixture` → `CI on 3 operating systems` | the golden-trajectory replay gate runs on every matrix OS at `.github/workflows/ci.yml:42-43`; every committed `site/*.jsonl` is re-verified by the gate at `.github/workflows/ci.yml:221-236` |
 
 [Replay the infiltration recording in your browser](https://candavere.github.io/lattice/).
 The page replays committed recordings only: ground truth shows everything a
@@ -304,6 +304,41 @@ evaluation artifacts is documented in
 (section 5), and the turnkey external-reviewer path, pinned to the published
 `v3.0.0` release, is [`docs/reproduction_packet.md`](docs/reproduction_packet.md).
 
+### Or install the CLI once as a .NET global tool
+
+The commands above are the **zero-install path**: nothing to install, just the
+SDK and a checkout. If you would rather type `lattice <command>` than repeat the
+`dotnet run --project Cli --` prefix, pack the CLI and install it as a global
+tool:
+
+```sh
+dotnet pack Cli -c Release                                  # produces Cli/bin/Release/lattice.3.1.0.nupkg
+dotnet tool install -g --add-source ./Cli/bin/Release lattice
+lattice replay Tests/fixtures/golden_trajectory.jsonl --verify
+```
+
+```sh
+dotnet tool uninstall -g lattice                             # back to the zero-install path
+```
+
+This is **packaging, not a second implementation**. The tool is the same
+compiled binary with a launcher named `lattice`; every command, flag, output and
+exit code is the one documented above, because it is the same code. It adds **no
+dependency**: the eight production projects still declare zero
+`PackageReference` items, and the packed `.nuspec` declares no dependencies at
+all — the package carries Lattice's own assemblies and asks for the .NET
+runtime, which you already have for the commands above. CI proves the two entry
+points agree: the `build-test` matrix packs, installs the tool into a
+throwaway tool path on Ubuntu, Windows and macOS, and fails if the installed
+`lattice` and `dotnet run` differ by a single byte on the golden replay.
+
+`--add-source` points NuGet at the package you just built. NuGet may still
+consult your other configured sources, so pass `--version 3.1.0` as well if you
+want the install pinned to exactly what you packed. Publishing to nuget.org is a
+**separate, optional maintainer action** and is not required to use any of this;
+the `lattice` package ID there may already be taken, and the command name is
+`lattice` either way.
+
 ### The gates, and where the code is authoritative
 
 Where this page describes a gate, the code is authoritative and the reference
@@ -387,7 +422,8 @@ matches what CI enforces.
   `high: 80`, `low: 60`, `break: 0`. The only threshold the tool enforces is
   `break`, so the committed gate fails only at a 0% score; `high`/`low` are
   informational. There is no mutation step in CI (`.github/workflows/ci.yml`
-  runs restore, build, replay-verify, test, the UI regression, a parser unit-test
+  runs restore, build, replay-verify, test, a global-tool pack/install/smoke
+  check, the UI regression, a parser unit-test
   job, and a second job that replays every `site/` recording). The 99.61% figure
   is a historical local calibration recorded in
   [`benchmarks/mutation_stryker_summary.json`](benchmarks/mutation_stryker_summary.json)

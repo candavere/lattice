@@ -14,6 +14,46 @@ last released one — its `version` moves with `main`, while its `date-released`
 stays at `2026-09-27`, the day `v3.0.0` was tagged, and updates only when the
 next tag ships.
 
+### Added
+
+- **The CLI is packaged as a .NET global tool.** `Cli/Lattice.Cli.csproj` now sets
+  `PackAsTool` and `ToolCommandName`, so `dotnet pack Cli -c Release` produces
+  `lattice.3.1.0.nupkg` and `dotnet tool install -g --add-source
+  ./Cli/bin/Release lattice` puts a `lattice` launcher on PATH. This is
+  packaging only: the same compiled binary under a launcher name, so no command,
+  flag, output or exit code changes, the hand-written parser in `Cli/CliApp.cs`
+  is untouched, and `dotnet run --project Cli --` remains the documented
+  zero-install path. It adds **no dependency** — the eight production projects
+  still declare zero `PackageReference` items, and the produced `.nuspec`
+  declares no dependencies at all. README and `docs/CLI.md` document it as a
+  second way to run, after the unchanged `dotnet run` instructions. Publishing
+  to nuget.org remains a separate, optional maintainer action.
+
+- **CI packs, installs and smoke-tests the tool on all three operating systems.**
+  Three new steps in the existing `build-test` matrix job
+  (`.github/workflows/ci.yml`, after `Test`) run on `ubuntu-24.04`,
+  `windows-latest` and `macos-latest`: pack the CLI, install it with
+  `dotnet tool install --tool-path` scoped to `$RUNNER_TEMP` (never
+  `-g`/`--global`), then run the golden `replay --verify` through both the
+  installed `lattice` launcher and `dotnet run` and fail if the two outputs
+  differ. The package version is read back out of the produced `.nupkg` rather
+  than hardcoded, so the step cannot drift from the project files. No new matrix
+  and no existing step's behaviour is changed.
+
+### Fixed
+
+- **The GitHub Pages favicon is now a gothic blackletter L.** `site/index.html`
+  carried an inline data-URI SVG mark that read as an `H` at 16px. It is
+  replaced with a single fixed path: the uppercase L of UnifrakturCook Bold
+  (SIL OFL 1.1) as graphic artwork, on the same 32x32 viewBox and `#0f172a`
+  rounded tile, in `#f8fafc` and without the terminal dots. The inline
+  data-URI mechanism, the `viewBox` and the tile are unchanged, no font file is
+  embedded, loaded or added, and the edit is confined to the single
+  `<link rel="icon" ...>` line. Verified by rendering before and after at true
+  16x16 and 32x32 CSS pixels in an isolated headless browser: the old mark read
+  as `H`, the new one reads as a gothic `L` with its angular stem, bottom foot
+  and open interior on both light and dark tab-bar backgrounds.
+
 ### Changed
 
 - **The benchmark-gate docs now describe the gate that is actually enforced.**

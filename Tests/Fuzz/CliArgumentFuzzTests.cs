@@ -9,10 +9,13 @@ namespace Lattice.Tests.Fuzz;
 /// argument vectors (unknown flags, dangling flags, malformed seeds and step
 /// counts, invalid scenario/agent/format identifiers, mutated rule and replay
 /// files, missing paths) must be rejected with graceful typed failures and an
-/// exit code of exactly 0 or 1. No argument vector may cause an uncaught
-/// exception to escape <c>Run</c>, because a real CLI crash surfaces as a
-/// non-zero runtime failure where <c>Report</c> should have produced a typed
-/// message instead. Execution-heavy branches (<c>--agent mcts</c>,
+/// exit code of exactly 0, 1, or 2 — 0 success, 2 the command line is not
+/// runnable, 1 the command ran and its work failed. Nothing outside that set is
+/// a contract; a code outside it would mean <c>Run</c> reported a status no caller
+/// can act on. No argument vector may cause an uncaught exception to escape
+/// <c>Run</c>, because a real CLI crash surfaces as a non-zero runtime failure
+/// where <c>Report</c> should have produced a typed message instead.
+/// Execution-heavy branches (<c>--agent mcts</c>,
 /// <c>benchmark</c>, <c>evaluate</c>, and strict <c>--min-fairness</c> retry
 /// loops) are excluded so the suite stays runtime-bounded; those surfaces are
 /// covered by dedicated integration tests in the CLI suite.
@@ -53,7 +56,7 @@ public sealed class CliArgumentFuzzTests
                     exitCode = CliApp.Run(vector, stdout, stderr);
                 });
 
-                if (exitCode is not 0 and not 1)
+                if (exitCode is not 0 and not 1 and not 2)
                 {
                     throw new FuzzCheckException($"CliApp.Run returned unexpected exit code {exitCode} for [{string.Join(' ', vector)}].");
                 }

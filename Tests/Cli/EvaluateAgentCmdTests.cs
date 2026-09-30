@@ -387,7 +387,7 @@ public class EvaluateAgentCmdTests
         // and the flag must not grow a second meaning under another command.
         var (exit, _, stderr) = Run("simulate", "--seed", "42", "--agent-cmd", "python3 agent.py");
 
-        Assert.Equal(1, exit);
+        Assert.Equal(UsageError.ExitCode, exit);
         Assert.Contains("unknown flag '--agent-cmd'.", stderr, StringComparison.Ordinal);
     }
 

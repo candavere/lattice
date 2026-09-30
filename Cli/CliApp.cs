@@ -26,12 +26,31 @@ namespace Lattice.Cli;
 /// inputs (no hidden state, no ambient reading of Console). The real entry
 /// point (Program.cs) just forwards <see cref="Console.Out"/>/<see cref="Console.Error"/>;
 /// keeping the app class separate is what lets the integration tests drive exit
-/// codes and stdout deterministically. Exit code is 0 on success, non-zero on
-/// any bad-argument or runtime error.
+/// codes and stdout deterministically.
+/// <para>
+/// The exit-status contract is three-way and is decided by <em>when</em> the
+/// fault is known, not by which command hit it: <c>0</c> on success,
+/// <see cref="UsageError.ExitCode"/> (<c>2</c>) when the command line itself is
+/// not runnable, and <c>1</c> when the command was runnable and the work failed.
+/// "Not runnable" is decidable from <c>args</c> alone — an unknown, duplicated,
+/// bare or malformed flag, a missing required flag, an unexpected argument, an
+/// unknown command, no command at all. Everything discovered by doing the work
+/// (a file that is missing or unparseable, a descriptor that fails validation or
+/// declares something this build cannot run, a verification divergence) is a
+/// runtime failure and keeps <c>1</c>. §3.3's <c>--agent-cmd</c> usage errors are
+/// a subset of the first kind, so the one documented exit status there is also
+/// the one every other usage error reports.
+/// </para>
 /// </summary>
 public static class CliApp
 {
     private const int Success = 0;
+
+    /// <summary>
+    /// A runtime failure: the command line was runnable and the work it named
+    /// could not be completed. Distinct from <see cref="UsageError.ExitCode"/>,
+    /// which means the work never started because the invocation was wrong.
+    /// </summary>
     private const int Failure = 1;
 
     /// <summary>
@@ -192,7 +211,7 @@ public static class CliApp
         if (args.Length == 0)
         {
             WriteUsage(stderr);
-            return Failure;
+            return UsageError.ExitCode;
         }
 
         if (args[0] is "-h" or "--help")
@@ -313,7 +332,7 @@ public static class CliApp
 
             if (scenario.Length > 0)
             {
-                throw new ArgumentException(
+                throw new UsageError(
                     $"invalid --scenario '{scenarioText}' (expected 'infiltration' or a path to a scenario file).");
             }
 
@@ -332,7 +351,7 @@ public static class CliApp
                 "greedy" => (IAgent)new GreedyCollectorAgent(0),
                 "random" => new RandomAgent(0, new Rng(seed)),
                 "mcts" => new MctsAgent(0, config, seed, new MctsSearchConfig(), rules),
-                _ => throw new ArgumentException(
+                _ => throw new UsageError(
                     $"invalid --agent '{agentText}' (expected 'greedy', 'random', or 'mcts')."),
             };
             var contenders = new IAgent[] { agent0, new RandomAgent(1, new Rng(seed)) };
@@ -436,7 +455,7 @@ public static class CliApp
     {
         if (flags.ContainsKey("--agent"))
         {
-            throw new ArgumentException(
+            throw new UsageError(
                 "--agent cannot be used with a scenario file: the roster is declared by the descriptor's 'Slots'.");
         }
 
@@ -458,7 +477,7 @@ public static class CliApp
 
         if (flags.ContainsKey("--steps"))
         {
-            throw new ArgumentException(
+            throw new UsageError(
                 $"--steps cannot be combined with a scenario file: the descriptor declares 'Simulation.StepLimit' " +
                 $"({descriptor.StepLimit}) and overriding it would make the recorded budget differ from the declared one.");
         }
@@ -541,6 +560,10 @@ public static class CliApp
                 "scout" => new ScoutCollectorAgent(slot.Slot, slot.Vision),
                 "sentry" => new SentryPatrolAgent(slot.Slot, slot.RivalSlot!.Value, vision: slot.Vision),
                 "infiltrator" => new InfiltratorAgent(slot.Slot, slot.RivalSlot!.Value, vision: slot.Vision),
+                // Not a UsageError on purpose: the command line named a file
+                // that parsed cleanly, and what is wrong is a fact discovered
+                // inside that file. It is a runtime failure of this build
+                // against this descriptor, not an unrunnable invocation.
                 _ => throw new ArgumentException(
                     $"scenario slot {slot.Slot} names policy '{slot.Policy}', which this build cannot construct."),
             };
@@ -569,12 +592,12 @@ public static class CliApp
     {
         if (flags.ContainsKey("--agent"))
         {
-            throw new ArgumentException("--agent cannot be used with --scenario infiltration (the roster is fixed: Sentry vs Infiltrator).");
+            throw new UsageError("--agent cannot be used with --scenario infiltration (the roster is fixed: Sentry vs Infiltrator).");
         }
 
         if (flags.ContainsKey("--rules"))
         {
-            throw new ArgumentException("--rules cannot be used with --scenario infiltration (the scenario owns its topology).");
+            throw new UsageError("--rules cannot be used with --scenario infiltration (the scenario owns its topology).");
         }
 
         var stopwatch = Stopwatch.StartNew();
@@ -816,7 +839,7 @@ public static class CliApp
                 : "ascii";
             if (format is not ("ascii" or "svg"))
             {
-                throw new ArgumentException(
+                throw new UsageError(
                     $"invalid --format '{formatText}' (expected 'ascii' or 'svg').");
             }
 
@@ -894,13 +917,13 @@ public static class CliApp
                 : positionals.Count == 1 ? positionals[0] : null;
             if (trajectoryPath is null)
             {
-                throw new ArgumentException(
+                throw new UsageError(
                     "missing trajectory path (pass a positional path or --trajectory <file>).");
             }
 
             if (positionals.Count > (flags.ContainsKey("--trajectory") ? 0 : 1))
             {
-                throw new ArgumentException($"unexpected argument '{positionals[^1]}'.");
+                throw new UsageError($"unexpected argument '{positionals[^1]}'.");
             }
 
             TrajectoryRecording recording;
@@ -971,7 +994,7 @@ public static class CliApp
             var allowedPositionals = flags.ContainsKey("--out") ? 0 : 1;
             if (positionals.Count > allowedPositionals)
             {
-                throw new ArgumentException(
+                throw new UsageError(
                     $"unexpected argument '{positionals[allowedPositionals]}'.");
             }
 
@@ -980,7 +1003,7 @@ public static class CliApp
                 : positionals.Count == 1 ? positionals[0] : null;
             if (path is null)
             {
-                throw new ArgumentException(
+                throw new UsageError(
                     "missing scenario path (pass a positional path or --out <file>).");
             }
 
@@ -1098,12 +1121,12 @@ public static class CliApp
             var suites = seedSetText.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
             if (suites.Length == 0)
             {
-                throw new ArgumentException("--seed-set requires at least one suite.");
+                throw new UsageError("--seed-set requires at least one suite.");
             }
 
             if (suites.Any(suite => suite is not (DevelopmentSuite or HeldOutSuite)))
             {
-                throw new ArgumentException(
+                throw new UsageError(
                     $"invalid --seed-set '{seedSetText}' (expected '{DevelopmentSuite}' and/or '{HeldOutSuite}').");
             }
 
@@ -1137,7 +1160,7 @@ public static class CliApp
             {
                 "standard" => seed => MapGenerator.Generate(seed, DefaultGeneratorConfig),
                 "bottleneck" => BottleneckScenario.ForSeed,
-                _ => throw new ArgumentException(
+                _ => throw new UsageError(
                     $"invalid --scenario '{scenarioText2}' (expected 'standard' and/or 'bottleneck', or a path to a scenario file)."),
             };
 
@@ -1217,6 +1240,10 @@ public static class CliApp
 
         if (descriptor.AgentCount != EvaluationSimulationConfig.AgentCount)
         {
+            // Runtime failure, not a UsageError, for the same reason as the
+            // unconstructable policy above: the descriptor parsed, and its
+            // contents are incompatible with what this study runs. Nothing about
+            // the command line itself was wrong.
             throw new ArgumentException(
                 $"scenario '{descriptor.Id}' declares 'Simulation.AgentCount' = {descriptor.AgentCount}, but the paired " +
                 $"study is head-to-head and runs {EvaluationSimulationConfig.AgentCount} seats. A descriptor may supply the " +
@@ -1232,7 +1259,7 @@ public static class CliApp
             .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
         if (suites.Length == 0 || suites.Any(suite => suite is not (DevelopmentSuite or HeldOutSuite)))
         {
-            throw new ArgumentException(
+            throw new UsageError(
                 $"invalid --seed-set '{flags.GetValueOrDefault("--seed-set", HeldOutSuite)}' (expected '{DevelopmentSuite}' and/or '{HeldOutSuite}').");
         }
 
@@ -1697,20 +1724,28 @@ public static class CliApp
         return Success;
     }
 
+    /// <summary>
+    /// Refuses an unrecognised verb. A verb the CLI does not have is a property
+    /// of the command line alone, so it reports the usage status rather than the
+    /// runtime-failure status: nothing was ever run.
+    /// </summary>
     private static int UnknownCommand(string command, TextWriter stderr)
     {
         stderr.WriteLine($"error: unknown command '{command}'.");
         WriteUsage(stderr);
-        return Failure;
+        return UsageError.ExitCode;
     }
 
+    /// <summary>
+    /// Maps a caught exception to an exit status. A <see cref="UsageError"/> was
+    /// raised on the way in — before any work, any seed and any artifact — so it
+    /// reports the usage status; §3.3's <c>--agent-cmd</c> status is the same
+    /// channel. Everything else was discovered while doing the work and keeps
+    /// the runtime-failure status.
+    /// </summary>
     private static int Report(Exception ex, TextWriter stderr)
     {
         stderr.WriteLine($"error: {ex.Message}");
-
-        // A usage error is reported before any work is done, so it gets its own
-        // exit status (§3.3) and says so on the way out. Everything else keeps the
-        // runtime-failure status it has always returned.
         return ex is UsageError ? UsageError.ExitCode : Failure;
     }
 
@@ -1718,6 +1753,11 @@ public static class CliApp
     /// Parses `--key value` pairs into a flag map, rejecting duplicates and
     /// bare flags, and collecting any non-flag tokens as positionals.
     /// </summary>
+    /// <remarks>
+    /// Every rejection here is decidable from <c>args</c> before the command
+    /// touches the filesystem, so each is a <see cref="UsageError"/> and reports
+    /// the usage status — the same status an unknown verb gets.
+    /// </remarks>
     private static (Dictionary<string, string> Flags, List<string> Positionals) ParseFlags(
         string[] args,
         params string[] allowedFlags)
@@ -1736,17 +1776,17 @@ public static class CliApp
                 var name = token[2..];
                 if (!allowed.Contains(name))
                 {
-                    throw new ArgumentException($"unknown flag '--{name}'.");
+                    throw new UsageError($"unknown flag '--{name}'.");
                 }
 
                 if (i + 1 >= args.Length)
                 {
-                    throw new ArgumentException($"flag '--{name}' requires a value.");
+                    throw new UsageError($"flag '--{name}' requires a value.");
                 }
 
                 if (!flags.TryAdd(token, args[++i]))
                 {
-                    throw new ArgumentException($"duplicate flag '--{name}'.");
+                    throw new UsageError($"duplicate flag '--{name}'.");
                 }
             }
             else
@@ -1762,7 +1802,7 @@ public static class CliApp
     {
         if (!flags.TryGetValue(name, out var value))
         {
-            throw new ArgumentException($"missing required flag '{name}'.");
+            throw new UsageError($"missing required flag '{name}'.");
         }
 
         return value;
@@ -1772,7 +1812,7 @@ public static class CliApp
     {
         if (positionals.Count > 0)
         {
-            throw new ArgumentException($"unexpected argument '{positionals[0]}'.");
+            throw new UsageError($"unexpected argument '{positionals[0]}'.");
         }
     }
 
@@ -1780,7 +1820,7 @@ public static class CliApp
     {
         if (!ulong.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var value))
         {
-            throw new ArgumentException($"flag '{flag}' expects an unsigned integer, got '{text}'.");
+            throw new UsageError($"flag '{flag}' expects an unsigned integer, got '{text}'.");
         }
 
         return value;
@@ -1790,7 +1830,7 @@ public static class CliApp
     {
         if (!int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var value) || value < 1)
         {
-            throw new ArgumentException($"flag '{flag}' expects a positive integer, got '{text}'.");
+            throw new UsageError($"flag '{flag}' expects a positive integer, got '{text}'.");
         }
 
         return value;
@@ -1801,7 +1841,7 @@ public static class CliApp
         if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value)
             || value < 0.0 || value > 1.0)
         {
-            throw new ArgumentException(
+            throw new UsageError(
                 $"flag '--min-fairness' expects a SpawnBiasIndex threshold in [0, 1], got '{text}'.");
         }
 
@@ -1872,5 +1912,11 @@ public static class CliApp
         sink.WriteLine();
         sink.WriteLine("  -h, --help                                    Show this help and exit");
         sink.WriteLine("  -v, --version                                 Print the version and exit");
+        sink.WriteLine();
+        sink.WriteLine("  Exit status: 0 on success; 2 when the command line is not runnable (unknown");
+        sink.WriteLine("  command, unknown/duplicated/missing flag, malformed value, unexpected");
+        sink.WriteLine("  argument) and nothing is run; 1 when the command was runnable and the work");
+        sink.WriteLine("  it named failed (a file that is missing or unreadable, a rejected");
+        sink.WriteLine("  descriptor, a replay divergence).");
     }
 }

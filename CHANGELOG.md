@@ -313,6 +313,32 @@ state; it creates no release and no tag. The `v3.0.0` narrative below and
 
 ### Fixed
 
+- **The CLI's exit status is now one contract, not two.** Option A: the contract
+  is unified to **0 = success, 2 = the command line is not runnable, 1 = the work
+  failed**, because the split is drawn by *when the fault became knowable* rather
+  than by which command hit it. Every argument fault decidable from `args` alone
+  now throws `UsageError` instead of `ArgumentException` — the unknown flag, the
+  flag with no value, the duplicated flag, the missing required flag, the
+  malformed value, the unexpected argument, the rejected flag combination, the
+  invalid `--agent`/`--format`/`--seed-set`/`--scenario` token — and
+  `UnknownCommand` (plus a bare invocation with no arguments at all) returns `2`.
+  `UsageError.cs`'s own remarks already said this type is "the CLI's way of
+  saying this command line is not runnable"; it is now literally true of the
+  whole CLI rather than of one flag. **No runtime path changed status**: a file
+  that is missing or unparseable, a descriptor that fails validation, a
+  descriptor declaring a policy this build cannot construct or a seat count the
+  study cannot run, and a replay divergence all still report `1`, because those
+  are discovered by doing the work. `docs/EXTERNAL_AGENT_PROTOCOL.md` §3.3 is
+  untouched and still satisfied: it constrains the `--agent-cmd` surface, and
+  that surface's four usage errors already exited `2`. `docs/CLI.md`,
+  `CliApp.cs`'s usage text, and the README Reference intro now state the
+  three-way contract. Tests: `Tests/Cli/CliIntegrationTests.cs` pins all three
+  statuses through the real entry point, `Tests/Cli/CliAnalyzeTests.cs` splits
+  its missing-flag/unknown-flag/stray-positional cases (now `2`) from its
+  missing-file case (still `1`), `Tests/Cli/EvaluateAgentCmdTests.cs` follows
+  the unknown-flag status, and `Tests/Fuzz/CliArgumentFuzzTests.cs` admits `2`
+  alongside `0` and `1`.
+
 - **README reproducibility proof row.** The landing page's proof row quoted the
   pre-schema-4 recording digest for the currently committed
   `site/infiltration.jsonl`, giving a false expected result. It now quotes the

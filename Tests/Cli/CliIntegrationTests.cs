@@ -10,10 +10,10 @@ namespace Lattice.Tests.Cli;
 /// Integration coverage for the <see cref="Lattice.Cli"/> driver: it
 /// drives the real <see cref="CliApp.Run"/> entry point (which is what
 /// <c>Program.Main</c> forwards to) through String writers, asserting exit
-/// codes — 0 on success, non-zero on any bad-argument or runtime error — and
-/// the stdout/stderr/file side effects each subcommand is documented to
-/// produce. Every run is seeded, so repeated invocations are asserted
-/// byte-identical.
+/// codes — 0 on success, <c>2</c> when the command line is not runnable, 1 when
+/// the command ran and its work failed — and the stdout/stderr/file side effects
+/// each subcommand is documented to produce. Every run is seeded, so repeated
+/// invocations are asserted byte-identical.
 /// </summary>
 public class CliIntegrationTests
 {
@@ -331,6 +331,35 @@ public class CliIntegrationTests
         var (exit, _, stderr) = Run("frobnicate");
         Assert.NotEqual(0, exit);
         Assert.Contains("unknown command 'frobnicate'", stderr);
+    }
+
+    /// <summary>
+    /// The exit-status contract in one test, at the level a script can see it.
+    /// <b>0</b> is success, <b>2</b> is a command line the CLI refuses to run,
+    /// <b>1</b> is work that started and failed. The dividing line is when the
+    /// fault became knowable: everything decidable from <c>args</c> alone is 2,
+    /// everything discovered by touching the filesystem or running the engine is
+    /// 1. This is the same status §3.3 already assigns the <c>--agent-cmd</c>
+    /// surface, so an external-agent author and a shell script read one contract
+    /// rather than two.
+    /// </summary>
+    [Fact]
+    public void Exit_Status_Separates_Unrunnable_Command_Lines_From_Failed_Work()
+    {
+        Assert.Equal(0, Run("generate", "--seed", "7").ExitCode);
+
+        // 2: no verb, unknown verb, unknown flag, flag with no value, duplicated
+        // flag, malformed value, unexpected argument.
+        Assert.Equal(UsageError.ExitCode, Run().ExitCode);
+        Assert.Equal(UsageError.ExitCode, Run("frobnicate").ExitCode);
+        Assert.Equal(UsageError.ExitCode, Run("generate", "--seed", "7", "--bogus", "1").ExitCode);
+        Assert.Equal(UsageError.ExitCode, Run("generate", "--seed").ExitCode);
+        Assert.Equal(UsageError.ExitCode, Run("generate", "--seed", "7", "--seed", "8").ExitCode);
+        Assert.Equal(UsageError.ExitCode, Run("generate", "--seed", "oops").ExitCode);
+        Assert.Equal(UsageError.ExitCode, Run("generate", "--seed", "7", "stray").ExitCode);
+
+        // 1: the command line was fine and the thing it named was not there.
+        Assert.Equal(1, Run("analyze", "--trajectory", "/definitely/not/here.jsonl").ExitCode);
     }
 
     [Fact]

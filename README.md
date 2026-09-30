@@ -643,8 +643,12 @@ enforcement tests are in [`docs/MECHANICS.md`](docs/MECHANICS.md).
 
 `Lattice.Cli` exposes eight commands (`Cli/CliApp.cs`). Run any of them with
 `dotnet run --project Cli -- <command> ...`; the binary name is `lattice`.
-Every command is seeded, and exit status is 0 on success, non-zero on a bad
-argument or runtime error.
+Every command is seeded, and the exit status is one of three values: **0** on
+success, **2** when the command line is not runnable (an unknown command, an
+unknown/duplicated/valueless flag, a missing required flag, a malformed value,
+an unexpected argument — nothing is run), and **1** when the command was
+runnable and the work it named failed (a missing or unreadable file, a rejected
+descriptor, a replay divergence).
 
 | Command | Purpose | Key flags |
 | :--- | :--- | :--- |

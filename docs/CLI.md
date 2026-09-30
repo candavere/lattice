@@ -2,9 +2,17 @@
 
 `Lattice.Cli` exposes eight commands. Run any of them with
 `dotnet run --project Cli -- <command> ...`; the binary name is `lattice`.
-Every command is seeded, and exit status is `0` on success, non-zero on a bad
-argument or runtime error. This page is the full flag-by-flag reference; the
-landing page keeps a [compact table](../README.md#reference).
+Every command is seeded, and the exit status is one of three values: `0` on
+success, `2` when the command line is not runnable, and `1` when the command
+was runnable and the work it named failed. The line between the two failures is
+*when the fault became knowable* — everything decidable from `args` alone (no
+command, an unknown command, an unknown/duplicated/valueless flag, a missing
+required flag, a malformed value, an unexpected argument) is `2` and nothing is
+run; everything discovered by touching the filesystem or running the engine (a
+file that is missing or unparseable, a descriptor that fails validation or
+declares something this build cannot run, a replay divergence) is `1`. This page
+is the full flag-by-flag reference; the landing page keeps a
+[compact table](../README.md#reference).
 
 ## generate — write a valid map
 
@@ -380,7 +388,10 @@ too, on Windows). A program that cannot be resolved or cannot be started is
 **not a match result and not a scored failure** — no agent ever spoke — so the
 CLI names it on stderr, exits **2**, and writes no artifact. So do an
 unterminated quote, an empty command, and `--agent-step-timeout-ms` below 1.
-Argument errors in the other commands keep their existing exit status of 1.
+Those four are a subset of the general usage contract at the top of this page:
+**every** command-line fault in **every** command is a usage error and exits
+**2**, decided before any work runs, so an author writing a script against this
+CLI has one status for "I typed it wrong" rather than one per surface.
 
 | Artifact field | Meaning |
 | :--- | :--- |

@@ -153,7 +153,7 @@ public class CliAnalyzeTests : IDisposable
         using var stdout = new StringWriter();
         using var stderr = new StringWriter();
         var exit = CliApp.Run(new[] { "analyze" }, stdout, stderr);
-        Assert.Equal(1, exit);
+        Assert.Equal(UsageError.ExitCode, exit);
         Assert.Contains("missing required flag '--trajectory'.", stderr.ToString());
     }
 
@@ -166,10 +166,15 @@ public class CliAnalyzeTests : IDisposable
             new[] { "analyze", "--trajectory", temp.TrajectoryPath, "--bogus", "x" },
             stdout,
             stderr);
-        Assert.Equal(1, exit);
+        Assert.Equal(UsageError.ExitCode, exit);
         Assert.Contains("unknown flag '--bogus'.", stderr.ToString());
     }
 
+    /// <summary>
+    /// The other half of the exit-status contract, and the case that keeps it
+    /// honest: a file that is not there is not a bad command line, so it stays a
+    /// runtime failure at 1 rather than joining the argument errors at 2.
+    /// </summary>
     [Fact]
     public void Analyze_MissingFile_FailsWithMessage()
     {
@@ -189,7 +194,7 @@ public class CliAnalyzeTests : IDisposable
         using var stdout = new StringWriter();
         using var stderr = new StringWriter();
         var exit = CliApp.Run(new[] { "analyze", "--trajectory", temp.TrajectoryPath, "stray" }, stdout, stderr);
-        Assert.Equal(1, exit);
+        Assert.Equal(UsageError.ExitCode, exit);
         Assert.Contains("unexpected argument 'stray'.", stderr.ToString());
     }
 

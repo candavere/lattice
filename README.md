@@ -275,8 +275,10 @@ build profile.
 
 ## Verify everything yourself
 
-All commands run from a clean checkout at the repository root with the .NET 10
-SDK installed, and require no network access once dependencies are restored.
+The commands in this section run from a clean checkout at the repository root
+with the .NET 10 SDK installed, and require no network access once dependencies
+are restored. (That guarantee covers this block only; it does not cover
+`dotnet tool install` below, which contacts a NuGet source.)
 You need the [.NET 10 SDK](https://dotnet.microsoft.com/download); Lattice also
 runs on later .NET majors via `RollForward=LatestMajor`.
 
@@ -320,6 +322,13 @@ lattice replay Tests/fixtures/golden_trajectory.jsonl --verify
 ```sh
 dotnet tool uninstall -g lattice                             # back to the zero-install path
 ```
+
+On a Homebrew .NET install the `lattice` launcher can fail with `You must
+install .NET to run this application.` even though `dotnet` itself works,
+because the launcher resolves the runtime from `DOTNET_ROOT` or a registered
+location and Homebrew installs to neither. Set `DOTNET_ROOT` to the real runtime
+root — for Homebrew that is `/opt/homebrew/opt/dotnet/libexec`. `dotnet run`
+above is unaffected, so if the launcher fails, use the zero-install path instead.
 
 This is **packaging, not a second implementation**. The tool is the same
 compiled binary with a launcher named `lattice`; every command, flag, output and

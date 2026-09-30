@@ -403,9 +403,18 @@ next tag ships.
   fell below the five-sample minimum on all five workloads with no measured
   code changed since the sampled tree; **the cause of that slowdown is
   unestablished**, and the record was demoted rather than re-thresholded. The
-  bare-metal research record is a separate, untouched artifact. Consequence to
-  read honestly: **CI currently enforces no throughput on GitHub-hosted
-  runners.** See [`docs/BENCHMARKING.md`](docs/BENCHMARKING.md) and
+  bare-metal research record is a separate, untouched artifact. That demotion
+  did **not** leave hosted runners ungated: the record was later re-collected as
+  20 full-protocol sessions on one pinned commit, and
+  `runner-class-gate` now adjudicates **four of the five workloads** on a full
+  fingerprint and protocol match
+  (`micro_raw_2agent` 0.7914, `facility_static_4agent` 0.8416,
+  `dynamic_contention_4agent` 0.7804, `stress_topology_4agent` 0.8236).
+  `policy_lookahead_mcts_32` is measured, printed and compared but never
+  adjudicated, because 20 same-commit sessions span 2.050x max/min there and no
+  threshold is separable from that jitter. The demotion above stands as the
+  record of why five samples were insufficient; see
+  [`docs/BENCHMARKING.md`](docs/BENCHMARKING.md) and
   [`benchmarks/runner_class_summary.md`](benchmarks/runner_class_summary.md).
 
 ### Fixed

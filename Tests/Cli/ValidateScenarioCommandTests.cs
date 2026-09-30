@@ -1,8 +1,11 @@
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.Threading;
 using Lattice.Cli;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Lattice.Tests.Cli;
 
@@ -22,8 +25,20 @@ public class ValidateScenarioCommandTests
     /// </summary>
     private const int ChildTimeoutMs = 60_000;
 
-    /// <summary>How long the churn control waits for its own task to notice cancellation.</summary>
+    /// <summary>
+    /// Ceiling for the churn worker to reach readiness. Readiness is a completed
+    /// real write/delete cycle, which is two syscalls, so this only has to absorb
+    /// a slow or heavily loaded machine. It is finite so a worker that faults or
+    /// dies before its first cycle fails the test instead of hanging the run.
+    /// </summary>
+    private const int ChurnReadyTimeoutMs = 30_000;
+
+    /// <summary>How long the churn worker is given to notice cancellation and exit.</summary>
     private const int ChurnStopTimeoutMs = 10_000;
+
+    private readonly ITestOutputHelper _output;
+
+    public ValidateScenarioCommandTests(ITestOutputHelper output) => _output = output;
 
     private static (int ExitCode, string Stdout, string Stderr) Run(params string[] args)
     {
@@ -155,73 +170,102 @@ public class ValidateScenarioCommandTests
         // assertion could fail on an unrelated sibling's temp file — and it did.
         // It was measuring the machine, not this command.
         var sandbox = CreateSandbox();
-        try
-        {
-            var descriptor = SeedCollectionSkirmish(sandbox);
-            var before = Snapshot(sandbox);
 
-            var (exit, stdout, stderr) = RunIsolated(sandbox, descriptor);
+        RunWithTeardown(
+            body: () =>
+            {
+                var descriptor = SeedCollectionSkirmish(sandbox);
+                var before = Snapshot(sandbox);
 
-            var unexpected = Unexpected(before, Snapshot(sandbox));
+                var (exit, stdout, stderr) = RunIsolated(sandbox, descriptor);
 
-            Assert.Equal(0, exit);
-            Assert.Equal(string.Empty, stdout);
-            Assert.Contains("is valid", stderr, StringComparison.Ordinal);
-            Assert.True(
-                unexpected.Count == 0,
-                "validate-scenario changed its sandbox: " + string.Join("; ", unexpected));
-        }
-        finally
-        {
-            DeleteSandbox(sandbox);
-        }
+                var unexpected = Unexpected(before, Snapshot(sandbox));
+
+                Assert.Equal(0, exit);
+                Assert.Equal(string.Empty, stdout);
+                Assert.Contains("is valid", stderr, StringComparison.Ordinal);
+                Assert.True(
+                    unexpected.Count == 0,
+                    "validate-scenario changed its sandbox: " + string.Join("; ", unexpected));
+            },
+            teardown: new (string, Action)[] { ("delete the sandbox", () => DeleteSandbox(sandbox)) });
     }
 
     [Fact]
-    public async Task UnrelatedActivityInTheSharedSystemTempRoot_CannotFailThisAssertion()
+    public void UnrelatedActivityInTheSharedSystemTempRoot_CannotFailThisAssertion()
     {
         // The regression guard for the race this file used to have. It reproduces
         // the original trigger exactly — files appearing and disappearing in the
         // shared Path.GetTempPath() while the command runs — and asserts that the
         // command-owned surfaces are now immune to it. If someone reintroduces a
-        // shared-temp snapshot, this fails; today it passes while the churn below
-        // is provably still running.
+        // shared-temp snapshot, this fails; today it passes while the churn worker
+        // is provably still running and has provably been running the whole time.
         var sandbox = CreateSandbox();
-        try
-        {
-            var descriptor = SeedCollectionSkirmish(sandbox);
-            var before = Snapshot(sandbox);
+        using var churn = new SharedTempChurnWorker();
 
-            using var stop = new CancellationTokenSource();
-            var churned = Task.Run(() => ChurnSharedSystemTempRoot(stop.Token));
+        RunWithTeardown(
+            body: () =>
+            {
+                var descriptor = SeedCollectionSkirmish(sandbox);
+                var before = Snapshot(sandbox);
 
-            var (exit, stdout, stderr) = RunIsolated(sandbox, descriptor);
+                // Ordering is established by an explicit rendezvous, not by hoping
+                // the thread pool got round to the churn loop. A dedicated worker
+                // thread signals readiness only after it has actually completed a
+                // real create/delete cycle in the shared system temp root, so the
+                // CLI below cannot be launched against zero activity.
+                Assert.True(
+                    churn.WaitUntilReady(ChurnReadyTimeoutMs),
+                    $"the churn worker did not complete a real write within {ChurnReadyTimeoutMs} ms.");
 
-            stop.Cancel();
-            var stopped = await Task.WhenAny(churned, Task.Delay(ChurnStopTimeoutMs));
-            Assert.True(
-                ReferenceEquals(churned, stopped),
-                "the churn task did not stop after cancellation.");
-            var churnCount = await churned;
+                // A worker that faults before signalling must say so rather than
+                // leave this waiting until the ceiling above.
+                var faultBeforeReady = churn.Fault;
+                Assert.True(
+                    faultBeforeReady is null,
+                    "the churn worker faulted before it became ready: " + faultBeforeReady);
 
-            var unexpected = Unexpected(before, Snapshot(sandbox));
+                var createdAtLaunch = churn.Created;
+                Assert.True(
+                    createdAtLaunch > 0,
+                    "the churn created no files, so this proved nothing about isolation.");
 
-            // The control is only meaningful if the churn really happened.
-            Assert.True(
-                churnCount > 0,
-                "the churn created no files, so this proved nothing about isolation.");
-            Assert.Equal(0, exit);
-            Assert.Equal(string.Empty, stdout);
-            Assert.Contains("is valid", stderr, StringComparison.Ordinal);
-            Assert.True(
-                unexpected.Count == 0,
-                "unrelated shared-temp activity leaked into the sandbox: " +
-                string.Join("; ", unexpected));
-        }
-        finally
-        {
-            DeleteSandbox(sandbox);
-        }
+                var (exit, stdout, stderr) = RunIsolated(sandbox, descriptor);
+
+                // The proof is the worker's own state, not elapsed time. Sampled
+                // before it is stopped, the worker must be alive and unfaulted;
+                // sampled after it is stopped, it must be strictly further along
+                // than it was when the child was launched — so it really was
+                // running for the whole of the CLI invocation.
+                var aliveAcrossInvocation = churn.IsAlive;
+                var fault = churn.Fault;
+                StopChurnWorker(churn);
+                var createdAcrossInvocation = churn.Created;
+
+                Assert.True(aliveAcrossInvocation, "the churn worker had already exited while the CLI was running.");
+                Assert.True(fault is null, "the churn worker faulted during the CLI invocation: " + fault);
+                Assert.True(
+                    createdAcrossInvocation > createdAtLaunch,
+                    $"the churn worker completed no further activity during the CLI invocation " +
+                    $"({createdAtLaunch} -> {createdAcrossInvocation}), so it was not provably still running.");
+
+                var unexpected = Unexpected(before, Snapshot(sandbox));
+
+                Assert.Equal(0, exit);
+                Assert.Equal(string.Empty, stdout);
+                Assert.Contains("is valid", stderr, StringComparison.Ordinal);
+                Assert.True(
+                    unexpected.Count == 0,
+                    "unrelated shared-temp activity leaked into the sandbox: " +
+                    string.Join("; ", unexpected));
+            },
+            teardown: new (string, Action)[]
+            {
+                // Idempotent: the body may already have stopped the worker, in
+                // which case this returns immediately instead of faulting.
+                ("stop the shared-temp churn worker", () => StopChurnWorker(churn)),
+                ("delete the sandbox", () => DeleteSandbox(sandbox)),
+            });
     }
 
     [Fact]
@@ -232,27 +276,271 @@ public class ValidateScenarioCommandTests
         // this plants one file and one directory and requires both to be
         // reported. This is what keeps the assertion above meaningful.
         var sandbox = CreateSandbox();
+
+        RunWithTeardown(
+            body: () =>
+            {
+                SeedCollectionSkirmish(sandbox);
+                var before = Snapshot(sandbox);
+
+                File.WriteAllText(Path.Combine(sandbox, "unexpected.jsonl"), "{}\n");
+                Directory.CreateDirectory(Path.Combine(sandbox, "unexpected-directory"));
+
+                var unexpected = Unexpected(before, Snapshot(sandbox));
+
+                Assert.True(
+                    unexpected.Any(entry => entry.Contains("unexpected.jsonl", StringComparison.Ordinal)),
+                    "a new file inside the sandbox was not detected: " + string.Join("; ", unexpected));
+                Assert.True(
+                    unexpected.Any(entry => entry.Contains("unexpected-directory", StringComparison.Ordinal)),
+                    "a new directory inside the sandbox was not detected: " + string.Join("; ", unexpected));
+            },
+            teardown: new (string, Action)[] { ("delete the sandbox", () => DeleteSandbox(sandbox)) });
+    }
+
+    // ---------------------------------------------------------------------
+    // Failure preservation for teardown.
+    //
+    // These four tests pin the behaviour that the helpers below implement, so
+    // the guarantee is enforced by passing tests rather than by a comment. They
+    // inject a teardown fault through a delegate rather than by changing
+    // permissions on a real directory, because the latter is OS-dependent and
+    // behaves differently per platform and per filesystem.
+    // ---------------------------------------------------------------------
+
+    [Fact]
+    public void ATeardownFaultDoesNotReplaceAnAlreadyFailingTest()
+    {
+        var reported = new List<string>();
+        var primary = new InvalidTimeZoneException("the body failed first");
+
+        var caught = Record.Exception(() => RunWithTeardown(
+            body: () => throw primary,
+            teardown: new (string, Action)[] { ("delete the sandbox", () => throw new UnauthorizedAccessException("the OS refused")) },
+            report: reported.Add,
+            caller: nameof(ATeardownFaultDoesNotReplaceAnAlreadyFailingTest)));
+
+        Assert.NotNull(caught);
+
+        // Identity: the very same exception object, so nothing about the original
+        // diagnosis was rewritten.
+        Assert.Same(primary, caught);
+        Assert.Contains("the body failed first", caught.Message, StringComparison.Ordinal);
+
+        // Stack: rethrown through ExceptionDispatchInfo, so the original throw
+        // site is still on it rather than the helper's rethrow site.
+        Assert.NotNull(caught.StackTrace);
+        Assert.Contains(
+            nameof(ATeardownFaultDoesNotReplaceAnAlreadyFailingTest),
+            caught.StackTrace,
+            StringComparison.Ordinal);
+
+        // Secondary: reported beside the primary rather than in place of it.
+        Assert.Contains(
+            reported,
+            line => line.Contains("delete the sandbox", StringComparison.Ordinal)
+                 && line.Contains(nameof(UnauthorizedAccessException), StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ATeardownFaultFailsAnOtherwiseSuccessfulTest()
+    {
+        var reported = new List<string>();
+        var bodyRan = false;
+
+        var caught = Record.Exception(() => RunWithTeardown(
+            body: () => bodyRan = true,
+            teardown: new (string, Action)[] { ("delete the sandbox", () => throw new UnauthorizedAccessException("the OS refused")) },
+            report: reported.Add,
+            caller: nameof(ATeardownFaultFailsAnOtherwiseSuccessfulTest)));
+
+        Assert.True(bodyRan, "the body did not run.");
+        Assert.NotNull(caught);
+
+        var aggregate = Assert.IsType<AggregateException>(caught);
+        Assert.Contains("1 teardown step(s) failed", aggregate.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(ATeardownFaultFailsAnOtherwiseSuccessfulTest), aggregate.Message, StringComparison.Ordinal);
+
+        var step = Assert.IsType<TeardownStepFault>(Assert.Single(aggregate.InnerExceptions));
+        Assert.Equal("delete the sandbox", step.Step);
+        Assert.IsType<UnauthorizedAccessException>(step.InnerException);
+        Assert.Contains(
+            reported,
+            line => line.Contains("delete the sandbox", StringComparison.Ordinal)
+                 && line.Contains(nameof(UnauthorizedAccessException), StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void OneTeardownFaultDoesNotSkipTheRemainingCleanup()
+    {
+        var attempted = new List<string>();
+        var reported = new List<string>();
+        var primary = new TimeoutException("the body failed first");
+
+        var caught = Record.Exception(() => RunWithTeardown(
+            body: () => throw primary,
+            teardown: new (string, Action)[]
+            {
+                ("stop the shared-temp churn worker", () =>
+                {
+                    attempted.Add("stop the shared-temp churn worker");
+                    throw new IOException("the OS refused");
+                }),
+                ("delete the sandbox", () => attempted.Add("delete the sandbox")),
+            },
+            report: reported.Add,
+            caller: nameof(OneTeardownFaultDoesNotSkipTheRemainingCleanup)));
+
+        // The primary survives untouched, even though the first teardown step threw.
+        Assert.Same(primary, caught);
+
+        // Every step was still attempted: a fault stopping the worker must not
+        // prevent the sandbox from being cleaned up too.
+        Assert.Equal(
+            new[] { "stop the shared-temp churn worker", "delete the sandbox" },
+            attempted);
+
+        // Exactly one step's fault is reported, with that step named and its type
+        // intact; the step that succeeded is not reported as a fault. The helper
+        // also writes a trailing count line, so the assertion is on content
+        // rather than on the number of lines written.
+        Assert.Equal(2, reported.Count);
+        Assert.Contains("stop the shared-temp churn worker", reported[0], StringComparison.Ordinal);
+        Assert.Contains(nameof(IOException), reported[0], StringComparison.Ordinal);
+        Assert.Contains("1 teardown step(s) failed", reported[1], StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            reported,
+            line => line.Contains("delete the sandbox", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void DeletingAnAlreadyDeletedSandboxIsNotACleanupFailure()
+    {
+        // Harmless absence is not a cleanup failure. This is the idempotent case
+        // teardown relies on: the body may already have deleted the surface, and
+        // running the same step again must not manufacture a fault.
+        var sandbox = CreateSandbox();
+        DeleteSandbox(sandbox);
+        Assert.False(Directory.Exists(sandbox));
+
+        var reported = new List<string>();
+
+        RunWithTeardown(
+            body: () => { },
+            teardown: new (string, Action)[] { ("delete the sandbox", () => DeleteSandbox(sandbox)) },
+            report: reported.Add,
+            caller: nameof(DeletingAnAlreadyDeletedSandboxIsNotACleanupFailure));
+
+        Assert.Empty(reported);
+    }
+
+    /// <summary>
+    /// Runs <paramref name="body"/>, then runs every teardown step, and decides
+    /// which failure the caller sees.
+    /// </summary>
+    /// <remarks>
+    /// The rule is asymmetric on purpose, because the two cases want different
+    /// things:
+    ///
+    /// <list type="bullet">
+    /// <item>If the body, an assertion, readiness or the worker already failed,
+    /// that exception is rethrown as the same object, with its original stack,
+    /// because it is the diagnosis. A teardown fault that happened afterwards is
+    /// written to the test's output and onto the primary's
+    /// <see cref="Exception.Data"/> — beside the failure, never in place of it.
+    /// A teardown exception that escaped here instead would have overwritten the
+    /// real error and left the reader debugging the wrong problem.</item>
+    ///
+    /// <item>If the body succeeded and a teardown step genuinely failed, the test
+    /// fails. Swallowing it would turn a broken cleanup into a green run, which
+    /// is how leaked sandboxes and orphaned child processes stay invisible.</item>
+    /// </list>
+    ///
+    /// Every step is attempted even after one fails, so a fault stopping the owned
+    /// worker cannot also strand the sandbox. Each fault is reported separately
+    /// and honestly; nothing is aggregated away silently.
+    ///
+    /// The catch here is broad on purpose: this is the diagnostic boundary, and
+    /// every caught exception is either rethrown or reported. No path here turns
+    /// a failure into a pass.
+    ///
+    /// <paramref name="report"/> defaults to this test's output helper so a
+    /// secondary fault is visible in the retained run output instead of being
+    /// dropped into an unused local. The regression tests above pass their own
+    /// collector so they can assert on what was reported.
+    /// </remarks>
+    private void RunWithTeardown(
+        Action body,
+        IReadOnlyList<(string Description, Action Teardown)> teardown,
+        Action<string>? report = null,
+        [CallerMemberName] string caller = "")
+    {
+        var write = report ?? _output.WriteLine;
+
+        Exception? primary = null;
         try
         {
-            SeedCollectionSkirmish(sandbox);
-            var before = Snapshot(sandbox);
-
-            File.WriteAllText(Path.Combine(sandbox, "unexpected.jsonl"), "{}\n");
-            Directory.CreateDirectory(Path.Combine(sandbox, "unexpected-directory"));
-
-            var unexpected = Unexpected(before, Snapshot(sandbox));
-
-            Assert.True(
-                unexpected.Any(entry => entry.Contains("unexpected.jsonl", StringComparison.Ordinal)),
-                "a new file inside the sandbox was not detected: " + string.Join("; ", unexpected));
-            Assert.True(
-                unexpected.Any(entry => entry.Contains("unexpected-directory", StringComparison.Ordinal)),
-                "a new directory inside the sandbox was not detected: " + string.Join("; ", unexpected));
+            body();
         }
-        finally
+        catch (Exception ex)
         {
-            DeleteSandbox(sandbox);
+            primary = ex;
         }
+
+        var faults = new List<(string Description, Exception Error)>();
+        foreach (var (description, step) in teardown)
+        {
+            try
+            {
+                step();
+            }
+            catch (Exception ex)
+            {
+                faults.Add((description, ex));
+            }
+        }
+
+        if (primary is not null)
+        {
+            foreach (var (description, error) in faults)
+            {
+                write(
+                    $"[{caller}] teardown step '{description}' failed after the test had already failed; " +
+                    $"reported here, not substituted for the test's own failure: {error}");
+                primary.Data[$"Lattice.Teardown.{description}"] = error.ToString();
+            }
+
+            if (faults.Count > 0)
+            {
+                write($"[{caller}] {faults.Count} teardown step(s) failed; the test's own failure is preserved below.");
+            }
+
+            ExceptionDispatchInfo.Capture(primary).Throw();
+        }
+
+        if (faults.Count > 0)
+        {
+            foreach (var (description, error) in faults)
+            {
+                write($"[{caller}] teardown step '{description}' failed: {error}");
+            }
+
+            throw new AggregateException(
+                $"{faults.Count} teardown step(s) failed in '{caller}' after the body succeeded.",
+                faults.ConvertAll(fault => new TeardownStepFault(fault.Description, fault.Error)));
+        }
+    }
+
+    /// <summary>One teardown step's failure, tagged with the step that produced it.</summary>
+    private sealed class TeardownStepFault : Exception
+    {
+        public TeardownStepFault(string step, Exception error)
+            : base($"teardown step '{step}' failed: {error.Message}", error)
+        {
+            Step = step;
+        }
+
+        public string Step { get; }
     }
 
     /// <summary>
@@ -269,32 +557,40 @@ public class ValidateScenarioCommandTests
     }
 
     /// <summary>
-    /// Deletes the sandbox, tolerating one refusal from the OS.
+    /// Deletes the sandbox, or does nothing if it is already gone.
     /// </summary>
     /// <remarks>
-    /// The catch is not a retry and adds no wait. The child has already exited by
-    /// the time this runs, so a refusal means a transient lock — an indexer or a
-    /// virus scanner on Windows, which is why the original test could not simply
-    /// assert a clean directory. The path is unique to this test, so the next run
-    /// starts from a fresh one and nothing accumulates within or across runs. Any
-    /// other exception propagates: a permissions or path fault is a real problem,
-    /// not noise. Assertions run before this in the caller's <c>finally</c>, so a
-    /// swallowed cleanup fault can never mask a failed assertion.
+    /// Absence is treated as success, not as a fault: teardown is expected to be
+    /// runnable more than once, and a surface this test owns is not a resource
+    /// anyone else can be holding open.
+    ///
+    /// Everything else propagates. An earlier version caught <see cref="IOException"/>
+    /// here and called that "one refusal from the OS", on the grounds that an
+    /// indexer or a virus scanner can hold a handle briefly on Windows. That was
+    /// two mistakes at once: it turned a real cleanup fault into a green run on
+    /// the success path, and because this runs from a <c>finally</c>, a fault of
+    /// any other type — <see cref="UnauthorizedAccessException"/> and
+    /// <see cref="ArgumentException"/> both derive from
+    /// <see cref="SystemException"/>, not <see cref="IOException"/> — escaped the
+    /// catch and replaced whatever the test was already reporting. Letting it
+    /// propagate into <see cref="RunWithTeardown"/> fixes both: the original
+    /// failure survives, and a genuine cleanup fault is now visible on the success
+    /// path too.
+    ///
+    /// The cost of that is honest and worth stating: a transient scanner lock on
+    /// Windows is no longer absorbed, and will now surface as a named teardown
+    /// fault naming this path. That is a visible test failure rather than a
+    /// silently undeleted directory, which is the trade this file wants. The
+    /// deletion is still a single attempt with no retry and no wait.
     /// </remarks>
     private static void DeleteSandbox(string sandbox)
     {
-        try
+        if (!Directory.Exists(sandbox))
         {
-            if (Directory.Exists(sandbox))
-            {
-                Directory.Delete(sandbox, recursive: true);
-            }
+            return;
         }
-        catch (IOException)
-        {
-            // One attempt refused by the OS; the directory stays and the next run
-            // uses a different path, so nothing accumulates within a run.
-        }
+
+        Directory.Delete(sandbox, recursive: true);
     }
 
     /// <summary>
@@ -454,24 +750,172 @@ public class ValidateScenarioCommandTests
     }
 
     /// <summary>
-    /// Creates and deletes files in the shared system temp root until cancelled,
-    /// returning how many it made — the behaviour of the sibling tests that used
-    /// to be able to fail the shared-snapshot version of this file's assertion.
+    /// Asks the worker to stop and waits, with a finite ceiling, for it to
+    /// notice. Safe to call more than once: the second call is a no-op that
+    /// returns immediately, which is what lets the body and the teardown both
+    /// guarantee the worker is stopped.
     /// </summary>
-    private static int ChurnSharedSystemTempRoot(CancellationToken token)
+    private static void StopChurnWorker(SharedTempChurnWorker churn)
     {
-        var root = Path.GetTempPath();
-        var created = 0;
-
-        while (!token.IsCancellationRequested)
+        if (!churn.RequestStopAndJoin(ChurnStopTimeoutMs))
         {
-            var path = Path.Combine(root, $"lattice-validate-churn-{Guid.NewGuid():N}.tmp");
-            File.WriteAllText(path, "unrelated sibling activity");
-            File.Delete(path);
-            created++;
+            throw new TimeoutException(
+                $"the shared-temp churn worker did not stop within {ChurnStopTimeoutMs} ms.");
+        }
+    }
+
+    /// <summary>
+    /// Creates and deletes uniquely named files in the shared system temp root
+    /// until cancelled — the behaviour of the sibling tests that used to be able
+    /// to fail the shared-snapshot version of this file's assertion.
+    /// </summary>
+    /// <remarks>
+    /// This runs on a thread it creates and owns, not on a thread-pool callback,
+    /// and that is the whole point of the rewrite. The previous version used
+    /// <c>Task.Run</c>, which queues on the global thread pool — the same pool
+    /// this suite's 850-odd parallel collections occupy, several of which block
+    /// inside real child-process waits. The churn work item could therefore sit
+    /// queued for the entire duration of the CLI invocation, get cancelled before
+    /// it ever ran, and complete with a count of zero, failing the very guard
+    /// that exists to prove the churn was real. A dedicated thread cannot be
+    /// starved that way, so the guarantee rests on the rendezvous below instead
+    /// of on scheduling luck.
+    ///
+    /// Readiness means one real create/delete cycle has completed. It is never
+    /// signalled by a queued work item, an entered callback, or a primed counter,
+    /// so a test that reaches its assertions has already observed genuine shared
+    /// -temp-root activity.
+    /// </remarks>
+    private sealed class SharedTempChurnWorker : IDisposable
+    {
+        private const string FilePrefix = "lattice-validate-churn-";
+
+        private readonly ManualResetEventSlim _ready = new(false);
+        private readonly ManualResetEventSlim _finished = new(false);
+        private readonly CancellationTokenSource _stop = new();
+        private readonly object _gate = new();
+        private readonly Thread _thread;
+
+        private int _created;
+        private Exception? _fault;
+
+        public SharedTempChurnWorker()
+        {
+            // Background so a worker that somehow refused to stop can never wedge
+            // the test runner's exit; every path that owns it still joins it.
+            _thread = new Thread(Run) { IsBackground = true, Name = "lattice-shared-temp-churn" };
+            _thread.Start();
         }
 
-        return created;
+        /// <summary>Completed create/delete cycles so far.</summary>
+        public int Created
+        {
+            get { lock (_gate) { return _created; } }
+        }
+
+        /// <summary>The worker's own fault, if it faulted. Checked before and after the CLI run.</summary>
+        public Exception? Fault
+        {
+            get { lock (_gate) { return _fault; } }
+        }
+
+        public bool IsAlive => _thread.IsAlive;
+
+        /// <summary>
+        /// Blocks until a real activity cycle has completed, the worker has
+        /// faulted, or the ceiling expires. Returns whether readiness was
+        /// actually acknowledged.
+        /// </summary>
+        public bool WaitUntilReady(int timeoutMs) => _ready.Wait(timeoutMs);
+
+        /// <summary>
+        /// Signals cancellation and waits a bounded time for the worker to exit.
+        /// Idempotent: once the worker has exited this returns true immediately.
+        /// </summary>
+        public bool RequestStopAndJoin(int timeoutMs)
+        {
+            _stop.Cancel();
+            return _finished.Wait(timeoutMs);
+        }
+
+        /// <summary>
+        /// Last-resort teardown. It never throws, because throwing here would
+        /// escape a <c>finally</c> and displace whatever the test was already
+        /// reporting; the bounded, throwing check belongs in the teardown list
+        /// via <see cref="StopChurnWorker"/> instead.
+        /// </summary>
+        public void Dispose() => RequestStopAndJoin(ChurnStopTimeoutMs);
+
+        private void Run()
+        {
+            var root = Path.GetTempPath();
+            var acknowledged = false;
+
+            try
+            {
+                while (!_stop.IsCancellationRequested)
+                {
+                    var path = Path.Combine(root, $"{FilePrefix}{Guid.NewGuid():N}.tmp");
+                    try
+                    {
+                        File.WriteAllText(path, "unrelated sibling activity");
+                        File.Delete(path);
+                    }
+                    finally
+                    {
+                        // Never strand a test-owned file in a directory shared with
+                        // the whole suite, even when unwinding from a fault. The
+                        // broad catch is safe here because it runs while another
+                        // exception is in flight, where replacing it would lose
+                        // the real diagnosis; the in-flight fault itself is still
+                        // recorded below and reported.
+                        try
+                        {
+                            if (File.Exists(path))
+                            {
+                                File.Delete(path);
+                            }
+                        }
+                        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or ArgumentException)
+                        {
+                        }
+                    }
+
+                    var announce = false;
+                    lock (_gate)
+                    {
+                        _created++;
+                        if (!acknowledged)
+                        {
+                            acknowledged = true;
+                            announce = true;
+                        }
+                    }
+
+                    // Only ever signalled from here, which is only ever reached
+                    // after a completed real cycle.
+                    if (announce)
+                    {
+                        _ready.Set();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                lock (_gate)
+                {
+                    _fault = ex;
+                }
+            }
+            finally
+            {
+                // Signalled on the fault path too, so a worker that dies early
+                // releases the waiting test immediately instead of making it sit
+                // out the full readiness ceiling before learning why.
+                _ready.Set();
+                _finished.Set();
+            }
+        }
     }
 
     [Fact]

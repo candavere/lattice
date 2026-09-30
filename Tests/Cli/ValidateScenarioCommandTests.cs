@@ -198,8 +198,9 @@ public class ValidateScenarioCommandTests
         // the original trigger exactly — files appearing and disappearing in the
         // shared Path.GetTempPath() while the command runs — and asserts that the
         // command-owned surfaces are now immune to it. If someone reintroduces a
-        // shared-temp snapshot, this fails; today it passes while the churn worker
-        // is provably still running and has provably been running the whole time.
+        // shared-temp snapshot, this fails; today it passes with the churn worker
+        // having completed real work, established by the readiness rendezvous and
+        // the counter increase described below.
         var sandbox = CreateSandbox();
         using var churn = new SharedTempChurnWorker();
 
@@ -232,11 +233,18 @@ public class ValidateScenarioCommandTests
 
                 var (exit, stdout, stderr) = RunIsolated(sandbox, descriptor);
 
-                // The proof is the worker's own state, not elapsed time. Sampled
-                // before it is stopped, the worker must be alive and unfaulted;
-                // sampled after it is stopped, it must be strictly further along
-                // than it was when the child was launched — so it really was
-                // running for the whole of the CLI invocation.
+                // The proof is the worker's own state, not elapsed time. Readiness
+                // guarantees one completed real churn cycle before the child is
+                // launched. Sampled before it is stopped, the worker must be alive
+                // and unfaulted; sampled after it is stopped, it must be strictly
+                // further along than the pre-invocation sample. The counter increase
+                // therefore proves at least one additional completed cycle between
+                // the pre-invocation sample and the post-shutdown sample. That
+                // sampling interval spans, but extends beyond, the child's
+                // launch-to-return interval: it does not prove continuous churn, nor
+                // that a cycle completed strictly inside the child invocation.
+                // Repeated green runs are not a universal scheduling guarantee, and
+                // do not prove a spurious scheduling failure impossible.
                 var aliveAcrossInvocation = churn.IsAlive;
                 var fault = churn.Fault;
                 StopChurnWorker(churn);

@@ -25,6 +25,15 @@ state; it creates no release and no tag. The `v3.0.0` narrative below and
   `.NET 8` statements describe the immutable `v2.3.2` and `v3.0.0` release
   assets rather than the current tree.
 
+- **The architecture diagram is redrawn from the current tree with Archify.**
+  `docs/architecture.svg` and the new `docs/architecture.png` are exports of an
+  Archify-authored candidate validated against this revision: every box cites the
+  source that implements it, and the recording box now says **schema 5**, which
+  the previous hand-drawn diagram still called schema 4. The README embed, alt
+  text, data-flow block and per-box citation table were corrected with it,
+  including two citations that had drifted (`TrajectoryWriter.cs:71` and
+  `CliApp.cs:1060`).
+
 - **The CRLF example test now asserts the framing contract specifically, plus an
   inverse test proving CR emission is caught.**
 

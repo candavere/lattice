@@ -50,30 +50,36 @@ The data flow, drawn from the committed tools:
 
 ```
 simulate -> recording (.jsonl) -> replay --verify / render / analyze / site
-benchmark -> throughput JSON          evaluate -> evaluation JSON
+benchmark -> throughput JSON -> throughput gate
+evaluate  -> evaluation JSON   evaluate --agent-cmd -> your agent
 ```
 
-The full diagram is [`docs/architecture.svg`](docs/architecture.svg):
+The full diagram is [`docs/architecture.svg`](docs/architecture.svg), and a
+fixed-size raster of the same rendering is
+[`docs/architecture.png`](docs/architecture.png):
 
 <p align="center">
-  <img src="docs/architecture.svg" alt="Lattice architecture. A seeded lattice simulate run writes one schema 5 JSONL recording, and four readers consume it: replay --verify, render, analyze, and the site replay viewer. Independently of any recording, lattice benchmark writes a host-scoped throughput JSON and lattice evaluate writes an evaluation JSON; seated instead of the in-process MCTS candidate, evaluate --agent-cmd runs an external agent process that speaks protocol 1 over stdin and stdout. The test suite and the three-operating-system CI gates block a merge on the recording." />
+  <img src="docs/architecture.svg" alt="Lattice architecture, drawn from the committed tools. A seeded lattice simulate run writes one schema 5 JSONL recording, and four readers consume it: lattice replay --verify, lattice render, lattice analyze, and the site replay viewer. The golden fixture is itself a recording, so the test suite pins the reader, and CI runs that suite on Ubuntu, Windows and macOS. Independently of any recording, lattice benchmark writes a host-scoped throughput JSON that is gated only on a full host match, and lattice evaluate writes an evaluation JSON from a mirrored-seat paired study of MCTS against the Scout baseline. Seated instead of the in-process MCTS candidate, lattice evaluate --agent-cmd runs an external agent process of any language, in a separate OS process, that speaks protocol 1 over stdin and stdout." />
 </p>
 
 Where each box in that diagram is implemented, at this commit:
 
 | Box | Implementation |
 | --- | --- |
-| `lattice simulate` | `Cli/CliApp.cs:219`; the header is stamped with the current schema at `Trajectories/TrajectoryWriter.cs:71` |
+| `lattice simulate` | `Cli/CliApp.cs:219`; the header is stamped with the current schema at `Trajectories/TrajectoryWriter.cs:117` |
 | `recording .jsonl` (schema 5) | `Trajectories/TrajectoryModel.cs`; one header line, one line per tick, one final line. Schema 5 adds the header's `ScenarioSha256`, the digest of the scenario descriptor's exact bytes; schema 4's decision-time `Perceptions` and `AgentVision` and schema 3's per-tick state hash are unchanged |
 | `lattice replay --verify` | `Cli/CliApp.cs:222`; per-tick result, state-digest and decision-time perception comparison at `Trajectories/TrajectoryReplay.cs` |
 | `lattice render` | `Cli/CliApp.cs:220`, over `Visualization/` |
 | `lattice analyze` | `Cli/CliApp.cs:221`, over `Analytics/` |
 | `site/ replay viewer` | `site/app.js`, deployed by `.github/workflows/pages.yml` |
 | `lattice benchmark` | `Cli/CliApp.cs:223`; five workloads on fresh simulations, never on a recording |
-| `throughput JSON` | the strict gate arms only on a full host match, at `.github/workflows/compare_benchmarks.py:518-543`; which hosted-runner workloads are armed, and which is a permanent non-verdict, is stated once in [`FINDING-014`](docs/FINDINGS_LEDGER.md#finding-014--the-mcts-decision-throughput-case-cannot-be-gated-on-this-host-class-and-four-of-five-workloads-can) |
+| `throughput JSON` | the host is sampled for the artifact at `Analytics/Benchmarking/BenchmarkMetadata.cs:53`, so the record names its own commit, runtime, OS, CPU, cores and RAM |
+| `throughput gate` | the strict gate arms only on a full host match, at `.github/workflows/compare_benchmarks.py:518-543`; which hosted-runner workloads are armed, and which is a permanent non-verdict, is stated once in [`FINDING-014`](docs/FINDINGS_LEDGER.md#finding-014--the-mcts-decision-throughput-case-cannot-be-gated-on-this-host-class-and-four-of-five-workloads-can) |
 | `lattice evaluate` | `Cli/CliApp.cs:224`; the pass/fail verdict is composed at `Agents/PairedEvaluation.cs:145-150` |
-| `lattice evaluate --agent-cmd` | the candidate seat, with the command line split without a shell at `Cli/CliApp.cs:1060`; the child process is launched from `Agents/External/ExternalAgentLaunch.cs:84` |
-| `tests + fixtures` → `CI on 3 operating systems` | the golden-trajectory replay gate runs on every matrix OS at `.github/workflows/ci.yml:42-43` |
+| `evaluation JSON` | the per-seed rows and statistics are written at `Cli/CliApp.cs:1450`; an external agent's failures are tallied per reason code at `Cli/CliApp.cs:1416` |
+| `lattice evaluate --agent-cmd` | the candidate seat, with the command line split without a shell at `Cli/AgentCommandLine.cs:49`; the child process is launched from `Agents/External/ExternalAgentLaunch.cs:84` |
+| `your agent, any language` | a separate OS process reached only over protocol 1; a CR anywhere in a line is refused as `malformed_json` at `Protocol/ProtocolFraming.cs:65` |
+| `tests + golden fixture` → `CI on 3 operating systems` | the golden-trajectory replay gate runs on every matrix OS at `.github/workflows/ci.yml:42-43`; every committed `site/*.jsonl` is re-verified by the gate at `.github/workflows/ci.yml:130-162` |
 
 [Replay the infiltration recording in your browser](https://candavere.github.io/lattice/).
 The page replays committed recordings only: ground truth shows everything a

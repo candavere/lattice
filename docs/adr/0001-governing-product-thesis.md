@@ -99,3 +99,23 @@ Feature intake now gates on the evidentiary standard:
   does not implement yet. Where a capability is slated for a future engine
   revision — as with a formal canonical simulation-state hash tree — the
   documentation says so.
+## Addendum — the BCL contract is now .NET 10 (2026-09-30)
+
+Decision 5 above names the runtime contract as "the specified .NET 8 BCL
+runtime contract". That wording was accurate when this record was accepted and
+is left unchanged, because rewriting accepted decision text would rewrite the
+record of what was decided. The current contract is **the .NET 10 BCL runtime
+contract**: every solution-included project now targets `net10.0`, and the
+gated CI matrix, the release workflow and the benchmark workflows all install
+the .NET 10 SDK.
+
+Nothing about the four guarantees changes with the runtime bump. Transition
+determinism is still a contract scoped to one runtime, and it is still scoped
+rather than absolute: the artifact metadata names the host, runtime, build
+configuration and source revision that produced each recording, and
+cross-platform determinism remains a property of the code exercised by the CI
+matrix rather than a claim asserted in prose. A reader verifying a recording
+must compare the runtime recorded in the artifact against the runtime they
+replay on; a .NET 8 recording replayed on .NET 10 is a cross-runtime
+comparison, and the reader should say so rather than treat the result as the
+guarantee this record names.

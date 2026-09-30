@@ -2,7 +2,7 @@ namespace Lattice.Tests.Fuzz;
 
 /// <summary>
 /// Resolves fixture paths repo-relative from the test output directory. Tests
-/// run out of <c>Tests/bin/&lt;Config&gt;/net8.0</c>, so the resolver walks up
+/// run out of <c>Tests/bin/&lt;Config&gt;/net10.0</c>, so the resolver walks up
 /// from <see cref="AppContext.BaseDirectory"/> looking for the
 /// <c>Tests/fixtures</c> tree rather than depending on the ambient working
 /// directory of the test host.

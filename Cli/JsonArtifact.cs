@@ -21,8 +21,14 @@ namespace Lattice.Cli;
 ///
 /// <para>
 /// Normalization happens after serialization rather than by configuring the
-/// writer because <c>JsonWriterOptions.NewLine</c> is .NET 9+ and this project
-/// targets <c>net8.0</c>. Replacing <c>"\r\n"</c> with <c>"\n"</c> is sufficient
+/// writer. The original reason was that <c>JsonWriterOptions.NewLine</c> did not
+/// exist before .NET 9 while this project targeted <c>net8.0</c>; the project
+/// now targets <c>net10.0</c>, so that blocker is gone and
+/// <c>JsonWriterOptions.NewLine</c> is available. The replacement below is kept
+/// because it is still lossless for this writer, not because the API is
+/// unavailable; moving the newline onto the writer is a behaviour-bearing
+/// change and is deliberately not made in a comment-only edit. Replacing
+/// <c>"\r\n"</c> with <c>"\n"</c> is sufficient
 /// and lossless here: the only newlines a serializer can emit are the
 /// indentation breaks it writes itself, and a <c>CR</c> that arrived inside a
 /// string value is escaped to the two-character sequence <c>\r</c> rather than

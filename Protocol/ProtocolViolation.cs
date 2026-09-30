@@ -16,8 +16,8 @@ namespace Lattice.Protocol;
 /// <see cref="NullReferenceException"/>. Every fuzz case feeds hostile bytes
 /// through the parser, so that distinction is the difference between a covered
 /// input class and an unexplained crash. (<see cref="InvalidDataException"/>
-/// would read better but is sealed in .NET 8, and the boundary cannot be edited
-/// to learn about a new type.)
+/// would read better but is still sealed in .NET 10, and the boundary cannot be
+/// edited to learn about a new type.)
 /// <para>
 /// A <see cref="ProtocolViolation"/> always carries <b>one</b> reason. When
 /// several conditions hold at once, the reported one is the first detected

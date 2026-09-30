@@ -25,6 +25,24 @@ state; it creates no release and no tag. The `v3.0.0` narrative below and
   `.NET 8` statements describe the immutable `v2.3.2` and `v3.0.0` release
   assets rather than the current tree.
 
+- **The architecture diagram's legend names Lattice's own roles.** The generic
+  `Frontend` / `Backend` / `Database` / `Security` / `External` categories are
+  replaced with *CLI command*, *artifact on disk*, *site viewer*,
+  *verification / CI gate* and *external agent process*, and the column gap is
+  narrowed so edge labels render at about 7.7px at README width instead of
+  about 7.1px. `docs/architecture.svg` and `docs/architecture.png` are
+  re-exported together from the same Archify run.
+
+- **Present-tense .NET 8 wording is corrected; historical .NET 8 is labelled as
+  historical.** Seven current-state sites now say .NET 10. Two of them needed
+  more than a version swap, and say so: `Cli/JsonArtifact.cs` explains that
+  `JsonWriterOptions.NewLine` became available in .NET 9 and the original blocker
+  is gone, and `Protocol/ProtocolViolation.cs` records that
+  `InvalidDataException` is *still* sealed on .NET 10. ADR-0001 and ADR-0003 keep
+  their original `.NET 8` decision text and each gain a dated addendum pointing
+  at it as history. `docs/reproduction_packet.md` is untouched: its `.NET 8`
+  statements describe the immutable `v2.3.2` and `v3.0.0` release assets.
+
 - **The architecture diagram is redrawn from the current tree with Archify.**
   `docs/architecture.svg` and the new `docs/architecture.png` are exports of an
   Archify-authored candidate validated against this revision: every box cites the
@@ -200,7 +218,7 @@ state; it creates no release and no tag. The `v3.0.0` narrative below and
 
 - **Ubuntu 26.04 compatibility probe (informational).** CI gains a distinctly
   named `ubuntu-26.04` job that restores, builds in Release, runs the golden
-  replay verification, and runs the test suite under the same .NET 8 SDK as the
+  replay verification, and runs the test suite under the same .NET 10 SDK as the
   gated matrix. It is `continue-on-error` and non-gating: it publishes no
   artifact, nothing depends on it, and it is not part of the three-OS
   cross-platform equivalence contract, so its step results and logs must be read

@@ -226,3 +226,18 @@ The documentation and the verifier must stay in step:
   never reported as a full one. A recording that claims the current schema
   without carrying the digests is a defect in the file, not a legacy file, and
   must exit non-zero.
+## Addendum — the BCL contract is now .NET 10 (2026-09-30)
+
+The addendum above names "the specified .NET 8 BCL runtime contract" as the
+engine-level transition-determinism contract. That wording is accurate history
+and is left unchanged. The current contract is **the .NET 10 BCL runtime
+contract**: every solution-included project now targets `net10.0`, and CI,
+release and the benchmark workflows install the .NET 10 SDK.
+
+The contract itself is unchanged by the bump. The same state plus the same
+actions still yields the same next state, and the replay gate still asserts
+per-step serialized `StepResult` equivalence plus the per-tick state digest.
+The guarantee remains runtime-scoped rather than cross-runtime: determinism is
+claimed under one named BCL contract, and the recording's own metadata records
+the runtime that produced it, so a verification run on a different runtime is a
+different claim and must be reported as one.

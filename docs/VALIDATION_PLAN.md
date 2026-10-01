@@ -17,19 +17,21 @@ re-check without trusting the first.
 
 > **Scope: the v2.3.2 release.** Every judged target, expected `--version`
 > string, and checksum in this plan belongs to the published **v2.3.2** assets
-> and is left unchanged. **v3.0.0 shipped on 2026-09-27 and is the latest
-> published release.** The current source tree is at **3.1.0**, where
-> `--version` prints `3.1.0` — an unreleased source version, distinct from the
-> published `v3.0.0` — and the `v3.0.0` turnkey challenge guide is the second
-> packet in [`reproduction_packet.md`](reproduction_packet.md).
-> That packet is a challenge guide, not a judged plan: nothing in this
-> document judges 3.0.0, and independent validation of 3.0.0 under this
-> protocol would require its own v3-scoped plan, with its own judged targets,
-> expected `--version` string and checksums, drawn from the v3.0.0 release
-> assets. No such plan has been published, so none is claimed here. Experiment
-> 2's wording below describes what `replay --verify` checked in v2.3.2 and is
-> not a statement about 3.0.0, which additionally compares a canonical
-> per-tick state digest.
+> and is left unchanged. **v3.0.0 shipped on 2026-09-27** — a historical fact
+> about that release, not a claim about which release is latest. The current
+> source tree is at **3.1.0**, where `--version` prints `3.1.0`. **This source
+> snapshot targets v3.1.0: publication is pending until the `v3.1.0` tag and
+> GitHub Release are verified, and after that checkpoint v3.1.0 is the
+> published release for this snapshot.** The `v3.0.0` turnkey challenge guide
+> is the second packet in [`reproduction_packet.md`](reproduction_packet.md).
+> That packet is a challenge guide, not a judged plan: **nothing in this
+> document judges 3.0.0, and nothing in it judges 3.1.0.** Independent
+> validation of either one would require its own version-scoped plan, with its
+> own judged targets, expected `--version` string and checksums, drawn from that
+> version's release assets. No such plan has been published, so none is
+> claimed here. Experiment 2's wording below describes what `replay --verify`
+> checked in v2.3.2 and is not a statement about 3.0.0, which additionally
+> compares a canonical per-tick state digest.
 
 ## 1. Scope and status of validation evidence
 

@@ -6,22 +6,30 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Post-`v3.0.0` work on `main`, at source version 3.1.0. This section describes
-unversioned development state; it creates no release and no tag, and nothing in
-it implies one. The `v3.0.0` narrative below is unchanged.
+No unreleased work is recorded above the 3.1.0 section at this revision. The next
+version's section is created when work lands on `main`.
 
-[`CITATION.cff`](CITATION.cff) carries `version: 3.1.0` — the in-development
-version, which tracks the project files rather than pinning itself to the last
-released one — and deliberately carries **no** `date-released`. Under CFF 1.2.0
-that field is optional and means the date the software was released, so while
-3.1.0 is unreleased it has no honest value: there is no `v3.1.0` tag, no GitHub
-Release, and no published package. The 2026-09-27 date recorded for `v3.0.0`
-below belongs to that release and is not a claim about 3.1.0. The actual
-release date is a checkpoint of the tagging/publication step, which is a
-separate and separately approved action; it is filled in from what that step
-actually does, not from a planned or assumed date. 1 October 2026 was the
-*intended* release date for 3.1.0 and is recorded here only as that intention.
-Publication of any package to nuget.org likewise remains a separate, optional
+## [3.1.0] - 2026-10-01
+
+Source version 3.1.0, the release line that follows `v3.0.0`. This section
+describes the work on `main` since `v3.0.0`; the `v3.0.0` narrative below is
+unchanged.
+
+**This section is a publication candidate written on its actual release day,
+2026-10-01 (Asia/Kolkata).** The authoritative record of whether v3.1.0
+published is the `v3.1.0` tag and its GitHub Release, not this prose: the
+tagging step creates them, and nothing here asserts that step has already
+succeeded. No documentation is mutated after the tag to turn a pending claim
+into a success claim.
+
+[`CITATION.cff`](CITATION.cff) carries `version: 3.1.0`, which tracks the
+project files, and `date-released: 2026-10-01` as the release-day candidate
+for that field. Under CFF 1.2.0 the field is optional and means the date the
+software was released, so it is written from the day the release step actually
+runs — never from a planned or assumed date, and never moved afterwards to
+repair a mismatch, because a published tag is permanent. The 2026-09-27 date
+recorded for `v3.0.0` below belongs to that release and is not a claim about
+3.1.0. Publication of any package to nuget.org remains a separate, optional
 maintainer action that this repository does not perform.
 
 ### Added
@@ -92,21 +100,31 @@ maintainer action that this repository does not perform.
   when `v3.0.0` shipped on 2026-09-27. The table now reads `3.x` supported,
   `2.x` and `1.x` unsupported, verified against `git tag -l` (newest tag
   `v3.0.0`) and this changelog. It describes **release lines**, so it makes no
-  claim about 3.1.0, which exists only as the unreleased version on `main`. The
-  reporting policy and the zero-external-runtime-packages paragraph are
-  untouched.
+  claim about 3.1.0 either way: the entry was true when 3.1.0 was an unreleased
+  version on `main`, and it stays true once 3.1.0 is published, because `3.x`
+  names the line rather than a point release. The reporting policy and the
+  zero-external-runtime-packages paragraph are untouched.
 
-- **`CITATION.cff` tracks the in-development version, and states no release
-  date for it.** Its `version` moves from `3.0.0` to `3.1.0`, matching the
-  project files and `CliApp.Version`, so version, changelog and README agree at
-  all times as the repo's own rule requires. Its `date-released` is **omitted**,
-  not held at `"2026-09-27"` as an earlier state of this entry had it. CFF 1.2.0
-  defines that field as optional and as the date the software was released;
-  while 3.1.0 is unreleased it has no honest value, and keeping a v3.0.0 date
-  beside a 3.1.0 version is a contradiction a citation tool would render as a
-  release claim. The field is filled in at the tagging/publication step, from
-  the date that step actually happens. **Corrected 2026-10-01.** No other field
-  changed.
+- **`CITATION.cff` tracks the in-development version, and at the version-bump
+  change stated no release date for it.** Its `version` moves from `3.0.0` to
+  `3.1.0`, matching the project files and `CliApp.Version`, so version,
+  changelog and README agree at all times as the repo's own rule requires. Its
+  `date-released` was **omitted** at that change, not held at `"2026-09-27"`
+  as an earlier state of this entry had it. CFF 1.2.0 defines that field as
+  optional and as the date the software was released; while 3.1.0 was unreleased
+  it had no honest value, and keeping a v3.0.0 date beside a 3.1.0 version is
+  a contradiction a citation tool would render as a release claim. The field is
+  filled in at the tagging/publication step, from the date that step actually
+  happens. **Corrected 2026-10-01.** No other field changed.
+  **Release-day update 2026-10-01:** the omission described above was the state
+  of the file before that step, and it is now filled with `2026-10-01`, the
+  actual release day (Asia/Kolkata) — the release-day candidate for the field,
+  replacing the omission rather than any earlier value. Whether that value has
+  become a statement of fact is decided by the `v3.1.0` tag and its GitHub
+  Release, not by this changelog. `version`, authors, title, license, abstract,
+  type and repository-code are unchanged. The entry above is left in place
+  because the omission it describes really was the state of the file before
+  this step.
 
 - **A one-sided paired-evaluation seed stays a refusal, deliberately, until
   v3.2.** The Known-limitations bullet that said "there is no drop-and-count
@@ -217,11 +235,14 @@ maintainer action that this repository does not perform.
   wrong for `CITATION.cff` in the state it is now in. `CITATION.cff` now
   carries `version: 3.1.0`, matching the project files (see the
   `CITATION.cff` bullet above and the section preamble), so it no longer
-  describes a released 3.0.0 identity. What *is* still held back is its
-  `date-released`, which is omitted rather than set to a stale or invented
-  date while 3.1.0 is unreleased. The pinned `v3.0.0` GitHub Release record is
-  genuinely untouched: it is an immutable published artifact of that release,
-  not a working file.
+  describes a released 3.0.0 identity. What *was* still held back at that
+  change was its `date-released`, which was omitted rather than set to a stale
+  or invented date while 3.1.0 was unreleased; **Release-day update
+  2026-10-01:** that omission was the state of the file before the tagging
+  step, and was replaced then by the actual release-day candidate value (see
+  the release-day update on the `CITATION.cff` bullet above). The pinned
+  `v3.0.0` GitHub Release record is genuinely untouched: it is an immutable
+  published artifact of that release, not a working file.
 
 - **`FINDING-014` is the single canonical statement of the runner-class arming
   decision.** The MCTS workload's "informational / not armed" status was
@@ -275,11 +296,16 @@ maintainer action that this repository does not perform.
 
   **Schema 0 through 4 recordings remain readable, replayable, and verifiable
   unchanged.** The digest is a new optional field, omitted when absent, so an
-  older recording is not rewritten or rejected by its absence. The committed
-  `site/infiltration.jsonl` (schema 4) and `site/demo.jsonl` and the golden
-  fixture (schema 3) stay at their own versions **on purpose** — they are the
-  standing backward-compatibility evidence, and CI's site-recording gate
-  continues to replay them. A schema-5 recording whose digest is absent verifies
+  older recording is not rewritten or rejected by its absence. At that
+  schema-5 introduction change, `site/infiltration.jsonl` remained schema 4 and
+  `site/demo.jsonl` and the golden fixture remained schema 3; the subsequent
+  re-recording described above moved `site/infiltration.jsonl` to schema 5 and
+  retained its schema-4 predecessor at
+  `Tests/fixtures/legacy/infiltration_schema4.jsonl`, while `site/demo.jsonl`
+  and the golden fixture remain schema 3. Those schema-4 and schema-3 files
+  stay at their own versions **on purpose** — they are the standing
+  backward-compatibility evidence, and CI's site-recording gate continues to
+  replay them. A schema-5 recording whose digest is absent verifies
   on every tick and reports
   `no scenario digest: the recording does not name the descriptor that produced it`
   as a *notice* — deliberately unlike the state hash, whose absence from a
@@ -621,5 +647,6 @@ releases are [`docs/reproduction_packet.md`](docs/reproduction_packet.md) and
 [`docs/VALIDATION_PLAN.md`](docs/VALIDATION_PLAN.md), both scoped to the
 `v2.3.2` release assets and checksums.
 
+[3.1.0]: https://github.com/candavere/lattice/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/candavere/lattice/compare/v2.3.2...v3.0.0
-[Unreleased]: https://github.com/candavere/lattice/compare/v3.0.0...HEAD
+[Unreleased]: https://github.com/candavere/lattice/compare/v3.1.0...HEAD

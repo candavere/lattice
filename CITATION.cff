@@ -12,10 +12,13 @@ authors:
 license: MIT
 repository-code: "https://github.com/candavere/lattice"
 version: 3.1.0
-# date-released is intentionally omitted. Under CFF 1.2.0 it is optional and
-# means the date the software was released. 3.1.0 is not released yet: there is
-# no v3.1.0 tag, no GitHub Release, and no published package. The field is
-# filled in at the tagging/publication step, which is a separate, separately
-# approved action, and it must record that step's real date -- not a planned or
-# assumed one. The last actual release date, for v3.0.0, was 2026-09-27; it
-# belongs to that version and is not a claim about 3.1.0.
+# Under CFF 1.2.0 date-released is optional and means the date the software was
+# released. It is recorded here as a publication candidate: 2026-10-01 is the
+# actual release day this metadata was written for (Asia/Kolkata), and the
+# authoritative record of whether publication completed is the v3.1.0 GitHub
+# Release itself. This field becomes a statement of fact at the moment the
+# v3.1.0 tag and GitHub Release exist; until then it is the intended date of
+# that step, not evidence that it happened. It is never moved to repair a
+# mismatch: a published tag is permanent. The 2026-09-27 date belongs to
+# v3.0.0 and is not a claim about 3.1.0.
+date-released: 2026-10-01

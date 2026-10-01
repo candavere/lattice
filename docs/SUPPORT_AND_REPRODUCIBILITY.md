@@ -307,19 +307,25 @@ check: what each agent actually saw when it chose.
   so the fog cannot be stripped from some steps to narrow the check. A header
   that declares an `AgentVision` no step backs, or a recording whose steps carry
   perceptions but whose header declares no cone, is likewise a discrepancy.
-- **The notice path.** A recording that declares schema
+- **The notice path.** A recording with at least one step that declares schema
   `TrajectorySchema.DecisionTimePerceptionVersion` (currently `4`) or later and
-  carries neither perceptions nor a declared vision reports
+  carries neither recorded perceptions nor a declared vision reports
   `no recorded perception: decision-time visibility not verified`, published as
   `TrajectoryReplay.NoPerceptionNotice`. It is a notice rather than a
   discrepancy because the fields are optional on the wire — an agent that
   carries no filter has no decision-time fog to record, and an external-agent
   match is exactly that — but it is never silence, because a reader that did
   not check the fog must not be able to report a pass that reads as though it
-  had. A recording from **before** schema 4 is not nagged: the field never
-  existed, so there is nothing it failed to carry. A recording at schema 4 or
-  later that declares neither recorded perceptions nor a per-agent vision **is**
-  nagged, because that is the case the check exists for. The committed
+  had. The predicate is narrow in three ways, and the other cases stay
+  discrepancies rather than falling into this notice: a header that declares an
+  `AgentVision` that no step backs, a recording whose steps carry perceptions
+  with no declared vision, and partial perception coverage. A recording from
+  **before** schema 4 is not nagged either: the field never existed, so there is
+  nothing it failed to carry. A **zero-step** recording with no declared vision
+  is not nagged, because there is no step whose decision-time visibility went
+  unverified. None of this excuses a malformed or internally inconsistent
+  perception declaration, and it does not weaken the state-hash, final-summary
+  or provenance gates, which are reported independently. The committed
   `demo.jsonl` and the golden fixture are both in the un-nagged position and
   verify as they always did.
 - **A recording without the fields is byte-identical to one written before
@@ -359,10 +365,18 @@ check: what each agent actually saw when it chose.
   scenario digest is a new *optional* field, omitted when absent, so an older
   recording is not rewritten or rejected by its absence — it simply has no
   digest, the same way a pre-schema-3 recording has no state hash. The
-  committed schema-4 recording `../site/infiltration.jsonl` and the schema-3
-  recordings `../site/demo.jsonl` and the golden fixture are the standing
-  backward-compatibility evidence, and `Tests/Cli/ScenarioProvenanceTests.cs`
-  replays and verifies all three.
+  retained schema-4 recording
+  [`../Tests/fixtures/legacy/infiltration_schema4.jsonl`](../Tests/fixtures/legacy/infiltration_schema4.jsonl)
+  and the schema-3 recordings `../site/demo.jsonl` and the golden fixture are
+  the standing backward-compatibility evidence.
+  `Tests/Cli/ScenarioProvenanceTests.cs` pins them in three separate cases
+  rather than one: `TheCommittedSchema4Fixture_StillReadsReplaysAndVerifies`
+  and `EveryCommittedLegacyFixture_StillVerifiesUnderSchema5` cover the legacy
+  schema-4 fixture alongside `../Tests/fixtures/legacy/demo_schema3.jsonl`,
+  `TheCommittedSchema3SiteRecording_StillVerifiesWithNoDigestNotice` covers the
+  schema-3 site/golden pair, and
+  `ANewlyRecordedSiteArtifact_CarriesTheSchema5Digest` covers the current
+  schema-5 `../site/infiltration.jsonl` as the other half of the contract.
 - **Forward compatibility is refused, not guessed.** A header whose
   `SchemaVersion` is newer than the version this library writes is rejected with
   an explicit error. Version skew fails loudly rather than replaying under the
@@ -382,20 +396,31 @@ The golden fixtures used to pin these invariants are
 [`../Tests/fixtures/golden_dynamic_rules.json`](../Tests/fixtures/golden_dynamic_rules.json).
 The v3 fixture stays at v3 on purpose: it is the standing proof that a
 pre-perception recording is still read, still verified, and still emits no
-perception notice. The committed
-[`../site/infiltration.jsonl`](../site/infiltration.jsonl) is the schema-4
-counterpart (seed 42, 20 steps, per-agent vision `[2, 2]`), and
+perception notice. Its retained schema-4 counterpart, kept as deliberate
+backward-compatibility evidence, is
+[`../Tests/fixtures/legacy/infiltration_schema4.jsonl`](../Tests/fixtures/legacy/infiltration_schema4.jsonl)
+(seed 42, 20 steps, per-agent vision `[2, 2]`, and no `ScenarioSha256`), and
 `../site/demo.jsonl` remains a schema-3 recording with no perceptions, which is
-why the viewer labels its sightline a reconstruction rather than a record. Both
-are **pre-schema-5 and stay that way on purpose**: they are the committed
-evidence that a recording without a scenario digest is still read, still
-verified, and reports no digest notice. Newly recorded artifacts carry schema
-5; these two are the legacy half of the compatibility contract, not stale
-files awaiting regeneration.
+why the viewer labels its sightline a reconstruction rather than a record. The
+current committed
+[`../site/infiltration.jsonl`](../site/infiltration.jsonl) is the **schema-5**
+half of that same pair (seed 42, 20 steps, `AgentVision [2, 2]`, and a
+`ScenarioSha256` naming `../scenarios/dungeon-infiltration.json`): it is the
+current recording, not a retained pre-schema-5 fixture, and
+`DecisionTimePerceptionTests.cs` verifies its recorded perceptions against the
+current schema-5 reader.
+
+The two retained pre-schema-5 files — the schema-4 legacy fixture and the
+schema-3 `demo.jsonl` — are **pre-schema-5 and stay that way on purpose**: they
+are the committed evidence that a recording without a scenario digest is still
+read, still verified, and reports no digest notice. Newly recorded artifacts
+carry schema 5; those two are the legacy half of the compatibility contract, not
+stale files awaiting regeneration.
 
 `demo.jsonl` is pinned for a second, sharper reason: `NoPerceptionNotice` fires
-for any recording at `DecisionTimePerceptionVersion` (4) or later that declares
-no perception, and stays silent below it. Migrating this file to schema 5 would
+for a recording with at least one step at `DecisionTimePerceptionVersion` (4) or
+later that declares neither recorded perceptions nor a declared vision, and
+stays silent below 4. Migrating this file to schema 5 would
 therefore turn the committed example of a *silently* read pre-perception
 recording into one the reader is obliged to flag. That is why
 `scripts/regenerate-site-demos.sh` verifies it and never rewrites it.
@@ -443,8 +468,10 @@ they live in. That layer order is load-bearing: a card is an opaque fill in an
 observed room, so painting loot first buries every chest under the card it is in
 and no chest is visible in any view, at any DPR. `ui_tests/test_loot_pixels.py`
 reads the actual canvas pixels with `getImageData` for one desktop frame of the
-schema-4 recording, on every perspective, and fails when a diamond is absent or
-in the wrong colour; `ui_tests/test_agent_view_honesty.py` covers the same claim
+committed `site/infiltration.jsonl` — the schema-5 recording whose perception
+fields were introduced at schema 4 — on every perspective, and fails when a
+diamond is absent or in the wrong colour;
+`ui_tests/test_agent_view_honesty.py` covers the same claim
 semantics across every frame of every view from the geometry probe.
 
 ### Viewer presence semantics
@@ -491,8 +518,8 @@ probe, with each token assigned to the room box that contains it. Neither
 committed file contains a rival an observer has lost — every recorded rival
 sighting in `infiltration.jsonl` is currently observed, and `demo.jsonl`'s four
 rooms all sit inside the page's two-hop cone — so the ghost and unknown-rival
-cases, and the missing-perception case, run on controlled variants of the
-schema-4 file written to a temp directory and loaded through the page's own file
+cases, and the missing-perception case, run on controlled variants of that same
+file written to a temp directory and loaded through the page's own file
 input. The committed recordings are immutable evidence and are not edited to
 make a test pass.
 

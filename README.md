@@ -467,9 +467,11 @@ recorded turn of actions back through the engine, compares every re-serialized
 `StepResult` against the recorded one, recomputes each step's state digest and
 compares that, reprojects each recorded per-agent decision-time perception
 through a `PerceptionFilter` built from the header's `AgentVision` and compares
-that too (schema 4 and later only; an older file reports
+that too (a nonempty recording at schema 4 or later that declares neither
+recorded perceptions nor a declared `AgentVision` reports
 `no recorded perception: decision-time visibility not verified` rather than
-passing in silence), and re-computes the final summary line's aggregates field
+passing in silence; a file below schema 4 is not nagged), and re-computes the
+final summary line's aggregates field
 by field; exit code `0` means every tick, every recorded perception and the
 final aggregates reproduced. That
 is the same check the CI pipeline runs on the golden trajectory on Ubuntu,
@@ -550,10 +552,11 @@ Only claims the repository can back up are listed here.
   at v3 because it is the committed proof that a **pre-perception** recording is
   read, replayed and verified *without* the reader nagging it about fields that
   did not exist yet: `TrajectoryReplay.NoPerceptionNotice` is gated on
-  `DecisionTimePerceptionVersion = 4`, so a current-schema recording that
-  records no perception is *required* to be flagged, and re-recording this one
-  would make it exactly that. Re-recording it would replace a contract test with
-  a nagged file, which is a regression dressed as tidying.
+  `DecisionTimePerceptionVersion = 4`, so a recording with at least one step at
+  schema 4 or later that declares neither recorded perceptions nor a declared
+  `AgentVision` is *required* to be flagged, and re-recording this one would make
+  it exactly that. Re-recording it would replace a contract test with a nagged
+  file, which is a regression dressed as tidying.
 
   It is also **not** true, as an earlier version of this file claimed, that no
   current invocation regenerates it. Measured against the file, every one of its

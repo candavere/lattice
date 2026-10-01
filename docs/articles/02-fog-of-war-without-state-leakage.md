@@ -86,9 +86,10 @@ distinction checkable.
   `V`, or one that never saw a room, does not get the room back.
 - **External-agent recordings.** The agents are another process, so there is no
   library-side `PerceptionFilter` whose output could have been recorded. These
-  files are legal schema-4 recordings with the perception fields absent, and
-  `replay --verify` reports `no recorded perception: decision-time visibility
-  not verified` on stderr. It is a notice, not a failure: the exit code is
+  files are legal schema-4-or-later recordings with the perception fields
+  absent, and `replay --verify` reports `no recorded perception: decision-time
+  visibility not verified` on stderr for a nonempty one that declares no vision.
+  It is a notice, not a failure: the exit code is
   still 0 and the verdict line still reads `replay verified`. Nothing is
   invented in place of the missing data, and step-level verification is
   unaffected.

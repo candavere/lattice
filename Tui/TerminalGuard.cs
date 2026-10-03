@@ -75,7 +75,20 @@ public static class TerminalGuard
     /// handle that restores both exactly once however many times it is
     /// disposed.
     /// </summary>
-    /// <param name="output">Where the escape sequences and the frame go.</param>
+    /// <param name="output">
+    /// Where the escape sequences and the frame go. The escapes are written
+    /// unconditionally, to whatever writer is supplied: the guard is handed a
+    /// <see cref="TextWriter"/> rather than reaching for
+    /// <see cref="Console.Out"/>, so redirection of <em>that</em> writer is not
+    /// something the guard can see or should guess at. Deciding whether a
+    /// terminal is attached is the caller's job, and
+    /// <see cref="TerminalCapabilities.OutputRedirected"/> is the value to
+    /// decide it with — a caller rendering into a redirected stream should not
+    /// enter the alternate screen at all. Note that
+    /// <see cref="Console.IsOutputRedirected"/> describes the process's own
+    /// standard output and says nothing about this writer, so it is not a
+    /// substitute for the capability record.
+    /// </param>
     /// <param name="subscription">
     /// The Ctrl-C hook to register the restore with. Defaults to
     /// <see cref="ConsoleCancelSubscription"/>, which attaches to

@@ -247,6 +247,23 @@ public class TerminalGuardTests
     }
 
     [Fact]
+    public void EnterWritesToTheSuppliedWriterWithoutConsultingTheConsole()
+    {
+        // The guard is handed a writer, not Console.Out, so it cannot know
+        // whether that writer is redirected and must not try to find out. These
+        // tests run under a host whose own standard output is redirected, and
+        // the escapes are written regardless -- which is what keeps this
+        // contract testable on every platform rather than only on a terminal.
+        var output = new StringWriter();
+
+        using (TerminalGuard.Enter(output))
+        {
+        }
+
+        Assert.Equal(Enter + Hide + Show + Leave, output.ToString());
+    }
+
+    [Fact]
     public void Utf8PreparationIsGuardedAndSkipsRedirectedOutput()
     {
         if (Console.IsOutputRedirected)

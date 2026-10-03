@@ -74,6 +74,25 @@ public class GlyphsTests
     }
 
     [Fact]
+    public void TheMappingTableCannotBeMutatedThroughItsPublicType()
+    {
+        // An IReadOnlyList over a bare array only hides mutation at compile
+        // time; a caller could cast back and rewrite a process-wide global. The
+        // table is exposed as an immutable array so the guarantee holds at
+        // runtime as well, which is what this asserts.
+        // The compiler can see the static type is already not an array, so this
+        // asserts it through reflection rather than an `is` check that would
+        // fold to a constant and warn as unreachable.
+        Assert.NotEqual(typeof(GlyphMapping[]), Glyphs.Mappings.GetType());
+
+        // Every read hands back the same 59 mappings, and the one mutating entry
+        // point on the underlying IList refuses.
+        Assert.Equal(59, Glyphs.Mappings.Length);
+        Assert.Throws<NotSupportedException>(
+            () => ((System.Collections.IList)Glyphs.Mappings).Add(default));
+    }
+
+    [Fact]
     public void AnUnmappedGlyphIsAnErrorRatherThanASilentReplacement()
     {
         Assert.Throws<KeyNotFoundException>(() => Glyphs.ToAscii('\u0001'));

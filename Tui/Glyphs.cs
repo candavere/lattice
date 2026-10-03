@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace Lattice.Tui;
 
 /// <summary>One glyph and the ASCII text that stands in for it.</summary>
@@ -84,8 +86,15 @@ public static class Glyphs
     /// coverage test walks, so a glyph used anywhere without an entry here
     /// fails that test.
     /// </summary>
-    public static readonly IReadOnlyList<GlyphMapping> Mappings = new[]
-    {
+
+    /// <summary>
+    /// The mapping table is exposed as an <see cref="ImmutableArray{T}"/> rather
+    /// than a bare array behind an interface: an interface alone only hides the
+    /// mutation at compile time, and a caller casting back to
+    /// <c>GlyphMapping[]</c> could still rewrite a shared global for the whole
+    /// process. An immutable array makes the guarantee hold at runtime too.
+    /// </summary>
+    public static ImmutableArray<GlyphMapping> Mappings { get; } = ImmutableArray.Create(
         // Box Drawing: light.
         new GlyphMapping('─', '-'),
         new GlyphMapping('│', '|'),
@@ -155,8 +164,7 @@ public static class Glyphs
         new GlyphMapping('◀', '<'),
         new GlyphMapping('▶', '>'),
         new GlyphMapping('◆', '*'),
-        new GlyphMapping('◇', 'o'),
-    };
+        new GlyphMapping('◇', 'o'));
 
     /// <summary>
     /// The glyph to draw for <paramref name="unicode"/>: itself when the

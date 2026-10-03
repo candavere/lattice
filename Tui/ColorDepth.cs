@@ -9,7 +9,10 @@ public enum ColorDepth
     /// <summary>No colour: the output carries glyphs and nothing else.</summary>
     None = 0,
 
-    /// <summary>The 16 base ANSI colours (SGR 30-37 and 90-97).</summary>
+    /// <summary>
+    /// The 16 base ANSI colours: SGR 30-37 and 90-97 select a foreground, 40-47
+    /// and 100-107 select a background.
+    /// </summary>
     Ansi16 = 1,
 
     /// <summary>The xterm 256-colour palette (SGR 38;5;n).</summary>

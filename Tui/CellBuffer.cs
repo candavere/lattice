@@ -64,11 +64,17 @@ public sealed class CellBuffer
         }
     }
 
-    /// <summary>Fills the inclusive rectangle with one cell style.</summary>
+    /// <summary>
+    /// Fills the rectangle with one cell style. The whole rectangle is checked
+    /// before the first cell is written, so a rectangle that does not fit throws
+    /// <see cref="ArgumentOutOfRangeException"/> and leaves the buffer untouched
+    /// rather than half-filled. A zero width or height is a legal no-op.
+    /// </summary>
     public void Fill(int x, int y, int width, int height, Cell style)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(width);
         ArgumentOutOfRangeException.ThrowIfNegative(height);
+        CheckRectangle(x, y, width, height);
 
         for (var row = y; row < y + height; row++)
         {
@@ -102,14 +108,21 @@ public sealed class CellBuffer
     }
 
     /// <summary>
-    /// Draws a single-line box with the given corner, edge and tee glyphs.
+    /// Draws a single-line box with the given corner and edge glyphs.
     /// This is the primitive panels are built from, so the box geometry lives
     /// in exactly one place.
+    ///
+    /// The whole rectangle is checked before the first cell is written, so a box
+    /// that does not fit throws <see cref="ArgumentOutOfRangeException"/> and
+    /// leaves the buffer untouched rather than half-drawn. A caller that has
+    /// already checked the geometry still gets the same exception, from the
+    /// explicit check rather than from the indexer partway through.
     /// </summary>
     public void DrawBorder(int x, int y, int width, int height, BorderGlyphs glyphs, Cell style)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(width, 2);
         ArgumentOutOfRangeException.ThrowIfLessThan(height, 2);
+        CheckRectangle(x, y, width, height);
 
         for (var column = x; column < x + width; column++)
         {
@@ -149,6 +162,22 @@ public sealed class CellBuffer
         }
 
         return lines;
+    }
+
+    /// <summary>
+    /// Whether the whole rectangle lies inside the buffer, far edge included.
+    /// Checked up front by the writers so a rejected rectangle never mutates
+    /// anything.
+    /// </summary>
+    private void CheckRectangle(int x, int y, int width, int height)
+    {
+        if (x < 0 || y < 0 || x + width > Width || y + height > Height)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(x),
+                x,
+                $"Rectangle ({x}, {y}, {width}, {height}) does not fit inside a {Width}x{Height} buffer.");
+        }
     }
 
     private void CheckBounds(int x, int y)

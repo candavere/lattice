@@ -85,9 +85,7 @@ public static class Glyphs
     /// Every glyph in the set with its fallback. This is the authority the
     /// coverage test walks, so a glyph used anywhere without an entry here
     /// fails that test.
-    /// </summary>
-
-    /// <summary>
+    ///
     /// The mapping table is exposed as an <see cref="ImmutableArray{T}"/> rather
     /// than a bare array behind an interface: an interface alone only hides the
     /// mutation at compile time, and a caller casting back to

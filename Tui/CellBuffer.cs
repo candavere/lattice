@@ -174,10 +174,15 @@ public sealed class CellBuffer
     /// Whether the whole rectangle lies inside the buffer, far edge included.
     /// Checked up front by the writers so a rejected rectangle never mutates
     /// anything.
+    ///
+    /// The sums are computed as <see cref="long"/> on purpose: in
+    /// <see cref="int"/> they wrap, so a rectangle far larger than the buffer
+    /// summed back to a negative number, passed this check, and then drew
+    /// nothing at all instead of being rejected.
     /// </summary>
     private void CheckRectangle(int x, int y, int width, int height)
     {
-        if (x < 0 || y < 0 || x + width > Width || y + height > Height)
+        if (x < 0 || y < 0 || x + (long)width > Width || y + (long)height > Height)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(x),

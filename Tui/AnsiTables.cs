@@ -1,19 +1,33 @@
+using System.Collections.Immutable;
+
 namespace Lattice.Tui;
 
 /// <summary>
 /// The fixed colour tables the mapper degrades onto: the 16 base ANSI colours
-/// and the xterm 256-colour palette. The 16 ANSI entries use the standard
-/// xterm base values (<c>#000000</c> black through <c>#ffffff</c> white), which
-/// is what the SGR 30-37 / 90-97 codes denote on every mainstream terminal.
+/// and the xterm 256-colour palette.
 /// </summary>
 public static class AnsiTables
 {
     /// <summary>
     /// The 16 base ANSI colours, indexed by SGR colour number 0-15. Index 0-7
-    /// are the normal-intensity set (SGR 30-37), 8-15 the bright set (90-97).
+    /// are the normal-intensity set (SGR 30-37 / 40-47), 8-15 the bright set
+    /// (90-97 / 100-107).
     /// </summary>
-    public static readonly Rgb[] Ansi16 =
-    {
+    /// <remarks>
+    /// The values are the VGA/"standard" set rather than xterm's own defaults:
+    /// the normal colours sit at <c>0x80</c> on each lit channel and index 7 is
+    /// <c>0xC0C0C0</c> grey, where xterm uses darker, more saturated darks such
+    /// as <c>#cd0000</c> and a <c>#e5e5e5</c> white. The values are kept exactly
+    /// as they are because they are what the nearest-colour mapping has always
+    /// been calibrated against, and changing them would change rendered output;
+    /// only this description was wrong.
+    ///
+    /// The table is an <see cref="ImmutableArray{T}"/> rather than a bare array
+    /// because it is process-wide state read on every styled cell: an array
+    /// would let any caller rewrite an entry and silently change every later
+    /// colour decision in the process.
+    /// </remarks>
+    public static ImmutableArray<Rgb> Ansi16 { get; } = ImmutableArray.Create<Rgb>(
         new(0x00, 0x00, 0x00), // 0  black
         new(0x80, 0x00, 0x00), // 1  red
         new(0x00, 0x80, 0x00), // 2  green
@@ -29,8 +43,7 @@ public static class AnsiTables
         new(0x00, 0x00, 0xFF), // 12 bright blue
         new(0xFF, 0x00, 0xFF), // 13 bright magenta
         new(0x00, 0xFF, 0xFF), // 14 bright cyan
-        new(0xFF, 0xFF, 0xFF), // 15 bright white
-    };
+        new(0xFF, 0xFF, 0xFF)); // 15 bright white
 
     /// <summary>
     /// The six channel levels of the xterm 6x6x6 colour cube, indices 16-231.
@@ -43,8 +56,12 @@ public static class AnsiTables
     /// </summary>
     private static readonly Rgb[] GreyscaleRamp = BuildGreyscaleRamp();
 
-    /// <summary>The whole xterm 256-colour palette, indices 0-255.</summary>
-    public static readonly Rgb[] Palette256 = BuildPalette256();
+    /// <summary>
+    /// The whole xterm 256-colour palette, indices 0-255: the base 16, the
+    /// 6x6x6 cube at 16-231 and the greyscale ramp at 232-255. Immutable for
+    /// the same reason as <see cref="Ansi16"/>.
+    /// </summary>
+    public static ImmutableArray<Rgb> Palette256 { get; } = BuildPalette256();
 
     private static Rgb[] BuildGreyscaleRamp()
     {
@@ -58,7 +75,7 @@ public static class AnsiTables
         return ramp;
     }
 
-    private static Rgb[] BuildPalette256()
+    private static ImmutableArray<Rgb> BuildPalette256()
     {
         var palette = new Rgb[256];
 
@@ -87,7 +104,7 @@ public static class AnsiTables
             palette[232 + i] = GreyscaleRamp[i];
         }
 
-        return palette;
+        return ImmutableArray.Create(palette);
     }
 
     /// <summary>

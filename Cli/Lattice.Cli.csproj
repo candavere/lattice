@@ -18,6 +18,11 @@
     <ProjectReference Include="..\Trajectories\Lattice.Trajectories.csproj" />
     <ProjectReference Include="..\Analytics\Lattice.Analytics.csproj" />
     <ProjectReference Include="..\Visualization\Lattice.Visualization.csproj" />
+    <!-- The command-lifecycle lines (spinner, success, failure) reuse the Tui
+         theme, colour mapper and capability detection rather than restating
+         them, so the CLI's stderr and the interactive screens cannot drift apart
+         in colour or in how they decide a stream is a terminal. -->
+    <ProjectReference Include="..\Tui\Lattice.Tui.csproj" />
   </ItemGroup>
 
   <!--

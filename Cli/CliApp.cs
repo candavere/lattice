@@ -206,7 +206,26 @@ public static class CliApp
     private static readonly SimulationConfig FairnessSimulationConfig =
         new(AgentCount: 2, MaxTicks: 200, TransitSpeed: 8);
 
-    public static int Run(string[] args, TextWriter stdout, TextWriter stderr)
+    public static int Run(string[] args, TextWriter stdout, TextWriter stderr) =>
+        Run(args, stdout, stderr, CliTerminal.For(stderr));
+
+    /// <summary>
+    /// The overload that takes the terminal as a value, so the lifecycle output
+    /// and every other terminal-dependent decision can be driven from a test
+    /// without a real terminal.
+    /// </summary>
+    /// <remarks>
+    /// The two overloads exist so that the eight existing subcommands keep
+    /// their exact stdout bytes and exit codes for every current caller: the
+    /// three-argument form resolves the terminal from the writer it was given,
+    /// and a <see cref="StringWriter"/> — what the tests and any redirecting
+    /// script supply — resolves to a non-interactive terminal, which is silent.
+    /// </remarks>
+    /// <param name="args">The command line.</param>
+    /// <param name="stdout">Where the command's own output goes, byte for byte as before.</param>
+    /// <param name="stderr">Where diagnostics and the lifecycle lines go.</param>
+    /// <param name="terminal">What the CLI believes about the attached terminal.</param>
+    public static int Run(string[] args, TextWriter stdout, TextWriter stderr, CliTerminal terminal)
     {
         if (args.Length == 0)
         {
@@ -232,16 +251,40 @@ public static class CliApp
             return Success;
         }
 
+        // Every command that can take a while is wrapped, so the working line,
+        // the success line and the failure line are decided in exactly one
+        // place and cannot be forgotten by a future subcommand. The wrapper is
+        // inert unless stderr is an interactive terminal, and it never touches
+        // stdout.
+        //
+        // --quiet is read here rather than from each command's own flag parsing
+        // because the scope has to be opened before the command runs, and
+        // because a suppressed dashboard must suppress the lifecycle line too:
+        // --quiet is the caller's statement that they want no incidental
+        // output. Only the commands that accept it are considered, so a literal
+        // "--quiet" appearing as another command's value cannot silence it.
+        using var lifecycle = CommandLifecycleScope.Begin(
+            args[0],
+            stderr,
+            terminal,
+            quiet: AcceptsQuiet(args[0]) && args.Skip(1).Contains("--quiet", StringComparer.Ordinal));
+
+        // The command's own diagnostics go through the indicator's writer when a
+        // live line is being repainted, so a summary line cannot land in the
+        // middle of a spinner frame. Inert otherwise, and byte-identical to
+        // before: the same writer object reaches the same code.
+        var commandErrors = lifecycle.Interleave(stderr);
+
         return args[0] switch
         {
-            "generate" => Generate(args[1..], stdout, stderr),
-            "simulate" => Simulate(args[1..], stdout, stderr),
-            "render" => Render(args[1..], stdout, stderr),
-            "analyze" => Analyze(args[1..], stdout, stderr),
-            "replay" => Replay(args[1..], stdout, stderr),
-            "benchmark" => RunBenchmark(args[1..], stdout, stderr),
-            "evaluate" => Evaluate(args[1..], stdout, stderr),
-            "validate-scenario" => ValidateScenario(args[1..], stdout, stderr),
+            "generate" => lifecycle.Run(() => Generate(args[1..], stdout, commandErrors)),
+            "simulate" => lifecycle.Run(() => Simulate(args[1..], stdout, commandErrors)),
+            "render" => lifecycle.Run(() => Render(args[1..], stdout, commandErrors)),
+            "analyze" => lifecycle.Run(() => Analyze(args[1..], stdout, commandErrors)),
+            "replay" => lifecycle.Run(() => Replay(args[1..], stdout, commandErrors)),
+            "benchmark" => lifecycle.Run(() => RunBenchmark(args[1..], stdout, commandErrors)),
+            "evaluate" => lifecycle.Run(() => Evaluate(args[1..], stdout, commandErrors, lifecycle)),
+            "validate-scenario" => lifecycle.Run(() => ValidateScenario(args[1..], stdout, commandErrors)),
             _ => UnknownCommand(args[0], stderr),
         };
     }
@@ -249,6 +292,14 @@ public static class CliApp
     private static bool IsKnownCommand(string command) =>
         command is "generate" or "simulate" or "render" or "analyze"
             or "replay" or "benchmark" or "evaluate" or "validate-scenario";
+
+    /// <summary>
+    /// Whether <paramref name="command"/> accepts <c>--quiet</c>. Only
+    /// <c>simulate</c> does today: it is the one command with incidental output
+    /// beyond its artifact, and widening the set would widen what a stray
+    /// <c>--quiet</c> in another command's argument list could silence.
+    /// </summary>
+    private static bool AcceptsQuiet(string command) => command == "simulate";
 
     private static int Generate(string[] args, TextWriter stdout, TextWriter stderr)
     {
@@ -1100,7 +1151,11 @@ public static class CliApp
     /// out of the paired delta; the decision rule (mean paired delta &gt; 0 with
     /// a 95% CI lower bound &gt; 0) is graded on the held-out suite.
     /// </summary>
-    private static int Evaluate(string[] args, TextWriter stdout, TextWriter stderr)
+    private static int Evaluate(
+        string[] args,
+        TextWriter stdout,
+        TextWriter stderr,
+        CommandLifecycleScope? lifecycle = null)
     {
         try
         {
@@ -1152,7 +1207,7 @@ public static class CliApp
             // protocol.
             if (LooksLikePath(scenarioText2))
             {
-                return EvaluateScenarioFile(flags, scenarioText2, stdout, stderr);
+                return EvaluateScenarioFile(flags, scenarioText2, stdout, stderr, lifecycle);
             }
 
             var scenario = scenarioText2.ToLowerInvariant();
@@ -1185,7 +1240,7 @@ public static class CliApp
                     : ExternalTimeLimits.DefaultStepTimeoutMs);
 
             return request.AgentCommand is null
-                ? EvaluateInProcess(request, flags, stdout, stderr)
+                ? EvaluateInProcess(request, flags, stdout, stderr, lifecycle)
                 : EvaluateExternal(request, flags, stdout, stderr);
         }
         catch (Exception ex)
@@ -1220,7 +1275,8 @@ public static class CliApp
         Dictionary<string, string> flags,
         string path,
         TextWriter stdout,
-        TextWriter stderr)
+        TextWriter stderr,
+        CommandLifecycleScope? lifecycle = null)
     {
         ScenarioDescriptor descriptor;
         string digest;
@@ -1291,7 +1347,7 @@ public static class CliApp
                 : ExternalTimeLimits.DefaultStepTimeoutMs);
 
         return request.AgentCommand is null
-            ? EvaluateInProcess(request, flags, stdout, stderr)
+            ? EvaluateInProcess(request, flags, stdout, stderr, lifecycle)
             : EvaluateExternal(request, flags, stdout, stderr);
     }
 
@@ -1310,7 +1366,8 @@ public static class CliApp
         EvaluateRequest request,
         Dictionary<string, string> flags,
         TextWriter stdout,
-        TextWriter stderr)
+        TextWriter stderr,
+        CommandLifecycleScope? lifecycle = null)
     {
         var pairings = new[] { (0, 1), (1, 0) };
 
@@ -1318,9 +1375,20 @@ public static class CliApp
         foreach (var suite in request.Suites)
         {
             var seeds = EvaluationSeeds(suite).Take(request.SeedCap).ToArray();
+
+            // The harness builds a map exactly once per match, from the factory
+            // the CLI supplies (EvaluationHarness.Evaluate), so counting the
+            // factory's own calls counts matches actually started. That is a real
+            // counter read from the real work, not an estimate of it, and it
+            // needs no change to the harness.
+            //
+            // Null when no lifecycle line is showing, in which case the factory
+            // is handed over unwrapped and the study is byte-for-byte the study
+            // that ran before this existed.
+            var matches = lifecycle?.Matches(seeds.Length * pairings.Length);
             var spec = new EvaluationSpec(
                 seeds,
-                request.MapFactory,
+                matches?.Wrap(request.MapFactory) ?? request.MapFactory,
                 EvaluationSimulationConfig,
                 request.Teams,
                 pairings,

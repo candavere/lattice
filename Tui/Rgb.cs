@@ -9,6 +9,12 @@ public readonly record struct Rgb(byte R, byte G, byte B)
 {
     /// <summary>Parses a six-digit <c>#rrggbb</c> string.</summary>
     /// <exception cref="FormatException">The text is not six hex digits.</exception>
+    /// <remarks>
+    /// Each pair is read with <c>AllowHexSpecifier</c> rather than
+    /// <c>HexNumber</c>: the latter also permits leading and trailing white
+    /// space, so <c>"# 00000"</c> came back as <c>#000000</c> instead of being
+    /// the malformed string it is.
+    /// </remarks>
     public static Rgb FromHex(string hex)
     {
         if (hex is null)
@@ -22,9 +28,9 @@ public readonly record struct Rgb(byte R, byte G, byte B)
         }
 
         return new Rgb(
-            byte.Parse(hex.Substring(1, 2), System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture),
-            byte.Parse(hex.Substring(3, 2), System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture),
-            byte.Parse(hex.Substring(5, 2), System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture));
+            byte.Parse(hex.Substring(1, 2), System.Globalization.NumberStyles.AllowHexSpecifier, System.Globalization.CultureInfo.InvariantCulture),
+            byte.Parse(hex.Substring(3, 2), System.Globalization.NumberStyles.AllowHexSpecifier, System.Globalization.CultureInfo.InvariantCulture),
+            byte.Parse(hex.Substring(5, 2), System.Globalization.NumberStyles.AllowHexSpecifier, System.Globalization.CultureInfo.InvariantCulture));
     }
 
     /// <summary>Renders the colour as lower-case <c>#rrggbb</c>.</summary>

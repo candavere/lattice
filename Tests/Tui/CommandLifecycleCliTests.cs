@@ -86,7 +86,7 @@ public class CommandLifecycleCliTests : IDisposable
         var result = Run("analyze", "--trajectory", trajectoryPath, "--out", Path.Combine(directory, "r.md"));
 
         Assert.Equal(0, result.Exit);
-        Assert.Equal($"wrote {Path.Combine(directory, "r.md")}\n", result.Err);
+        Assert.Equal($"wrote {Path.Combine(directory, "r.md")}{System.Environment.NewLine}", result.Err);
     }
 
     [Fact]

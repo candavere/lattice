@@ -17,9 +17,27 @@ public sealed class CellBuffer
         ArgumentOutOfRangeException.ThrowIfLessThan(width, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(height, 1);
 
+        // Counted as long and checked against the largest array the runtime can
+        // back, before anything is allocated: as an int the product wraps, so a
+        // grid far larger than memory could be requested would quietly allocate a
+        // small array and then fail much later with an index out of range,
+        // partway through a draw.
+        //
+        // This is only about the count being supported at all. A count that is
+        // supported but exhausts memory is a different matter and is left to the
+        // runtime as an OutOfMemoryException.
+        var count = (long)width * height;
+        if (count > Array.MaxLength)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(width),
+                width,
+                $"A {width}x{height} grid is {count} cells, which is not a supported cell count.");
+        }
+
         Width = width;
         Height = height;
-        _cells = new Cell[width * height];
+        _cells = new Cell[(int)count];
 
         var blank = Cell.Blank;
         for (var i = 0; i < _cells.Length; i++)

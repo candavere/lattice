@@ -36,6 +36,7 @@
     <ProjectReference Include="..\Analytics\Lattice.Analytics.csproj" />
     <ProjectReference Include="..\Cli\Lattice.Cli.csproj" />
     <ProjectReference Include="..\Protocol\Lattice.Protocol.csproj" />
+    <ProjectReference Include="..\Tui\Lattice.Tui.csproj" />
 
     <!-- Built only, never referenced. The external-agent tests need a REAL child
          process, and the stub is a console app launched as `dotnet <stub>.dll`, so

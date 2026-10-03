@@ -86,9 +86,15 @@ public sealed class CellBuffer
     }
 
     /// <summary>
-    /// Writes one character per column starting at <paramref name="x"/>.
-    /// Characters past the right edge are dropped, so a screen can hand a
-    /// fixed-width label to a narrow panel without bounds arithmetic.
+    /// Writes one character per column starting at <paramref name="x"/>,
+    /// clipping at <em>both</em> edges. Characters past the right edge are
+    /// dropped, and so are characters left of column 0: an origin before the
+    /// grid keeps the visible tail of the string. That is what lets a screen
+    /// hand a fixed-width label to a narrow panel, and a string scrolled past a
+    /// viewport edge to the same call, without doing the arithmetic itself.
+    ///
+    /// The row is still bounds-checked, so <paramref name="y"/> outside the
+    /// buffer throws rather than clips.
     /// </summary>
     public void DrawText(int x, int y, string text, Cell style)
     {

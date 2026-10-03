@@ -74,6 +74,11 @@ public static class TerminalGuard
     /// Switches to the alternate screen and hides the cursor, and returns a
     /// handle that restores both exactly once however many times it is
     /// disposed.
+    ///
+    /// Call <see cref="TryUseUtf8"/> <em>before</em> this, not after: on
+    /// Windows changing the console encoding resets console state, so doing it
+    /// once the alternate screen is active drops the mode set here. The guard
+    /// does not do it for you and nothing enforces the order.
     /// </summary>
     /// <param name="output">
     /// Where the escape sequences and the frame go. The escapes are written
@@ -127,9 +132,15 @@ public static class TerminalGuard
 
     /// <summary>
     /// Asks the console for UTF-8 output, ignoring a host that will not allow
-    /// it. Called before entering the alternate screen: on Windows the encoding
-    /// change resets console state, so doing it afterwards would drop the mode
-    /// the guard just set.
+    /// it. Call this <em>before</em> <see cref="Enter"/> or
+    /// <see cref="Run"/>: on Windows the encoding change resets console state,
+    /// so doing it afterwards would drop the mode the guard just set. The
+    /// ordering is the caller's responsibility; nothing in the guard enforces
+    /// it, and it is the step most likely to be missed, because a caller that
+    /// writes nothing but ASCII cannot tell it was skipped.
+    ///
+    /// Returns <c>false</c>, without throwing, when output is redirected or the
+    /// host refuses the encoding change.
     /// </summary>
     public static bool TryUseUtf8()
     {

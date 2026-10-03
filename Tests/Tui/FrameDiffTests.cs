@@ -163,6 +163,44 @@ public class FrameDiffTests
     }
 
     [Fact]
+    public void ColumnsAddedByAWiderFrameArePainted()
+    {
+        var previous = Blank(10, 1);
+        var next = Blank(14, 1);
+        next.DrawText(10, 0, "WXYZ", Cell.Blank);
+
+        var rendered = FrameDiff.Render(previous, next, ColorDepth.None);
+
+        Assert.Equal("\u001b[1;11HWXYZ", rendered);
+    }
+
+    [Fact]
+    public void RowsAddedByATallerFrameArePaintedInFull()
+    {
+        // A row past the end of the previous buffer holds unknown text on
+        // screen, so the whole row is painted, not just the changed cell.
+        var previous = Blank(4, 2);
+        var next = Blank(4, 3);
+        next[1, 2] = new Cell('b');
+
+        var rendered = FrameDiff.Render(previous, next, ColorDepth.None);
+
+        Assert.Equal("\u001b[3;1H b  ", rendered);
+    }
+
+    [Fact]
+    public void ColumnsAndRowsAddedByALargerFrameArePainted()
+    {
+        var previous = Blank(4, 1);
+        var next = Blank(8, 3);
+        next.DrawText(5, 2, "hi", Cell.Blank);
+
+        var rendered = FrameDiff.Render(previous, next, ColorDepth.None);
+
+        Assert.Equal("\u001b[1;5H    \n\u001b[2;1H        \n\u001b[3;1H     hi ", rendered);
+    }
+
+    [Fact]
     public void ShrinkingTheBufferOnlyDiffsTheOverlap()
     {
         var previous = Blank(6, 2);
@@ -172,5 +210,29 @@ public class FrameDiffTests
         var rendered = FrameDiff.Render(previous, next, ColorDepth.None);
 
         Assert.Equal("\u001b[1;1HX", rendered);
+    }
+
+    [Fact]
+    public void ShrinkingTheHeightOnlyDiffsTheOverlap()
+    {
+        var previous = Blank(6, 4);
+        var next = Blank(6, 2);
+        next[0, 0] = new Cell('X');
+
+        var rendered = FrameDiff.Render(previous, next, ColorDepth.None);
+
+        Assert.Equal("\u001b[1;1HX", rendered);
+    }
+
+    [Fact]
+    public void ANullPreviousRepaintsEveryCellAfterAShrink()
+    {
+        // The supported way to clear the area a shrink vacated: hand over no
+        // previous buffer and the whole new frame is written.
+        var next = Blank(6, 2);
+
+        var rendered = FrameDiff.Render(null, next, ColorDepth.None);
+
+        Assert.Equal("\u001b[1;1H      \n\u001b[2;1H      ", rendered);
     }
 }

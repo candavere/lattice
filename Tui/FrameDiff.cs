@@ -22,6 +22,19 @@ public static class FrameDiff
     /// by an absolute cursor position and carries an SGR only when its style
     /// differs from the style in force. Rows are joined with a single newline,
     /// so two identical buffers produce an empty string.
+    ///
+    /// Every cell of <paramref name="next"/> outside
+    /// <paramref name="previous"/> — a new column or a new row — counts as
+    /// changed, because the screen holds no frame there yet.
+    ///
+    /// This renderer only ever writes cells; it cannot erase one. So when the
+    /// buffer gets <em>smaller</em>, whatever was in the dropped columns or
+    /// rows stays on screen and the caller must clear it. The supported way to
+    /// do that is to pass <paramref name="previous"/> as <c>null</c> on any
+    /// size change, which repaints every cell from scratch; clearing the old
+    /// extent itself is deliberately not attempted here, because a screen that
+    /// reflows to a new size is the place to decide what the vacated area
+    /// should look like.
     /// </remarks>
     public static string Render(CellBuffer? previous, CellBuffer next, ColorDepth depth)
     {
@@ -50,7 +63,10 @@ public static class FrameDiff
 
     private static string RenderRow(CellBuffer? previous, CellBuffer next, int row, ColorDepth depth, ref Cell? emitted)
     {
-        var width = Math.Min(next.Width, previous?.Width ?? next.Width);
+        // Scanned across the whole of next, never the narrower of the two: a
+        // column the previous buffer did not reach has to be painted, and
+        // IsUnchanged already reports it as changed.
+        var width = next.Width;
         var builder = new StringBuilder();
         var column = 0;
 

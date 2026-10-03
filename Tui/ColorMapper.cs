@@ -97,8 +97,16 @@ public static class ColorMapper
                     .Append(AnsiTables.NearestIndex256(color));
                 break;
             case ColorDepth.Ansi16:
+                // The base codes are the one place the channel is positional
+                // rather than prefixed: 30-37 / 90-97 are foregrounds and
+                // 40-47 / 100-107 are backgrounds. At TrueColor and Ansi256 the
+                // channel rides in the 38 / 48 prefix, so it cannot be dropped
+                // there; here it has to be added explicitly.
                 var index = AnsiTables.NearestIndex16(color);
-                builder.Append(';').Append(index < 8 ? 30 + index : 90 + (index - 8));
+                var baseCode = foreground
+                    ? (index < 8 ? 30 + index : 90 + (index - 8))
+                    : (index < 8 ? 40 + index : 100 + (index - 8));
+                builder.Append(';').Append(baseCode);
                 break;
             case ColorDepth.None:
                 break;

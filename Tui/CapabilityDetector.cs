@@ -68,13 +68,29 @@ public readonly record struct TerminalEnvironment(
         Environment.GetEnvironmentVariable("COLORTERM"),
         Environment.GetEnvironmentVariable("TERM"),
         Environment.GetEnvironmentVariable("NO_COLOR"),
-        Environment.GetEnvironmentVariable("LANG")
-            ?? Environment.GetEnvironmentVariable("LC_ALL")
-            ?? Environment.GetEnvironmentVariable("LC_CTYPE"),
+        LocaleFrom(
+            Environment.GetEnvironmentVariable("LC_ALL"),
+            Environment.GetEnvironmentVariable("LC_CTYPE"),
+            Environment.GetEnvironmentVariable("LANG")),
         Console.IsInputRedirected,
         Console.IsOutputRedirected,
         UsableWidth(SafeWidth()),
         UsableHeight(SafeHeight()));
+
+    /// <summary>
+    /// The effective locale, resolved in POSIX order: <c>LC_ALL</c> first, then
+    /// <c>LC_CTYPE</c>, then <c>LANG</c>, and an empty variable counting as
+    /// unset. The order is not cosmetic. <c>LANG</c> is the broadest setting
+    /// and the other two override it, so reading it first lets a UTF-8
+    /// <c>LANG</c> outrank an <c>LC_ALL=C</c> that declares the terminal is not
+    /// UTF-8 — which is exactly the host that would render box glyphs as
+    /// mojibake. Returns <c>null</c> when none of the three is set.
+    /// </summary>
+    public static string? LocaleFrom(string? lcAll, string? lcCtype, string? lang) =>
+        Set(lcAll) ?? Set(lcCtype) ?? Set(lang);
+
+    private static string? Set(string? value) =>
+        string.IsNullOrEmpty(value) ? null : value;
 
     /// <summary>
     /// The width a screen may lay out against: what the console reported when

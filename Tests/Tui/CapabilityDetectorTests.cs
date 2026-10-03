@@ -193,6 +193,32 @@ public class CapabilityDetectorTests
         Assert.Equal(25, TerminalEnvironment.UsableHeight(reported));
     }
 
+    [Theory]
+    [InlineData("C", null, "en_US.UTF-8", "C")]
+    [InlineData(null, "C", "en_US.UTF-8", "C")]
+    [InlineData(null, null, "en_US.UTF-8", "en_US.UTF-8")]
+    [InlineData("C", "en_US.UTF-8", null, "C")]
+    [InlineData("", "C", "en_US.UTF-8", "C")]
+    [InlineData("C", "", "en_US.UTF-8", "C")]
+    [InlineData("", "en_US.UTF-8", "", "en_US.UTF-8")]
+    [InlineData(null, null, null, null)]
+    [InlineData("", "", "", null)]
+    public void TheLocaleIsReadInPosixPrecedence(
+        string? lcAll, string? lcCtype, string? lang, string? expected)
+    {
+        Assert.Equal(expected, TerminalEnvironment.LocaleFrom(lcAll, lcCtype, lang));
+    }
+
+    [Fact]
+    public void AnAllCapsLocaleBeatsAUtf8Lang()
+    {
+        // The regression this pins: LANG said UTF-8 while LC_ALL said C, so
+        // detection reported UTF-8 on a terminal that is not UTF-8.
+        var locale = TerminalEnvironment.LocaleFrom("C", null, "en_US.UTF-8");
+
+        Assert.False(CapabilityDetector.IsUtf8(Env(lang: locale)));
+    }
+
     /// <summary>
     /// The real environment is the one that varies by host: attached to a
     /// terminal it reports the window, redirected it reports nothing usable.

@@ -157,6 +157,48 @@ public class CapabilityDetectorTests
         Assert.Equal(expected, capabilities.MeetsMinimumSize);
     }
 
+    [Theory]
+    [InlineData(120)]
+    [InlineData(1)]
+    [InlineData(80)]
+    public void AUsableWidthIsKeptExactlyAsReported(int reported)
+    {
+        Assert.Equal(reported, TerminalEnvironment.UsableWidth(reported));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(int.MinValue)]
+    public void AnUnusableWidthFallsBackToTheConventionalEighty(int reported)
+    {
+        Assert.Equal(80, TerminalEnvironment.UsableWidth(reported));
+    }
+
+    [Theory]
+    [InlineData(40)]
+    [InlineData(1)]
+    [InlineData(25)]
+    public void AUsableHeightIsKeptExactlyAsReported(int reported)
+    {
+        Assert.Equal(reported, TerminalEnvironment.UsableHeight(reported));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(int.MinValue)]
+    public void AnUnusableHeightFallsBackToTheConventionalTwentyFive(int reported)
+    {
+        Assert.Equal(25, TerminalEnvironment.UsableHeight(reported));
+    }
+
+    /// <summary>
+    /// The real environment is the one that varies by host: attached to a
+    /// terminal it reports the window, redirected it reports nothing usable.
+    /// Detection must hand back a layout either way, which is the invariant the
+    /// start-up screen depends on.
+    /// </summary>
     [Fact]
     public void DetectionAgainstTheRealEnvironmentReturnsAUsableRecord()
     {

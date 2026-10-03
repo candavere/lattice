@@ -53,6 +53,12 @@ public readonly record struct TerminalEnvironment(
     int Width,
     int Height)
 {
+    /// <summary>The width a screen falls back to when the console reports none.</summary>
+    private const int ConventionalWidth = 80;
+
+    /// <summary>The height a screen falls back to when the console reports none.</summary>
+    private const int ConventionalHeight = 25;
+
     /// <summary>
     /// Reads the real environment. Width and height come from the console and
     /// fall back to the conventional 80x25 when the console will not report
@@ -67,8 +73,22 @@ public readonly record struct TerminalEnvironment(
             ?? Environment.GetEnvironmentVariable("LC_CTYPE"),
         Console.IsInputRedirected,
         Console.IsOutputRedirected,
-        SafeWidth(),
-        SafeHeight());
+        UsableWidth(SafeWidth()),
+        UsableHeight(SafeHeight()));
+
+    /// <summary>
+    /// The width a screen may lay out against: what the console reported when
+    /// that is a usable number, otherwise the conventional 80. A console asked
+    /// for a size it does not have answers with zero or a negative number
+    /// rather than failing, so the value has to be checked, not only caught.
+    /// </summary>
+    public static int UsableWidth(int reported) => reported > 0 ? reported : ConventionalWidth;
+
+    /// <summary>
+    /// The height a screen may lay out against, on the same terms as
+    /// <see cref="UsableWidth"/>.
+    /// </summary>
+    public static int UsableHeight(int reported) => reported > 0 ? reported : ConventionalHeight;
 
     private static int SafeWidth()
     {
@@ -78,7 +98,7 @@ public readonly record struct TerminalEnvironment(
         }
         catch (Exception exception) when (exception is IOException or PlatformNotSupportedException or ArgumentOutOfRangeException)
         {
-            return 80;
+            return ConventionalWidth;
         }
     }
 
@@ -90,7 +110,7 @@ public readonly record struct TerminalEnvironment(
         }
         catch (Exception exception) when (exception is IOException or PlatformNotSupportedException or ArgumentOutOfRangeException)
         {
-            return 25;
+            return ConventionalHeight;
         }
     }
 }

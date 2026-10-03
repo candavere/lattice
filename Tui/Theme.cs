@@ -97,7 +97,9 @@ public static class Theme
     /// terminal's own background alone. Panels are painted only when truecolor
     /// is available: on 256- and 16-colour terminals the palette has no entry
     /// close enough to the sampled panel fill to be worth replacing the user's
-    /// background with.
+    /// background with. "16 colours" means the ANSI base set
+    /// <see cref="AnsiTables.Ansi16"/> degrades onto, whatever a given terminal
+    /// renders those indices as.
     /// </summary>
     public static Rgb? PanelFill(ColorDepth depth) =>
         depth == ColorDepth.TrueColor ? Palette.PanelBackground : null;

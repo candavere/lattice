@@ -10,8 +10,8 @@ public static class AnsiTables
 {
     /// <summary>
     /// The 16 base ANSI colours, indexed by SGR colour number 0-15. Index 0-7
-    /// are the normal-intensity set (SGR 30-37 / 40-47), 8-15 the bright set
-    /// (90-97 / 100-107).
+    /// are the normal-intensity set, 8-15 the bright set. Foregrounds are
+    /// selected by SGR 30-37 / 90-97 and backgrounds by 40-47 / 100-107.
     /// </summary>
     /// <remarks>
     /// The values are the VGA/"standard" set rather than xterm's own defaults:

@@ -101,7 +101,9 @@ public static class ColorMapper
                 // rather than prefixed: 30-37 / 90-97 are foregrounds and
                 // 40-47 / 100-107 are backgrounds. At TrueColor and Ansi256 the
                 // channel rides in the 38 / 48 prefix, so it cannot be dropped
-                // there; here it has to be added explicitly.
+                // there; here it has to be added explicitly. Which index a
+                // colour maps to is decided by AnsiTables.Ansi16, whose entries
+                // are the VGA-style values rather than xterm's own defaults.
                 var index = AnsiTables.NearestIndex16(color);
                 var baseCode = foreground
                     ? (index < 8 ? 30 + index : 90 + (index - 8))

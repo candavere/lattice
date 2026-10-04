@@ -105,6 +105,57 @@ public class WorkingIndicatorTests
     }
 
     [Fact]
+    public void AttachingACounterPaintsTheRatioWithoutWaitingForTheTimer()
+    {
+        var sink = new RecordingSink();
+        var clock = new ManualClock();
+
+        // A minute-long interval: the repaint timer cannot possibly fire inside
+        // this test, so whatever reaches the sink was painted by the call that
+        // attached the counter. That is what makes the assertion deterministic
+        // rather than a bet that a thread-pool callback got scheduled.
+        using var indicator = new WorkingIndicator(
+            "evaluate",
+            sink,
+            CapabilityDetector.Detect(Terminal()),
+            quiet: false,
+            clock: () => clock.Now,
+            repaintIntervalMs: 60_000);
+
+        indicator.Start();
+        indicator.UseProgress(() => new CommandProgress(3, 6, "matches"));
+
+        Assert.Contains("3/6 matches", sink.Text);
+    }
+
+    [Fact]
+    public void StartPaintsTheFirstFrameWithoutWaitingForTheTimer()
+    {
+        var sink = new RecordingSink();
+        var clock = new ManualClock();
+
+        // Same reasoning as above: the interval rules the timer out entirely.
+        using var indicator = new WorkingIndicator(
+            "simulate",
+            sink,
+            CapabilityDetector.Detect(Terminal()),
+            quiet: false,
+            clock: () => clock.Now,
+            repaintIntervalMs: 60_000);
+
+        // Elapsed is measured from construction, so the clock has to move after
+        // the indicator is built rather than before it.
+        clock.Advance(TimeSpan.FromMilliseconds(1400));
+        indicator.Start();
+
+        Assert.Contains(CommandLifecycle.Spinner(0, true), sink.Text);
+        Assert.Contains("1.4s", sink.Text);
+
+        // No counter has been attached yet, so no ratio may be claimed.
+        Assert.DoesNotContain("matches", sink.Text);
+    }
+
+    [Fact]
     public void TheIndicatorStaysSilentWhenNoColorDisablesStyling()
     {
         // NO_COLOR means no styling, but the plan still allows plain status. So

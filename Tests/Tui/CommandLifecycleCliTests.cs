@@ -174,11 +174,55 @@ public class CommandLifecycleCliTests : IDisposable
         InteractiveStderr: true);
 
     /// <summary>
+    /// An interactive terminal whose repaint pump does nothing at all, so no
+    /// callback can ever run.
+    /// </summary>
+    /// <remarks>
+    /// This is the point of the repair. These assertions used to depend on a
+    /// <see cref="System.Threading.Timer"/> callback being scheduled inside the
+    /// command's lifetime, which is not guaranteed and is exactly what failed on
+    /// a loaded CI runner. With an inert pump they hold only because attaching a
+    /// real counter paints the line synchronously — so they now test the
+    /// production behaviour instead of the thread pool.
+    /// </remarks>
+    private static CliTerminal InertPumpTerminal => InteractiveTerminal with
+    {
+        RepaintIntervalMs = 60_000,
+        PumpFactory = static (_, _) => new NoOpPump(),
+    };
+
+    /// <summary>
+    /// A terminal whose repaints are driven synchronously by a pump that ticks a
+    /// fixed number of times the moment it is created, so an animation assertion
+    /// measures the animation rather than the scheduler.
+    /// </summary>
+    /// <param name="ticks">How many repaints the pump performs.</param>
+    private static CliTerminal ManualPumpTerminal(int ticks) => InteractiveTerminal with
+    {
+        RepaintIntervalMs = 1,
+        PumpFactory = (tick, _) =>
+        {
+            for (var i = 0; i < ticks; i++)
+            {
+                tick();
+            }
+
+            return new NoOpPump();
+        },
+    };
+
+    /// <summary>A pump handle that never schedules anything.</summary>
+    private sealed class NoOpPump : IDisposable
+    {
+        public void Dispose()
+        {
+        }
+    }
+
+    /// <summary>
     /// An interactive terminal whose working line repaints every millisecond.
-    /// The animation assertions below depend on a frame being drawn while a
-    /// command runs; at the production 100ms interval that would make each one
-    /// a bet on how fast the machine is, and a slow or a fast runner would fail
-    /// them for reasons that have nothing to do with the code.
+    /// Retained for the tests that genuinely want the real timer; the ratio
+    /// assertions below use <see cref="InertPumpTerminal"/> instead.
     /// </summary>
     private static CliTerminal FastRepaintingTerminal => InteractiveTerminal with { RepaintIntervalMs = 1 };
 
@@ -291,7 +335,7 @@ public class CommandLifecycleCliTests : IDisposable
         // is in flight; asserting the budget rather than the numerator keeps the
         // test independent of exactly how many matches had started by then.
         var result = RunWith(
-            FastRepaintingTerminal,
+            InertPumpTerminal,
             "evaluate", "--seed-set", "dev", "--seeds", "3", "--rollouts", "1",
             "--out", Path.Combine(directory, "study.json"));
 
@@ -306,7 +350,7 @@ public class CommandLifecycleCliTests : IDisposable
         // --seeds caps the suite at 1, so the budget is 1 x 2 seatings = 2
         // matches, not the 50 seeds the held-out suite nominally holds.
         var result = RunWith(
-            FastRepaintingTerminal,
+            InertPumpTerminal,
             "evaluate", "--seed-set", "dev", "--seeds", "1", "--rollouts", "1",
             "--out", Path.Combine(directory, "study.json"));
 
@@ -319,8 +363,12 @@ public class CommandLifecycleCliTests : IDisposable
     {
         // The plan requires a live spinner, not one static line. Every frame of
         // the animation must be a distinct glyph drawn on the same row, and all
-        // of them must be erased before the closing line lands.
-        var result = RunWith(FastRepaintingTerminal, "benchmark", "--runs", "2", "--warmup", "2", "--steps", "4");
+        // of them must be erased before the closing line lands. The pump ticks
+        // three times synchronously, so the frames exist because the indicator
+        // animated them, not because a thread-pool callback was scheduled.
+        var result = RunWith(
+            ManualPumpTerminal(ticks: 3),
+            "benchmark", "--runs", "2", "--warmup", "2", "--steps", "4");
 
         var frames = CommandLifecycle.SpinnerFrameCount;
         var seen = 0;
@@ -338,8 +386,14 @@ public class CommandLifecycleCliTests : IDisposable
     [Fact]
     public void EveryWorkingFrameIsErasedBeforeTheClosingLine()
     {
-        // Without this the terminal keeps one row of spinner debris per frame.
-        var result = RunInteractively("benchmark", "--runs", "2", "--warmup", "2", "--steps", "4");
+        // Without this the terminal keeps one row of spinner debris per frame. The
+        // pump ticks synchronously at Start, so every frame is drawn before the
+        // command writes anything: with a real timer, a tick landing after the
+        // command's own stderr write would legitimately repaint on the next row
+        // and this assertion would measure the scheduler instead of the erase.
+        var result = RunWith(
+            ManualPumpTerminal(ticks: 3),
+            "benchmark", "--runs", "2", "--warmup", "2", "--steps", "4");
 
         var rows = result.Err.Split('\n');
         var spinnerRows = rows.Count(row => row.Contains("benchmark", StringComparison.Ordinal));
@@ -355,8 +409,12 @@ public class CommandLifecycleCliTests : IDisposable
     public void TheAnimationStopsOnceTheCommandHasReturned()
     {
         // Nothing may repaint after the closing line: a spinner ticking over the
-        // prompt is the classic way a progress indicator outlives its work.
-        var result = RunInteractively("benchmark", "--runs", "2", "--warmup", "2", "--steps", "4");
+        // prompt is the classic way a progress indicator outlives its work. The
+        // pump is driven synchronously, so the assertion is about the pump being
+        // stopped at close rather than about how fast the machine ran.
+        var result = RunWith(
+            ManualPumpTerminal(ticks: 3),
+            "benchmark", "--runs", "2", "--warmup", "2", "--steps", "4");
 
         var lines = result.Err.Split('\n');
         var closing = Array.FindLastIndex(lines, line => line.Contains("ok", StringComparison.Ordinal));

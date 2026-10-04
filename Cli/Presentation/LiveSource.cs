@@ -28,13 +28,24 @@ namespace Lattice.Cli.Presentation;
 public sealed record LiveEpisodeSetup(
     MapGraph Map,
     SimulationConfig Config,
-    IAgent[] Roster,
+    Func<IAgent[]> NewRoster,
     int MaxSteps,
     ulong Seed,
     string Label,
     string[] Roles,
     DynamicMapRuleSet Rules)
 {
+    /// <summary>
+    /// A fresh roster for this episode.
+    /// <para>
+    /// Always new: an agent that holds a seeded generator advances with the episode,
+    /// so a second run of the same setup with the same instances would be an
+    /// episode the arguments do not describe. A restart therefore builds a new
+    /// roster too, and is the same episode rather than a continuation of it.
+    /// </para>
+    /// </summary>
+    public IAgent[] Roster => NewRoster();
+
     /// <summary>
     /// The one collection skirmish <c>lattice simulate</c> runs with no scenario: a
     /// generated map, a greedy collector in slot 0, and a seeded random rival in
@@ -44,25 +55,27 @@ public sealed record LiveEpisodeSetup(
     {
         var config = new SimulationConfig(AgentCount: 2, MaxTicks: steps);
         var map = MapGenerator.Generate(seed, new GeneratorConfig(3, 5, 1, 1, 3, GeneratorConfig.DefaultRetryCap));
-        var contender = agent switch
-        {
-            "greedy" => (IAgent)new GreedyCollectorAgent(0),
-            "random" => new RandomAgent(0, new Rng(seed)),
-            "mcts" => new MctsAgent(0, config, seed, new MctsSearchConfig(), rules),
-            _ => throw new UsageError(
-                $"invalid --agent '{agent}' (expected 'greedy', 'random', or 'mcts')."),
-        };
 
         return new LiveEpisodeSetup(
             map,
             config,
-            new IAgent[] { contender, new RandomAgent(1, new Rng(seed)) },
+            () => new IAgent[] { Contender(agent, config, seed, rules), new RandomAgent(1, new Rng(seed)) },
             steps,
             seed,
             "collection skirmish",
             new[] { "Collector", "Random" },
             rules);
     }
+
+    private static IAgent Contender(string agent, SimulationConfig config, ulong seed, DynamicMapRuleSet rules) =>
+        agent switch
+        {
+            "greedy" => new GreedyCollectorAgent(0),
+            "random" => new RandomAgent(0, new Rng(seed)),
+            "mcts" => new MctsAgent(0, config, seed, new MctsSearchConfig(), rules),
+            _ => throw new UsageError(
+                $"invalid --agent '{agent}' (expected 'greedy', 'random', or 'mcts')."),
+        };
 
     /// <summary>
     /// The dungeon infiltration episode, whose roster and vision bounds belong to
@@ -73,22 +86,21 @@ public sealed record LiveEpisodeSetup(
     {
         var map = DungeonMapBuilder.Build(seed);
         var config = InfiltrationScenario.DefaultConfig(steps);
-        var roster = new IAgent[]
-        {
-            new SentryPatrolAgent(
-                InfiltrationScenario.SentryAgentId,
-                InfiltrationScenario.InfiltratorAgentId,
-                vision: SentryPatrolAgent.DefaultVision),
-            new InfiltratorAgent(
-                InfiltrationScenario.InfiltratorAgentId,
-                InfiltrationScenario.SentryAgentId,
-                vision: InfiltratorAgent.DefaultVision),
-        };
 
         return new LiveEpisodeSetup(
             map,
             config,
-            roster,
+            () => new IAgent[]
+            {
+                new SentryPatrolAgent(
+                    InfiltrationScenario.SentryAgentId,
+                    InfiltrationScenario.InfiltratorAgentId,
+                    vision: SentryPatrolAgent.DefaultVision),
+                new InfiltratorAgent(
+                    InfiltrationScenario.InfiltratorAgentId,
+                    InfiltrationScenario.SentryAgentId,
+                    vision: InfiltratorAgent.DefaultVision),
+            },
             steps,
             seed,
             "dungeon infiltration & sentry patrol",
@@ -213,6 +225,18 @@ public sealed class LiveEpisode : ILiveEpisode, IDisposable
             lock (_gate)
             {
                 return _finishedReason;
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public bool HasStopped
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _finishedReason is not null || _failure is not null;
             }
         }
     }

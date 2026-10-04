@@ -250,7 +250,28 @@ public static class TuiHost
         while (!quit && !playback.IsFinished)
         {
             var wait = frameInterval - (request.Clock.Now - lastTickAt);
-            if (wait > TimeSpan.Zero && request.Keys.Wait(wait, out var key) == KeyWait.Key)
+            var key = default(TuiKey);
+            KeyWait outcome;
+
+            if (wait > TimeSpan.Zero)
+            {
+                outcome = request.Keys.Wait(wait, out key);
+            }
+            else
+            {
+                // The frame interval has already elapsed, so the pass is late rather
+                // than early. The key that is waiting is still the reader's, and
+                // dropping it because the screen is behind would lose the very key
+                // that ends the run.
+                outcome = request.Keys.Wait(TimeSpan.Zero, out key);
+            }
+
+            if (outcome == KeyWait.Closed)
+            {
+                break;
+            }
+
+            if (outcome == KeyWait.Key)
             {
                 // The quit key ends the run here rather than being left to the input
                 // running out: a real terminal's reader blocks on the next key for as
@@ -269,11 +290,6 @@ public static class TuiHost
                 }
 
                 continue;
-            }
-
-            if (request.Keys.Wait(TimeSpan.Zero, out _) == KeyWait.Closed)
-            {
-                break;
             }
 
             var now = request.Clock.Now;

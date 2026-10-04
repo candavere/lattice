@@ -67,6 +67,15 @@ public interface ILiveEpisode
     LiveStepperStatus StepperStatus { get; }
 
     /// <summary>
+    /// Whether the stepper has stopped for good and will produce nothing more — the
+    /// episode ended, or the simulation failed. The two are not the same claim and
+    /// are not merged: <see cref="FinishedReason"/> says the episode ended and why,
+    /// and this says only that there is nothing left to wait for. A failure has no
+    /// end reason, so a pane still prints "not recorded" for one.
+    /// </summary>
+    bool HasStopped { get; }
+
+    /// <summary>
     /// The one line the host must show the reader in preference to the cursor's
     /// own state — why a restart is waiting, or that the stepper is stopping — or
     /// null when there is nothing to say.
@@ -204,15 +213,17 @@ public sealed class LivePlayback : ICockpitCursor
         ProducedTicks: Math.Max(0, _episode.Frames.Count - 1),
         MaximumTicks: _episode.MaximumTicks,
         FinishedReason: _episode.FinishedReason,
-        Notice: _episode.Notice ?? (NoticeState()));
+        Notice: Notice());
 
     /// <inheritdoc />
     /// <remarks>
-    /// A finished episode ends the host run: there is nothing left to compute and
-    /// nothing left to show, so the terminal goes back rather than sitting on a
-    /// last frame looking live.
+    /// A finished episode ends the host run, and so does a stepper that has failed:
+    /// there is nothing left to compute and nothing left to show, so the terminal
+    /// goes back rather than sitting on a last frame looking live. A failure says no
+    /// reason — <see cref="LiveState.IsFinished"/> stays false and the panes print
+    /// "not recorded" — because the viewer does not get to invent an ending.
     /// </remarks>
-    public bool IsFinished => CockpitEpisodes.HasReason(_episode.FinishedReason);
+    public bool IsFinished => CockpitEpisodes.HasReason(_episode.FinishedReason) || _episode.HasStopped;
 
     /// <summary>The frame on show.</summary>
     public ReplayFrame Frame => Document.Frames[Clamped(_index)];
@@ -232,6 +243,7 @@ public sealed class LivePlayback : ICockpitCursor
     {
         SnapToTheFrontier();
         var before = _index;
+        var notice = Notice();
         var changed = ApplyCore(key);
 
         // A key can end the episode or throw it away, which moves the frontier
@@ -239,7 +251,10 @@ public sealed class LivePlayback : ICockpitCursor
         // from standing on a frame that no longer exists.
         SnapToTheFrontier();
 
-        return changed || _index != before;
+        // The episode's own notice is part of the frame too. Without this a restart
+        // that had to wait for a running turn would change nothing the cursor could
+        // see, and the reason it did nothing would never reach the reader.
+        return changed || _index != before || !Same(notice, Notice());
     }
 
     private bool ApplyCore(TuiKey key)
@@ -291,10 +306,11 @@ public sealed class LivePlayback : ICockpitCursor
     {
         SnapToTheFrontier();
         var before = _index;
+        var notice = Notice();
 
         if (_paused || elapsed <= TimeSpan.Zero)
         {
-            return _index != before;
+            return _index != before || !Same(notice, Notice());
         }
 
         _accumulatedTicks += elapsed.TotalSeconds * StepsPerSecond;
@@ -322,7 +338,7 @@ public sealed class LivePlayback : ICockpitCursor
         }
 
         SnapToTheFrontier();
-        return _index != before;
+        return _index != before || !Same(notice, Notice());
     }
 
     /// <summary>
@@ -432,12 +448,12 @@ public sealed class LivePlayback : ICockpitCursor
     }
 
     /// <summary>
-    /// Whether a tick may be asked for: the episode is still running and has not
-    /// spent its budget. A finished or budget-spent episode computes nothing more,
+    /// Whether a tick may be asked for: the stepper is still able to produce one and
+    /// the budget has not been spent. A stopped stepper computes nothing more,
     /// however many times the reader asks.
     /// </summary>
     private bool CanProduce() =>
-        !IsFinished && ProducedFrames < _episode.MaximumTicks;
+        !_episode.HasStopped && ProducedFrames < _episode.MaximumTicks;
 
     private void Faster()
     {
@@ -464,6 +480,15 @@ public sealed class LivePlayback : ICockpitCursor
 
     private bool Changed(int index, bool paused, double speed) =>
         _index != index || _paused != paused || StepsPerSecond != speed;
+
+    /// <summary>
+    /// The one line the frame must carry, from the episode if it has one and from
+    /// the stepper's own state otherwise.
+    /// </summary>
+    private string? Notice() => _episode.Notice ?? NoticeState();
+
+    private static bool Same(string? left, string? right) =>
+        string.Equals(left, right, StringComparison.Ordinal);
 
     /// <summary>
     /// The stepper's own state, when the episode offers no notice of its own. Only

@@ -388,30 +388,26 @@ public static class CliApp
     {
         var setup = BuildLiveSetup(args);
 
-        // Nothing is stepped and no screen is entered before the arguments are
-        // known good, so a refusal cannot leave a half-started episode behind.
-        using var episode = new LiveEpisode(setup);
-
-        // The host owns the alternate screen. It refuses a redirected run itself,
-        // with the same one-line reason and the same status the replay viewer uses,
-        // and on that path nothing here has been started.
+        // The terminal is settled before the stepper is: a redirected run must
+        // leave nothing running and nothing on screen, which is only true if the
+        // check comes first. The host refuses it, with the same one-line reason and
+        // the same status the replay viewer uses.
         var capabilities = CapabilityDetector.Detect();
-        var cursor = new LivePlayback(episode);
-        var session = new TerminalGuardSessionFactory();
-        var probe = TuiHost.RefusalFor(capabilities);
-        if (probe is not null)
+        if (TuiHost.RefusalFor(capabilities) is { } refusal)
         {
-            // The episode's thread is stopped and joined by the using above, before
-            // this returns and before the line is printed.
-            stderr.WriteLine(probe);
+            stderr.WriteLine(refusal);
             return UsageError.ExitCode;
         }
+
+        using var episode = new LiveEpisode(setup);
+        var cursor = new LivePlayback(episode);
+        var session = new TerminalGuardSessionFactory();
 
         TuiRunResult result;
         using (var keys = new KeyQueue(ConsoleKeyReader.FromConsole()))
         {
             result = TuiHost.Run(new TuiHostRequest(
-                DocumentOf(episode, cursor),
+                cursor.Document,
                 stdout,
                 stderr,
                 capabilities,
@@ -431,20 +427,27 @@ public static class CliApp
         // the time TuiHost.Run returned, and the agent that may still be deciding is
         // no longer one once the join has returned.
         var joined = episode.Stop();
+        var failure = episode.Failure;
 
-        if (episode.Failure is { } failure)
+        if (failure is not null)
         {
             stderr.WriteLine($"lattice tui simulate: {failure.Message}");
-            return Failure;
         }
-
-        if (!joined)
+        else if (!joined)
         {
+            // Reported, not fatal: the viewer closed cleanly and the agent merely
+            // outlived it. A background thread ends with the process.
             stderr.WriteLine(LiveEpisode.StillDecidingNotice);
         }
 
-        return result.ExitCode;
+        return result.ExitCode == 0 ? LiveExitCode(failure) : result.ExitCode;
     }
+
+    /// <summary>
+    /// The status a finished live run reports: a simulation that failed is a
+    /// runtime failure, and a clean quit or a finished episode is success.
+    /// </summary>
+    public static int LiveExitCode(Exception? failure) => failure is null ? Success : Failure;
 
     /// <summary>
     /// The episode a live run plays, built from the same flags and through the same
@@ -510,13 +513,6 @@ public static class CliApp
 
         return LiveEpisodeSetup.Skirmish(seed, steps, agent, rules);
     }
-
-    /// <summary>
-    /// The document the host opens on: the episode's own frames as they stand. The
-    /// live cursor carries the real document from the first produced tick, so this
-    /// is only the request's required shape before that point.
-    /// </summary>
-    private static ReplayDocument DocumentOf(LiveEpisode episode, LivePlayback cursor) => cursor.Document;
 
     /// <summary>
     /// The viewer's own usage line, on stderr only, and deliberately one line: a

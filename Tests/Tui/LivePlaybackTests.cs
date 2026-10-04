@@ -351,10 +351,11 @@ public class LivePlaybackTests
     {
         private readonly List<ReplayFrame> _frames;
 
-        internal FakeEpisode(int Frames = 0, int Maximum = 10, string? Finished = null)
+        internal FakeEpisode(int Frames = 0, int Maximum = 10, string? Finished = null, bool failed = false)
         {
             MaximumTicks = Maximum;
             FinishedReason = Finished;
+            Failed = failed;
             _frames = new List<ReplayFrame>();
             Add(0, isStart: true);
 
@@ -399,6 +400,11 @@ public class LivePlaybackTests
 
         public LiveStepperStatus StepperStatus => Status;
 
+        public bool HasStopped => CockpitEpisodes.HasReason(FinishedReason) || Failed;
+
+        /// <summary>Whether the simulation failed, which ends the run with no reason.</summary>
+        internal bool Failed { get; init; }
+
         public string? Notice => Status switch
         {
             LiveStepperStatus.Stopping => LivePlayback.StoppingNotice,
@@ -408,7 +414,7 @@ public class LivePlaybackTests
 
         public void RequestTick()
         {
-            if (FinishedReason is not null)
+            if (FinishedReason is not null || Failed)
             {
                 return;
             }

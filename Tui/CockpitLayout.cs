@@ -85,6 +85,26 @@ public static class CockpitLayout
     /// <summary>How many characters of a recorded digest the scoreboard shows.</summary>
     public const int DigestCharacters = 12;
 
+    /// <summary>
+    /// The columns each scoreboard column occupies, named so the headings and the
+    /// rows cannot drift apart. The role column is cut to its own width before the
+    /// row is composed, which is what keeps a long recorded role from pushing the
+    /// score off the end of the pane.
+    /// </summary>
+    private const int SlotColumnWidth = 5;
+
+    /// <summary>The columns a role name is cut to, before the row is composed.</summary>
+    private const int RoleColumnWidth = 12;
+
+    /// <summary>The columns the zone column occupies.</summary>
+    private const int ZoneColumnWidth = 6;
+
+    /// <summary>The columns the score column occupies.</summary>
+    private const int ScoreColumnWidth = 5;
+
+    /// <summary>The columns before the slot column: the agent glyph and a space.</summary>
+    private const int RowIndentWidth = 2;
+
     /// <summary>What a pane's title looks like in its top border.</summary>
     public static string PaneTitle(string title) => $" {title} ";
 
@@ -130,7 +150,7 @@ public static class CockpitLayout
         cells.DrawText(
             2,
             0,
-            "LATTICE TUI  replay  " + Title(request.Document),
+            Clip(request, "LATTICE TUI  replay  " + Title(request.Document), Math.Max(0, size.Width - 4)),
             new Cell(' ', palette.Accent, request.PanelFill));
 
         if (IsCockpit(size))
@@ -171,7 +191,7 @@ public static class CockpitLayout
         var size = request.Size;
         if (size.Height >= 2)
         {
-            cells.DrawText(2, 1, ResizeNotice(size), new Cell(' ', palette.Accent, request.PanelFill));
+            cells.DrawText(2, 1, Clip(request, ResizeNotice(size), Math.Max(0, size.Width - 4)), new Cell(' ', palette.Accent, request.PanelFill));
         }
 
         var innerWidth = size.Width - 4;
@@ -225,7 +245,7 @@ public static class CockpitLayout
 
         foreach (var agent in frame.Agents)
         {
-            var role = roles is not null && agent.Slot < roles.Count && !string.IsNullOrEmpty(roles[agent.Slot])
+            var recorded = roles is not null && agent.Slot < roles.Count && !string.IsNullOrEmpty(roles[agent.Slot])
                 ? roles[agent.Slot]
                 : "A" + agent.Slot.ToString(System.Globalization.CultureInfo.InvariantCulture);
             var glyph = GlyphModes.Glyph(
@@ -240,7 +260,8 @@ public static class CockpitLayout
             rows.Add((
                 string.Create(
                     System.Globalization.CultureInfo.InvariantCulture,
-                    $"{glyph} {Invariant(agent.Slot),-5}{role,-12}{where,-6}{Invariant(agent.Score),5}"),
+                    $"{glyph} {Invariant(agent.Slot),-5}{Role(request, recorded),-RoleColumnWidth}" +
+                    $"{where,-ZoneColumnWidth}{Invariant(agent.Score),ScoreColumnWidth}"),
                 Theme.AgentSlot(agent.Slot)));
         }
 
@@ -248,14 +269,17 @@ public static class CockpitLayout
         var row = pane.Y + 1;
 
         // The column headings, dimmed: a scoreboard whose columns are only
-        // discoverable by counting is a scoreboard nobody reads.
+        // discoverable by counting is a scoreboard nobody reads. They stand under
+        // the same indent the rows use, so each heading is over its own column.
         cells.DrawText(
             pane.X + 1,
             row++,
-            Fit(
+            Clip(
+                request,
                 string.Create(
                     System.Globalization.CultureInfo.InvariantCulture,
-                    $" {"slot",-5}{"role",-12}{"zone",-6}{"score",5}"),
+                    $"{new string(' ', RowIndentWidth)}{"slot",-SlotColumnWidth}{"role",-RoleColumnWidth}" +
+                    $"{"zone",-ZoneColumnWidth}{"score",ScoreColumnWidth}"),
                 width),
             new Cell(' ', palette.TextDim, request.PanelFill));
 
@@ -269,7 +293,7 @@ public static class CockpitLayout
             cells.DrawText(
                 pane.X + 1,
                 row++,
-                Fit(text, width),
+                Clip(request, text, width),
                 new Cell(' ', accent ?? palette.TextPrimary, request.PanelFill));
         }
 
@@ -280,7 +304,7 @@ public static class CockpitLayout
             $"tick    {Invariant(frame.Tick)}/{Invariant(request.Document.Header.RecordedSteps)}",
             $"claims  {claims}/{resources}",
             "digest  " + (frame.StateDigest is { Length: > 0 } digest
-                ? digest[..DigestCharacters] + Ellipsis
+                ? Digest(request, digest)
                 : "not recorded"),
         };
 
@@ -309,10 +333,26 @@ public static class CockpitLayout
             cells.DrawText(
                 pane.X + 1,
                 row++,
-                Fit(fact, width),
+                Clip(request, fact, width),
                 new Cell(' ', palette.TextPrimary, request.PanelFill));
         }
     }
+
+    /// <summary>
+    /// A recorded role in its own column: made column-safe and cut to exactly the
+    /// column's width, marked when it was cut. Every surviving character is one
+    /// column, so padding to the width afterwards is padding in columns too, and
+    /// the zone and score columns that follow land where they always land.
+    /// </summary>
+    private static string Role(CockpitRequest request, string recorded) =>
+        CellText.Clip(recorded, RoleColumnWidth, request.Glyphs).PadRight(RoleColumnWidth);
+
+    /// <summary>
+    /// The leading characters of a recorded digest, made column-safe first so a cut
+    /// through it cannot leave half a surrogate in a cell.
+    /// </summary>
+    private static string Digest(CockpitRequest request, string digest) =>
+        CellText.Sanitize(digest, request.Glyphs)[..DigestCharacters] + CellText.Ellipsis(request.Glyphs);
 
     /// <summary>
     /// The event log: one compact row per recorded step, oldest at the top of the
@@ -336,7 +376,7 @@ public static class CockpitLayout
             cells.DrawText(
                 pane.X + 1,
                 row,
-                Fit("start of recording", pane.Width - 2),
+                Clip(request, "start of recording", pane.Width - 2),
                 new Cell(' ', palette.TextDim, request.PanelFill));
             row++;
         }
@@ -350,7 +390,7 @@ public static class CockpitLayout
                 ? new Cell(' ', Theme.SelectionForeground, Theme.SelectionBackground)
                 : new Cell(' ', palette.TextPrimary, request.PanelFill);
 
-            cells.DrawText(pane.X + 1, row++, Fit(line, pane.Width - 2), style);
+            cells.DrawText(pane.X + 1, row++, Clip(request, line, pane.Width - 2), style);
         }
 
         // Where the recording came from, in the recording's own terms: the seed and
@@ -361,12 +401,12 @@ public static class CockpitLayout
             var provenance = $"seed {Invariant((int)(header.Seed & 0xFFFFFFFF))}" +
                 $"  schema v{Invariant(header.SchemaVersion)}  " +
                 "sha256 " + (header.ScenarioDigest is { Length: > 0 } digest
-                    ? digest[..DigestCharacters] + Ellipsis
+                    ? Digest(request, digest)
                     : "not recorded");
             cells.DrawText(
                 pane.X + 1,
                 row,
-                Fit(provenance, pane.Width - 2),
+                Clip(request, provenance, pane.Width - 2),
                 new Cell(' ', palette.TextDim, request.PanelFill));
         }
     }
@@ -384,8 +424,8 @@ public static class CockpitLayout
         var row = pane.Y + 1;
 
         var state = new Cell(' ', palette.TextPrimary, request.PanelFill);
-        var label = $"tick {Invariant(tick)}/{Invariant(steps)}  ";
-        cells.DrawText(pane.X + 1, row, Fit(label, pane.Width - 2), state);
+        var label = Clip(request, $"tick {Invariant(tick)}/{Invariant(steps)}  ", pane.Width - 2);
+        cells.DrawText(pane.X + 1, row, label, state);
 
         var stateWord = request.Playback.IsPaused ? "paused" : "playing";
         var speed = request.Playback.StepsPerSecond.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
@@ -419,7 +459,7 @@ public static class CockpitLayout
         cells.DrawText(
             pane.X + 1 + label.Length + Math.Max(track, 0),
             row,
-            Fit(suffix, Math.Max(0, pane.Width - 2 - label.Length - Math.Max(track, 0))),
+            Clip(request, suffix, Math.Max(0, pane.Width - 2 - label.Length - Math.Max(track, 0))),
             state);
     }
 
@@ -456,7 +496,7 @@ public static class CockpitLayout
         cells.DrawText(
             pane.X + 2,
             pane.Y,
-            Fit(PaneTitle(title), Math.Max(0, pane.Width - 4)),
+            Clip(request, PaneTitle(title), Math.Max(0, pane.Width - 4)),
             new Cell(' ', palette.Accent, request.PanelFill));
     }
 
@@ -477,17 +517,18 @@ public static class CockpitLayout
     }
 
     /// <summary>
-    /// A string cut to what a pane can actually hold.
+    /// A pane's text, made column-safe and cut to what the pane can actually hold.
     /// <para>
     /// <see cref="CellBuffer.DrawText"/> clips at the edge of the buffer, not at
     /// the edge of a pane, so a row longer than its pane would be written straight
     /// over the pane's border and the screen's own frame — a long recorded action
     /// list does exactly that. Cutting the string here is what keeps a pane's
-    /// contents inside the pane.
+    /// contents inside the pane, and <see cref="CellText"/> marks the cut so a
+    /// clipped row cannot be mistaken for a short one.
     /// </para>
     /// </summary>
-    private static string Fit(string text, int width) =>
-        text.Length <= width ? text : text[..Math.Max(0, width)];
+    private static string Clip(CockpitRequest request, string text, int width) =>
+        CellText.Clip(text, Math.Max(0, width), request.Glyphs);
 
     private static BorderGlyphs Border(GlyphMode glyphs) =>
         glyphs == GlyphMode.Unicode ? BorderGlyphs.Rounded : BorderGlyphs.Ascii;
@@ -499,8 +540,6 @@ public static class CockpitLayout
 
     private static string Invariant(int value) =>
         value.ToString(System.Globalization.CultureInfo.InvariantCulture);
-
-    private const string Ellipsis = "...";
 
     /// <summary>The colour roles a frame is painted in, taken from the one theme.</summary>
     private readonly record struct PaletteRoles

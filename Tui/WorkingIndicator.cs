@@ -325,6 +325,16 @@ public sealed class WorkingIndicator : IDisposable
     /// <summary>The command this indicator is reporting on.</summary>
     public string Command { get; }
 
+    /// <summary>
+    /// Whether this indicator is live: an interactive stderr that is not
+    /// <c>--quiet</c>. Internal because it is not about the line's contents, only
+    /// about whether there is a line at all — which a caller wrapping
+    /// <see cref="Interleave"/> needs in order to stay inert exactly when this
+    /// indicator does, including the <c>NO_COLOR</c> run that has plain closing
+    /// status but no live row.
+    /// </summary>
+    internal bool IsActive => _active;
+
     private static TimeSpan DefaultClock()
     {
         // Process uptime, not wall-clock: a wall clock can jump backwards

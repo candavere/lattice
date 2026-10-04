@@ -105,19 +105,20 @@ public class LivePlaybackTests
     }
 
     [Fact]
-    public void AScrubPastTheFrontierAsksForWhatItNeedsAndStopsWhereItArrives()
+    public void AScrubPastTheFrontierStopsAtTheProducedEdgeAndAsksForNothing()
     {
         var episode = new FakeEpisode(Frames: 2, Maximum: 10) { TicksPerRequest = 1 };
         var cursor = new LivePlayback(episode);
 
-        // A live episode has no end to jump to, so End asks for one more tick and
-        // stands on it: never on a frame that does not exist, and never asking for
-        // a whole episode's worth at once.
+        // REWRITTEN in this commit: this test used to assert that End asks the
+        // stepper for one more tick. That was the bug — a key that moves the view is
+        // not a key that spends the reader's simulation budget, and only n asks for
+        // a tick. End now goes as far as the produced frames and no further.
         cursor.Apply(new TuiKey(TuiKeyKind.End));
 
-        Assert.Equal(1, episode.RequestedTicks);
+        Assert.Equal(0, episode.RequestedTicks);
+        Assert.Equal(2, cursor.Index);
         Assert.Equal(episode.Frames.Count - 1, cursor.Index);
-        Assert.Equal(3, cursor.Index);
     }
 
     [Fact]
@@ -126,18 +127,20 @@ public class LivePlaybackTests
         var episode = new FakeEpisode(Frames: 1, Maximum: 10);
         var cursor = new LivePlayback(episode);
 
+        // REWRITTEN in this commit: this test used to assert that twenty End presses
+        // asked the stepper for nine ticks, one per press until the budget ran out.
+        // Navigation no longer spends the reader's simulation budget at all — only n
+        // asks for a tick — so twenty presses ask for nothing and simply cannot
+        // reach a frame that does not exist.
         for (var i = 0; i < 20; i++)
         {
             cursor.Apply(new TuiKey(TuiKeyKind.End));
             Assert.True(cursor.Index <= episode.Frames.Count - 1);
         }
 
-        // Twenty end presses, and the stepper was asked for nine more ticks: one per
-        // press until the episode's own budget of ten was spent, and not one after.
-        // The viewer cannot outrun the frontier, and cannot outrun the budget.
-        Assert.Equal(9, episode.RequestedTicks);
-        Assert.Equal(10, cursor.Index);
-        Assert.Equal(10, cursor.ProducedFrames);
+        Assert.Equal(0, episode.RequestedTicks);
+        Assert.Equal(1, cursor.Index);
+        Assert.Equal(1, cursor.ProducedFrames);
     }
 
     [Fact]

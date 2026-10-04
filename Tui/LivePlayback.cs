@@ -419,7 +419,7 @@ public sealed class LivePlayback : ICockpitCursor
                     break;
                 }
 
-                if (CanProduce())
+                if (CanProduce() && !_awaitingFrontier)
                 {
                     _episode.RequestTick();
                     _awaitingFrontier = true;
@@ -456,19 +456,13 @@ public sealed class LivePlayback : ICockpitCursor
     }
 
     /// <summary>
-    /// The end key asks for the end of the episode. A live episode has no end yet,
-    /// so the cursor asks for what it can — the frames produced so far — and stops
-    /// there: it may never stand on a frame that does not exist.
+    /// The end key, on a live episode. There is no end yet — the episode is still
+    /// being computed — so End goes as far as the frames that exist and asks the
+    /// stepper for nothing. A key that moves the view is not a key that spends the
+    /// reader's simulation budget.
     /// </summary>
     private void RequestToTheEnd()
     {
-        if (CanProduce())
-        {
-            _episode.RequestTick();
-            _awaitingFrontier = true;
-        }
-
-        SnapToTheFrontier();
         ScrubTo(int.MaxValue);
     }
 

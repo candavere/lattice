@@ -576,6 +576,7 @@ public class LiveHostTests
             }
 
             key = default;
+            Yield(timeout);
             return KeyWait.TimedOut;
         }
 
@@ -583,6 +584,20 @@ public class LiveHostTests
         {
         }
     }
+
+    /// <summary>
+    /// Waits out a read that has nothing to deliver, or at least yields once.
+    /// <para>
+    /// Returning at once turns the host's loop into a spin: every pass reads the
+    /// episode under its lock, and a stepper thread trying to publish a frame can be
+    /// starved long enough that the run looks hung. Measured before this: the
+    /// finished-episode test aborted on 1 run in 8, with and without any change to
+    /// the episode; 0 in 8 after. A real console blocks in its reader instead, which
+    /// is why a live viewer never spins.
+    /// </para>
+    /// </summary>
+    private static void Yield(TimeSpan timeout) =>
+        Thread.Sleep(timeout > TimeSpan.Zero ? timeout : TimeSpan.FromMilliseconds(1));
 
     /// <summary>Waits for a condition, bounded, failing rather than hanging.</summary>
     private static void WaitUntil(Func<bool> condition)
@@ -615,6 +630,7 @@ public class LiveHostTests
             }
 
             key = default;
+            Yield(timeout);
             return KeyWait.TimedOut;
         }
 

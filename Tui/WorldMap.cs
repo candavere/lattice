@@ -112,16 +112,19 @@ public sealed record WorldMap
             throw new ArgumentException("A replayed map needs at least one zone.", nameof(zones));
         }
 
-        Zones = zones;
-        Resources = resources;
-        Edges = edges;
+        // Copied, because a map handed to a renderer that is still being built
+        // must not be able to change under it: a recording is read once and every
+        // frame after that has to see the same world.
+        Zones = (WorldZone[])zones.Clone();
+        Resources = (WorldResource[])resources.Clone();
+        Edges = (WorldEdge[])edges.Clone();
 
         var minX = int.MaxValue;
         var maxX = int.MinValue;
         var minY = int.MaxValue;
         var maxY = int.MinValue;
 
-        foreach (var zone in zones)
+        foreach (var zone in Zones)
         {
             minX = Math.Min(minX, zone.X);
             maxX = Math.Max(maxX, zone.X);
@@ -129,7 +132,7 @@ public sealed record WorldMap
             maxY = Math.Max(maxY, zone.Y);
         }
 
-        foreach (var resource in resources)
+        foreach (var resource in Resources)
         {
             minX = Math.Min(minX, resource.X);
             maxX = Math.Max(maxX, resource.X);

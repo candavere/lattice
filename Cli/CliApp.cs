@@ -292,8 +292,8 @@ public static class CliApp
     }
 
     /// <summary>
-    /// The interactive terminal viewer. One subcommand today — <c>replay</c> — which
-    /// plays a recorded trajectory in a read-only cockpit and runs no simulation.
+    /// The interactive terminal viewer: <c>replay</c>, which plays a recorded
+    /// trajectory in a read-only cockpit and runs no simulation.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -320,33 +320,24 @@ public static class CliApp
                 return UsageError.ExitCode;
             }
 
-            // --ascii is a boolean switch: strip it before the tokens are read as
-            // paths, so it can never be mistaken for one.
+            // --ascii is a boolean switch: stripped before parsing so it can never be
+            // mistaken for a path, and so the parser below sees only the path and
+            // any other flag it should refuse.
             var ascii = args.Skip(1).Contains("--ascii", StringComparer.Ordinal);
-            var tokens = args.Skip(1).Where(argument => argument != "--ascii").ToArray();
+            var (_, positionals) = ParseFlags(
+                args.Skip(1).Where(argument => argument != "--ascii").ToArray());
 
-            foreach (var token in tokens)
-            {
-                if (token.StartsWith("--", StringComparison.Ordinal))
-                {
-                    throw new UsageError($"unknown flag '{token}'.");
-                }
-            }
-
-            if (tokens.Length == 0)
+            if (positionals.Count == 0)
             {
                 WriteTuiUsage(stderr);
                 return UsageError.ExitCode;
             }
 
-            if (tokens.Length > 1)
-            {
-                throw new UsageError($"unexpected argument '{tokens[1]}'.");
-            }
+            GuardNoPositionals(positionals.Skip(1).ToList());
 
             // Read-only, and through the same reader every other command uses, so a
             // malformed file is rejected here rather than by the viewer.
-            var document = ReplaySource.ReadFile(tokens[0]);
+            var document = ReplaySource.ReadFile(positionals[0]);
 
             using var keys = new KeyQueue(ConsoleKeyReader.FromConsole());
             return TuiHost.Run(new TuiHostRequest(
@@ -366,9 +357,8 @@ public static class CliApp
     }
 
     /// <summary>
-    /// The viewer's own usage line, on stderr only. Deliberately one line: the
-    /// help text belongs with the rest of the CLI's help, which this stage does not
-    /// touch.
+    /// The viewer's own usage line, on stderr only, and deliberately one line: a
+    /// usage line is a diagnosis, not a manual.
     /// </summary>
     private static void WriteTuiUsage(TextWriter sink) =>
         sink.WriteLine("usage: lattice tui replay <trajectory.jsonl> [--ascii]");

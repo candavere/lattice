@@ -100,7 +100,7 @@ public interface IKeySource : IDisposable
 public sealed class KeyQueue : IKeySource
 {
     private readonly BlockingCollection<TuiKey> _queue = new();
-    private readonly ManualResetEventSlim _completion = new(false);
+    private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private bool _disposed;
 
     /// <summary>
@@ -120,11 +120,14 @@ public sealed class KeyQueue : IKeySource
     }
 
     /// <summary>
-    /// Signalled once the reader has reached the end of its input. A host never
+    /// Completes once the reader has reached the end of its input. A host never
     /// waits on it; it exists so a test can wait for the reading half to finish
-    /// instead of guessing how long that takes.
+    /// instead of guessing how long that takes. A task rather than a wait handle
+    /// because a queue is routinely disposed while its reader is still blocked —
+    /// releasing a handle underneath that reader would fault a background thread,
+    /// and a background thread fault takes the process with it.
     /// </summary>
-    public WaitHandle Completion => _completion.WaitHandle;
+    public Task Completion => _completion.Task;
 
     /// <summary>Waits for one key.</summary>
     public KeyWait Wait(TimeSpan timeout, out TuiKey key)
@@ -151,8 +154,7 @@ public sealed class KeyQueue : IKeySource
         }
 
         _disposed = true;
-        _completion.Set();
-        _completion.Dispose();
+        _completion.TrySetResult();
     }
 
     private void Pump(Func<TuiKey?> readOne)
@@ -173,7 +175,7 @@ public sealed class KeyQueue : IKeySource
         finally
         {
             _queue.CompleteAdding();
-            _completion.Set();
+            _completion.TrySetResult();
         }
     }
 }

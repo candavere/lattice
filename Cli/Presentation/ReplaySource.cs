@@ -69,7 +69,7 @@ public static class ReplaySource
             recording.Header.AgentRoles,
             recording.Final.TotalSteps,
             recording.Header.ScenarioSha256,
-            recording.Steps.Length > 0 && recording.Steps.All(step => step.Perceptions is not null));
+            recording.Header.DynamicRules?.Rules.Count ?? 0);
 
         return new ReplayDocument(map, header, frames);
     }
@@ -115,14 +115,18 @@ public static class ReplaySource
 
         // Full observability is the step contract's default, so every observation
         // of a step states the same world; the first is the one the existing
-        // playback reads for exactly this reason.
-        var observation = step.Result.Observations[0];
+        // playback reads for exactly this reason. A step that carries none at all is
+        // a shape the reader tolerates, so it is projected as the tick it is — no
+        // agents, nothing claimed — rather than read past: the scoreboard shows no
+        // agent row for that tick and the panes carry on.
+        var observation = step.Result.Observations is { Length: > 0 } stated ? stated[0] : null;
 
         return new ReplayFrame(
             info.StepNumber,
             isStart: false,
-            observation.AgentStates.Select(agent => Project(agent, recording, map)).ToArray(),
-            observation.Claims,
+            observation?.AgentStates.Select(agent => Project(agent, recording, map)).ToArray()
+                ?? Array.Empty<WorldAgent>(),
+            observation?.Claims ?? Array.Empty<int>(),
             TrajectoryPlayback.FormatActions(step.Actions),
             step.StateHash,
             info.IsTerminal,

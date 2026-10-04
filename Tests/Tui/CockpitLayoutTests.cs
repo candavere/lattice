@@ -307,7 +307,7 @@ public class CockpitLayoutTests
                 },
                 new[] { new WorldResource(0, 0, 2, 2), new WorldResource(1, 1, 12, 2) },
                 new[] { new WorldEdge(0, 0, 1, Capacity: 1), new WorldEdge(1, 1, 2, Capacity: 2) }),
-            new ReplayHeader(42, 5, "dungeon", new[] { "Sentry", "Infiltrator" }, 6, null, true),
+            new ReplayHeader(42, 5, "dungeon", new[] { "Sentry", "Infiltrator" }, 6, null, 0),
             frames);
     }
 }

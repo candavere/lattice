@@ -158,16 +158,7 @@ public static class CockpitLayout
         DrawPane(request, cells, frame, palette, log, "EVENT LOG");
         DrawPane(request, cells, frame, palette, timeline, "TIMELINE");
 
-        var worldRender = WorldRenderer.Render(new WorldRenderRequest(
-            request.Document.Map,
-            request.Frame(),
-            request.Document.TrailBefore(request.FrameIndex, TrailFrames),
-            new PaneSize(world.Width - 2, world.Height - 2),
-            request.Glyphs,
-            request.PanelFill,
-            request.Phase));
-
-        Blit(worldRender.Cells, cells, world.X + 1, world.Y + 1);
+        DrawWorld(request, cells, world);
 
         DrawScoreboard(request, cells, palette, scoreboard);
         DrawEventLog(request, cells, palette, log);
@@ -193,7 +184,23 @@ public static class CockpitLayout
         var pane = new Rect(1, 3, size.Width - 2, size.Height - 6);
         DrawPane(request, cells, frame, palette, pane, "WORLD");
 
-        var worldRender = WorldRenderer.Render(new WorldRenderRequest(
+        DrawWorld(request, cells, pane);
+
+        // The controls stay on screen at this size too. A reader who cannot see
+        // them cannot use them, and the hint row costs one line of a pane that is
+        // not there anyway.
+        DrawKeyHints(request, cells, palette);
+    }
+
+    /// <summary>
+    /// The world pane's contents: the renderer asked for at exactly the pane's
+    /// inner size, then copied in. One path for the cockpit and the fallback, so
+    /// the single-pane screen is the same world at a different size rather than a
+    /// second drawing of it.
+    /// </summary>
+    private static void DrawWorld(CockpitRequest request, CellBuffer cells, Rect pane)
+    {
+        var world = WorldRenderer.Render(new WorldRenderRequest(
             request.Document.Map,
             request.Frame(),
             request.Document.TrailBefore(request.FrameIndex, TrailFrames),
@@ -202,7 +209,7 @@ public static class CockpitLayout
             request.PanelFill,
             request.Phase));
 
-        Blit(worldRender.Cells, cells, pane.X + 1, pane.Y + 1);
+        Blit(world.Cells, cells, pane.X + 1, pane.Y + 1);
     }
 
     /// <summary>
@@ -268,7 +275,7 @@ public static class CockpitLayout
 
         var claims = frame.Claims.Count.ToString(System.Globalization.CultureInfo.InvariantCulture);
         var resources = request.Document.Map.Resources.Length.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        var facts = new[]
+        var facts = new List<string>
         {
             $"tick    {Invariant(frame.Tick)}/{Invariant(request.Document.Header.RecordedSteps)}",
             $"claims  {claims}/{resources}",
@@ -276,6 +283,21 @@ public static class CockpitLayout
                 ? digest[..DigestCharacters] + Ellipsis
                 : "not recorded"),
         };
+
+        if (frame.IsTerminal)
+        {
+            // The recorded end of the episode, in the recording's own words.
+            facts.Add("end     " + (frame.TerminalReason ?? "not recorded"));
+            facts.Add("winner  " + (frame.WinnerSlot is { } winner ? Invariant(winner) : "none"));
+        }
+
+        if (request.Document.Header.DynamicRuleCount > 0)
+        {
+            // The honesty line: this pane shows the capacities the recorded map
+            // declares, and a recording with a topology schedule has per-tick
+            // capacities the format does not carry as values.
+            facts.Add("chokes  map capacities; per-tick overrides not shown");
+        }
 
         foreach (var fact in facts)
         {
@@ -329,6 +351,23 @@ public static class CockpitLayout
                 : new Cell(' ', palette.TextPrimary, request.PanelFill);
 
             cells.DrawText(pane.X + 1, row++, Fit(line, pane.Width - 2), style);
+        }
+
+        // Where the recording came from, in the recording's own terms: the seed and
+        // wire format it declares, and the descriptor digest when it carries one.
+        if (row < pane.Y + pane.Height - 1)
+        {
+            var header = request.Document.Header;
+            var provenance = $"seed {Invariant((int)(header.Seed & 0xFFFFFFFF))}" +
+                $"  schema v{Invariant(header.SchemaVersion)}  " +
+                "sha256 " + (header.ScenarioDigest is { Length: > 0 } digest
+                    ? digest[..DigestCharacters] + Ellipsis
+                    : "not recorded");
+            cells.DrawText(
+                pane.X + 1,
+                row,
+                Fit(provenance, pane.Width - 2),
+                new Cell(' ', palette.TextDim, request.PanelFill));
         }
     }
 

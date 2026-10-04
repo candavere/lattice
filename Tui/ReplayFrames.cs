@@ -231,9 +231,11 @@ public sealed class ReplayFrame : IEquatable<ReplayFrame>
 /// <param name="AgentRoles">The recorded role per slot, when the recording carries a roster.</param>
 /// <param name="RecordedSteps">The step count the recording's own final line states.</param>
 /// <param name="ScenarioDigest">The recorded scenario digest, when the recording carries one.</param>
-/// <param name="PerceptionsRecorded">
-/// Whether every step carries the decision-time perceptions. Drives whether the
-/// panes may say the recorded fog is there.
+/// <param name="DynamicRuleCount">
+/// How many dynamic-topology rules the header declares, or 0 for a static map.
+/// The world pane draws the capacities the header's map declares, and a recording
+/// with a schedule has per-tick capacities the format does not carry as values —
+/// this is what lets a pane say so instead of implying the two are the same.
 /// </param>
 public sealed record ReplayHeader(
     ulong Seed,
@@ -242,7 +244,7 @@ public sealed record ReplayHeader(
     IReadOnlyList<string>? AgentRoles,
     int RecordedSteps,
     string? ScenarioDigest,
-    bool PerceptionsRecorded);
+    int DynamicRuleCount);
 
 /// <summary>
 /// A replayable recording: the map, what the recording says about itself, and
@@ -480,7 +482,7 @@ public sealed class ReplayPlayback
         }
 
         var before = _index;
-        var wasPaused = _paused;
+        var stopped = false;
         _accumulatedTicks += elapsed.TotalSeconds * StepsPerSecond;
 
         while (_accumulatedTicks >= 1.0)
@@ -490,6 +492,7 @@ public sealed class ReplayPlayback
                 _index = _document.LastIndex;
                 _accumulatedTicks = 0.0;
                 _paused = true;
+                stopped = true;
                 break;
             }
 
@@ -497,11 +500,11 @@ public sealed class ReplayPlayback
             _index++;
         }
 
-        // The frame on screen changes when the index moved, when the within-frame
-        // phase moved on, or when the cursor stopped at the end of the recording —
-        // that last one is why the pause state is compared rather than assumed: a
-        // pane that says whether the replay is running would otherwise keep saying
-        // "playing" over the last frame.
-        return _index != before || !_paused || wasPaused != _paused;
+        // The frame on screen changes when the index moved or the within-frame phase
+        // moved on — and separately when the cursor stopped at the end of the
+        // recording, which moves neither. That last one is reported in its own right
+        // because a pane that says whether the replay is running would otherwise go
+        // on saying "playing" over the last frame for ever.
+        return _index != before || !_paused || stopped;
     }
 }

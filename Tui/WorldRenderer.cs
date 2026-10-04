@@ -35,11 +35,16 @@ public readonly record struct PaneSize
 /// <param name="Label">The one character the zone draws as.</param>
 /// <param name="X">The column the zone's cell is in.</param>
 /// <param name="Y">The row the zone's cell is in.</param>
+/// <param name="Shut">
+/// Whether the recording says nothing may enter the zone, which is the same
+/// recorded fact a shut edge draws as, and travels with the placement so the panes
+/// do not have to look the zone up again.
+/// </param>
 /// <param name="Nudged">
 /// Whether scaling put this zone on a cell another zone already held, and the
 /// renderer had to move it to the nearest free cell to keep the two apart.
 /// </param>
-public sealed record ZonePlacement(int ZoneId, string Label, int X, int Y, bool Nudged);
+public sealed record ZonePlacement(int ZoneId, string Label, int X, int Y, bool Shut, bool Nudged);
 
 /// <summary>
 /// Everything the world pane needs for one frame, and nothing else.
@@ -166,9 +171,8 @@ public static class WorldRenderer
             cells.Fill(0, 0, size.Width, size.Height, new Cell(' ', null, fill));
         }
 
-        var scale = new MapScale(request.Map, size);
         var (placements, byZone, unplaced) = Place(request.Map, size);
-        var painter = new Painter(cells, new Dictionary<int, int>(), size);
+        var painter = new Painter(cells, size);
         foreach (var placement in placements)
         {
             painter.Claim(placement.X, placement.Y, PriorityZone);
@@ -176,7 +180,7 @@ public static class WorldRenderer
 
         DrawEdges(request, byZone, painter);
         var washes = DrawTrail(request, byZone, painter);
-        DrawResources(request, scale, painter);
+        DrawResources(request, new MapScale(request.Map, size), painter);
         DrawZones(request, placements, washes, painter);
         DrawAgents(request, byZone, painter);
 
@@ -210,7 +214,7 @@ public static class WorldRenderer
 
             if (taken.Add(scale.Key(column, row)))
             {
-                var placement = new ZonePlacement(zone.Id, zone.Label, column, row, Nudged: false);
+                var placement = new ZonePlacement(zone.Id, zone.Label, column, row, zone.Capacity == 0, Nudged: false);
                 placements.Add(placement);
                 byZone[zone.Id] = placement;
                 continue;
@@ -263,7 +267,7 @@ public static class WorldRenderer
                 }
 
                 found = true;
-                return new ZonePlacement(zone.Id, zone.Label, candidateX, candidateY, Nudged: true);
+                return new ZonePlacement(zone.Id, zone.Label, candidateX, candidateY, zone.Capacity == 0, Nudged: true);
             }
         }
 
@@ -460,8 +464,7 @@ public static class WorldRenderer
     {
         foreach (var placement in placements)
         {
-            var zone = request.Map.Zone(placement.ZoneId);
-            var shut = zone is { Capacity: 0 };
+            var shut = placement.Shut;
             washes.TryGetValue(painter.Key(placement.X, placement.Y), out var wash);
             var cell = new Cell(
                 placement.Label[0],
@@ -616,13 +619,12 @@ public static class WorldRenderer
     private sealed class Painter
     {
         private readonly CellBuffer _cells;
-        private readonly Dictionary<int, int> _held;
+        private readonly Dictionary<int, int> _held = new();
         private readonly PaneSize _size;
 
-        internal Painter(CellBuffer cells, Dictionary<int, int> held, PaneSize size)
+        internal Painter(CellBuffer cells, PaneSize size)
         {
             _cells = cells;
-            _held = held;
             _size = size;
         }
 

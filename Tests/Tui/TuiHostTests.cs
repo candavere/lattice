@@ -246,7 +246,7 @@ public class TuiHostTests
                 new[] { new WorldZone(0, "0", 0, 0), new WorldZone(1, "1", 10, 10) },
                 Array.Empty<WorldResource>(),
                 new[] { new WorldEdge(0, 0, 1) }),
-            new ReplayHeader(42, 5, null, null, 4, null, false),
+            new ReplayHeader(42, 5, null, null, 4, null, 0),
             frames);
     }
 

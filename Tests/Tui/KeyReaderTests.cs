@@ -15,28 +15,28 @@ public class KeyReaderTests
     private static readonly TimeSpan Generous = TimeSpan.FromSeconds(30);
 
     [Fact]
-    public void EveryKeyIsHandedOverInTheOrderItWasRead()
+    public async Task EveryKeyIsHandedOverInTheOrderItWasRead()
     {
         var scripted = new[] { Key('n'), Key(' '), Key(TuiKeyKind.Right), Key(TuiKeyKind.End) };
         using var queue = new KeyQueue(Producer(scripted));
 
-        Assert.True(queue.Completion.WaitOne(Generous));
+        await queue.Completion.WaitAsync(Generous);
 
         Assert.Equal(scripted, Drain(queue));
     }
 
     [Fact]
-    public void AnEmptyProducerReportsEndOfInput()
+    public async Task AnEmptyProducerReportsEndOfInput()
     {
         using var queue = new KeyQueue(Producer([]));
 
-        Assert.True(queue.Completion.WaitOne(Generous));
+        await queue.Completion.WaitAsync(Generous);
 
         Assert.Equal(KeyWait.Closed, queue.Wait(TimeSpan.Zero, out _));
     }
 
     [Fact]
-    public void AProducerThatHasNotFinishedReportsATimeoutRatherThanEndOfInput()
+    public async Task AProducerThatHasNotFinishedReportsATimeoutRatherThanEndOfInput()
     {
         var release = new ManualResetEventSlim(false);
         using var queue = new KeyQueue(() =>
@@ -48,16 +48,16 @@ public class KeyReaderTests
         Assert.Equal(KeyWait.TimedOut, queue.Wait(TimeSpan.FromMilliseconds(20), out _));
 
         release.Set();
-        Assert.True(queue.Completion.WaitOne(Generous));
+        await queue.Completion.WaitAsync(Generous);
         Assert.Equal(KeyWait.Closed, queue.Wait(TimeSpan.FromMilliseconds(20), out _));
     }
 
     [Fact]
-    public void AProducerThatThrowsEndsTheQueueRatherThanTakingTheProcessDown()
+    public async Task AProducerThatThrowsEndsTheQueueRatherThanTakingTheProcessDown()
     {
         using var queue = new KeyQueue(() => throw new IOException("the terminal went away"));
 
-        Assert.True(queue.Completion.WaitOne(Generous));
+        await queue.Completion.WaitAsync(Generous);
 
         Assert.Equal(KeyWait.Closed, queue.Wait(TimeSpan.Zero, out _));
     }

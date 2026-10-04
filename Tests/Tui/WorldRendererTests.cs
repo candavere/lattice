@@ -23,9 +23,9 @@ public class WorldRendererTests
         Assert.Equal(
             new[]
             {
-                new ZonePlacement(0, "0", 0, 0, false),
-                new ZonePlacement(1, "1", 31, 22, false),
-                new ZonePlacement(2, "2", 62, 11, false),
+                new ZonePlacement(0, "0", 0, 0, false, false),
+                new ZonePlacement(1, "1", 31, 22, false, false),
+                new ZonePlacement(2, "2", 62, 11, false, false),
             },
             placements);
     }

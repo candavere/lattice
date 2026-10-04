@@ -187,7 +187,7 @@ public class ReplayPlaybackTests
                 new[] { new WorldZone(0, "0", 0, 0) },
                 Array.Empty<WorldResource>(),
                 Array.Empty<WorldEdge>()),
-            new ReplayHeader(42, 5, null, ImmutableArray<string>.Empty, 6, null, false),
+            new ReplayHeader(42, 5, null, ImmutableArray<string>.Empty, 6, null, 0),
             frames);
     }
 }

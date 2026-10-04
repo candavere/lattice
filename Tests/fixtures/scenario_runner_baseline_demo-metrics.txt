@@ -1,0 +1,7 @@
+termination-reason=resources-exhausted
+terminated=true
+total-steps=10
+max-steps=30
+contended-ticks=0
+contention-rate=0
+agents=0:8:2:4|1:1:6:0.16666666666666666

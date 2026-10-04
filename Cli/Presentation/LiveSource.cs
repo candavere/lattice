@@ -307,6 +307,13 @@ public sealed class LiveEpisode : ILiveEpisode, IDisposable
     public bool IsJoined => StepperStatus == LiveStepperStatus.Stopped;
 
     /// <inheritdoc />
+    /// <remarks>
+    /// A slot of one, not a queue. A caller that asks again while a request is
+    /// outstanding is asking for a second tick nobody is waiting for, and honouring
+    /// it would put the simulation arbitrarily far ahead of the viewer. The slot is
+    /// cleared when the pump takes it, so a request made after a tick has been
+    /// picked up is a fresh one.
+    /// </remarks>
     public void RequestTick()
     {
         lock (_gate)
@@ -316,7 +323,7 @@ public sealed class LiveEpisode : ILiveEpisode, IDisposable
                 return;
             }
 
-            _requested++;
+            _requested = 1;
             Monitor.PulseAll(_gate);
         }
     }

@@ -342,10 +342,12 @@ public sealed class LivePlayback : ICockpitCursor
         {
             if (_index >= ProducedFrames)
             {
-                // At the frontier: ask for the next tick. The stepper produces it
-                // on its own thread, so the viewer shows the frame it has and the
-                // new one appears on the next pass — never more than one tick ahead.
-                if (!CanProduce())
+                // At the frontier. Ask for the next tick only when nothing is
+                // already outstanding: the stepper runs on its own thread, so a
+                // request made while the previous one is still being decided is a
+                // request for a tick nobody is waiting for — and a queue of them is
+                // exactly what puts the simulation ahead of the viewer.
+                if (!CanProduce() || _awaitingFrontier)
                 {
                     break;
                 }

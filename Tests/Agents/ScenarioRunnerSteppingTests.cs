@@ -66,6 +66,103 @@ public class ScenarioRunnerSteppingTests
     }
 
     [Fact]
+    public void TheStepperDrivenSkirmishEqualsTheCommittedEpisodeToo()
+    {
+        // The same fixture, reached the other way: one tick at a time through the
+        // stepper instead of the runner's own loop. Equivalence therefore does not
+        // rest on the two paths agreeing with each other — both are compared with
+        // the bytes committed before either of them existed.
+        var (map, config, roster, maxSteps, label, roles) = Demo();
+        var stepper = new ScenarioStepper(map, config, roster, maxSteps);
+
+        while (stepper.CanStep)
+        {
+            stepper.Step();
+        }
+
+        AssertCommitted("scenario_runner_baseline_demo", map, config, stepper.ToResult(), label, roles);
+    }
+
+    [Fact]
+    public void TheStepperDrivenInfiltrationEqualsTheCommittedEpisodeToo()
+    {
+        var (map, config, roster, maxSteps) = Infiltration();
+        var stepper = new ScenarioStepper(map, config, roster, maxSteps, recordPerceptions: true);
+
+        while (stepper.CanStep)
+        {
+            stepper.Step();
+        }
+
+        AssertCommitted(
+            "scenario_runner_baseline_infiltration",
+            map,
+            config,
+            stepper.ToResult(),
+            InfiltrationScenario.ScenarioName,
+            Roles());
+    }
+
+    [Fact]
+    public void AStepperIsFinishedExactlyWhenTheRunnerWouldHaveStopped()
+    {
+        var (map, config, roster, maxSteps, _, _) = Demo();
+
+        // Stopping on the budget and stopping on a terminal tick are two different
+        // endings, and the stepper has to be able to tell them apart: an episode
+        // that ran out of ticks is not a finished one, and a viewer that said
+        // otherwise would be claiming a verdict the episode never reached.
+        var spentBudget = new ScenarioStepper(map, config, new IAgent[] { new AlwaysWaits(0), new AlwaysWaits(1) }, 2);
+
+        Assert.True(spentBudget.CanStep);
+        spentBudget.Step();
+        Assert.True(spentBudget.CanStep);
+        spentBudget.Step();
+
+        Assert.False(spentBudget.CanStep);
+        Assert.False(spentBudget.IsTerminal);
+        Assert.Equal(2, spentBudget.StepCount);
+
+        var reachedATerminalTick = new ScenarioStepper(map, config, roster, maxSteps);
+        while (reachedATerminalTick.CanStep)
+        {
+            reachedATerminalTick.Step();
+        }
+
+        Assert.True(reachedATerminalTick.IsTerminal);
+        Assert.True(reachedATerminalTick.StepCount < maxSteps);
+    }
+
+    [Fact]
+    public void AStepperRefusesExactlyWhatTheRunnerRefuses()
+    {
+        var (map, config, roster, _, _, _) = Demo();
+
+        // Same parameter names and same messages, both ways: the runner now takes
+        // its validation from the stepper's constructor, and a caller that used to
+        // catch these must catch the very same thing.
+        var stepperBudget = Assert.Throws<ArgumentOutOfRangeException>(
+            () => new ScenarioStepper(map, config, roster, 0));
+        var runnerBudget = Assert.Throws<ArgumentOutOfRangeException>(
+            () => ScenarioRunner.Run(map, config, roster, 0));
+
+        Assert.Equal(runnerBudget.ParamName, stepperBudget.ParamName);
+        Assert.Equal(runnerBudget.Message, stepperBudget.Message);
+
+        var stepperRoster = Assert.Throws<ArgumentException>(
+            () => new ScenarioStepper(map, config, roster[..1], 10));
+        var runnerRoster = Assert.Throws<ArgumentException>(
+            () => ScenarioRunner.Run(map, config, roster[..1], 10));
+
+        Assert.Equal(runnerRoster.ParamName, stepperRoster.ParamName);
+        Assert.Equal(runnerRoster.Message, stepperRoster.Message);
+
+        // A roster that cannot carry perceptions is refused whole, not half-blind.
+        Assert.Throws<ArgumentException>(
+            () => new ScenarioStepper(map, config, roster, 10, recordPerceptions: true));
+    }
+
+    [Fact]
     public void TheInfiltrationSetupIsTheOnesTheScenarioItselfRuns()
     {
         // The roster above is rebuilt from the scenario's own constants so a
@@ -243,5 +340,19 @@ public class ScenarioRunnerSteppingTests
 
         Assert.NotNull(directory);
         return directory!.FullName;
+    }
+
+    /// <summary>
+    /// An agent that never changes the world, so an episode built from these two
+    /// runs until its budget is spent and never reaches a terminal tick. That is
+    /// the ending a budget-stop has to be distinguishable from.
+    /// </summary>
+    private sealed class AlwaysWaits : IAgent
+    {
+        internal AlwaysWaits(int agentId) => AgentId = agentId;
+
+        public int AgentId { get; }
+
+        public AgentAction Decide(Observation observation) => new(ActionKind.Wait);
     }
 }

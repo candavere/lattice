@@ -115,17 +115,46 @@ public class CockpitLiveStateTests
     public void ARecordingAndALiveEpisodeOfTheSameFramesDifferOnlyWhereTheyMust()
     {
         var recording = Render(Live: null);
-        var live = Render(new LiveState(6, 30));
+        var live = Render(new LiveState(6, 30, Seed: 42));
 
-        // The world, the scoreboard and the log are drawn from the same frames and
-        // must be identical; only the timeline and the hints know the difference.
+        // The world, the scoreboard and the log's action rows are drawn from the same
+        // frames and are identical. The provenance row is not, and must not be: a
+        // live episode has not been recorded, so it has no schema version and no
+        // digest to name.
         for (var row = 0; row < Cockpit.Height - 4; row++)
         {
+            if (row == 17)
+            {
+                Assert.NotEqual(recording[row], live[row]);
+                continue;
+            }
+
             Assert.Equal(recording[row], live[row]);
         }
 
+        // What the panes can honestly say about where the episode came from. A
+        // recording names its seed, its schema version and its digest; a live
+        // episode names its seed and says "not recorded" for the two things that only
+        // exist once an episode has been written down.
+        Assert.Contains("seed 42  schema v5  sha256", string.Join("\n", recording), StringComparison.Ordinal);
+
+        var liveText = string.Join("\n", live);
+        Assert.Contains("seed 42  schema not recorded", liveText, StringComparison.Ordinal);
+        Assert.DoesNotContain("start of recording", liveText, StringComparison.Ordinal);
+        Assert.DoesNotContain("schema v5", liveText, StringComparison.Ordinal);
+
         Assert.NotEqual(recording[TimelineRow], live[TimelineRow]);
         Assert.NotEqual(recording[^1], live[^1]);
+    }
+
+    [Fact]
+    public void AnEpisodeThatHasProducedNothingSaysItIsAnEpisodeAndNotARecording()
+    {
+        // On the start frame the log says what the frames are. A live episode has not
+        // been recorded, and calling it one would be a claim about its provenance
+        // that nothing supports.
+        Assert.Contains("start of episode", string.Join("\n", Render(new LiveState(0, 30, Seed: 42), frameIndex: 0)), StringComparison.Ordinal);
+        Assert.Contains("start of recording", string.Join("\n", Render(null, frameIndex: 0)), StringComparison.Ordinal);
     }
 
     [Fact]

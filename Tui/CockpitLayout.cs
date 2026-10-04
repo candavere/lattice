@@ -247,7 +247,7 @@ public static class CockpitLayout
     {
         var frame = request.Document[request.FrameIndex];
         var rows = new List<(string Text, Rgb? Accent)>();
-        var roles = request.Document.Header.AgentRoles;
+        var roles = CockpitEpisodes.AgentRoles(request.Document, request.Live);
 
         foreach (var agent in frame.Agents)
         {
@@ -382,7 +382,13 @@ public static class CockpitLayout
             cells.DrawText(
                 pane.X + 1,
                 row,
-                Clip(request, "start of recording", pane.Width - 2),
+                // A live episode has produced nothing yet and has not been
+                // recorded; calling it a recording would be a claim about its
+                // provenance that nothing supports.
+                Clip(
+                    request,
+                    request.Live is null ? "start of recording" : "start of episode",
+                    pane.Width - 2),
                 new Cell(' ', palette.TextDim, request.PanelFill));
             row++;
         }
@@ -404,11 +410,13 @@ public static class CockpitLayout
         if (row < pane.Y + pane.Height - 1)
         {
             var header = request.Document.Header;
-            var provenance = $"seed {Invariant((int)(header.Seed & 0xFFFFFFFF))}" +
-                $"  schema v{Invariant(header.SchemaVersion)}  " +
-                "sha256 " + (header.ScenarioDigest is { Length: > 0 } digest
-                    ? Digest(request, digest)
-                    : "not recorded");
+            var provenance = $"seed {CockpitEpisodes.Seed(document, request.Live)}" +
+                $"  schema {CockpitEpisodes.SchemaVersion(document, request.Live)}  " +
+                "sha256 " + (request.Live is not null
+                    ? CockpitEpisodes.NotRecorded
+                    : header.ScenarioDigest is { Length: > 0 } digest
+                        ? Digest(request, digest)
+                        : CockpitEpisodes.NotRecorded);
             cells.DrawText(
                 pane.X + 1,
                 row,

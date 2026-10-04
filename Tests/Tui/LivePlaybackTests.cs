@@ -396,6 +396,12 @@ public class LivePlaybackTests
 
         public int MaximumTicks { get; }
 
+        public ulong? Seed => 42;
+
+        public string Label => "fake-episode";
+
+        public IReadOnlyList<string>? AgentRoles => new[] { "First", "Second", "Third", "Fourth" };
+
         public string? FinishedReason { get; set; }
 
         public LiveStepperStatus StepperStatus => Status;

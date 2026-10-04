@@ -58,6 +58,22 @@ public interface ILiveEpisode
     int MaximumTicks { get; }
 
     /// <summary>
+    /// The seed the episode runs at, or null when the source was not told one. It is
+    /// a fact about the run, not about a recording, so the panes name it only when
+    /// there is one.
+    /// </summary>
+    ulong? Seed { get; }
+
+    /// <summary>The episode's name, as the source's own label for it.</summary>
+    string Label { get; }
+
+    /// <summary>
+    /// The role per slot the roster carries, so the scoreboard names agents rather
+    /// than falling back to a slot number. Null when the roster carries none.
+    /// </summary>
+    IReadOnlyList<string>? AgentRoles { get; }
+
+    /// <summary>
     /// The recorded reason the episode ended, or null while it is still running.
     /// The recording's own words; a live episode has none until one exists.
     /// </summary>
@@ -176,12 +192,17 @@ public sealed class LivePlayback : ICockpitCursor
 
             _documentFrames = produced;
             _document = new ReplayDocument(
-                WorldMapOf(_episode.Frames),
+                _episode.Map,
                 new ReplayHeader(
+                    // What a live episode is not: it has not been recorded, so it
+                    // carries no wire-format version and no digest. The panes read
+                    // the seed and the roster from the live state instead, and say
+                    // "not recorded" for the rest rather than showing a zero that
+                    // looks like a fact.
                     Seed: 0,
                     SchemaVersion: 0,
-                    Scenario: "live",
-                    AgentRoles: null,
+                    Scenario: _episode.Label,
+                    AgentRoles: _episode.AgentRoles,
                     RecordedSteps: _episode.MaximumTicks,
                     ScenarioDigest: null,
                     DynamicRuleCount: 0),
@@ -213,7 +234,9 @@ public sealed class LivePlayback : ICockpitCursor
         ProducedTicks: Math.Max(0, _episode.Frames.Count - 1),
         MaximumTicks: _episode.MaximumTicks,
         FinishedReason: _episode.FinishedReason,
-        Notice: Notice());
+        Notice: Notice(),
+        Seed: _episode.Seed,
+        AgentRoles: _episode.AgentRoles);
 
     /// <inheritdoc />
     /// <remarks>
@@ -504,13 +527,4 @@ public sealed class LivePlayback : ICockpitCursor
         };
 
     private int Clamped(int index) => Math.Clamp(index, 0, Math.Max(0, ProducedFrames));
-
-    /// <summary>
-    /// The world the panes draw the produced frames against: the episode's own map,
-    /// projected by the one projection a recording uses. Nothing here invents a
-    /// zone, a resource or an edge.
-    /// </summary>
-    private WorldMap WorldMapOf(IReadOnlyList<ReplayFrame> frames) => frames.Count == 0
-        ? new WorldMap(Array.Empty<WorldZone>(), Array.Empty<WorldResource>(), Array.Empty<WorldEdge>())
-        : _episode.Map;
 }

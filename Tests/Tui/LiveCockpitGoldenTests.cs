@@ -48,7 +48,11 @@ public class LiveCockpitGoldenTests
     /// still running, so the screen says LIVE, counts what has been produced against
     /// what can be, and shows the cursor's own state rather than an ending.
     /// </summary>
-    private static readonly LiveState Running = new(ProducedTicks: 7, MaximumTicks: 30);
+    private static readonly LiveState Running = new(
+        ProducedTicks: 7,
+        MaximumTicks: 30,
+        Seed: 7,
+        AgentRoles: new[] { "Sentry", "Infiltrator" });
 
     [Fact]
     public void ALiveCockpitIsTheCommittedFrame()
@@ -86,6 +90,10 @@ public class LiveCockpitGoldenTests
         // the list was cut. Five columns go to the tick and its padding, so
         // twenty-five are left: twenty-four of text and the marker.
         Assert.Equal("  5  agent0: Move(2); agent1:\u2026", Pane(lines[EventLogTop + 5]));
+
+        // The provenance row says what a live episode can be said to have: its
+        // seed, and "not recorded" for the two things a recording would carry.
+        Assert.Equal("seed 7  schema not recorded  \u2026", Pane(lines[EventLogTop + 6]));
 
         // The hint row is the live one, and names the live controls.
         Assert.Equal(CockpitLayout.LiveKeyHints, lines[^1].Substring(2, CockpitLayout.LiveKeyHints.Length));

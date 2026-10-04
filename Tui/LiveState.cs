@@ -20,11 +20,22 @@ namespace Lattice.Tui;
 /// else — the stepper is stopping, or a restart is waiting on an agent that is
 /// still deciding. Null when there is nothing to say.
 /// </param>
+/// <param name="Seed">
+/// The seed the episode is running at, which it is told rather than asked for: a
+/// pane that wants to name where the episode came from names the seed it was
+/// given, and says "not recorded" for anything it was not.
+/// </param>
+/// <param name="AgentRoles">
+/// The roster's role per slot, so the scoreboard names the agents rather than
+/// falling back to "A0". Null when the roster carries none.
+/// </param>
 public sealed record LiveState(
     int ProducedTicks,
     int MaximumTicks,
     string? FinishedReason = null,
-    string? Notice = null)
+    string? Notice = null,
+    ulong? Seed = null,
+    IReadOnlyList<string>? AgentRoles = null)
 {
     /// <summary>
     /// Whether the episode has ended. True only once the reason is known: a
@@ -43,11 +54,38 @@ public sealed record LiveState(
 public static class CockpitEpisodes
 {
     /// <summary>
+    /// What a source records when it records nothing. A pane that wants a fact the
+    /// source does not carry says this, which is a statement about the recording
+    /// rather than a guess.
+    /// </summary>
+    public const string NotRecorded = "not recorded";
+
+    /// <summary>
     /// Whether a source states a reason at all. A missing or blank reason is not a
     /// reason: claiming an episode ended on the strength of whitespace would be the
     /// viewer inventing a verdict.
     /// </summary>
     public static bool HasReason(string? reason) => !string.IsNullOrWhiteSpace(reason);
+
+    /// <summary>
+    /// The seed a frame's episode is running at, as the event log names it: the
+    /// value a live episode was given, or a recording's own header. A live episode
+    /// that was given no seed says so rather than printing a zero.
+    /// </summary>
+    public static string Seed(ReplayDocument document, LiveState? live) =>
+        live is null
+            ? Invariant((int)(document.Header.Seed & 0xFFFFFFFF))
+            : live.Seed is { } seed ? seed.ToString(System.Globalization.CultureInfo.InvariantCulture) : NotRecorded;
+
+    /// <summary>
+    /// The wire format a frame's episode was recorded in. A live episode is being
+    /// computed and has not been recorded at all, so it has no schema version and
+    /// says so.
+    /// </summary>
+    public static string SchemaVersion(ReplayDocument document, LiveState? live) =>
+        live is null
+            ? "v" + Invariant(document.Header.SchemaVersion)
+            : NotRecorded;
 
     /// <summary>
     /// The step count the episode is measured against: a recording's own final
@@ -71,6 +109,16 @@ public static class CockpitEpisodes
     /// </summary>
     public static string FinishedReason(ReplayFrame frame, LiveState? live) =>
         live is not null
-            ? live.IsFinished ? live.FinishedReason! : "not recorded"
-            : HasReason(frame.TerminalReason) ? frame.TerminalReason! : "not recorded";
+            ? live.IsFinished ? live.FinishedReason! : NotRecorded
+            : HasReason(frame.TerminalReason) ? frame.TerminalReason! : NotRecorded;
+
+    /// <summary>
+    /// The role per slot the scoreboard names agents by: a live episode's own
+    /// roster, or a recording's header.
+    /// </summary>
+    public static IReadOnlyList<string>? AgentRoles(ReplayDocument document, LiveState? live) =>
+        live?.AgentRoles ?? document.Header.AgentRoles;
+
+    private static string Invariant(int value) =>
+        value.ToString(System.Globalization.CultureInfo.InvariantCulture);
 }

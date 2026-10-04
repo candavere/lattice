@@ -218,6 +218,15 @@ public sealed class LiveEpisode : ILiveEpisode, IDisposable
     public int MaximumTicks => _setup.MaxSteps;
 
     /// <inheritdoc />
+    public ulong? Seed => _setup.Seed;
+
+    /// <inheritdoc />
+    public string Label => _setup.Label;
+
+    /// <inheritdoc />
+    public IReadOnlyList<string> AgentRoles => _setup.Roles;
+
+    /// <inheritdoc />
     public string? FinishedReason
     {
         get

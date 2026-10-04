@@ -12,6 +12,7 @@ using Lattice.Environment;
 using Lattice.Generator;
 using Lattice.Protocol;
 using Lattice.Trajectories;
+using Lattice.Tui;
 using Lattice.Visualization;
 
 namespace Lattice.Cli;
@@ -285,13 +286,96 @@ public static class CliApp
             "benchmark" => lifecycle.Run(() => RunBenchmark(args[1..], stdout, commandErrors)),
             "evaluate" => lifecycle.Run(() => Evaluate(args[1..], stdout, commandErrors, lifecycle)),
             "validate-scenario" => lifecycle.Run(() => ValidateScenario(args[1..], stdout, commandErrors)),
+            "tui" => lifecycle.Run(() => Tui(args[1..], stdout, commandErrors)),
             _ => UnknownCommand(args[0], stderr),
         };
     }
 
+    /// <summary>
+    /// The interactive terminal viewer. One subcommand today — <c>replay</c> — which
+    /// plays a recorded trajectory in a read-only cockpit and runs no simulation.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Everything the command line can be wrong about is decided before anything is
+    /// read: the subcommand, the arity, an unknown flag. Each of those is a
+    /// <see cref="UsageError"/> and reports the usage status. A path that is missing
+    /// or unreadable is a fact discovered while doing the work, so it keeps the
+    /// runtime-failure status — the same split every other command here makes.
+    /// </para>
+    /// <para>
+    /// The terminal itself is the host's business, not the parser's: whether the
+    /// streams can carry a full-screen view is decided inside
+    /// <see cref="TuiHost"/>, which refuses a redirected run with one line of
+    /// reason and the usage status.
+    /// </para>
+    /// </remarks>
+    private static int Tui(string[] args, TextWriter stdout, TextWriter stderr)
+    {
+        try
+        {
+            if (args.Length == 0 || args[0] != "replay")
+            {
+                WriteTuiUsage(stderr);
+                return UsageError.ExitCode;
+            }
+
+            // --ascii is a boolean switch: strip it before the tokens are read as
+            // paths, so it can never be mistaken for one.
+            var ascii = args.Skip(1).Contains("--ascii", StringComparer.Ordinal);
+            var tokens = args.Skip(1).Where(argument => argument != "--ascii").ToArray();
+
+            foreach (var token in tokens)
+            {
+                if (token.StartsWith("--", StringComparison.Ordinal))
+                {
+                    throw new UsageError($"unknown flag '{token}'.");
+                }
+            }
+
+            if (tokens.Length == 0)
+            {
+                WriteTuiUsage(stderr);
+                return UsageError.ExitCode;
+            }
+
+            if (tokens.Length > 1)
+            {
+                throw new UsageError($"unexpected argument '{tokens[1]}'.");
+            }
+
+            // Read-only, and through the same reader every other command uses, so a
+            // malformed file is rejected here rather than by the viewer.
+            var document = ReplaySource.ReadFile(tokens[0]);
+
+            using var keys = new KeyQueue(Console.In);
+            return TuiHost.Run(new TuiHostRequest(
+                document,
+                stdout,
+                stderr,
+                CapabilityDetector.Detect(),
+                ascii,
+                new TerminalGuardSessionFactory(),
+                keys,
+                new MonotonicClock())).ExitCode;
+        }
+        catch (Exception ex)
+        {
+            return Report(ex, stderr);
+        }
+    }
+
+    /// <summary>
+    /// The viewer's own usage line, on stderr only. Deliberately one line: the
+    /// help text belongs with the rest of the CLI's help, which this stage does not
+    /// touch.
+    /// </summary>
+    private static void WriteTuiUsage(TextWriter sink) =>
+        sink.WriteLine("usage: lattice tui replay <trajectory.jsonl> [--ascii]");
+
     private static bool IsKnownCommand(string command) =>
         command is "generate" or "simulate" or "render" or "analyze"
-            or "replay" or "benchmark" or "evaluate" or "validate-scenario";
+            or "replay" or "benchmark" or "evaluate" or "validate-scenario" or "tui";
 
     /// <summary>
     /// Whether <paramref name="command"/> accepts <c>--quiet</c>. Only

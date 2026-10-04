@@ -3,6 +3,21 @@ using System.Text;
 namespace Lattice.Tui;
 
 /// <summary>
+/// Builds whatever calls <c>tick</c> on a schedule, and hands back the handle
+/// that stops it.
+/// </summary>
+/// <remarks>
+/// Internal because it exists only so a test can drive repaints synchronously.
+/// Production passes null and gets the <see cref="Timer"/> it always used: a
+/// scheduled callback is the right mechanism for a real terminal, and the wrong
+/// thing for a test to depend on.
+/// </remarks>
+/// <param name="tick">The repaint to perform.</param>
+/// <param name="intervalMs">How often the caller intends it to run.</param>
+/// <returns>A handle whose disposal stops the ticking.</returns>
+internal delegate IDisposable RepaintPumpFactory(Action tick, int intervalMs);
+
+/// <summary>
 /// Owns the one live line a long command shows on stderr: it repaints that line
 /// as the command progresses and closes it with a success or failure line when
 /// the command ends.
@@ -35,6 +50,7 @@ public sealed class WorkingIndicator : IDisposable
     public const int DefaultRepaintIntervalMs = 100;
 
     private readonly int _repaintIntervalMs;
+    private readonly RepaintPumpFactory _pumpFactory;
 
     private bool _active;
     private bool _canRepaint;
@@ -42,7 +58,7 @@ public sealed class WorkingIndicator : IDisposable
     private int _lastFrame = -1;
     private string _lastLine = string.Empty;
     private bool _painted;
-    private Timer? _pump;
+    private IDisposable? _pump;
     private int _frame;
     private Func<CommandProgress?>? _progress;
 
@@ -71,16 +87,34 @@ public sealed class WorkingIndicator : IDisposable
             return;
         }
 
-        _pump = new Timer(_tick, null, _repaintIntervalMs, _repaintIntervalMs);
+        // The first frame is painted here rather than left to the timer. A
+        // command that finishes inside one repaint interval would otherwise
+        // never show a working line at all, and whether it did would depend on
+        // whether the thread pool happened to schedule the callback in time.
+        Repaint(0);
+
+        _pump = _pumpFactory(() => _tick(null), _repaintIntervalMs);
     }
+
+    private static IDisposable TimerPump(Action tick, int intervalMs) =>
+        new Timer(_ => tick(), null, intervalMs, intervalMs);
 
     /// <summary>
     /// Supplies the progress to show on each repaint, read fresh every time so a
     /// counter the command keeps incrementing reaches the line on its own. Null
     /// leaves the line showing the spinner and elapsed time alone.
     /// </summary>
-    public void UseProgress(Func<CommandProgress?>? progress) =>
+    public void UseProgress(Func<CommandProgress?>? progress)
+    {
         Volatile.Write(ref _progress, progress);
+
+        // Paint now, not on the next tick. Attaching a real counter is an
+        // event the line must reflect immediately: if the paint were left to the
+        // timer, a short command could finish before any callback ran and the
+        // ratio would never appear at all. The value shown is whatever the
+        // counter itself reports, so this invents nothing.
+        _paintIfChanged(progress?.Invoke());
+    }
 
     /// <summary>
     /// Returns the writer a command should use for its own stderr, such that
@@ -237,6 +271,26 @@ public sealed class WorkingIndicator : IDisposable
         bool quiet,
         Func<TimeSpan>? clock = null,
         int repaintIntervalMs = DefaultRepaintIntervalMs)
+        : this(command, sink, capabilities, quiet, clock, repaintIntervalMs, null)
+    {
+    }
+
+    /// <summary>
+    /// The overload carrying the repaint pump, so a test can drive ticks
+    /// synchronously instead of waiting on a thread-pool callback.
+    /// </summary>
+    /// <param name="pumpFactory">
+    /// Builds the thing that calls <c>tick</c> on a schedule. Null — the only
+    /// value production uses — means a <see cref="Timer"/>.
+    /// </param>
+    internal WorkingIndicator(
+        string command,
+        TextWriter sink,
+        TerminalCapabilities capabilities,
+        bool quiet,
+        Func<TimeSpan>? clock,
+        int repaintIntervalMs,
+        RepaintPumpFactory? pumpFactory)
     {
         ArgumentException.ThrowIfNullOrEmpty(command);
         ArgumentNullException.ThrowIfNull(sink);
@@ -248,6 +302,7 @@ public sealed class WorkingIndicator : IDisposable
         }
 
         _repaintIntervalMs = repaintIntervalMs;
+        _pumpFactory = pumpFactory ?? TimerPump;
         Command = command;
         _sink = sink;
         _capabilities = capabilities;
@@ -291,9 +346,22 @@ public sealed class WorkingIndicator : IDisposable
             return;
         }
 
+        _paintIfChanged(progress, frame);
+    }
+
+    /// <summary>
+    /// Renders the line for the current frame and writes it if it differs from
+    /// what is already on screen. The shared body of <see cref="Repaint"/> and
+    /// <see cref="UseProgress"/>, so both obey the same guards: live only, never
+    /// after the close, and never a second copy of the same line.
+    /// </summary>
+    private void _paintIfChanged(CommandProgress? progress, int? frame = null)
+    {
+        var spinner = frame ?? Volatile.Read(ref _frame);
+
         var line = CommandLifecycle.Working(
             Command,
-            frame,
+            spinner,
             _clock() - _startedAt,
             progress,
             _capabilities.Depth,
@@ -303,13 +371,13 @@ public sealed class WorkingIndicator : IDisposable
         {
             // Re-checked inside the lock: a repaint queued behind the closing
             // line must not write over it.
-            if (_closed || line == _lastLine)
+            if (!_canRepaint || _closed || line == _lastLine)
             {
                 return;
             }
 
             _paint(line);
-            _lastFrame = frame;
+            _lastFrame = spinner;
             _lastLine = line;
         }
     }

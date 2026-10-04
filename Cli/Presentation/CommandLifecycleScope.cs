@@ -88,7 +88,9 @@ public sealed class CommandLifecycleScope : IDisposable
             stderr,
             terminal.Capabilities,
             quiet,
-            repaintIntervalMs: terminal.RepaintIntervalMs);
+            clock: null,
+            repaintIntervalMs: terminal.RepaintIntervalMs,
+            pumpFactory: terminal.PumpFactory);
 
         return new CommandLifecycleScope(indicator);
     }

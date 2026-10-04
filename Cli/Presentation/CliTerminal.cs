@@ -41,6 +41,13 @@ public readonly record struct CliTerminal(
     int RepaintIntervalMs = WorkingIndicator.DefaultRepaintIntervalMs)
 {
     /// <summary>
+    /// Overrides how the working line is repainted. Internal and init-only, so
+    /// it is reachable from a test without becoming part of the public shape:
+    /// the positional parameters above, the constructor and the deconstructor are
+    /// all unchanged. Null means the production timer.
+    /// </summary>
+    internal RepaintPumpFactory? PumpFactory { get; init; }
+    /// <summary>
     /// The terminal as the real process sees it: stderr is interactive only when
     /// the writer the caller passed really is <see cref="Console.Error"/> and
     /// that stream was not redirected.

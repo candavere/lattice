@@ -278,7 +278,10 @@ public sealed class CommandLifecycleScope : IDisposable
 
         // Never cut between a surrogate pair: half of one is not a character, and
         // the terminal would be handed a replacement glyph for it.
-        var cut = char.IsHighSurrogate(text[MaxReasonCharacters])
+        //
+        // The pair at risk is the one straddling the cut: a high surrogate at
+        // MaxReasonCharacters-1 whose low half is the character just past it.
+        var cut = char.IsHighSurrogate(text[MaxReasonCharacters - 1])
             ? MaxReasonCharacters - 1
             : MaxReasonCharacters;
 

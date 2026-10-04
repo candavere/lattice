@@ -22,6 +22,15 @@ public class CommandLifecycleReasonTests
 {
     private const char Escape = '\u001b';
 
+    /// <summary>
+    /// A character outside the basic multilingual plane, so it occupies a
+    /// surrogate pair: a high surrogate at some index <c>n</c> and a low one at
+    /// <c>n + 1</c>. Nothing this CLI writes today contains one, which is exactly
+    /// why the cap's handling of them is pinned here rather than left for a real
+    /// failure to exercise.
+    /// </summary>
+    private const string Emoji = "\U0001F600";
+
     private static TerminalEnvironment TerminalEnvironmentOf(bool noColor = false) =>
         new(
             "truecolor",
@@ -75,6 +84,36 @@ public class CommandLifecycleReasonTests
         Assert.Single(
             Rows(stderr),
             row => row.Contains("failed (exit", StringComparison.Ordinal));
+
+    /// <summary>
+    /// Fails when <paramref name="text"/> holds a surrogate that is not part of a
+    /// pair: a high surrogate with no low surrogate after it, or a low surrogate
+    /// with no high surrogate before it.
+    /// </summary>
+    /// <remarks>
+    /// The rule is about whole characters, so this is the right way to say it
+    /// whatever the cut did. Asserting on a code point count would pass on a row
+    /// carrying half a character, because half of a pair is not a character the
+    /// text has — it is a replacement glyph the terminal prints.
+    /// </remarks>
+    private static void AssertNoLoneSurrogates(string text)
+    {
+        for (var index = 0; index < text.Length; index++)
+        {
+            if (char.IsHighSurrogate(text[index]))
+            {
+                Assert.True(
+                    index + 1 < text.Length && char.IsLowSurrogate(text[index + 1]),
+                    $"a high surrogate at index {index} has no low surrogate after it.");
+            }
+            else if (char.IsLowSurrogate(text[index]))
+            {
+                Assert.True(
+                    index > 0 && char.IsHighSurrogate(text[index - 1]),
+                    $"a low surrogate at index {index} has no high surrogate before it.");
+            }
+        }
+    }
 
     /// <summary>
     /// Runs a command that writes exactly the lines given, so the capture can be
@@ -277,21 +316,79 @@ public class CommandLifecycleReasonTests
     }
 
     [Fact]
-    public void ACappedReasonIsNeverCutBetweenSurrogatePairs()
+    public void AnEscapedExceptionStraddlingASurrogatePairLosesTheWholePair()
     {
-        // The cap lands exactly on the boundary of a surrogate pair: 7 characters
-        // of prefix, 93 of filler, then a character that needs two chars to
-        // exist. Half of one is not a character, and a terminal would print a
-        // replacement glyph for it.
-        var filler = CommandLifecycleScope.MaxReasonCharacters - "error: ".Length;
-        var reason = "error: " + new string('x', filler) + "\U0001F600";
+        // The exception path shares the same cap, so it shares the same cut. The
+        // message arrives with a pair split by the boundary, and the line must not
+        // be left holding one half of it.
+        var message = "error: " + new string('y', 92) + Emoji + "tail";
+
+        using var stderr = new StringWriter();
+        using var scope = CommandLifecycleScope.Begin("analyze", stderr, NoColorTerminal);
+
+        var caught = Assert.Throws<InvalidOperationException>(() =>
+        {
+            scope.Run(() => throw new InvalidOperationException(message));
+        });
+
+        // The fault still carries its own message to the runtime, unchanged.
+        Assert.Equal(message, caught.Message);
+
+        var row = FailedRow(stderr.ToString());
+        Assert.Contains("error: " + new string('y', 92) + "...", row, StringComparison.Ordinal);
+        Assert.DoesNotContain(Emoji, row, StringComparison.Ordinal);
+        AssertNoLoneSurrogates(row);
+    }
+
+    [Fact]
+    public void ACapStraddlingASurrogatePairLosesTheWholePair()
+    {
+        // The real boundary: the kept text is indices 0..99, so a pair whose high
+        // surrogate sits at 99 is cut in half by a cut at 100. Half a character is
+        // not a character, and the terminal prints a replacement glyph for it.
+        var reason = "error: " + new string('x', 92) + Emoji + "tail";
 
         var result = RunWriting(NoColorTerminal, exit: 1, reason);
+        var row = FailedRow(result.Err);
 
-        Assert.Contains(
-            "error: " + new string('x', filler - 1) + "...",
-            FailedRow(result.Err),
-            StringComparison.Ordinal);
+        Assert.Contains("error: " + new string('x', 92) + "...", row, StringComparison.Ordinal);
+        Assert.DoesNotContain(Emoji, row, StringComparison.Ordinal);
+        AssertNoLoneSurrogates(row);
+
+        // The detail itself is untouched: the cut bounds the repeat only.
+        Assert.Contains(reason, result.Err, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ACapEndingJustBeforeASurrogatePairKeepsEveryCharacter()
+    {
+        // A pair that begins exactly where the kept text stops is not cut at all:
+        // both of its halves fall beyond the cap, so no character has to be
+        // sacrificed to keep it whole.
+        var reason = "error: " + new string('x', 93) + Emoji;
+
+        var result = RunWriting(NoColorTerminal, exit: 1, reason);
+        var row = FailedRow(result.Err);
+
+        Assert.Contains("error: " + new string('x', 93) + "...", row, StringComparison.Ordinal);
+        AssertNoLoneSurrogates(row);
+
+        Assert.Contains(reason, result.Err, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ASurrogatePairWhollyInsideTheCapIsKeptIntact()
+    {
+        // The pair ends well before the cap, so the cut falls on an ordinary
+        // character after it and the pair survives whole.
+        var reason = "error: " + new string('x', 90) + Emoji + new string('y', 20);
+
+        var result = RunWriting(NoColorTerminal, exit: 1, reason);
+        var row = FailedRow(result.Err);
+
+        Assert.Contains("error: " + new string('x', 90) + Emoji + "y...", row, StringComparison.Ordinal);
+        AssertNoLoneSurrogates(row);
+
         Assert.Contains(reason, result.Err, StringComparison.Ordinal);
     }
 

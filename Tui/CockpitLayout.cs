@@ -1,0 +1,445 @@
+namespace Lattice.Tui;
+
+/// <summary>
+/// What the playback cursor is doing, as the panes need to say it. A value rather
+/// than the cursor itself, so a layout can be drawn from literals and never
+/// reaches back into a running replay.
+/// </summary>
+/// <param name="IsPaused">Whether the cursor is stopped.</param>
+/// <param name="StepsPerSecond">The speed the cursor is running at.</param>
+public readonly record struct PlaybackState(bool IsPaused, double StepsPerSecond);
+
+/// <summary>
+/// Everything one cockpit frame is composed from.
+/// </summary>
+/// <param name="Document">The replay being shown.</param>
+/// <param name="FrameIndex">Which frame of it is on show.</param>
+/// <param name="Size">The terminal's size, which the result matches exactly.</param>
+/// <param name="Glyphs">Which glyph vocabulary to draw from.</param>
+/// <param name="PanelFill">The panel background, or <c>null</c> for the terminal's own.</param>
+/// <param name="Phase">How far through the current frame's dwell time this frame is, in [0, 1).</param>
+/// <param name="Playback">What the cursor is doing.</param>
+public sealed record CockpitRequest(
+    ReplayDocument Document,
+    int FrameIndex,
+    PaneSize Size,
+    GlyphMode Glyphs,
+    Rgb? PanelFill,
+    double Phase,
+    PlaybackState Playback);
+
+/// <summary>
+/// The cockpit: the world, the scoreboard, the event log, the timeline and the
+/// key hints, framed once around the whole terminal.
+/// </summary>
+/// <remarks>
+/// <para>
+/// The layout is pure — a request in, a grid the size of the terminal out — so
+/// the whole screen can be asserted against its exact cells with no terminal
+/// attached. The panes are drawn from the same primitives the rest of the library
+/// already has: a rounded border, filled text, and the world renderer, whose grid
+/// is copied into the world pane rather than drawn a second time.
+/// </para>
+/// <para>
+/// <b>Below the minimum size the whole cockpit is refused</b>, because four panes
+/// and a timeline at 60 columns is four unreadable columns each. A smaller
+/// terminal gets the world alone with a line saying what size the cockpit needs.
+/// The notice leads with the size it measured so that it survives being clipped.
+/// </para>
+/// </remarks>
+public static class CockpitLayout
+{
+    /// <summary>The narrowest terminal the whole cockpit is drawn for.</summary>
+    public const int MinimumWidth = TerminalCapabilities.MinimumWidth;
+
+    /// <summary>The shortest terminal the whole cockpit is drawn for.</summary>
+    public const int MinimumHeight = TerminalCapabilities.MinimumHeight;
+
+    /// <summary>
+    /// The key hints are drawn on the screen's own bottom border: the one row no
+    /// pane can use, and the one a reader's eye already treats as frame rather than
+    /// as content.
+    /// </summary>
+    public const int KeyHintRowFromBottom = 1;
+
+    /// <summary>
+    /// The columns the right-hand column of panes occupies. Sized so that at the
+    /// minimum terminal the world pane's inner area is 63x23 — the size the golden
+    /// frames are drawn at, so the recorded map looks the same in the cockpit as in
+    /// the goldens.
+    /// </summary>
+    private const int RightColumnWidth = 32;
+
+    /// <summary>The rows the scoreboard occupies when the cockpit is at its minimum height.</summary>
+    private const int ScoreboardHeight = 12;
+
+    /// <summary>The smallest inner pane the fallback will draw a map into.</summary>
+    private const int FallbackMinimumInnerWidth = 20;
+
+    /// <summary>The smallest inner pane height the fallback will draw a map into.</summary>
+    private const int FallbackMinimumInnerHeight = 8;
+
+    /// <summary>How many recorded steps the agent trail reaches back over.</summary>
+    public const int TrailFrames = 3;
+
+    /// <summary>How many characters of a recorded digest the scoreboard shows.</summary>
+    public const int DigestCharacters = 12;
+
+    /// <summary>What a pane's title looks like in its top border.</summary>
+    public static string PaneTitle(string title) => $" {title} ";
+
+    /// <summary>The row the key hints are on for a terminal of this height.</summary>
+    public static int KeyHintRow(PaneSize size) => size.Height - KeyHintRowFromBottom;
+
+    /// <summary>Whether this terminal gets the whole cockpit.</summary>
+    public static bool IsCockpit(PaneSize size) =>
+        size.Width >= MinimumWidth && size.Height >= MinimumHeight;
+
+    /// <summary>The line a smaller terminal is shown instead of the cockpit.</summary>
+    public static string ResizeNotice(PaneSize size) =>
+        $"terminal is {Invariant(size.Width)}x{Invariant(size.Height)}; " +
+        $"the cockpit needs {MinimumWidth}x{MinimumHeight}; resize for the full layout";
+
+    /// <summary>Draws one cockpit frame.</summary>
+    /// <remarks>
+    /// A terminal too small to frame — one cell, or a shape with no room for a box —
+    /// is not an error: the grid comes back at exactly the size asked for with
+    /// whatever fits in it drawn, because a resize nobody asked for must not take
+    /// the replay down.
+    /// </remarks>
+    public static CellBuffer Render(CockpitRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var size = request.Size;
+        var cells = new CellBuffer(size.Width, size.Height);
+        var frame = Border(request.Glyphs);
+        var palette = new PaletteRoles();
+
+        if (request.PanelFill is { } fill)
+        {
+            cells.Fill(0, 0, size.Width, size.Height, new Cell(' ', null, fill));
+        }
+
+        if (size.Width < 2 || size.Height < 2)
+        {
+            return cells;
+        }
+
+        cells.DrawBorder(0, 0, size.Width, size.Height, frame, new Cell(' ', palette.Sage, request.PanelFill));
+        cells.DrawText(
+            2,
+            0,
+            "LATTICE TUI  replay  " + Title(request.Document),
+            new Cell(' ', palette.Accent, request.PanelFill));
+
+        if (IsCockpit(size))
+        {
+            DrawCockpit(request, cells, frame, palette);
+        }
+        else
+        {
+            DrawFallback(request, cells, frame, palette);
+        }
+
+        return cells;
+    }
+
+    private static void DrawCockpit(CockpitRequest request, CellBuffer cells, BorderGlyphs frame, PaletteRoles palette)
+    {
+        var size = request.Size;
+        var world = new Rect(1, 1, size.Width - 2 - RightColumnWidth - 1, size.Height - 5);
+        var scoreboard = new Rect(world.X + world.Width + 1, 1, RightColumnWidth, ScoreboardHeight);
+        var log = new Rect(scoreboard.X, scoreboard.Y + scoreboard.Height, RightColumnWidth, world.Height - ScoreboardHeight);
+        var timeline = new Rect(1, size.Height - 4, size.Width - 2, 3);
+
+        DrawPane(request, cells, frame, palette, world, "WORLD");
+        DrawPane(request, cells, frame, palette, scoreboard, "SCOREBOARD");
+        DrawPane(request, cells, frame, palette, log, "EVENT LOG");
+        DrawPane(request, cells, frame, palette, timeline, "TIMELINE");
+
+        var worldRender = WorldRenderer.Render(new WorldRenderRequest(
+            request.Document.Map,
+            request.Frame(),
+            request.Document.TrailBefore(request.FrameIndex, TrailFrames),
+            new PaneSize(world.Width - 2, world.Height - 2),
+            request.Glyphs,
+            request.PanelFill,
+            request.Phase));
+
+        Blit(worldRender.Cells, cells, world.X + 1, world.Y + 1);
+
+        DrawScoreboard(request, cells, palette, scoreboard);
+        DrawEventLog(request, cells, palette, log);
+        DrawTimeline(request, cells, palette, timeline);
+        DrawKeyHints(request, cells, palette);
+    }
+
+    private static void DrawFallback(CockpitRequest request, CellBuffer cells, BorderGlyphs frame, PaletteRoles palette)
+    {
+        var size = request.Size;
+        if (size.Height >= 2)
+        {
+            cells.DrawText(2, 1, ResizeNotice(size), new Cell(' ', palette.Accent, request.PanelFill));
+        }
+
+        var innerWidth = size.Width - 4;
+        var innerHeight = size.Height - 8;
+        if (innerWidth < FallbackMinimumInnerWidth || innerHeight < FallbackMinimumInnerHeight)
+        {
+            return;
+        }
+
+        var pane = new Rect(1, 3, size.Width - 2, size.Height - 6);
+        DrawPane(request, cells, frame, palette, pane, "WORLD");
+
+        var worldRender = WorldRenderer.Render(new WorldRenderRequest(
+            request.Document.Map,
+            request.Frame(),
+            request.Document.TrailBefore(request.FrameIndex, TrailFrames),
+            new PaneSize(pane.Width - 2, pane.Height - 2),
+            request.Glyphs,
+            request.PanelFill,
+            request.Phase));
+
+        Blit(worldRender.Cells, cells, pane.X + 1, pane.Y + 1);
+    }
+
+    /// <summary>
+    /// The scoreboard: one row per agent in its slot's accent, and the recorded
+    /// facts about the tick — its number, the claims it lists, and the digest it
+    /// carries or the fact that it carries none.
+    /// </summary>
+    private static void DrawScoreboard(CockpitRequest request, CellBuffer cells, PaletteRoles palette, Rect pane)
+    {
+        var frame = request.Document[request.FrameIndex];
+        var rows = new List<(string Text, Rgb? Accent)>();
+        var roles = request.Document.Header.AgentRoles;
+
+        foreach (var agent in frame.Agents)
+        {
+            var role = roles is not null && agent.Slot < roles.Count && !string.IsNullOrEmpty(roles[agent.Slot])
+                ? roles[agent.Slot]
+                : "A" + agent.Slot.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            var glyph = GlyphModes.Glyph(
+                agent.Transit is null ? Glyphs.FilledDiamond : Glyphs.HollowDiamond,
+                request.Glyphs);
+            var transit = agent.Transit is null
+                ? string.Empty
+                : " ->" + agent.Transit.ToZoneId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+            rows.Add((
+                string.Create(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    $"{glyph} {agent.Slot}  {role,-14}{agent.ZoneId,3}{transit,3} {agent.Score,4}"),
+                Theme.AgentSlot(agent.Slot)));
+        }
+
+        var width = pane.Width - 2;
+        var row = pane.Y + 1;
+        foreach (var (text, accent) in rows)
+        {
+            if (row >= pane.Y + pane.Height - 1)
+            {
+                break;
+            }
+
+            cells.DrawText(pane.X + 1, row++, text, new Cell(' ', accent ?? palette.TextPrimary, request.PanelFill));
+        }
+
+        var claims = frame.Claims.Count.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var resources = request.Document.Map.Resources.Length.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var facts = new[]
+        {
+            $"tick    {Invariant(frame.Tick)}/{Invariant(request.Document.Header.RecordedSteps)}",
+            $"claims  {claims}/{resources}",
+            "digest  " + (frame.StateDigest is { Length: > 0 } digest
+                ? digest[..DigestCharacters] + Ellipsis
+                : "not recorded"),
+        };
+
+        foreach (var fact in facts)
+        {
+            if (row >= pane.Y + pane.Height - 1)
+            {
+                break;
+            }
+
+            cells.DrawText(pane.X + 1, row++, fact, new Cell(' ', palette.TextPrimary, request.PanelFill));
+        }
+    }
+
+    /// <summary>
+    /// The event log: one compact row per recorded step, oldest at the top of the
+    /// pane, the step on show picked out. A start frame has no step behind it, and
+    /// says so rather than showing a blank pane.
+    /// </summary>
+    private static void DrawEventLog(CockpitRequest request, CellBuffer cells, PaletteRoles palette, Rect pane)
+    {
+        var capacity = pane.Height - 2;
+        if (capacity <= 0)
+        {
+            return;
+        }
+
+        var document = request.Document;
+        var first = System.Math.Max(1, request.FrameIndex - capacity + 1);
+        var row = pane.Y + 1;
+
+        if (request.FrameIndex == 0)
+        {
+            cells.DrawText(pane.X + 1, row, "start of recording", new Cell(' ', palette.TextDim, request.PanelFill));
+            row++;
+        }
+
+        for (var index = first; index <= request.FrameIndex && row < pane.Y + pane.Height - 1; index++)
+        {
+            var frame = document[index];
+            var current = index == request.FrameIndex;
+            var line = $"{Invariant(frame.Tick),3}  {frame.Actions}";
+            var style = current
+                ? new Cell(' ', Theme.SelectionForeground, Theme.SelectionBackground)
+                : new Cell(' ', palette.TextPrimary, request.PanelFill);
+
+            cells.DrawText(pane.X + 1, row++, line, style);
+        }
+    }
+
+    /// <summary>
+    /// The timeline: the recorded tick over the recorded step count, a bar filled
+    /// in proportion, and the cursor's own state. Every number on it is either read
+    /// from the recording or a setting the reader can change and see.
+    /// </summary>
+    private static void DrawTimeline(CockpitRequest request, CellBuffer cells, PaletteRoles palette, Rect pane)
+    {
+        var document = request.Document;
+        var steps = document.Header.RecordedSteps;
+        var tick = request.Frame().Tick;
+        var row = pane.Y + 1;
+
+        var state = new Cell(' ', palette.TextPrimary, request.PanelFill);
+        var label = $"tick {Invariant(tick)}/{Invariant(steps)}  ";
+        cells.DrawText(pane.X + 1, row, label, state);
+
+        var stateWord = request.Playback.IsPaused ? "paused" : "playing";
+        var speed = request.Playback.StepsPerSecond.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+        var suffix = $"  {stateWord} {speed} steps/s";
+        var track = pane.Width - 2 - label.Length - suffix.Length;
+
+        if (track > 0)
+        {
+            // One cell per recorded tick while the recording is short enough to
+            // show at that resolution, so the bar is a ruler the reader can count
+            // rather than a smear; longer recordings fall back to a proportional
+            // fill of the same track.
+            var cellsWide = Math.Min(steps, track);
+            var filled = steps <= 0 || cellsWide <= 0
+                ? 0
+                : Math.Min(cellsWide, ((tick * cellsWide * 2) + steps) / (steps * 2));
+
+            for (var column = 0; column < track; column++)
+            {
+                var played = column < filled;
+                var style = played
+                    ? new Cell(' ', column == filled - 1 ? palette.AccentBright : palette.Accent, request.PanelFill)
+                    : new Cell(' ', palette.TextDim, request.PanelFill);
+                cells[pane.X + 1 + label.Length + column, row] = style with
+                {
+                    Glyph = GlyphModes.Glyph(played ? Glyphs.FullBlock : Glyphs.LightShade, request.Glyphs),
+                };
+            }
+        }
+
+        cells.DrawText(pane.X + 1 + label.Length + Math.Max(track, 0), row, suffix, state);
+    }
+
+    /// <summary>
+    /// The key hints: plain ASCII, every control the reader can press, in one row.
+    /// ASCII unconditionally, so the one row that explains the keys is never the
+    /// row a terminal cannot encode.
+    /// </summary>
+    private static void DrawKeyHints(CockpitRequest request, CellBuffer cells, PaletteRoles palette)
+    {
+        cells.DrawText(
+            2,
+            KeyHintRow(request.Size),
+            KeyHints,
+            new Cell(' ', palette.TextDim, request.PanelFill));
+    }
+
+    /// <summary>
+    /// The controls, as the hint row states them. Kept beside the drawing so the
+    /// two cannot drift: a control added to one has to be named in the other.
+    /// </summary>
+    public const string KeyHints = "space pause  n/p step  < > speed  [ ] scrub  home/end jump  q quit";
+
+    private static void DrawPane(
+        CockpitRequest request,
+        CellBuffer cells,
+        BorderGlyphs frame,
+        PaletteRoles palette,
+        Rect pane,
+        string title)
+    {
+        cells.Fill(pane.X, pane.Y, pane.Width, pane.Height, new Cell(' ', null, request.PanelFill));
+        cells.DrawBorder(pane.X, pane.Y, pane.Width, pane.Height, frame, new Cell(' ', palette.Sage, request.PanelFill));
+        cells.DrawText(
+            pane.X + 2,
+            pane.Y,
+            PaneTitle(title),
+            new Cell(' ', palette.Accent, request.PanelFill));
+    }
+
+    /// <summary>
+    /// Copies a grid into another at an offset. A plain copy rather than a
+    /// redraw: the world renderer already decided what every cell says, and
+    /// drawing it twice is a second answer to the same question.
+    /// </summary>
+    private static void Blit(CellBuffer source, CellBuffer target, int left, int top)
+    {
+        for (var y = 0; y < source.Height; y++)
+        {
+            for (var x = 0; x < source.Width; x++)
+            {
+                target[left + x, top + y] = source[x, y];
+            }
+        }
+    }
+
+    private static BorderGlyphs Border(GlyphMode glyphs) =>
+        glyphs == GlyphMode.Unicode ? BorderGlyphs.Rounded : BorderGlyphs.Ascii;
+
+    private static string Title(ReplayDocument document) =>
+        document.Header.Scenario is { Length: > 0 } scenario
+            ? scenario
+            : "recorded episode";
+
+    private static string Invariant(int value) =>
+        value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    private const string Ellipsis = "...";
+
+    /// <summary>The colour roles a frame is painted in, taken from the one theme.</summary>
+    private readonly record struct PaletteRoles
+    {
+        internal Rgb Sage => Theme.Sage;
+
+        internal Rgb Accent => Palette.Accent;
+
+        internal Rgb AccentBright => Palette.AccentBright;
+
+        internal Rgb TextPrimary => Palette.TextPrimary;
+
+        internal Rgb TextDim => Palette.TextDim;
+    }
+
+    /// <summary>A pane's rectangle, in cells.</summary>
+    private readonly record struct Rect(int X, int Y, int Width, int Height);
+}
+
+internal static class CockpitRequestExtensions
+{
+    /// <summary>The frame this request is showing, clamped to the replay.</summary>
+    internal static ReplayFrame Frame(this CockpitRequest request) =>
+        request.Document[request.Document.Clamp(request.FrameIndex)];
+}

@@ -352,8 +352,13 @@ public sealed class ReplayDocument
 /// Stopping rather than wrapping is deliberate: a replay that silently restarted
 /// would make the timeline position lie.
 /// </para>
+/// <para>
+/// The key table lives here, beside the state it moves, rather than in the host:
+/// a binding and the thing it changes are one fact, and a host that held the
+/// bindings would need a second copy of the state to apply them to.
+/// </para>
 /// </remarks>
-public sealed class ReplayPlayback
+public sealed class ReplayPlayback : ICockpitCursor
 {
     /// <summary>
     /// The speeds the speed control moves between, in recorded steps per second.
@@ -365,6 +370,12 @@ public sealed class ReplayPlayback
 
     /// <summary>Where in <see cref="SpeedsPerSecond"/> a replay starts.</summary>
     private const int DefaultSpeedIndex = 3;
+
+    /// <summary>
+    /// How much of the replay one coarse scrub key moves: a tenth of the frames,
+    /// and at least one, so a scrub is a visible jump rather than a single tick.
+    /// </summary>
+    private const int ScrubFraction = 10;
 
     private readonly ReplayDocument _document;
     private double _accumulatedTicks;
@@ -394,6 +405,11 @@ public sealed class ReplayPlayback
 
     /// <summary>The replay being played.</summary>
     public ReplayDocument Document => _document;
+
+    /// <summary>
+    /// Null: a recording is finished, so there is no live episode state to report.
+    /// </summary>
+    public LiveState? Live => null;
 
     /// <summary>The current speed in recorded steps per second.</summary>
     public double StepsPerSecond => SpeedsPerSecond[_speedIndex];
@@ -507,4 +523,98 @@ public sealed class ReplayPlayback
         // on saying "playing" over the last frame for ever.
         return _index != before || !_paused || stopped;
     }
+
+    /// <summary>
+    /// What one key does to the cursor, and whether it changed anything a reader
+    /// can see. A key with no binding changes nothing and says so, which is what
+    /// keeps a stray keypress from costing a frame.
+    /// </summary>
+    public bool Apply(TuiKey key)
+    {
+        var before = _index;
+        var wasPaused = _paused;
+        var speed = StepsPerSecond;
+        var jump = Math.Max(1, _document.Count / ScrubFraction);
+
+        switch (key.Kind)
+        {
+            case TuiKeyKind.Left:
+            case TuiKeyKind.PageUp:
+                StepBack();
+                break;
+
+            case TuiKeyKind.Right:
+            case TuiKeyKind.PageDown:
+                StepForward();
+                break;
+
+            case TuiKeyKind.Home:
+                JumpToStart();
+                break;
+
+            case TuiKeyKind.End:
+                JumpToEnd();
+                break;
+
+            case TuiKeyKind.Up:
+                SpeedUp();
+                break;
+
+            case TuiKeyKind.Down:
+                SlowDown();
+                break;
+
+            case TuiKeyKind.Character:
+                return ApplyCharacter(key.Glyph, jump, before, wasPaused, speed);
+
+            default:
+                return false;
+        }
+
+        return Changed(before, wasPaused, speed);
+    }
+
+    private bool ApplyCharacter(char glyph, int jump, int before, bool wasPaused, double speed)
+    {
+        switch (glyph)
+        {
+            case ' ':
+                TogglePause();
+                break;
+
+            case 'n':
+                StepForward();
+                break;
+
+            case 'p':
+                StepBack();
+                break;
+
+            case '>':
+            case '+':
+                SpeedUp();
+                break;
+
+            case '<':
+            case '-':
+                SlowDown();
+                break;
+
+            case '[':
+                ScrubTo(_index - jump);
+                break;
+
+            case ']':
+                ScrubTo(_index + jump);
+                break;
+
+            default:
+                return false;
+        }
+
+        return Changed(before, wasPaused, speed);
+    }
+
+    private bool Changed(int index, bool paused, double speed) =>
+        _index != index || _paused != paused || StepsPerSecond != speed;
 }

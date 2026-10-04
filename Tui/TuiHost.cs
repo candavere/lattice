@@ -138,6 +138,11 @@ public sealed class MonotonicClock : IUiClock
 /// <param name="Keys">Where keys come from.</param>
 /// <param name="Clock">How elapsed time is measured.</param>
 /// <param name="MaxFramesPerSecond">The ceiling on how often a frame may be written.</param>
+/// <param name="Cursor">
+/// The cursor to move, or null to play <paramref name="Document"/> from the start.
+/// A live episode hands its own cursor in; a recording lets the host build a
+/// <see cref="ReplayPlayback"/>, because a recording needs nothing else.
+/// </param>
 public sealed record TuiHostRequest(
     ReplayDocument Document,
     TextWriter Output,
@@ -147,7 +152,8 @@ public sealed record TuiHostRequest(
     ITerminalSessionFactory Session,
     IKeySource Keys,
     IUiClock Clock,
-    int MaxFramesPerSecond = TuiHost.DefaultMaxFramesPerSecond);
+    int MaxFramesPerSecond = TuiHost.DefaultMaxFramesPerSecond,
+    ICockpitCursor? Cursor = null);
 
 /// <summary>How a host run ended: the status to return, and why it refused if it did.</summary>
 /// <param name="ExitCode">0 on a normal quit, 2 on a refusal.</param>
@@ -165,7 +171,8 @@ public readonly record struct TuiRunResult(int ExitCode, string? Refusal);
 /// alternate screen is entered, because on Windows changing the console encoding
 /// resets console state and would drop the mode the guard sets. Nothing else in
 /// this library enters the alternate screen: a screen that needs a terminal goes
-/// through here.
+/// through here, whether it is playing a recording or showing a live episode —
+/// the two differ only in the <see cref="ICockpitCursor"/> they move.
 /// </para>
 /// <para>
 /// <b>Redraw only on change.</b> A frame is composed and diffed against the one on
@@ -187,12 +194,6 @@ public static class TuiHost
     /// is better served by a frame it can finish than by the newest one it cannot.
     /// </summary>
     public const int DefaultMaxFramesPerSecond = 30;
-
-    /// <summary>
-    /// How much of the replay one coarse scrub key moves: a tenth of the frames,
-    /// and at least one, so a scrub is a visible jump rather than a single tick.
-    /// </summary>
-    private const int ScrubFraction = 10;
 
     /// <summary>The status a refused run reports: the invocation named no terminal.</summary>
     private const int UsageRefused = 2;
@@ -229,7 +230,7 @@ public static class TuiHost
             Math.Max(1, request.Capabilities.Height));
         var glyphs = GlyphModes.Resolve(request.Capabilities.Utf8, request.ForceAscii);
         var fill = request.Capabilities.PanelFill;
-        var playback = new ReplayPlayback(request.Document);
+        var playback = request.Cursor ?? new ReplayPlayback(request.Document);
         var frameInterval = TimeSpan.FromSeconds(1.0 / request.MaxFramesPerSecond);
         var written = (CellBuffer?)null;
 
@@ -254,7 +255,7 @@ public static class TuiHost
                     continue;
                 }
 
-                if (Apply(playback, key))
+                if (playback.Apply(key))
                 {
                     written = Compose(request, playback, size, glyphs, fill, written, session);
                 }
@@ -310,7 +311,7 @@ public static class TuiHost
     /// </summary>
     private static CellBuffer? Compose(
         TuiHostRequest request,
-        ReplayPlayback playback,
+        ICockpitCursor playback,
         PaneSize size,
         GlyphMode glyphs,
         Rgb? fill,
@@ -318,13 +319,14 @@ public static class TuiHost
         ITerminalSession session)
     {
         var composed = CockpitLayout.Render(new CockpitRequest(
-            request.Document,
+            playback.Document,
             playback.Index,
             size,
             glyphs,
             fill,
             playback.Phase,
-            new PlaybackState(playback.IsPaused, playback.StepsPerSecond)));
+            new PlaybackState(playback.IsPaused, playback.StepsPerSecond),
+            playback.Live));
 
         var diff = FrameDiff.Render(previous, composed, request.Capabilities.Depth);
         if (diff.Length == 0)
@@ -343,104 +345,4 @@ public static class TuiHost
 
         return composed;
     }
-
-    /// <summary>
-    /// What one key does to the cursor, and whether it changed anything a reader
-    /// can see. A key with no binding changes nothing and says so, which is what
-    /// keeps a stray keypress from costing a frame.
-    /// </summary>
-    private static bool Apply(ReplayPlayback playback, TuiKey key)
-    {
-        var before = playback.Index;
-        var wasPaused = playback.IsPaused;
-        var speed = playback.StepsPerSecond;
-        var jump = Math.Max(1, playback.Document.Count / ScrubFraction);
-
-        switch (key.Kind)
-        {
-            case TuiKeyKind.Left:
-            case TuiKeyKind.PageUp:
-                playback.StepBack();
-                break;
-
-            case TuiKeyKind.Right:
-            case TuiKeyKind.PageDown:
-                playback.StepForward();
-                break;
-
-            case TuiKeyKind.Home:
-                playback.JumpToStart();
-                break;
-
-            case TuiKeyKind.End:
-                playback.JumpToEnd();
-                break;
-
-            case TuiKeyKind.Up:
-                playback.SpeedUp();
-                break;
-
-            case TuiKeyKind.Down:
-                playback.SlowDown();
-                break;
-
-            case TuiKeyKind.Character:
-                return ApplyCharacter(playback, key.Glyph, jump, before, wasPaused, speed);
-
-            default:
-                return false;
-        }
-
-        return Changed(playback, before, wasPaused, speed);
-    }
-
-    private static bool ApplyCharacter(
-        ReplayPlayback playback,
-        char glyph,
-        int jump,
-        int before,
-        bool wasPaused,
-        double speed)
-    {
-        switch (glyph)
-        {
-            case ' ':
-                playback.TogglePause();
-                break;
-
-            case 'n':
-                playback.StepForward();
-                break;
-
-            case 'p':
-                playback.StepBack();
-                break;
-
-            case '>':
-            case '+':
-                playback.SpeedUp();
-                break;
-
-            case '<':
-            case '-':
-                playback.SlowDown();
-                break;
-
-            case '[':
-                playback.ScrubTo(playback.Index - jump);
-                break;
-
-            case ']':
-                playback.ScrubTo(playback.Index + jump);
-                break;
-
-            default:
-                return false;
-        }
-
-        return Changed(playback, before, wasPaused, speed);
-    }
-
-    private static bool Changed(ReplayPlayback playback, int index, bool paused, double speed) =>
-        playback.Index != index || playback.IsPaused != paused || playback.StepsPerSecond != speed;
 }

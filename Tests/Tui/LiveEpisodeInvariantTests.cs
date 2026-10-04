@@ -1,3 +1,4 @@
+using System.Reflection;
 using Lattice.Agents;
 using Lattice.Cli.Presentation;
 using Lattice.Environment;
@@ -193,17 +194,70 @@ public class LiveEpisodeInvariantTests
             Assert.Equal(episode.FinishedReason, new LivePlayback(episode).Live!.FinishedReason);
         }
 
-        // The viewer's own statement exists for the case where nothing was recorded
-        // at all, and it is visibly the viewer's: its own wording about the budget it
-        // was given, and not one of the engine's reason strings.
-        var viewerSentence = string.Format(
-            System.Globalization.CultureInfo.InvariantCulture,
-            LiveEpisode.BudgetReasonFormat,
-            4);
+        // The viewer's own words are not a reason. Where the simulation recorded none,
+        // the value is the recording's own words for an absence — the same words the
+        // scoreboard's end row prints — and the two panes' agreement on that is
+        // proven where the panes are drawn, in CockpitLiveStateTests.
+        Assert.Equal("not recorded", CockpitEpisodes.NotRecorded);
+    }
 
-        Assert.Equal("step limit reached (--steps 4)", viewerSentence);
-        Assert.DoesNotContain("tick-limit", viewerSentence, StringComparison.Ordinal);
-        Assert.DoesNotContain("resources-exhausted", viewerSentence, StringComparison.Ordinal);
+    [Fact]
+    public void ABudgetThatRanOutCarriesTheEnginesOwnReasonAndNothingElse()
+    {
+        // The whole of the fabricated-reason surface, checked against a run: every
+        // reason this episode ever reports must be one the engine recorded, and the
+        // viewer's own budget sentence must appear nowhere in it.
+        var rig = new CountingRig();
+        using var episode = Episode(rig.NewRoster, 3);
+
+        var seen = new List<string?>();
+        for (var tick = 0; tick < 6 && episode.FinishedReason is null; tick++)
+        {
+            seen.Add(episode.FinishedReason);
+            var before = episode.Frames.Count;
+            episode.RequestTick();
+            WaitFor(() => episode.Frames.Count != before || episode.FinishedReason is not null);
+            seen.Add(episode.FinishedReason);
+        }
+
+        Assert.Equal("tick-limit", episode.FinishedReason);
+        Assert.All(seen.Where(reason => reason is not null), reason =>
+        {
+            Assert.Equal("tick-limit", reason);
+            Assert.DoesNotContain("step limit", reason, StringComparison.Ordinal);
+            Assert.DoesNotContain("--steps", reason, StringComparison.Ordinal);
+            Assert.DoesNotContain("budget", reason, StringComparison.OrdinalIgnoreCase);
+        });
+
+        // The budget the viewer was given is still shown, as the viewer's own fact,
+        // and the episode produced exactly that many ticks before it ended.
+        Assert.Equal(3, episode.MaximumTicks);
+        Assert.Equal(3, episode.Frames.Count - 1);
+    }
+
+    [Fact]
+    public void TheEpisodeCarriesNoReasonWordingOfItsOwn()
+    {
+        // The fabricated fallback has to be gone rather than merely unreached, or the
+        // next person to read this file finds a sentence that looks like a verdict the
+        // simulation never reached. Checked against the type's own surface: the only
+        // strings it publishes are about being still deciding and about nothing at
+        // all, and none of them names an ending.
+        var published = typeof(LiveEpisode)
+            .GetFields(BindingFlags.Public | BindingFlags.Static)
+            .Where(field => field.IsLiteral && field.FieldType == typeof(string))
+            .Select(field => (string?)field.GetRawConstantValue())
+            .Where(value => value is not null)
+            .ToArray();
+
+        Assert.NotEmpty(published);
+        Assert.All(published, wording =>
+        {
+            foreach (var verdict in new[] { "limit", "exhausted", "reason", "ended", "finished" })
+            {
+                Assert.DoesNotContain(verdict, wording, StringComparison.OrdinalIgnoreCase);
+            }
+        });
     }
 
     private static int Produced(LiveEpisode episode) => episode.Frames.Count - 1;

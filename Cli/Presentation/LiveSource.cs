@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Globalization;
 using Lattice.Agents;
 using Lattice.Environment;
 using Lattice.Generator;
@@ -199,14 +198,6 @@ public sealed class LiveEpisode : ILiveEpisode, IDisposable
     /// let one blocked agent keep a reader waiting for twice it.
     /// </summary>
     public static readonly TimeSpan JoinTimeout = TimeSpan.FromSeconds(2);
-
-    /// <summary>
-    /// What the viewer says when an episode has stopped and the simulation recorded
-    /// no reason at all. Deliberately the viewer's own sentence about the budget the
-    /// caller gave it, and deliberately not one of the engine's reason strings: a
-    /// reason the engine never reached must never look like one it did.
-    /// </summary>
-    public const string BudgetReasonFormat = "step limit reached (--steps {0})";
 
     private readonly LiveEpisodeSetup _setup;
     private readonly WorldMap _map;
@@ -626,22 +617,23 @@ public sealed class LiveEpisode : ILiveEpisode, IDisposable
     /// Why an episode ended, in the words of whoever actually knows.
     /// <para>
     /// A terminal tick carries the engine's own reason, and that is what is shown.
-    /// An episode that merely ran out of the caller's tick budget has no recorded
-    /// reason, because the engine reached no verdict — so the viewer's own fact about
-    /// the budget it was given is stated instead, in its own words, and nothing is
-    /// borrowed from the engine's vocabulary to dress it up.
+    /// When nothing was recorded there is no reason to show, and the viewer does not
+    /// write one: the episode ended where the caller's tick budget ran out, which is
+    /// a fact about the budget the viewer was given rather than a verdict the
+    /// simulation reached, and the panes already state it as what it is by counting
+    /// produced ticks against the budget. So the value is "not recorded" — the same
+    /// words a recording's own panes use for an end it has no reason for, which is
+    /// what lets the two agree by construction.
     /// </para>
     /// </summary>
-    private string EndReason(StepResult result) =>
-        CockpitEpisodes.HasReason(result.Info.Reason) ? result.Info.Reason! : BudgetReason;
+    private string EndReason(StepResult result) => RecordedOrNotRecorded(result.Info.Reason);
 
     /// <summary>
-    /// The viewer's own statement that the episode stopped because the tick budget
-    /// the caller gave it ran out. A last resort: the engine records a reason on the
-    /// terminal tick that spends the budget, so this is reached only when nothing was
-    /// recorded at all.
+    /// The recorded reason, or the words for its absence. The only two things an end
+    /// value is ever allowed to be: what the simulation said, or that it said nothing.
     /// </summary>
-    private string BudgetReason => string.Format(CultureInfo.InvariantCulture, BudgetReasonFormat, _setup.MaxSteps);
+    private static string RecordedOrNotRecorded(string? recorded) =>
+        CockpitEpisodes.HasReason(recorded) ? recorded! : CockpitEpisodes.NotRecorded;
 
     /// <summary>
     /// Ends the episode where it stands, when the stepper says there is nothing
@@ -651,11 +643,10 @@ public sealed class LiveEpisode : ILiveEpisode, IDisposable
     {
         lock (_gate)
         {
-            // The reason the simulation recorded on the tick it last ran, or the
-            // viewer's own budget statement when it recorded none. Never a reason
-            // invented here.
+            // What the simulation recorded on the tick it last ran, or "not recorded"
+            // when it recorded nothing. Never a reason invented here.
             var recorded = stepper.Results.Count > 0 ? stepper.Results[^1].Info.Reason : null;
-            _finishedReason ??= CockpitEpisodes.HasReason(recorded) ? recorded! : BudgetReason;
+            _finishedReason ??= RecordedOrNotRecorded(recorded);
             Monitor.PulseAll(_gate);
         }
     }

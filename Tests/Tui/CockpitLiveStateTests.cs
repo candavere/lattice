@@ -81,6 +81,43 @@ public class CockpitLiveStateTests
     }
 
     [Fact]
+    public void AnEndNobodyRecordedIsTheSameWordInTheScoreboardAndTheTimeline()
+    {
+        // A frame the engine ended without a reason, and a live episode reporting the
+        // absence rather than a sentence of its own. The two panes must not disagree:
+        // one reason, one set of words, and nothing that reads like a verdict the
+        // simulation never reached.
+        var rows = Render(
+            new LiveState(6, 6, FinishedReason: CockpitEpisodes.NotRecorded),
+            frameIndex: 6,
+            terminalReason: null);
+        var text = string.Join("\n", rows);
+
+        Assert.Contains("end     " + CockpitEpisodes.NotRecorded, text, StringComparison.Ordinal);
+        Assert.Contains("finished: " + CockpitEpisodes.NotRecorded, rows[TimelineRow], StringComparison.Ordinal);
+        foreach (var invented in new[] { "step limit", "--steps", "budget", "exhausted" })
+        {
+            Assert.DoesNotContain(invented, text, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact]
+    public void ARecordedEndIsTheEnginesOwnWordInBothPanes()
+    {
+        // The other half of the same claim: what the engine did record reaches both
+        // panes unchanged, and neither of them paraphrases it. The frame and the live
+        // state carry the same recorded reason, as they do in a real run.
+        var rows = Render(
+            new LiveState(6, 6, FinishedReason: "resources-exhausted"),
+            frameIndex: 6,
+            terminalReason: "resources-exhausted");
+        var text = string.Join("\n", rows);
+
+        Assert.Contains("end     resources-exhausted", text, StringComparison.Ordinal);
+        Assert.Contains("finished: resources-exhausted", rows[TimelineRow], StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ALiveKeyHintRowIsAsciiAndNamesEveryLiveControl()
     {
         var hints = Hints(Render(new LiveState(1, 30)), CockpitLayout.LiveKeyHints);
@@ -172,12 +209,20 @@ public class CockpitLiveStateTests
     private static string Hints(string[] rows, string expected) =>
         string.Concat(rows[^1].Skip(2).Take(expected.Length));
 
-    private static string[] Render(LiveState? Live, GlyphMode glyphs = GlyphMode.Unicode, int frameIndex = 3) =>
-        CockpitLayout.Render(Request(Live, glyphs, frameIndex)).ToLines();
+    private static string[] Render(
+        LiveState? Live,
+        GlyphMode glyphs = GlyphMode.Unicode,
+        int frameIndex = 3,
+        string? terminalReason = "tick-limit") =>
+        CockpitLayout.Render(Request(Live, glyphs, frameIndex, terminalReason)).ToLines();
 
-    private static CockpitRequest Request(LiveState? live, GlyphMode glyphs, int frameIndex = 3) =>
+    private static CockpitRequest Request(
+        LiveState? live,
+        GlyphMode glyphs,
+        int frameIndex = 3,
+        string? terminalReason = "tick-limit") =>
         new(
-            Document(),
+            Document(terminalReason),
             frameIndex,
             Cockpit,
             glyphs,
@@ -186,7 +231,7 @@ public class CockpitLiveStateTests
             Playback: new PlaybackState(IsPaused: true, StepsPerSecond: 4.0),
             Live: live);
 
-    private static ReplayDocument Document()
+    private static ReplayDocument Document(string? terminalReason = "tick-limit")
     {
         var frames = new List<ReplayFrame>();
         for (var tick = 0; tick <= 6; tick++)
@@ -199,7 +244,7 @@ public class CockpitLiveStateTests
                 tick == 0 ? null : "agent0: Move(1); agent1: Collect(0)",
                 stateDigest: null,
                 isTerminal: tick == 6,
-                terminalReason: tick == 6 ? "tick-limit" : null,
+                terminalReason: tick == 6 ? terminalReason : null,
                 winnerSlot: tick == 6 ? 0 : null));
         }
 

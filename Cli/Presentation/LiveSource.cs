@@ -1,3 +1,4 @@
+using System.Globalization;
 using Lattice.Agents;
 using Lattice.Environment;
 using Lattice.Generator;
@@ -162,6 +163,14 @@ public sealed class LiveEpisode : ILiveEpisode, IDisposable
 
     /// <summary>How long a close waits for the stepper thread before giving up on it.</summary>
     public static readonly TimeSpan JoinTimeout = TimeSpan.FromSeconds(2);
+
+    /// <summary>
+    /// What the viewer says when an episode has stopped and the simulation recorded
+    /// no reason at all. Deliberately the viewer's own sentence about the budget the
+    /// caller gave it, and deliberately not one of the engine's reason strings: a
+    /// reason the engine never reached must never look like one it did.
+    /// </summary>
+    public const string BudgetReasonFormat = "step limit reached (--steps {0})";
 
     private readonly LiveEpisodeSetup _setup;
     private readonly WorldMap _map;
@@ -504,7 +513,7 @@ public sealed class LiveEpisode : ILiveEpisode, IDisposable
                 var stepper = _stepper;
                 if (!stepper.CanStep)
                 {
-                    Complete();
+                    Complete(stepper);
                     return;
                 }
 
@@ -541,24 +550,39 @@ public sealed class LiveEpisode : ILiveEpisode, IDisposable
     }
 
     /// <summary>
-    /// The recorded reason an episode ended, in the engine's own words: the
-    /// terminal tick's reason, or the budget the run was cut short by. Nothing here
-    /// substitutes a reason of its own.
+    /// Why an episode ended, in the words of whoever actually knows.
+    /// <para>
+    /// A terminal tick carries the engine's own reason, and that is what is shown.
+    /// An episode that merely ran out of the caller's tick budget has no recorded
+    /// reason, because the engine reached no verdict — so the viewer's own fact about
+    /// the budget it was given is stated instead, in its own words, and nothing is
+    /// borrowed from the engine's vocabulary to dress it up.
+    /// </para>
     /// </summary>
-    private static string EndReason(StepResult result) =>
-        CockpitEpisodes.HasReason(result.Info.Reason) ? result.Info.Reason! : "tick-limit";
+    private string EndReason(StepResult result) =>
+        CockpitEpisodes.HasReason(result.Info.Reason) ? result.Info.Reason! : BudgetReason;
+
+    /// <summary>
+    /// The viewer's own statement that the episode stopped because the tick budget
+    /// the caller gave it ran out. A last resort: the engine records a reason on the
+    /// terminal tick that spends the budget, so this is reached only when nothing was
+    /// recorded at all.
+    /// </summary>
+    private string BudgetReason => string.Format(CultureInfo.InvariantCulture, BudgetReasonFormat, _setup.MaxSteps);
 
     /// <summary>
     /// Ends the episode where it stands, when the stepper says there is nothing
-    /// left to do. The reason is the budget: a stepper that cannot step has either
-    /// spent it or reached a terminal tick, and the terminal tick's own reason is
-    /// recorded on the last frame.
+    /// left to do: the budget is spent and no tick is left to run.
     /// </summary>
-    private void Complete()
+    private void Complete(ScenarioStepper stepper)
     {
         lock (_gate)
         {
-            _finishedReason ??= "tick-limit";
+            // The reason the simulation recorded on the tick it last ran, or the
+            // viewer's own budget statement when it recorded none. Never a reason
+            // invented here.
+            var recorded = stepper.Results.Count > 0 ? stepper.Results[^1].Info.Reason : null;
+            _finishedReason ??= CockpitEpisodes.HasReason(recorded) ? recorded! : BudgetReason;
             Monitor.PulseAll(_gate);
         }
     }

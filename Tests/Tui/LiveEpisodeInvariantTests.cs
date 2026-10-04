@@ -167,6 +167,45 @@ public class LiveEpisodeInvariantTests
         Assert.Equal(2, rig.Disposed.Count);
     }
 
+    [Fact]
+    public void AnEndedEpisodeShowsOnlyAReasonTheSimulationRecorded()
+    {
+        // A terminal tick carries the engine's own reason, and that is what is
+        // shown: the words the engine used, not a paraphrase of them.
+        var collectors = new CollectingRig();
+        using (var episode = Episode(collectors.NewRoster, 50))
+        {
+            Produce(episode, 10);
+
+            Assert.NotNull(episode.FinishedReason);
+            Assert.Equal("resources-exhausted", episode.FinishedReason);
+        }
+
+        // A budget that ran out is a terminal tick too, and the engine records
+        // "tick-limit" on it. That is the engine's word, so that is what is shown —
+        // not the viewer's own sentence about the budget.
+        var waiters = new CountingRig();
+        using (var episode = Episode(waiters.NewRoster, 4))
+        {
+            Produce(episode, 10);
+
+            Assert.Equal("tick-limit", episode.FinishedReason);
+            Assert.Equal(episode.FinishedReason, new LivePlayback(episode).Live!.FinishedReason);
+        }
+
+        // The viewer's own statement exists for the case where nothing was recorded
+        // at all, and it is visibly the viewer's: its own wording about the budget it
+        // was given, and not one of the engine's reason strings.
+        var viewerSentence = string.Format(
+            System.Globalization.CultureInfo.InvariantCulture,
+            LiveEpisode.BudgetReasonFormat,
+            4);
+
+        Assert.Equal("step limit reached (--steps 4)", viewerSentence);
+        Assert.DoesNotContain("tick-limit", viewerSentence, StringComparison.Ordinal);
+        Assert.DoesNotContain("resources-exhausted", viewerSentence, StringComparison.Ordinal);
+    }
+
     private static int Produced(LiveEpisode episode) => episode.Frames.Count - 1;
 
     private static void Produce(LiveEpisode episode, int ticks)
@@ -321,6 +360,33 @@ public class LiveEpisodeInvariantTests
             public int AgentId { get; }
 
             public AgentAction Decide(Observation observation) => _rig.Decide(this);
+        }
+    }
+
+    /// <summary>Two agents that collect the map's one resource, so it ends early.</summary>
+    private sealed class CollectingRig
+    {
+        internal IAgent[] NewRoster() => new IAgent[] { new Fake(0), new Fake(1) };
+
+        private sealed class Fake : IAgent
+        {
+            internal Fake(int agentId) => AgentId = agentId;
+
+            public int AgentId { get; }
+
+            public AgentAction Decide(Observation observation)
+            {
+                var me = observation.AgentStates.First(agent => agent.AgentId == AgentId);
+                foreach (var resource in observation.Map.Resources.OrderBy(resource => resource.Id))
+                {
+                    if (resource.ZoneId == me.ZoneId && !observation.Claims.Contains(resource.Id))
+                    {
+                        return new AgentAction(ActionKind.Collect, ResourceId: resource.Id);
+                    }
+                }
+
+                return new AgentAction(ActionKind.Wait);
+            }
         }
     }
 

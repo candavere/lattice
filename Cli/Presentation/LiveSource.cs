@@ -496,7 +496,25 @@ public sealed class LiveEpisode : ILiveEpisode, IDisposable
             return;
         }
 
-        foreach (var agent in _ownedRoster)
+        DisposeRoster(_ownedRoster);
+    }
+
+    /// <summary>
+    /// A stepper over exactly these agents, so the episode and the stepper name the
+    /// same instances.
+    /// </summary>
+    private ScenarioStepper NewStepperOver(IAgent[] roster) =>
+        new(_setup.Map, _setup.Config, roster, _setup.MaxSteps, _setup.Rules, recordPerceptions: _setup.RecordsPerceptions);
+
+    /// <summary>
+    /// Disposes every agent in a roster that owns an external resource, once each.
+    /// Only ever called on instances this episode itself constructed and only at a
+    /// point where no decide of theirs can be running: after the join, or between
+    /// turns on the stepper's own thread.
+    /// </summary>
+    private void DisposeRoster(IAgent[] roster)
+    {
+        foreach (var agent in roster)
         {
             if (agent is IDisposable disposable)
             {
@@ -506,9 +524,9 @@ public sealed class LiveEpisode : ILiveEpisode, IDisposable
                 }
                 catch (Exception exception)
                 {
-                    // Disposal happens on the way out and a failure here cannot
-                    // change the outcome of the run: the episode is already over.
-                    // Recorded so it is not silently dropped.
+                    // Disposal happens on the way out — or between two episodes of the
+                    // same run — and a failure here cannot change the outcome of the
+                    // run. Recorded so it is not silently dropped.
                     lock (_gate)
                     {
                         _failure ??= exception;
@@ -517,13 +535,6 @@ public sealed class LiveEpisode : ILiveEpisode, IDisposable
             }
         }
     }
-
-    /// <summary>
-    /// A stepper over exactly these agents, so the episode and the stepper name the
-    /// same instances.
-    /// </summary>
-    private ScenarioStepper NewStepperOver(IAgent[] roster) =>
-        new(_setup.Map, _setup.Config, roster, _setup.MaxSteps, _setup.Rules, recordPerceptions: _setup.RecordsPerceptions);
 
     /// <summary>
     /// The stepper's own loop: wait for one request, run one tick, project it.
@@ -548,9 +559,16 @@ public sealed class LiveEpisode : ILiveEpisode, IDisposable
 
                 if (_restartPending)
                 {
-                    // Reached only between turns, so nothing is deciding.
+                    // Reached only between turns, so nothing is deciding: the outgoing
+                    // agents have run every turn they will ever run, and this is the
+                    // only moment at which disposing them cannot kill a decide. They
+                    // are disposed here, before they are replaced and while they are
+                    // still the roster the episode owns — a restart that dropped them
+                    // without disposing would strand whatever they own, such as an
+                    // external agent's child process, for the life of the process.
                     _restartPending = false;
                     _requested = 0;
+                    DisposeRoster(_ownedRoster);
                     _ownedRoster = _setup.Roster;
                     _stepper = NewStepperOver(_ownedRoster);
                     _frames.Clear();

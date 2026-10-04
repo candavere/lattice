@@ -260,6 +260,78 @@ public class LiveEpisodeInvariantTests
         });
     }
 
+    [Fact]
+    public void ARestartDisposesTheRosterThatDecidedBeforeItIsReplaced()
+    {
+        var rig = new DisposableRig();
+        using var episode = Episode(rig.NewRoster, 6);
+        var cursor = new LivePlayback(episode);
+
+        cursor.Apply(Character('n'));
+        WaitFor(() => Produced(episode) >= 1);
+
+        // The instances that decided in the first episode, by identity.
+        var first = rig.Decided.ToArray();
+        Assert.Equal(2, first.Length);
+        Assert.Empty(rig.Disposed);
+
+        cursor.Apply(Character('r'));
+        WaitFor(() => Produced(episode) == 0);
+
+        // Disposed exactly once each, and they are the instances that ran — a restart
+        // that dropped them without disposing would leak whatever they own.
+        Assert.Equal(first, rig.Disposed.ToArray());
+
+        // Nothing may be disposed while a decide of that agent is running.
+        Assert.All(rig.Disposals, disposal => Assert.Equal(0, disposal.Deciding));
+
+        // The new episode's roster is a different set of instances, and disposing the
+        // outgoing pair did not dispose them.
+        cursor.Apply(Character('n'));
+        WaitFor(() => Produced(episode) >= 1);
+
+        var second = rig.Decided.Skip(first.Length).ToArray();
+        Assert.Equal(2, second.Length);
+        Assert.Empty(first.Intersect(second));
+        Assert.Equal(first, rig.Disposed.ToArray());
+    }
+
+    [Fact]
+    public void ARestartAskedForMidTurnDisposesNothingUntilThatTurnHasEnded()
+    {
+        var rig = new BlockingDisposableRig();
+        var episode = Episode(rig.NewRoster, GenerousBudget);
+        var cursor = new LivePlayback(episode);
+
+        try
+        {
+            cursor.Apply(Character(' '));
+            episode.RequestTick();
+            WaitFor(() => rig.Blocked);
+
+            cursor.Apply(Character('r'));
+
+            // The turn is still deciding, so the restart is still waiting and nothing
+            // at all has been disposed: killing a decide is the one thing disposal
+            // must never do.
+            Thread.Sleep(250);
+            Assert.Empty(rig.Disposed);
+            Assert.Equal(LivePlayback.RestartWaitingNotice, episode.Notice);
+
+            rig.ReleaseAll();
+
+            // Only now, between turns, is the roster that decided disposed.
+            WaitFor(() => rig.Disposed.Count == 2);
+            Assert.All(rig.Disposals, disposal => Assert.Equal(0, disposal.Deciding));
+        }
+        finally
+        {
+            rig.ReleaseAll();
+            episode.Stop(TimeSpan.FromSeconds(20));
+            episode.Dispose();
+        }
+    }
+
     private static int Produced(LiveEpisode episode) => episode.Frames.Count - 1;
 
     private static void Produce(LiveEpisode episode, int ticks)
@@ -349,6 +421,9 @@ public class LiveEpisodeInvariantTests
         private readonly List<IAgent> _decided = new();
         private int _decides;
         private int _blocked;
+
+        /// <summary>How many decides are inside an agent right now.</summary>
+        internal int Deciding;
 
         /// <summary>A fresh pair per call, as the shipped setup's factory is.</summary>
         internal IAgent[] NewRoster()
@@ -482,27 +557,51 @@ public class LiveEpisodeInvariantTests
 
     /// <summary>
     /// Two disposable agents that remember their own identity, so "the instances
-    /// that decided are the instances disposed" is checkable rather than assumed.
+    /// that decided are the instances disposed" is checkable rather than assumed,
+    /// and how many decides were running when each one was disposed.
     /// </summary>
     private sealed class DisposableRig
     {
+        private static int _nextSerial;
+
         private readonly List<IAgent> _decided = new();
         private readonly List<IAgent> _disposed = new();
+        private readonly List<Disposal> _disposals = new();
+        private int _deciding;
 
-        internal IReadOnlyList<IAgent> Decided => _decided;
+        internal IReadOnlyList<IAgent> Decided
+        {
+            get { lock (_decided) { return _decided.ToArray(); } }
+        }
 
-        internal IReadOnlyList<IAgent> Disposed => _disposed;
+        internal IReadOnlyList<IAgent> Disposed
+        {
+            get { lock (_disposed) { return _disposed.ToArray(); } }
+        }
+
+        internal IReadOnlyList<Disposal> Disposals
+        {
+            get { lock (_disposals) { return _disposals.ToArray(); } }
+        }
 
         internal IAgent[] NewRoster() => new IAgent[] { new Fake(this, 0), new Fake(this, 1) };
 
         internal AgentAction Decide(IAgent self)
         {
-            lock (_decided)
+            Interlocked.Increment(ref _deciding);
+            try
             {
-                _decided.Add(self);
-            }
+                lock (_decided)
+                {
+                    _decided.Add(self);
+                }
 
-            return new AgentAction(ActionKind.Wait);
+                return new AgentAction(ActionKind.Wait);
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _deciding);
+            }
         }
 
         internal void Dispose(IAgent self)
@@ -510,12 +609,22 @@ public class LiveEpisodeInvariantTests
             lock (_disposed)
             {
                 _disposed.Add(self);
+                _disposals.Add(new Disposal(self, Volatile.Read(ref _deciding)));
             }
         }
+
+        /// <summary>One disposal, and what the agent was doing when it happened.</summary>
+        internal sealed record Disposal(IAgent Agent, int Deciding);
 
         private sealed class Fake : IAgent, IDisposable
         {
             private readonly DisposableRig _rig;
+
+            /// <summary>
+            /// A serial in the printed name, so a failed identity assertion shows
+            /// which instances differ instead of two identical-looking pairs.
+            /// </summary>
+            private readonly int _serial = Interlocked.Increment(ref _nextSerial);
 
             internal Fake(DisposableRig rig, int agentId)
             {
@@ -528,6 +637,8 @@ public class LiveEpisodeInvariantTests
             public AgentAction Decide(Observation observation) => _rig.Decide(this);
 
             public void Dispose() => _rig.Dispose(this);
+
+            public override string ToString() => $"Fake#{_serial}";
         }
     }
 
@@ -535,19 +646,29 @@ public class LiveEpisodeInvariantTests
     private sealed class BlockingDisposableRig : BlockingRig
     {
         private readonly List<IAgent> _disposed = new();
+        private readonly List<DisposableRig.Disposal> _disposals = new();
 
         internal new IAgent[] NewRoster() => new IAgent[]
         {
             new DisposableFake(this, 0), new DisposableFake(this, 1),
         };
 
-        internal IReadOnlyList<IAgent> Disposed => _disposed;
+        internal IReadOnlyList<IAgent> Disposed
+        {
+            get { lock (_disposed) { return _disposed.ToArray(); } }
+        }
+
+        internal IReadOnlyList<DisposableRig.Disposal> Disposals
+        {
+            get { lock (_disposals) { return _disposals.ToArray(); } }
+        }
 
         internal void Dispose(IAgent self)
         {
             lock (_disposed)
             {
                 _disposed.Add(self);
+                _disposals.Add(new DisposableRig.Disposal(self, Volatile.Read(ref this.Deciding)));
             }
         }
 
@@ -559,6 +680,19 @@ public class LiveEpisodeInvariantTests
                 : base(rig, agentId)
             {
                 _rig = rig;
+            }
+
+            public AgentAction Decide(Observation observation)
+            {
+                Interlocked.Increment(ref _rig.Deciding);
+                try
+                {
+                    return base.Decide(observation);
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref _rig.Deciding);
+                }
             }
 
             public void Dispose() => _rig.Dispose(this);

@@ -219,13 +219,6 @@ public class CommandLifecycleCliTests : IDisposable
         }
     }
 
-    /// <summary>
-    /// An interactive terminal whose working line repaints every millisecond.
-    /// Retained for the tests that genuinely want the real timer; the ratio
-    /// assertions below use <see cref="InertPumpTerminal"/> instead.
-    /// </summary>
-    private static CliTerminal FastRepaintingTerminal => InteractiveTerminal with { RepaintIntervalMs = 1 };
-
     [Fact]
     public void AnInteractiveStderrGetsTheSuccessLine()
     {
@@ -330,10 +323,10 @@ public class CommandLifecycleCliTests : IDisposable
         // render path. If the wiring were severed the line would fall back to
         // showing no ratio at all, which every other test here would still pass.
         //
-        // The budget is 3 seeds x 2 mirrored seatings = 6 matches. The terminal
-        // repaints every millisecond so a frame is certainly drawn while the run
-        // is in flight; asserting the budget rather than the numerator keeps the
-        // test independent of exactly how many matches had started by then.
+        // The budget is 3 seeds x 2 mirrored seatings = 6 matches. The pump never
+        // ticks, so the line can only carry a ratio if attaching the real
+        // counter painted it synchronously; asserting the budget rather than the
+        // numerator keeps the test independent of how many matches had started.
         var result = RunWith(
             InertPumpTerminal,
             "evaluate", "--seed-set", "dev", "--seeds", "3", "--rollouts", "1",
@@ -409,12 +402,13 @@ public class CommandLifecycleCliTests : IDisposable
     public void TheAnimationStopsOnceTheCommandHasReturned()
     {
         // Nothing may repaint after the closing line: a spinner ticking over the
-        // prompt is the classic way a progress indicator outlives its work. The
-        // pump is driven synchronously, so the assertion is about the pump being
-        // stopped at close rather than about how fast the machine ran.
-        var result = RunWith(
-            ManualPumpTerminal(ticks: 3),
-            "benchmark", "--runs", "2", "--warmup", "2", "--steps", "4");
+        // prompt is the classic way a progress indicator outlives its work.
+        //
+        // This one deliberately keeps the REAL timer. Its assertion holds whether
+        // or not any callback happens to fire during the command, so it never
+        // depended on the scheduler — and a manually-driven pump would make it
+        // vacuous, since that pump cannot tick at all once Start has returned.
+        var result = RunInteractively("benchmark", "--runs", "2", "--warmup", "2", "--steps", "4");
 
         var lines = result.Err.Split('\n');
         var closing = Array.FindLastIndex(lines, line => line.Contains("ok", StringComparison.Ordinal));

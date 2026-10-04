@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using Lattice.Agents;
 using Lattice.Environment;
@@ -190,7 +191,13 @@ public sealed class LiveEpisode : ILiveEpisode, IDisposable
     public const string StillDecidingNotice =
         "lattice tui: an agent was still deciding when the viewer closed";
 
-    /// <summary>How long a close waits for the stepper thread before giving up on it.</summary>
+    /// <summary>
+    /// The whole of what a close may spend waiting for the stepper thread: one
+    /// budget for the entire way out, started by the first stop request and shared
+    /// by every join after it. Not a per-join allowance — a close stops the stepper
+    /// and then disposes the episode, and a budget each of those could spend would
+    /// let one blocked agent keep a reader waiting for twice it.
+    /// </summary>
     public static readonly TimeSpan JoinTimeout = TimeSpan.FromSeconds(2);
 
     /// <summary>
@@ -206,6 +213,14 @@ public sealed class LiveEpisode : ILiveEpisode, IDisposable
     private readonly object _gate = new();
     private readonly List<ReplayFrame> _frames = new();
     private readonly Thread _thread;
+
+    /// <summary>
+    /// The one clock the whole way out is measured against, started by the first
+    /// stop request. Every join reads what is left of <see cref="JoinTimeout"/>
+    /// rather than starting a fresh allowance, so stopping and disposing together
+    /// cost the reader one budget and not one budget each.
+    /// </summary>
+    private readonly Stopwatch _shutdown = new();
     private ScenarioStepper _stepper;
 
     /// <summary>
@@ -397,10 +412,11 @@ public sealed class LiveEpisode : ILiveEpisode, IDisposable
     /// finish. Reports whether it was joined.
     /// </summary>
     /// <remarks>
-    /// The wait is bounded and the caller keeps painting and reading keys while it
-    /// happens. A stepper that does not join inside the bound is left to finish on
-    /// its own: it is a background thread, the process is about to end, and killing
-    /// it would mean killing an agent mid-decision.
+    /// The first call starts the shutdown clock, and every wait after it — including
+    /// the one <see cref="Dispose"/> makes — may spend only what is left of
+    /// <see cref="JoinTimeout"/>. A stepper that does not join inside that is left to
+    /// finish on its own: it is a background thread, the process is about to end, and
+    /// killing it would mean killing an agent mid-decision.
     /// </remarks>
     public bool Stop(TimeSpan? joinTimeout = null)
     {
@@ -410,6 +426,14 @@ public sealed class LiveEpisode : ILiveEpisode, IDisposable
             {
                 _stopRequested = true;
                 _status = LiveStepperStatus.Stopping;
+
+                // Started once, here, under the lock, so no two callers can each
+                // believe they are the first and restart the budget between them.
+                if (!_shutdown.IsRunning)
+                {
+                    _shutdown.Start();
+                }
+
                 Monitor.PulseAll(_gate);
             }
         }
@@ -419,11 +443,15 @@ public sealed class LiveEpisode : ILiveEpisode, IDisposable
 
     /// <summary>
     /// Waits, bounded, for the stepper thread to finish, and reports whether it was
-    /// joined. "Stopped" is reported only when it was.
+    /// joined. "Stopped" is reported only when it was. With no explicit
+    /// <paramref name="joinTimeout"/> the wait is bounded by what is left of the
+    /// shutdown budget, or by the whole of <see cref="JoinTimeout"/> when no stop has
+    /// been asked for yet.
     /// </summary>
     public bool Join(TimeSpan? joinTimeout = null)
     {
-        var joined = _thread.Join(joinTimeout ?? JoinTimeout) || !_thread.IsAlive;
+        var budget = joinTimeout ?? RemainingShutdownBudget();
+        var joined = (budget > TimeSpan.Zero && _thread.Join(budget)) || !_thread.IsAlive;
 
         if (joined)
         {
@@ -434,6 +462,22 @@ public sealed class LiveEpisode : ILiveEpisode, IDisposable
         }
 
         return joined;
+    }
+
+    /// <summary>
+    /// What is left of <see cref="JoinTimeout"/> for one more wait, or all of it
+    /// while no stop has been asked for. Never negative: a budget that is spent is a
+    /// budget of zero, which joins nothing and reports the thread's own liveness.
+    /// </summary>
+    private TimeSpan RemainingShutdownBudget()
+    {
+        if (!_shutdown.IsRunning)
+        {
+            return JoinTimeout;
+        }
+
+        var remaining = JoinTimeout - _shutdown.Elapsed;
+        return remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
     }
 
     /// <summary>

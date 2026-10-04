@@ -59,4 +59,12 @@ public interface ICockpitCursor
     /// long the elapsed time is, which is what stops a paused screen animating.
     /// </summary>
     bool Advance(TimeSpan elapsed);
+
+    /// <summary>
+    /// Whether the source has nothing left to give: there will be no further frames
+    /// and no further state changes, so the host puts the terminal back rather than
+    /// sitting on a last frame looking live. A recording is never finished this way
+    /// — a replay ends when the reader says so.
+    /// </summary>
+    bool IsFinished { get; }
 }

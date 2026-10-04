@@ -239,7 +239,7 @@ public static class TuiHost
         written = Compose(request, playback, size, glyphs, fill, written, session);
         var lastTickAt = request.Clock.Now;
 
-        while (!quit)
+        while (!quit && !playback.IsFinished)
         {
             var wait = frameInterval - (request.Clock.Now - lastTickAt);
             if (wait > TimeSpan.Zero && request.Keys.Wait(wait, out var key) == KeyWait.Key)

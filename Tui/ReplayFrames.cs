@@ -411,6 +411,12 @@ public sealed class ReplayPlayback : ICockpitCursor
     /// </summary>
     public LiveState? Live => null;
 
+    /// <summary>
+    /// Always false: a recording has every frame it will ever have from the first
+    /// frame, so it ends when the reader quits and not before.
+    /// </summary>
+    public bool IsFinished => false;
+
     /// <summary>The current speed in recorded steps per second.</summary>
     public double StepsPerSecond => SpeedsPerSecond[_speedIndex];
 

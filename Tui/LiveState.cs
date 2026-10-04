@@ -31,7 +31,7 @@ public sealed record LiveState(
     /// stepper that has stopped has an end to report, and a viewer that has not
     /// heard one must not claim the episode is over.
     /// </summary>
-    public bool IsFinished => FinishedReason is { Length: > 0 };
+    public bool IsFinished => CockpitEpisodes.HasReason(FinishedReason);
 }
 
 /// <summary>
@@ -42,6 +42,13 @@ public sealed record LiveState(
 /// </summary>
 public static class CockpitEpisodes
 {
+    /// <summary>
+    /// Whether a source states a reason at all. A missing or blank reason is not a
+    /// reason: claiming an episode ended on the strength of whitespace would be the
+    /// viewer inventing a verdict.
+    /// </summary>
+    public static bool HasReason(string? reason) => !string.IsNullOrWhiteSpace(reason);
+
     /// <summary>
     /// The step count the episode is measured against: a recording's own final
     /// line, or a live episode's tick budget.
@@ -64,6 +71,6 @@ public static class CockpitEpisodes
     /// </summary>
     public static string FinishedReason(ReplayFrame frame, LiveState? live) =>
         live is not null
-            ? live.IsFinished ? live.FinishedReason! : "still running"
-            : frame.TerminalReason ?? "not recorded";
+            ? live.IsFinished ? live.FinishedReason! : "not recorded"
+            : HasReason(frame.TerminalReason) ? frame.TerminalReason! : "not recorded";
 }

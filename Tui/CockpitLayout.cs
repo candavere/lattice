@@ -19,6 +19,11 @@ public readonly record struct PlaybackState(bool IsPaused, double StepsPerSecond
 /// <param name="PanelFill">The panel background, or <c>null</c> for the terminal's own.</param>
 /// <param name="Phase">How far through the current frame's dwell time this frame is, in [0, 1).</param>
 /// <param name="Playback">What the cursor is doing.</param>
+/// <param name="Live">
+/// The live episode state, or null for a finished recording. Null is the whole of
+/// the difference: the world, scoreboard and log are drawn from the same frames
+/// either way, and only the timeline and the key hints read this.
+/// </param>
 public sealed record CockpitRequest(
     ReplayDocument Document,
     int FrameIndex,
@@ -26,7 +31,8 @@ public sealed record CockpitRequest(
     GlyphMode Glyphs,
     Rgb? PanelFill,
     double Phase,
-    PlaybackState Playback);
+    PlaybackState Playback,
+    LiveState? Live = null);
 
 /// <summary>
 /// The cockpit: the world, the scoreboard, the event log, the timeline and the
@@ -419,17 +425,28 @@ public static class CockpitLayout
     private static void DrawTimeline(CockpitRequest request, CellBuffer cells, PaletteRoles palette, Rect pane)
     {
         var document = request.Document;
-        var steps = document.Header.RecordedSteps;
+        var live = request.Live;
+        var maximum = CockpitEpisodes.MaximumTicks(document, live);
+        var produced = CockpitEpisodes.ProducedTicks(document, live);
         var tick = request.Frame().Tick;
         var row = pane.Y + 1;
 
         var state = new Cell(' ', palette.TextPrimary, request.PanelFill);
-        var label = Clip(request, $"tick {Invariant(tick)}/{Invariant(steps)}  ", pane.Width - 2);
+
+        // A live episode names itself, and says how much of it exists: the tick on
+        // show, the ticks produced so far, and the budget it is measured against.
+        // A recording has already produced all of its steps, so it states the two
+        // numbers as one fraction and says no such thing.
+        var label = live is null
+            ? $"tick {Invariant(tick)}/{Invariant(maximum)}  "
+            : $"LIVE tick {Invariant(tick)}/{Invariant(produced)} of {Invariant(maximum)}  ";
+        label = Clip(request, label, pane.Width - 2);
         cells.DrawText(pane.X + 1, row, label, state);
 
-        var stateWord = request.Playback.IsPaused ? "paused" : "playing";
-        var speed = request.Playback.StepsPerSecond.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
-        var suffix = $"  {stateWord} {speed} steps/s";
+        // The bar's position is the produced count over the budget for a live
+        // episode, so a reader sees how much is left as well as how much has run.
+        var position = live is null ? tick : produced;
+        var suffix = TimelineSuffix(request);
         var track = pane.Width - 2 - label.Length - suffix.Length;
 
         if (track > 0)
@@ -438,10 +455,10 @@ public static class CockpitLayout
             // show at that resolution, so the bar is a ruler the reader can count
             // rather than a smear; longer recordings fall back to a proportional
             // fill of the same track.
-            var cellsWide = Math.Min(steps, track);
-            var filled = steps <= 0 || cellsWide <= 0
+            var cellsWide = Math.Min(maximum, track);
+            var filled = maximum <= 0 || cellsWide <= 0
                 ? 0
-                : Math.Min(cellsWide, ((tick * cellsWide * 2) + steps) / (steps * 2));
+                : Math.Min(cellsWide, ((position * cellsWide * 2) + maximum) / (maximum * 2));
 
             for (var column = 0; column < track; column++)
             {
@@ -464,6 +481,30 @@ public static class CockpitLayout
     }
 
     /// <summary>
+    /// What the timeline says after the bar. A transient notice comes first: a
+    /// viewer that is stopping, or a restart waiting on an agent, is telling the
+    /// reader something they cannot infer from a paused cursor. Then the recorded
+    /// reason the episode ended, in the recording's own words. Then the cursor's
+    /// own state, which is all a frame that has neither has to say.
+    /// </summary>
+    private static string TimelineSuffix(CockpitRequest request)
+    {
+        if (request.Live is { Notice: { Length: > 0 } notice })
+        {
+            return "  " + notice;
+        }
+
+        if (request.Live is { IsFinished: true } finished)
+        {
+            return "  finished: " + finished.FinishedReason;
+        }
+
+        var stateWord = request.Playback.IsPaused ? "paused" : "playing";
+        var speed = request.Playback.StepsPerSecond.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+        return $"  {stateWord} {speed} steps/s";
+    }
+
+    /// <summary>
     /// The key hints: plain ASCII, every control the reader can press, in one row.
     /// ASCII unconditionally, so the one row that explains the keys is never the
     /// row a terminal cannot encode.
@@ -473,7 +514,7 @@ public static class CockpitLayout
         cells.DrawText(
             2,
             KeyHintRow(request.Size),
-            KeyHints,
+            KeyHintsFor(request.Live is not null),
             new Cell(' ', palette.TextDim, request.PanelFill));
     }
 
@@ -482,6 +523,20 @@ public static class CockpitLayout
     /// two cannot drift: a control added to one has to be named in the other.
     /// </summary>
     public const string KeyHints = "space pause  n/p step  < > speed  [ ] scrub  home/end jump  q quit";
+
+    /// <summary>
+    /// The controls a live episode has, which are not the recording's: there is no
+    /// recording to scrub to the end of, and there is a restart to name. Says LIVE
+    /// so the reader knows the episode in front of them is still being computed.
+    /// </summary>
+    public const string LiveKeyHints =
+        "LIVE  space pause  n tick  p back  < > speed  [ ] speed  home/end jump  r restart  q quit";
+
+    /// <summary>
+    /// The hint row this frame draws, from the one place that decides, so a caller
+    /// and the renderer can never disagree about which row is on screen.
+    /// </summary>
+    public static string KeyHintsFor(bool live) => live ? LiveKeyHints : KeyHints;
 
     private static void DrawPane(
         CockpitRequest request,

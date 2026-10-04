@@ -254,7 +254,7 @@ public class CommandLifecycleReasonTests
 
         var result = RunWriting(NoColorTerminal, exit: 1, long_);
 
-        // The first hundred display characters, then one marker.
+        // The first hundred UTF-16 code units, then one marker.
         Assert.Contains(
             "error: " + new string('x', CommandLifecycleScope.MaxReasonCharacters - "error: ".Length) + "...",
             FailedRow(result.Err),

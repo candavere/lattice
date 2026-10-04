@@ -69,10 +69,11 @@ public sealed class CommandLifecycleScope : IDisposable
     };
 
     /// <summary>
-    /// How much of a reason the failure line repeats, in display characters.
-    /// Long enough to name the failure, short enough to leave the closing line
-    /// readable on an 80-column terminal beside the verb, the status and the
-    /// elapsed time.
+    /// How much of a reason the failure line repeats, counted in UTF-16 code
+    /// units — the unit <see cref="string.Length"/> reports, so a character
+    /// outside the Basic Multilingual Plane counts as two. Long enough to name
+    /// the failure, short enough to leave the closing line readable on an
+    /// 80-column terminal beside the verb, the status and the elapsed time.
     /// </summary>
     internal const int MaxReasonCharacters = 100;
 
@@ -237,7 +238,8 @@ public sealed class CommandLifecycleScope : IDisposable
     /// <summary>
     /// The text safe to repeat on a failure line: control characters dropped,
     /// every run of whitespace collapsed to one space, both ends trimmed, and at
-    /// most <see cref="MaxReasonCharacters"/> display characters.
+    /// most <see cref="MaxReasonCharacters"/> UTF-16 code units — the unit
+    /// <see cref="string.Length"/> counts in.
     /// </summary>
     private static string Sanitise(string reason)
     {

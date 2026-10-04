@@ -198,6 +198,14 @@ public static class TuiHost
     /// <summary>The status a refused run reports: the invocation named no terminal.</summary>
     private const int UsageRefused = 2;
 
+    /// <summary>
+    /// The one line these capabilities refuse, or null when the terminal can carry
+    /// the cockpit. Public so a caller that owns something to start — a live
+    /// episode's stepper thread, say — can ask before it starts it, and get the
+    /// host's own answer rather than a second opinion about redirection.
+    /// </summary>
+    public static string? RefusalFor(TerminalCapabilities capabilities) => Refusal(capabilities);
+
     /// <summary>Runs the cockpit until the reader quits.</summary>
     public static TuiRunResult Run(TuiHostRequest request)
     {

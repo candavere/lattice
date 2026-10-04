@@ -293,7 +293,9 @@ public static class CliApp
 
     /// <summary>
     /// The interactive terminal viewer: <c>replay</c>, which plays a recorded
-    /// trajectory in a read-only cockpit and runs no simulation.
+    /// trajectory in a read-only cockpit and runs no simulation, and
+    /// <c>simulate</c>, which runs a real episode in the same cockpit and lets the
+    /// reader control it.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -314,18 +316,24 @@ public static class CliApp
     {
         try
         {
+            // --ascii is a boolean switch shared by both subcommands: stripped before
+            // parsing so it can never be mistaken for a value or a path, and so the
+            // parser below sees only the flags it should refuse or use.
+            var ascii = args.Skip(1).Contains("--ascii", StringComparer.Ordinal);
+            var rest = args.Skip(1).Where(argument => argument != "--ascii").ToArray();
+
+            if (args.Length > 0 && args[0] == "simulate")
+            {
+                return TuiSimulate(rest, ascii, stdout, stderr);
+            }
+
             if (args.Length == 0 || args[0] != "replay")
             {
                 WriteTuiUsage(stderr);
                 return UsageError.ExitCode;
             }
 
-            // --ascii is a boolean switch: stripped before parsing so it can never be
-            // mistaken for a path, and so the parser below sees only the path and
-            // any other flag it should refuse.
-            var ascii = args.Skip(1).Contains("--ascii", StringComparer.Ordinal);
-            var (_, positionals) = ParseFlags(
-                args.Skip(1).Where(argument => argument != "--ascii").ToArray());
+            var (_, positionals) = ParseFlags(rest);
 
             if (positionals.Count == 0)
             {
@@ -357,11 +365,165 @@ public static class CliApp
     }
 
     /// <summary>
+    /// Runs a live episode in the cockpit: the same roster, map, rules, seed and
+    /// vision <c>lattice simulate</c> would use for the same arguments, stepped one
+    /// tick at a time on a thread of its own while the reader holds the controls.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The statuses are the ones every other command here returns: 0 for a clean
+    /// quit or a finished episode, 1 for a runtime failure with one line on stderr,
+    /// 2 for an invocation that cannot be run. A refusal — a redirected stream, a
+    /// flag that does not apply to a live run — touches nothing and says why.
+    /// </para>
+    /// <para>
+    /// The order on the way out is fixed and is the whole point: the stepper is
+    /// stopped and the terminal is restored first, and only then is anything
+    /// printed. A reader whose terminal was left in the alternate screen, or a
+    /// caller whose agent was still deciding, is told after the fact rather than
+    /// before.
+    /// </para>
+    /// </remarks>
+    private static int TuiSimulate(string[] args, bool ascii, TextWriter stdout, TextWriter stderr)
+    {
+        var setup = BuildLiveSetup(args);
+
+        // Nothing is stepped and no screen is entered before the arguments are
+        // known good, so a refusal cannot leave a half-started episode behind.
+        using var episode = new LiveEpisode(setup);
+
+        // The host owns the alternate screen. It refuses a redirected run itself,
+        // with the same one-line reason and the same status the replay viewer uses,
+        // and on that path nothing here has been started.
+        var capabilities = CapabilityDetector.Detect();
+        var cursor = new LivePlayback(episode);
+        var session = new TerminalGuardSessionFactory();
+        var probe = TuiHost.RefusalFor(capabilities);
+        if (probe is not null)
+        {
+            // The episode's thread is stopped and joined by the using above, before
+            // this returns and before the line is printed.
+            stderr.WriteLine(probe);
+            return UsageError.ExitCode;
+        }
+
+        TuiRunResult result;
+        using (var keys = new KeyQueue(ConsoleKeyReader.FromConsole()))
+        {
+            result = TuiHost.Run(new TuiHostRequest(
+                DocumentOf(episode, cursor),
+                stdout,
+                stderr,
+                capabilities,
+                ascii,
+                session,
+                keys,
+                new MonotonicClock(),
+                Cursor: cursor));
+        }
+
+        if (result.Refusal is not null)
+        {
+            stderr.WriteLine(result.Refusal);
+        }
+
+        // Stop and join before anything is printed: the terminal is already back by
+        // the time TuiHost.Run returned, and the agent that may still be deciding is
+        // no longer one once the join has returned.
+        var joined = episode.Stop();
+
+        if (episode.Failure is { } failure)
+        {
+            stderr.WriteLine($"lattice tui simulate: {failure.Message}");
+            return Failure;
+        }
+
+        if (!joined)
+        {
+            stderr.WriteLine(LiveEpisode.StillDecidingNotice);
+        }
+
+        return result.ExitCode;
+    }
+
+    /// <summary>
+    /// The episode a live run plays, built from the same flags and through the same
+    /// public constructors <c>lattice simulate</c> uses. The flags that decide an
+    /// artifact rather than an episode are refused by name: a live run writes
+    /// nothing, and silently ignoring a request to write a file would be worse than
+    /// saying so.
+    /// </summary>
+    private static LiveEpisodeSetup BuildLiveSetup(string[] args)
+    {
+        var (flags, positionals) = ParseFlags(
+            args,
+            "--seed",
+            "--steps",
+            "--agent",
+            "--scenario",
+            "--rules");
+        GuardNoPositionals(positionals);
+
+        if (flags.ContainsKey("--out"))
+        {
+            throw new UsageError("--out cannot be used with 'tui simulate': a live run records nothing to a file.");
+        }
+
+        var seed = ParseULong(Require(flags, "--seed"), "--seed");
+        var steps = flags.TryGetValue("--steps", out var stepsText)
+            ? ParsePositiveInt(stepsText, "--steps")
+            : DefaultSimulationSteps;
+
+        var scenario = flags.TryGetValue("--scenario", out var namedText)
+            ? namedText.ToLowerInvariant()
+            : "";
+
+        if (scenario.Length > 0)
+        {
+            if (scenario != InfiltrationScenario.ScenarioName)
+            {
+                throw new UsageError(
+                    $"invalid --scenario '{namedText}' (expected 'infiltration').");
+            }
+
+            if (flags.ContainsKey("--agent"))
+            {
+                throw new UsageError(
+                    "--agent cannot be used with --scenario infiltration (the roster is fixed: Sentry vs Infiltrator).");
+            }
+
+            if (flags.ContainsKey("--rules"))
+            {
+                throw new UsageError(
+                    "--rules cannot be used with --scenario infiltration (the scenario owns its topology).");
+            }
+
+            return LiveEpisodeSetup.Infiltration(seed, steps);
+        }
+
+        var agent = flags.TryGetValue("--agent", out var agentText)
+            ? agentText.ToLowerInvariant()
+            : "greedy";
+        var rules = flags.TryGetValue("--rules", out var rulesPath)
+            ? LoadRules(rulesPath)
+            : DynamicMapRuleSet.None;
+
+        return LiveEpisodeSetup.Skirmish(seed, steps, agent, rules);
+    }
+
+    /// <summary>
+    /// The document the host opens on: the episode's own frames as they stand. The
+    /// live cursor carries the real document from the first produced tick, so this
+    /// is only the request's required shape before that point.
+    /// </summary>
+    private static ReplayDocument DocumentOf(LiveEpisode episode, LivePlayback cursor) => cursor.Document;
+
+    /// <summary>
     /// The viewer's own usage line, on stderr only, and deliberately one line: a
     /// usage line is a diagnosis, not a manual.
     /// </summary>
     private static void WriteTuiUsage(TextWriter sink) =>
-        sink.WriteLine("usage: lattice tui replay <trajectory.jsonl> [--ascii]");
+        sink.WriteLine("usage: lattice tui replay <trajectory.jsonl> [--ascii] | lattice tui simulate --seed <n> [--steps <n>] [--agent <a>] [--scenario infiltration] [--rules <f>] [--ascii]");
 
     private static bool IsKnownCommand(string command) =>
         command is "generate" or "simulate" or "render" or "analyze"

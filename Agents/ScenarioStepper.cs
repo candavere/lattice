@@ -168,11 +168,26 @@ public sealed class ScenarioStepper
     /// previous tick, the turn is recorded, the tick's contention is counted, and
     /// the pure step function advances the state.
     /// </summary>
+    /// <remarks>
+    /// <paramref name="stopRequested"/> is consulted before every agent's
+    /// <see cref="IAgent.Decide"/> and again before the step is applied, and a tick
+    /// that was asked to stop simply does not happen: nothing is recorded, the
+    /// observations are not rebound, and the episode is left exactly as it was.
+    /// That is the only safe stopping point in this type, because
+    /// <see cref="IAgent.Decide"/> is synchronous and takes no token — a call
+    /// already running cannot be interrupted, and this contract does not pretend
+    /// otherwise. Null, the default, never stops.
+    /// </remarks>
+    /// <returns>
+    /// The tick's result, or null when <paramref name="stopRequested"/> asked to
+    /// stop before the tick could run. A null result is the caller's signal that
+    /// the episode ended where it stands rather than where it was going.
+    /// </returns>
     /// <exception cref="InvalidOperationException">
     /// <see cref="CanStep"/> is false — the budget is spent or the last tick was
     /// terminal.
     /// </exception>
-    public StepResult Step()
+    public StepResult? Step(Func<bool>? stopRequested = null)
     {
         if (!CanStep)
         {
@@ -184,7 +199,19 @@ public sealed class ScenarioStepper
         var turn = new AgentAction[_config.AgentCount];
         foreach (var agent in _agents.OrderBy(a => a.AgentId))
         {
+            if (stopRequested?.Invoke() == true)
+            {
+                return null;
+            }
+
             turn[agent.AgentId] = agent.Decide(_observations[agent.AgentId]);
+        }
+
+        // Checked again before anything is recorded, so a stopped tick leaves no
+        // half-episode behind: no perception, no turn, no contention count, no step.
+        if (stopRequested?.Invoke() == true)
+        {
+            return null;
         }
 
         if (_perceptions is not null)

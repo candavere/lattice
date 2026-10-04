@@ -159,8 +159,19 @@ public static class ReplaySource
             toZoneId,
             recording.Header.SimulationConfig.TransitSpeed);
 
-    private static WorldMap Project(MapGraph map)
+    private static WorldMap Project(MapGraph map) => ProjectMap(map);
+
+    /// <summary>
+    /// The map a panes draw, projected from the engine's own. Public because a live
+    /// episode has a map for the same reason a recording has one — it is the world
+    /// the simulation is playing — and there is exactly one projection of it, so a
+    /// live frame and a replayed frame of the same map cannot be drawn differently.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The map has more zones than a pane can name.</exception>
+    public static WorldMap ProjectMap(MapGraph map)
     {
+        ArgumentNullException.ThrowIfNull(map);
+
         var zones = new WorldZone[map.Zones.Length];
         for (var i = 0; i < map.Zones.Length; i++)
         {

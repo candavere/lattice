@@ -169,6 +169,14 @@ public sealed class LiveEpisode : ILiveEpisode, IDisposable
     private readonly List<ReplayFrame> _frames = new();
     private readonly Thread _thread;
     private ScenarioStepper _stepper;
+
+    /// <summary>
+    /// The exact instances the current stepper was constructed with. Not the setup's
+    /// roster property — that is a factory, and asking it again at dispose time hands
+    /// back agents that never decided anything while the ones that did are never
+    /// disposed.
+    /// </summary>
+    private IAgent[] _ownedRoster;
     private int _requested;
     private bool _restartPending;
     private volatile bool _stopRequested;
@@ -184,7 +192,8 @@ public sealed class LiveEpisode : ILiveEpisode, IDisposable
 
         _setup = setup;
         _map = ReplaySource.ProjectMap(setup.Map);
-        _stepper = setup.NewStepper();
+        _ownedRoster = setup.Roster;
+        _stepper = NewStepperOver(_ownedRoster);
         _frames.Add(StartFrame(_stepper, setup));
         _status = LiveStepperStatus.Running;
 
@@ -403,10 +412,18 @@ public sealed class LiveEpisode : ILiveEpisode, IDisposable
         }
 
         _disposed = true;
-        Stop();
-        Join();
 
-        foreach (var agent in _setup.Roster)
+        // The join decides whether disposal happens at all. An agent that owns an
+        // external resource owns a child process, and disposing it while a decide of
+        // that agent may still be running would terminate that process mid-decision.
+        // A stepper that will not join is left alone: it is a background thread and
+        // the process is about to end.
+        if (!Stop())
+        {
+            return;
+        }
+
+        foreach (var agent in _ownedRoster)
         {
             if (agent is IDisposable disposable)
             {
@@ -427,6 +444,13 @@ public sealed class LiveEpisode : ILiveEpisode, IDisposable
             }
         }
     }
+
+    /// <summary>
+    /// A stepper over exactly these agents, so the episode and the stepper name the
+    /// same instances.
+    /// </summary>
+    private ScenarioStepper NewStepperOver(IAgent[] roster) =>
+        new(_setup.Map, _setup.Config, roster, _setup.MaxSteps, _setup.Rules, recordPerceptions: _setup.RecordsPerceptions);
 
     /// <summary>
     /// The stepper's own loop: wait for one request, run one tick, project it.
@@ -454,7 +478,8 @@ public sealed class LiveEpisode : ILiveEpisode, IDisposable
                     // Reached only between turns, so nothing is deciding.
                     _restartPending = false;
                     _requested = 0;
-                    _stepper = _setup.NewStepper();
+                    _ownedRoster = _setup.Roster;
+                    _stepper = NewStepperOver(_ownedRoster);
                     _frames.Clear();
                     _frames.Add(StartFrame(_stepper, _setup));
                     _finishedReason = null;

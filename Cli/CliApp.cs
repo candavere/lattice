@@ -458,24 +458,58 @@ public static class CliApp
     /// </summary>
     private static LiveEpisodeSetup BuildLiveSetup(string[] args)
     {
+        // --quiet is a boolean switch, exactly as it is for the batch command: it is
+        // stripped before the key/value parser so it never demands a value. A live
+        // viewer has no dashboard and no progress line to suppress, so accepting it
+        // and doing nothing is the whole of its meaning here.
+        args = args.Where(argument => argument != "--quiet").ToArray();
+
         var (flags, positionals) = ParseFlags(
             args,
             "--seed",
             "--steps",
             "--agent",
             "--scenario",
-            "--rules");
+            "--rules",
+            "--out");
         GuardNoPositionals(positionals);
 
         if (flags.ContainsKey("--out"))
         {
-            throw new UsageError("--out cannot be used with 'tui simulate': a live run records nothing to a file.");
+            throw new UsageError(
+                "--out cannot be used with 'tui simulate': a live run records nothing to a file.");
         }
 
         var seed = ParseULong(Require(flags, "--seed"), "--seed");
         var steps = flags.TryGetValue("--steps", out var stepsText)
             ? ParsePositiveInt(stepsText, "--steps")
             : DefaultSimulationSteps;
+
+        // A --scenario value is EITHER a path to a descriptor file or a built-in
+        // name — never both, and never guessed between. The same test the batch
+        // command uses: a path separator, not a case-insensitive name match.
+        if (flags.TryGetValue("--scenario", out var scenarioText) && LooksLikePath(scenarioText))
+        {
+            if (flags.ContainsKey("--agent"))
+            {
+                throw new UsageError(
+                    "--agent cannot be used with a scenario file: the roster is declared by the descriptor's 'Slots'.");
+            }
+
+            if (flags.ContainsKey("--rules"))
+            {
+                throw new UsageError(
+                    "--rules cannot be used with a scenario file: the descriptor owns its topology.");
+            }
+
+            if (flags.ContainsKey("--steps"))
+            {
+                throw new UsageError(
+                    "--steps cannot be combined with a scenario file: the descriptor declares 'Simulation.StepLimit'.");
+            }
+
+            return LiveEpisodeSetup.FromDescriptorFile(scenarioText, seed);
+        }
 
         var scenario = flags.TryGetValue("--scenario", out var namedText)
             ? namedText.ToLowerInvariant()
@@ -486,7 +520,7 @@ public static class CliApp
             if (scenario != InfiltrationScenario.ScenarioName)
             {
                 throw new UsageError(
-                    $"invalid --scenario '{namedText}' (expected 'infiltration').");
+                    $"invalid --scenario '{namedText}' (expected 'infiltration' or a path to a scenario file).");
             }
 
             if (flags.ContainsKey("--agent"))
@@ -519,7 +553,7 @@ public static class CliApp
     /// usage line is a diagnosis, not a manual.
     /// </summary>
     private static void WriteTuiUsage(TextWriter sink) =>
-        sink.WriteLine("usage: lattice tui replay <trajectory.jsonl> [--ascii] | lattice tui simulate --seed <n> [--steps <n>] [--agent <a>] [--scenario infiltration] [--rules <f>] [--ascii]");
+        sink.WriteLine("usage: lattice tui replay <trajectory.jsonl> [--ascii] | lattice tui simulate --seed <n> [--steps <n>] [--agent <a>] [--scenario <infiltration|file>] [--rules <f>] [--ascii]");
 
     private static bool IsKnownCommand(string command) =>
         command is "generate" or "simulate" or "render" or "analyze"
@@ -825,7 +859,7 @@ public static class CliApp
     /// decision-time perceptions, which is all-or-nothing by the step contract
     /// and is therefore a property of the roster rather than a per-slot choice.
     /// </summary>
-    private static IAgent[] BuildRoster(
+    internal static IAgent[] BuildRoster(
         ScenarioDescriptor descriptor,
         SimulationConfig config,
         ulong seed,

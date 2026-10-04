@@ -109,6 +109,35 @@ public sealed record LiveEpisodeSetup(
             DynamicMapRuleSet.None);
     }
 
+    /// <summary>
+    /// The episode a declarative scenario descriptor declares, built from the same
+    /// descriptor, the same roster construction and the same config the batch
+    /// <c>simulate</c> path builds for the same file — the roster builder is
+    /// literally the batch command's, not a second copy of it.
+    /// </summary>
+    public static LiveEpisodeSetup FromDescriptorFile(string path, ulong seed)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(path);
+
+        var (descriptor, _) = ScenarioLoader.LoadFile(path);
+        var config = new SimulationConfig(
+            descriptor.AgentCount,
+            descriptor.StepLimit,
+            TransitSpeed: descriptor.TransitSpeed);
+        var roster = CliApp.BuildRoster(descriptor, config, seed, out _);
+        var map = descriptor.BuildMap(seed);
+
+        return new LiveEpisodeSetup(
+            map,
+            config,
+            () => CliApp.BuildRoster(descriptor, config, seed, out _),
+            descriptor.StepLimit,
+            seed,
+            descriptor.Id,
+            descriptor.Slots.Select(slot => slot.Role ?? slot.Policy).ToArray(),
+            DynamicMapRuleSet.None);
+    }
+
     /// <summary>A stepper over this episode, with nothing run yet.</summary>
     public ScenarioStepper NewStepper() =>
         new(Map, Config, Roster, MaxSteps, Rules, recordPerceptions: RecordsPerceptions);

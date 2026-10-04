@@ -63,10 +63,19 @@ public static class Glyphs
     /// <summary>A small hollow square, used for an open edge.</summary>
     public const char OpenMark = '▫';
 
-    /// <summary>A filled diamond, used for a selected agent.</summary>
+    /// <summary>A filled diamond, used for an agent at rest.</summary>
     public const char FilledDiamond = '◆';
 
-    /// <summary>A hollow diamond, used for an unselected agent.</summary>
+    /// <summary>A hollow circle, used for a resource the recording does not claim.</summary>
+    public const char HollowCircle = '○';
+
+    /// <summary>A filled circle, used for a resource the recording claims.</summary>
+    public const char FilledCircle = '●';
+
+    /// <summary>A full crossing, used for an edge that runs equally on both axes.</summary>
+    public const char Cross = '┼';
+
+    /// <summary>A hollow diamond, used for an agent in transit.</summary>
     public const char HollowDiamond = '◇';
 
     /// <summary>A left-pointing triangle, used for an inbound edge.</summary>

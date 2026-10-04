@@ -348,7 +348,7 @@ public static class CliApp
             // malformed file is rejected here rather than by the viewer.
             var document = ReplaySource.ReadFile(tokens[0]);
 
-            using var keys = new KeyQueue(Console.In);
+            using var keys = new KeyQueue(ConsoleKeyReader.FromConsole());
             return TuiHost.Run(new TuiHostRequest(
                 document,
                 stdout,

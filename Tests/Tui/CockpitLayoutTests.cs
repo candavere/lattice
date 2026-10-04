@@ -86,6 +86,15 @@ public class CockpitLayoutTests
     }
 
     [Fact]
+    public void TheScoreboardNamesItsColumns()
+    {
+        var header = Rows(Render(Cockpit, 3)).Single(row => row.Contains("role", StringComparison.Ordinal));
+
+        Assert.Contains("zone", header, StringComparison.Ordinal);
+        Assert.Contains("score", header, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TheEventLogShowsTheRecordedActionsOfTheTickOnShow()
     {
         var rows = Rows(Render(Cockpit, 3));
@@ -227,6 +236,19 @@ public class CockpitLayoutTests
     }
 
     [Fact]
+    public void APaneRowLongerThanItsPaneStaysInsideThePane()
+    {
+        // A recorded action list is as long as it is and a pane is thirty columns
+        // wide. Without a cut the row is written over the pane's border and over
+        // the screen's own frame — invisible in the text and obvious on screen.
+        var cells = Render(Cockpit, 3, Document(new string('m', 200)));
+
+        Assert.Equal('│', cells[99, 15].Glyph);
+        Assert.Equal('│', cells[99, 23].Glyph);
+        Assert.All(Rows(cells), row => Assert.True(row.Length <= Cockpit.Width));
+    }
+
+    [Fact]
     public void EveryCockpitIsExactlyAsBigAsTheTerminalAndNothingIsDrawnOutsideIt()
     {
         foreach (var size in new[] { Cockpit, new PaneSize(100, 30), new PaneSize(120, 40), new PaneSize(80, 25) })
@@ -254,7 +276,7 @@ public class CockpitLayoutTests
             Phase: 0.0,
             Playback: new PlaybackState(IsPaused: true, StepsPerSecond: 4.0)));
 
-    private static ReplayDocument Document()
+    private static ReplayDocument Document(string? actions = null)
     {
         var frames = new List<ReplayFrame>();
         for (var tick = 0; tick <= 6; tick++)
@@ -268,7 +290,7 @@ public class CockpitLayoutTests
                     new WorldAgent(1, 1, tick / 2, tick == 2 ? new WorldTransit(1, 2, 1, 2) : null),
                 },
                 tick == 0 ? Array.Empty<int>() : new[] { 0 },
-                tick == 0 ? null : "agent0: Move(1); agent1: Collect(0)",
+                tick == 0 ? null : actions ?? "agent0: Move(1); agent1: Collect(0)",
                 stateDigest: tick == 4 ? "0000000000ff" + new string('0', 52) : null,
                 isTerminal: tick == 6,
                 terminalReason: tick == 6 ? "tick-limit" : null,

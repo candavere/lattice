@@ -90,25 +90,33 @@ public interface IKeySource : IDisposable
 /// goes with it. <see cref="Completion"/> is what a test waits on, which is how the
 /// reading half is asserted without sleeping.
 /// </para>
+/// <para>
+/// The producer is a function rather than a reader so the queue can be driven
+/// either from a real terminal — <see cref="ConsoleKeyReader.FromConsole"/>, which
+/// is what a run uses — or from a fixed sequence in a test. Nothing else about the
+/// queue differs between the two.
+/// </para>
 /// </remarks>
 public sealed class KeyQueue : IKeySource
 {
     private readonly BlockingCollection<TuiKey> _queue = new();
     private readonly ManualResetEventSlim _completion = new(false);
-    private readonly Thread _reader;
     private bool _disposed;
 
-    /// <summary>Reads from <paramref name="input"/> on its own thread.</summary>
-    public KeyQueue(TextReader input)
+    /// <summary>
+    /// Reads through <paramref name="readOne"/> on a thread of its own. The
+    /// producer returns <c>null</c> at end of input, which is what ends the queue.
+    /// </summary>
+    public KeyQueue(Func<TuiKey?> readOne)
     {
-        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(readOne);
 
-        _reader = new Thread(() => Pump(input))
+        var reader = new Thread(() => Pump(readOne))
         {
             IsBackground = true,
             Name = "lattice-tui-keys",
         };
-        _reader.Start();
+        reader.Start();
     }
 
     /// <summary>
@@ -118,7 +126,7 @@ public sealed class KeyQueue : IKeySource
     /// </summary>
     public WaitHandle Completion => _completion.WaitHandle;
 
-    /// <summary>Waits for one key, decoding escape sequences as it goes.</summary>
+    /// <summary>Waits for one key.</summary>
     public KeyWait Wait(TimeSpan timeout, out TuiKey key)
     {
         var milliseconds = timeout >= TimeSpan.FromMilliseconds(int.MaxValue)
@@ -147,14 +155,20 @@ public sealed class KeyQueue : IKeySource
         _completion.Dispose();
     }
 
-    private void Pump(TextReader input)
+    private void Pump(Func<TuiKey?> readOne)
     {
         try
         {
-            while (ReadOne(input, out var key))
+            while (readOne() is { } key)
             {
                 _queue.Add(key);
             }
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or IOException)
+        {
+            // A reader that cannot read — a closed stream, a host with no console —
+            // ends the queue rather than taking the process down on a thread nobody
+            // is watching.
         }
         finally
         {
@@ -162,82 +176,68 @@ public sealed class KeyQueue : IKeySource
             _completion.Set();
         }
     }
+}
+
+/// <summary>
+/// The production key producer: the console's own key reader, which puts the
+/// terminal into the mode a key-at-a-time program needs.
+/// </summary>
+/// <remarks>
+/// Reading the console's keys rather than its characters is what makes single
+/// keystrokes arrive at all. A terminal in its ordinary line mode hands a reader
+/// nothing until a newline is typed, so a viewer whose controls are single
+/// characters would wait for return after every one of them. The console's reader
+/// also decodes the escape sequences the navigation keys arrive as, which is why
+/// this type maps a reported key rather than parsing bytes.
+/// </remarks>
+public static class ConsoleKeyReader
+{
+    /// <summary>The character a terminal sends for Ctrl-C.</summary>
+    private const char ControlC = '\u0003';
 
     /// <summary>
-    /// One key from the reader, or false at end of input. Escape sequences are
-    /// decoded here rather than in the host, so the host sees a key and not a
-    /// terminal's wire format.
+    /// A producer over the process's own console. End of input — which is what a
+    /// host treats as "nothing more will arrive" — is reported when the console
+    /// cannot produce keys at all, as it cannot when standard input is redirected.
     /// </summary>
-    private static bool ReadOne(TextReader input, out TuiKey key)
+    public static Func<TuiKey?> FromConsole()
     {
-        var read = input.Read();
-        if (read < 0)
+        return () =>
         {
-            key = default;
-            return false;
-        }
-
-        var glyph = (char)read;
-        if (glyph == '\u0003')
-        {
-            key = new TuiKey(TuiKeyKind.Interrupt);
-            return true;
-        }
-
-        if (glyph != '\u001b')
-        {
-            key = new TuiKey(TuiKeyKind.Character, glyph);
-            return true;
-        }
-
-        // ESC on its own is a key too: a reader who pressed it meant something, and
-        // swallowing it makes an unbound key indistinguishable from a hung reader.
-        var bracket = input.Read();
-        if (bracket < 0 || ((char)bracket is not ('[' or 'O')))
-        {
-            key = new TuiKey(TuiKeyKind.Character, '\u001b');
-            return true;
-        }
-
-        var code = input.Read();
-        if (code < 0)
-        {
-            key = new TuiKey(TuiKeyKind.Character, '\u001b');
-            return true;
-        }
-
-        var final = (char)code;
-        if (final is < '0' or > '9')
-        {
-            key = FromLetter(final);
-            return true;
-        }
-
-        // The numeric form, ESC [ <n> ~ , which is how most terminals send the
-        // navigation keys that have no letter of their own. The terminator is read
-        // so the next key is read from the right place.
-        input.Read();
-        key = FromDigit(final);
-        return true;
+            try
+            {
+                return Map(Console.ReadKey(intercept: true));
+            }
+            catch (Exception exception) when (exception is InvalidOperationException or IOException)
+            {
+                return null;
+            }
+        };
     }
 
-    private static TuiKey FromLetter(char final) => final switch
+    /// <summary>
+    /// One reported key as this library names it. A named key keeps its identity;
+    /// anything else arrives as the character it typed, which is how the space bar
+    /// and the letters reach a host without a table of key codes.
+    /// </summary>
+    public static TuiKey Map(ConsoleKeyInfo key)
     {
-        'A' => new TuiKey(TuiKeyKind.Up),
-        'B' => new TuiKey(TuiKeyKind.Down),
-        'C' => new TuiKey(TuiKeyKind.Right),
-        'D' => new TuiKey(TuiKeyKind.Left),
-        'H' => new TuiKey(TuiKeyKind.Home),
-        'F' => new TuiKey(TuiKeyKind.End),
-        _ => new TuiKey(TuiKeyKind.Character, '\u001b'),
-    };
+        if (key.KeyChar == ControlC)
+        {
+            return new TuiKey(TuiKeyKind.Interrupt);
+        }
 
-    private static TuiKey FromDigit(char digit) => digit switch
-    {
-        '1' or '7' => new TuiKey(TuiKeyKind.Home),
-        '4' or '8' => new TuiKey(TuiKeyKind.End),
-        '5' => new TuiKey(TuiKeyKind.PageUp),
-        '6' => new TuiKey(TuiKeyKind.PageDown),
-        _ => new TuiKey(TuiKeyKind.Character, '\u001b'),
-    };
+        return key.Key switch
+        {
+            ConsoleKey.LeftArrow => new TuiKey(TuiKeyKind.Left),
+            ConsoleKey.RightArrow => new TuiKey(TuiKeyKind.Right),
+            ConsoleKey.UpArrow => new TuiKey(TuiKeyKind.Up),
+            ConsoleKey.DownArrow => new TuiKey(TuiKeyKind.Down),
+            ConsoleKey.Home => new TuiKey(TuiKeyKind.Home),
+            ConsoleKey.End => new TuiKey(TuiKeyKind.End),
+            ConsoleKey.PageUp => new TuiKey(TuiKeyKind.PageUp),
+            ConsoleKey.PageDown => new TuiKey(TuiKeyKind.PageDown),
+            _ => new TuiKey(TuiKeyKind.Character, key.KeyChar),
+        };
+    }
 }

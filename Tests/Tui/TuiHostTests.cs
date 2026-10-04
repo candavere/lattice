@@ -129,6 +129,19 @@ public class TuiHostTests
     }
 
     [Fact]
+    public void AQuitKeyEndsTheRunEvenWhenInputKeepsGoing()
+    {
+        // The reading half of a real terminal never reports end of input: it blocks
+        // on the next key for as long as the reader sits there. So the quit key
+        // itself has to end the run — a loop that waits for the input to end hangs
+        // on a terminal that is behaving exactly as intended.
+        var surface = new RecordingSurface();
+
+        Assert.Equal(0, TuiHost.Run(Request(surface, new EndlessKeys("q"))).ExitCode);
+        Assert.Equal("restore", surface.Events[^1]);
+    }
+
+    [Fact]
     public void AnInterruptQuitsAndStillRestoresTheTerminal()
     {
         var surface = new RecordingSurface();
@@ -266,6 +279,34 @@ public class TuiHostTests
 
             key = default;
             return KeyWait.Closed;
+        }
+
+        public void Dispose()
+        {
+        }
+    }
+
+    /// <summary>
+    /// Keys a test hands the host one at a time and then, unlike a real terminal,
+    /// never again: every wait after the last one times out.
+    /// </summary>
+    private sealed class EndlessKeys : IKeySource
+    {
+        private readonly Queue<TuiKey> _keys;
+
+        public EndlessKeys(params string[] keys) => _keys = new Queue<TuiKey>(
+            keys.Select(key => new TuiKey(TuiKeyKind.Character, key[0])));
+
+        public KeyWait Wait(TimeSpan timeout, out TuiKey key)
+        {
+            if (_keys.Count > 0)
+            {
+                key = _keys.Dequeue();
+                return KeyWait.Key;
+            }
+
+            key = default;
+            return KeyWait.TimedOut;
         }
 
         public void Dispose()

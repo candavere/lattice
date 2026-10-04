@@ -70,10 +70,19 @@ public class ReplayPlaybackTests
         var playback = new ReplayPlayback(Document());
         playback.TogglePause();
 
-        Assert.True(playback.Advance(TimeSpan.FromMinutes(1)));
-
+        // Six ticks at four steps a second lands on the last frame without having
+        // noticed yet that there is nowhere further to go.
+        Assert.True(playback.Advance(TimeSpan.FromSeconds(1.5)));
         Assert.Equal(playback.Document.LastIndex, playback.Index);
+        Assert.False(playback.IsPaused);
+
+        // The next tick finds the end, stops, and reports that it did: the pane that
+        // says whether the replay is running has to hear about the stop, or it goes
+        // on saying "playing" over the last frame for ever.
+        Assert.True(playback.Advance(TimeSpan.FromMilliseconds(250)));
         Assert.True(playback.IsPaused);
+
+        // And then nothing changes any more.
         Assert.False(playback.Advance(TimeSpan.FromMinutes(1)));
     }
 

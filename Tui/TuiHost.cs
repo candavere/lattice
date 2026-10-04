@@ -243,6 +243,17 @@ public static class TuiHost
             var wait = frameInterval - (request.Clock.Now - lastTickAt);
             if (wait > TimeSpan.Zero && request.Keys.Wait(wait, out var key) == KeyWait.Key)
             {
+                // The quit key ends the run here rather than being left to the input
+                // running out: a real terminal's reader blocks on the next key for as
+                // long as the reader sits there, so waiting for an end of input that
+                // never comes is how a viewer hangs on a terminal that is working
+                // exactly as intended.
+                if (key.IsQuit)
+                {
+                    quit = true;
+                    continue;
+                }
+
                 if (Apply(playback, key))
                 {
                     written = Compose(request, playback, size, glyphs, fill, written, session);
@@ -340,11 +351,6 @@ public static class TuiHost
     /// </summary>
     private static bool Apply(ReplayPlayback playback, TuiKey key)
     {
-        if (key.IsQuit)
-        {
-            return false;
-        }
-
         var before = playback.Index;
         var wasPaused = playback.IsPaused;
         var speed = playback.StepsPerSecond;

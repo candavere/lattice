@@ -4,86 +4,130 @@ using Xunit;
 namespace Lattice.Tests.Tui;
 
 /// <summary>
-/// The reading half of the input path: characters, the escape sequences terminals
-/// send for the navigation keys, and end of input. Driven through the queue's own
-/// completion signal, so nothing here waits for a thread to be scheduled.
+/// The input path: what the queue hands a host, in order, and how it reports the
+/// end of its input. The queue is driven through a scripted producer and through
+/// the console's own key mapping, so nothing here needs a terminal, a timer or a
+/// thread to be scheduled before it can pass.
 /// </summary>
 public class KeyReaderTests
 {
+    /// <summary>Long enough that a loaded machine does not lose the race, short enough to fail.</summary>
+    private static readonly TimeSpan Generous = TimeSpan.FromSeconds(30);
+
     [Fact]
-    public void CharactersArrowsAndTheNumericNavigationFormAllArriveAsKeys()
+    public void EveryKeyIsHandedOverInTheOrderItWasRead()
     {
-        using var queue = new KeyQueue(new StringReader("n \u001b[C\u001b[D\u001b[A\u001b[B\u001b[H\u001b[F\u001b[5~\u001b[6~"));
+        var scripted = new[] { Key('n'), Key(' '), Key(TuiKeyKind.Right), Key(TuiKeyKind.End) };
+        using var queue = new KeyQueue(Producer(scripted));
 
         Assert.True(queue.Completion.WaitOne(Generous));
 
-        Assert.Equal(
-            new[]
-            {
-                new TuiKey(TuiKeyKind.Character, 'n'),
-                new TuiKey(TuiKeyKind.Character, ' '),
-                new TuiKey(TuiKeyKind.Right),
-                new TuiKey(TuiKeyKind.Left),
-                new TuiKey(TuiKeyKind.Up),
-                new TuiKey(TuiKeyKind.Down),
-                new TuiKey(TuiKeyKind.Home),
-                new TuiKey(TuiKeyKind.End),
-                new TuiKey(TuiKeyKind.PageUp),
-                new TuiKey(TuiKeyKind.PageDown),
-            },
-            Drain(queue));
+        Assert.Equal(scripted, Drain(queue));
     }
 
     [Fact]
-    public void CtrlCArrivesAsAnInterruptRatherThanAsACharacter()
+    public void AnEmptyProducerReportsEndOfInput()
     {
-        using var queue = new KeyQueue(new StringReader("x\u0003"));
-
-        Assert.True(queue.Completion.WaitOne(Generous));
-
-        var keys = Drain(queue);
-        Assert.Equal(new TuiKey(TuiKeyKind.Character, 'x'), keys[0]);
-        Assert.Equal(new TuiKey(TuiKeyKind.Interrupt), keys[1]);
-        Assert.True(keys[1].IsQuit);
-        Assert.False(keys[0].IsQuit);
-    }
-
-    [Fact]
-    public void ALoneEscapeIsAKeyRatherThanAHalfReadSequence()
-    {
-        using var queue = new KeyQueue(new StringReader("\u001b"));
-
-        Assert.True(queue.Completion.WaitOne(Generous));
-
-        Assert.Equal(new[] { new TuiKey(TuiKeyKind.Character, '\u001b') }, Drain(queue));
-    }
-
-    [Fact]
-    public void AnOpenReaderWithNothingQueuedTimesOutAndThenReportsEndOfInput()
-    {
-        var reader = new BlockingReader();
-        using var queue = new KeyQueue(reader);
-
-        Assert.Equal(KeyWait.TimedOut, queue.Wait(TimeSpan.FromMilliseconds(20), out _));
-
-        reader.Complete();
-        Assert.True(queue.Completion.WaitOne(Generous));
-
-        Assert.Equal(KeyWait.Closed, queue.Wait(TimeSpan.FromMilliseconds(20), out _));
-    }
-
-    [Fact]
-    public void AnEmptyReaderReportsEndOfInputImmediately()
-    {
-        using var queue = new KeyQueue(new StringReader(string.Empty));
+        using var queue = new KeyQueue(Producer([]));
 
         Assert.True(queue.Completion.WaitOne(Generous));
 
         Assert.Equal(KeyWait.Closed, queue.Wait(TimeSpan.Zero, out _));
     }
 
-    /// <summary>Long enough that a loaded machine does not lose the race, short enough to fail.</summary>
-    private static readonly TimeSpan Generous = TimeSpan.FromSeconds(30);
+    [Fact]
+    public void AProducerThatHasNotFinishedReportsATimeoutRatherThanEndOfInput()
+    {
+        var release = new ManualResetEventSlim(false);
+        using var queue = new KeyQueue(() =>
+        {
+            release.Wait();
+            return null;
+        });
+
+        Assert.Equal(KeyWait.TimedOut, queue.Wait(TimeSpan.FromMilliseconds(20), out _));
+
+        release.Set();
+        Assert.True(queue.Completion.WaitOne(Generous));
+        Assert.Equal(KeyWait.Closed, queue.Wait(TimeSpan.FromMilliseconds(20), out _));
+    }
+
+    [Fact]
+    public void AProducerThatThrowsEndsTheQueueRatherThanTakingTheProcessDown()
+    {
+        using var queue = new KeyQueue(() => throw new IOException("the terminal went away"));
+
+        Assert.True(queue.Completion.WaitOne(Generous));
+
+        Assert.Equal(KeyWait.Closed, queue.Wait(TimeSpan.Zero, out _));
+    }
+
+    [Fact]
+    public void TheConsoleKeyNamesArriveAsTheKindsAHostBinds()
+    {
+        var cases = new (ConsoleKey Key, TuiKeyKind Expected)[]
+        {
+            (ConsoleKey.LeftArrow, TuiKeyKind.Left),
+            (ConsoleKey.RightArrow, TuiKeyKind.Right),
+            (ConsoleKey.UpArrow, TuiKeyKind.Up),
+            (ConsoleKey.DownArrow, TuiKeyKind.Down),
+            (ConsoleKey.Home, TuiKeyKind.Home),
+            (ConsoleKey.End, TuiKeyKind.End),
+            (ConsoleKey.PageUp, TuiKeyKind.PageUp),
+            (ConsoleKey.PageDown, TuiKeyKind.PageDown),
+        };
+
+        foreach (var (key, expected) in cases)
+        {
+            var mapped = ConsoleKeyReader.Map(new ConsoleKeyInfo(
+                '\0',
+                key,
+                shift: false,
+                alt: false,
+                control: false));
+
+            Assert.Equal(expected, mapped.Kind);
+        }
+    }
+
+    [Fact]
+    public void CharactersAndTheInterruptKeepTheirIdentityThroughTheMapping()
+    {
+        Assert.Equal(
+            new TuiKey(TuiKeyKind.Character, 'q'),
+            ConsoleKeyReader.Map(new ConsoleKeyInfo('q', ConsoleKey.Q, false, false, false)));
+
+        Assert.Equal(
+            new TuiKey(TuiKeyKind.Character, ' '),
+            ConsoleKeyReader.Map(new ConsoleKeyInfo(' ', ConsoleKey.Spacebar, false, false, false)));
+
+        var interrupt = ConsoleKeyReader.Map(
+            new ConsoleKeyInfo('\u0003', ConsoleKey.C, false, false, true));
+        Assert.Equal(new TuiKey(TuiKeyKind.Interrupt), interrupt);
+        Assert.True(interrupt.IsQuit);
+    }
+
+    [Fact]
+    public void OnlyTheTwoQuitKeysAreQuitKeys()
+    {
+        Assert.True(new TuiKey(TuiKeyKind.Character, 'q').IsQuit);
+        Assert.True(new TuiKey(TuiKeyKind.Character, 'Q').IsQuit);
+        Assert.True(new TuiKey(TuiKeyKind.Interrupt).IsQuit);
+        Assert.False(new TuiKey(TuiKeyKind.Character, 'n').IsQuit);
+        Assert.False(new TuiKey(TuiKeyKind.Left).IsQuit);
+        Assert.False(new TuiKey(TuiKeyKind.Character, ' ').IsQuit);
+    }
+
+    private static TuiKey Key(char glyph) => new(TuiKeyKind.Character, glyph);
+
+    private static TuiKey Key(TuiKeyKind kind) => new(kind);
+
+    /// <summary>A producer that hands over a fixed sequence and then reports end of input.</summary>
+    private static Func<TuiKey?> Producer(params TuiKey[] keys)
+    {
+        var queue = new Queue<TuiKey>(keys);
+        return () => queue.Count > 0 ? queue.Dequeue() : null;
+    }
 
     private static List<TuiKey> Drain(IKeySource queue)
     {
@@ -94,19 +138,5 @@ public class KeyReaderTests
         }
 
         return keys;
-    }
-
-    /// <summary>A reader that blocks until the test says input has ended.</summary>
-    private sealed class BlockingReader : TextReader
-    {
-        private readonly ManualResetEventSlim _ended = new(false);
-
-        public override int Read()
-        {
-            _ended.Wait();
-            return -1;
-        }
-
-        internal void Complete() => _ended.Set();
     }
 }

@@ -480,6 +480,7 @@ public sealed class ReplayPlayback
         }
 
         var before = _index;
+        var wasPaused = _paused;
         _accumulatedTicks += elapsed.TotalSeconds * StepsPerSecond;
 
         while (_accumulatedTicks >= 1.0)
@@ -496,6 +497,11 @@ public sealed class ReplayPlayback
             _index++;
         }
 
-        return _index != before || !_paused;
+        // The frame on screen changes when the index moved, when the within-frame
+        // phase moved on, or when the cursor stopped at the end of the recording —
+        // that last one is why the pause state is compared rather than assumed: a
+        // pane that says whether the replay is running would otherwise keep saying
+        // "playing" over the last frame.
+        return _index != before || !_paused || wasPaused != _paused;
     }
 }

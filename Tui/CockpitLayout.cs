@@ -224,19 +224,34 @@ public static class CockpitLayout
             var glyph = GlyphModes.Glyph(
                 agent.Transit is null ? Glyphs.FilledDiamond : Glyphs.HollowDiamond,
                 request.Glyphs);
-            var transit = agent.Transit is null
-                ? string.Empty
-                : " ->" + agent.Transit.ToZoneId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            // Where the agent is: the zone it occupies, or the zone it is heading
+            // for while its recorded countdown runs.
+            var where = agent.Transit is null
+                ? Invariant(agent.ZoneId)
+                : "->" + Invariant(agent.Transit.ToZoneId);
 
             rows.Add((
                 string.Create(
                     System.Globalization.CultureInfo.InvariantCulture,
-                    $"{glyph} {agent.Slot}  {role,-14}{agent.ZoneId,3}{transit,3} {agent.Score,4}"),
+                    $"{glyph} {Invariant(agent.Slot),-5}{role,-12}{where,-6}{Invariant(agent.Score),5}"),
                 Theme.AgentSlot(agent.Slot)));
         }
 
         var width = pane.Width - 2;
         var row = pane.Y + 1;
+
+        // The column headings, dimmed: a scoreboard whose columns are only
+        // discoverable by counting is a scoreboard nobody reads.
+        cells.DrawText(
+            pane.X + 1,
+            row++,
+            Fit(
+                string.Create(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    $" {"slot",-5}{"role",-12}{"zone",-6}{"score",5}"),
+                width),
+            new Cell(' ', palette.TextDim, request.PanelFill));
+
         foreach (var (text, accent) in rows)
         {
             if (row >= pane.Y + pane.Height - 1)
@@ -244,7 +259,11 @@ public static class CockpitLayout
                 break;
             }
 
-            cells.DrawText(pane.X + 1, row++, text, new Cell(' ', accent ?? palette.TextPrimary, request.PanelFill));
+            cells.DrawText(
+                pane.X + 1,
+                row++,
+                Fit(text, width),
+                new Cell(' ', accent ?? palette.TextPrimary, request.PanelFill));
         }
 
         var claims = frame.Claims.Count.ToString(System.Globalization.CultureInfo.InvariantCulture);
@@ -265,7 +284,11 @@ public static class CockpitLayout
                 break;
             }
 
-            cells.DrawText(pane.X + 1, row++, fact, new Cell(' ', palette.TextPrimary, request.PanelFill));
+            cells.DrawText(
+                pane.X + 1,
+                row++,
+                Fit(fact, width),
+                new Cell(' ', palette.TextPrimary, request.PanelFill));
         }
     }
 
@@ -288,7 +311,11 @@ public static class CockpitLayout
 
         if (request.FrameIndex == 0)
         {
-            cells.DrawText(pane.X + 1, row, "start of recording", new Cell(' ', palette.TextDim, request.PanelFill));
+            cells.DrawText(
+                pane.X + 1,
+                row,
+                Fit("start of recording", pane.Width - 2),
+                new Cell(' ', palette.TextDim, request.PanelFill));
             row++;
         }
 
@@ -301,7 +328,7 @@ public static class CockpitLayout
                 ? new Cell(' ', Theme.SelectionForeground, Theme.SelectionBackground)
                 : new Cell(' ', palette.TextPrimary, request.PanelFill);
 
-            cells.DrawText(pane.X + 1, row++, line, style);
+            cells.DrawText(pane.X + 1, row++, Fit(line, pane.Width - 2), style);
         }
     }
 
@@ -319,7 +346,7 @@ public static class CockpitLayout
 
         var state = new Cell(' ', palette.TextPrimary, request.PanelFill);
         var label = $"tick {Invariant(tick)}/{Invariant(steps)}  ";
-        cells.DrawText(pane.X + 1, row, label, state);
+        cells.DrawText(pane.X + 1, row, Fit(label, pane.Width - 2), state);
 
         var stateWord = request.Playback.IsPaused ? "paused" : "playing";
         var speed = request.Playback.StepsPerSecond.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
@@ -350,7 +377,11 @@ public static class CockpitLayout
             }
         }
 
-        cells.DrawText(pane.X + 1 + label.Length + Math.Max(track, 0), row, suffix, state);
+        cells.DrawText(
+            pane.X + 1 + label.Length + Math.Max(track, 0),
+            row,
+            Fit(suffix, Math.Max(0, pane.Width - 2 - label.Length - Math.Max(track, 0))),
+            state);
     }
 
     /// <summary>
@@ -386,7 +417,7 @@ public static class CockpitLayout
         cells.DrawText(
             pane.X + 2,
             pane.Y,
-            PaneTitle(title),
+            Fit(PaneTitle(title), Math.Max(0, pane.Width - 4)),
             new Cell(' ', palette.Accent, request.PanelFill));
     }
 
@@ -405,6 +436,19 @@ public static class CockpitLayout
             }
         }
     }
+
+    /// <summary>
+    /// A string cut to what a pane can actually hold.
+    /// <para>
+    /// <see cref="CellBuffer.DrawText"/> clips at the edge of the buffer, not at
+    /// the edge of a pane, so a row longer than its pane would be written straight
+    /// over the pane's border and the screen's own frame — a long recorded action
+    /// list does exactly that. Cutting the string here is what keeps a pane's
+    /// contents inside the pane.
+    /// </para>
+    /// </summary>
+    private static string Fit(string text, int width) =>
+        text.Length <= width ? text : text[..Math.Max(0, width)];
 
     private static BorderGlyphs Border(GlyphMode glyphs) =>
         glyphs == GlyphMode.Unicode ? BorderGlyphs.Rounded : BorderGlyphs.Ascii;

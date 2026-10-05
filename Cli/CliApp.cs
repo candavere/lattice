@@ -241,6 +241,115 @@ public static class CliApp
     /// <param name="stderr">Where diagnostics and the lifecycle lines go.</param>
     /// <param name="terminal">What the CLI believes about the attached terminal.</param>
     /// <param name="console">The console <c>lattice tui</c> is composed from.</param>
+    /// <summary>
+    /// The overload that also names the terminal's capabilities, so the bare
+    /// invocation can be decided from them.
+    /// <para>
+    /// <b>This is the only path that opens the Launchpad.</b> A zero-argument run
+    /// reaches a screen only when the caller has said the streams are a terminal's.
+    /// Deciding that from <see cref="Console"/> inside the three-argument overload
+    /// would mean a test — which hands it a <see cref="StringWriter"/> and is itself
+    /// usually run from a developer's terminal — opened a full-screen view and
+    /// blocked. The capabilities are a parameter for that reason: the answer is the
+    /// caller's, not the ambient one's.
+    /// </para>
+    /// </summary>
+    /// <param name="args">The command line.</param>
+    /// <param name="stdout">Where the command's own output goes, byte for byte as before.</param>
+    /// <param name="stderr">Where diagnostics and the lifecycle lines go.</param>
+    /// <param name="terminal">What the CLI believes about the attached terminal.</param>
+    /// <param name="console">The console the screens are composed from.</param>
+    /// <param name="capabilities">What the attached terminal can carry.</param>
+    /// <param name="session">The terminal seam; the guard's by default.</param>
+    /// <param name="clock">How elapsed time is measured on a screen.</param>
+    /// <param name="runner">How a command is started from the Launchpad.</param>
+    /// <param name="onLaunchpad">
+    /// Called once, after the Launchpad has opened, for a caller that wants to know
+    /// it did. Not a hook into the screen itself: the screen's behaviour is asserted
+    /// through <see cref="LaunchpadHost"/>, and this exists so a test can tell an
+    /// opened screen from a usage line without a terminal to draw one on.
+    /// </param>
+    internal static int Run(
+        string[] args,
+        TextWriter stdout,
+        TextWriter stderr,
+        CliTerminal terminal,
+        TuiConsole console,
+        TerminalCapabilities capabilities,
+        ITerminalSessionFactory? session = null,
+        IUiClock? clock = null,
+        ILaunchpadRunner? runner = null,
+        Action? onLaunchpad = null)
+    {
+        if (args.Length == 0)
+        {
+            // The one place a bare invocation can become something other than usage,
+            // and only for a terminal that can carry a screen. Everywhere else the
+            // behaviour is exactly what it was before this screen existed.
+            return CanOpenLaunchpad(capabilities)
+                ? RunLaunchpad(stdout, stderr, capabilities, console, session, clock, runner, onLaunchpad)
+                : NoCommand(stdout, stderr);
+        }
+
+        return Run(args, stdout, stderr, terminal, console);
+    }
+
+    /// <summary>
+    /// What a bare invocation does when no terminal can carry a screen: the usage
+    /// text on the stderr it was handed and the usage status. Nothing else, and
+    /// nothing read from the ambient console — the writers are the caller's, because
+    /// this path is exactly the one a test and a script both arrive at.
+    /// </summary>
+    private static int NoCommand(TextWriter stdout, TextWriter stderr)
+    {
+        WriteUsage(stderr);
+        return UsageError.ExitCode;
+    }
+
+    /// <summary>
+    /// Whether these capabilities can carry the Launchpad: standard input and
+    /// standard output both have to be the terminal, because the screen reads keys
+    /// from one and draws on the other, and a screen that drew into a redirect would
+    /// put escape sequences into whatever the redirect was for.
+    /// </summary>
+    public static bool CanOpenLaunchpad(TerminalCapabilities capabilities) =>
+        !capabilities.InputRedirected && !capabilities.OutputRedirected;
+
+    /// <summary>
+    /// Opens the Launchpad and runs it to the reader's quit. The screen takes the
+    /// process's own writers: a screen that drew anywhere but the real stdout would
+    /// not be the screen a reader sees.
+    /// </summary>
+    private static int RunLaunchpad(
+        TextWriter stdout,
+        TextWriter stderr,
+        TerminalCapabilities capabilities,
+        TuiConsole console,
+        ITerminalSessionFactory? session,
+        IUiClock? clock,
+        ILaunchpadRunner? runner,
+        Action? onLaunchpad)
+    {
+        onLaunchpad?.Invoke();
+
+        var result = LaunchpadHost.Run(new LaunchpadHostRequest(
+            LaunchpadCatalog.Commands,
+            stdout,
+            stderr,
+            capabilities,
+            console,
+            session ?? new TerminalGuardSessionFactory(),
+            clock ?? new MonotonicClock(),
+            runner ?? new CliAppLaunchpadRunner()));
+
+        if (result.Refusal is not null)
+        {
+            stderr.WriteLine(result.Refusal);
+        }
+
+        return result.ExitCode;
+    }
+
     internal static int Run(string[] args, TextWriter stdout, TextWriter stderr, CliTerminal terminal, TuiConsole console)
     {
         if (args.Length == 0)
@@ -2281,6 +2390,11 @@ public static class CliApp
         sink.WriteLine("and resource contention.");
         sink.WriteLine();
         sink.WriteLine("usage: lattice <command> [options]");
+        sink.WriteLine();
+        sink.WriteLine("  With no command, and standard input and standard output both a terminal,");
+        sink.WriteLine("  lattice opens the Launchpad: a screen where each command below can be");
+        sink.WriteLine("  configured from its own flags and started. On a redirected stream, or with");
+        sink.WriteLine("  any argument at all, the behaviour is exactly as described here.");
         sink.WriteLine();
         sink.WriteLine("  generate  --seed <ulong> [--min-fairness <0..1>] [--out <file>]");
         sink.WriteLine("            Generate a valid map (JSON) to stdout or file; with --min-fairness,");

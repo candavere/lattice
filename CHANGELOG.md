@@ -6,6 +6,38 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Typing bare `lattice` in a terminal opens the Launchpad: a screen listing all eight
+  commands, with the selected command's real flags as a form, the equivalent
+  `lattice ...` command line shown live underneath, and inline validation that is
+  the CLI parser's own — the same helpers, on the same values, with the same
+  messages. A form with more fields than the pane has rows scrolls and says how many
+  are out of sight; a value longer than its pane is cut to it and marked. Below
+  100x30 the panes stack and the screen states the size it measured.
+- Two key modes, explicit. Navigation: arrows or `j`/`k` move, Tab enters a field,
+  Enter runs, `q` or Esc leaves. Editing: every printable character types into the
+  field, including `q`, `j` and `k`; Backspace, Delete, arrows, Home and End edit;
+  Enter or Tab commits; Esc leaves the field and keeps the text. A navigation
+  shortcut never fires while a field has focus.
+- Replay and `simulate` open the existing cockpit. Every other command leaves the
+  alternate screen, restores the terminal, runs through the same `CliApp.Run` path
+  with the process's own stdout and stderr, and shows its exit status when it
+  finishes; a Ctrl-C during such a command interrupts it normally, because the
+  Ctrl-C-as-input setting is released for the duration of the run and taken again
+  afterwards.
+- Enter, Tab, Backspace, Delete and Escape are now named key kinds rather than
+  arriving as unnamed control characters. What the cockpit does with them is
+  unchanged: it has no field to commit and no text to edit, so each leaves the
+  cursor exactly where it was.
+
+### Changed
+
+- The usage text gained one paragraph saying what a bare `lattice` does. On a
+  terminal it opens the Launchpad; with any argument, or on a redirected stream, it
+  does exactly what it always did, and prints the usage on stderr with the usage
+  status.
+
 ### Fixed
 
 - `lattice tui replay` on a redirected run reported a runtime failure (exit 1)

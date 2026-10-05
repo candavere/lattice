@@ -1,0 +1,25 @@
+╭─LATTICE LAUNCHPAD  8 commands────────────────────────────────────────────────╮
+│╭─ COMMANDS ─────────────────────────────────────────────────────────────────╮│
+││> generate Generate a valid map as JSON.                                    ││
+││  simulate Record an episode as trajectory JSONL.                           ││
+││  render Render a recorded trajectory as ASCII or SVG.                      ││
+││  analyze Report contention and turning points for a trajectory.            ││
+││  replay Re-run a recorded trajectory, or play it in the cockpit.           ││
+││  benchmark Measure the five-case workload matrix.                          ││
+│╰────────────────────────────────────────────────────────────────────────────╯│
+│ terminal is 80x25; the full layout needs 100x30; resize for it               │
+│╭─ generate ─────────────────────────────────────────────────────────────────╮│
+││--seed*         42                                                          ││
+││--min-fairness  (unset)                                                     ││
+││--out           (unset)                                                     ││
+││extra arguments (unset)                                                     ││
+││                                                                            ││
+││                                                                            ││
+││                                                                            ││
+││                                                                            ││
+││                                                                            ││
+││                                                                            ││
+││                                                                            ││
+│─lattice generate --seed 42───────────────────────────────────────────────────│
+│                                                                              │
+╰─tab next field  enter commit  esc leave field  ctrl-c quit───────────────────╯

@@ -152,6 +152,14 @@ public static class CellText
         glyphs == GlyphMode.Unicode ? UnicodeEllipsis.ToString() : AsciiEllipsis;
 
     /// <summary>
+    /// The character a rune that is not one column is replaced with in this
+    /// vocabulary. Exposed so a caller that has to assert a replacement happened —
+    /// a test, or a layout that counts them — reads the same one this type uses
+    /// rather than writing the code point out again.
+    /// </summary>
+    public static char ReplacementFor(GlyphMode glyphs) => Replacement(glyphs);
+
+    /// <summary>
     /// Whether <paramref name="value"/> is one column under this contract. The
     /// named rule, exposed so the choice of marker is a measurement rather than an
     /// assumption, and so a caller can ask the clipper's question directly.

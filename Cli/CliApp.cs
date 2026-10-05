@@ -2184,7 +2184,7 @@ public static class CliApp
     /// touches the filesystem, so each is a <see cref="UsageError"/> and reports
     /// the usage status — the same status an unknown verb gets.
     /// </remarks>
-    private static (Dictionary<string, string> Flags, List<string> Positionals) ParseFlags(
+    internal static (Dictionary<string, string> Flags, List<string> Positionals) ParseFlags(
         string[] args,
         params string[] allowedFlags)
     {
@@ -2224,7 +2224,7 @@ public static class CliApp
         return (flags, positionals);
     }
 
-    private static string Require(Dictionary<string, string> flags, string name)
+    internal static string Require(Dictionary<string, string> flags, string name)
     {
         if (!flags.TryGetValue(name, out var value))
         {
@@ -2234,7 +2234,7 @@ public static class CliApp
         return value;
     }
 
-    private static void GuardNoPositionals(List<string> positionals)
+    internal static void GuardNoPositionals(List<string> positionals)
     {
         if (positionals.Count > 0)
         {
@@ -2242,7 +2242,7 @@ public static class CliApp
         }
     }
 
-    private static ulong ParseULong(string text, string flag)
+    internal static ulong ParseULong(string text, string flag)
     {
         if (!ulong.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var value))
         {
@@ -2252,7 +2252,7 @@ public static class CliApp
         return value;
     }
 
-    private static int ParsePositiveInt(string text, string flag)
+    internal static int ParsePositiveInt(string text, string flag)
     {
         if (!int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var value) || value < 1)
         {
@@ -2262,7 +2262,7 @@ public static class CliApp
         return value;
     }
 
-    private static double ParseFairnessThreshold(string text)
+    internal static double ParseFairnessThreshold(string text)
     {
         if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value)
             || value < 0.0 || value > 1.0)

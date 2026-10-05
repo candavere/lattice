@@ -1,0 +1,30 @@
++-LATTICE LAUNCHPAD  8 commands--------------------------------------------------------------------+
+|+- COMMANDS ---------------------+ +- FORM ------------------------------------------------------+|
+||> generate Generate a valid m...| |--seed*         42???                                        ||
+||  simulate Record an episode ...| |--min-fairness  (unset)                                      ||
+||  render Render a recorded tr...| |--out           (unset)                                      ||
+||  analyze Report contention a...| |extra arguments (unset)                                      ||
+||  replay Re-run a recorded tr...| |flag '--seed' expects an unsigned integer, got '42???'.      ||
+||  benchmark Measure the five-...| |                                                             ||
+||  evaluate Run the paired MCT...| |                                                             ||
+||  validate-scenario Check a s...| |                                                             ||
+||                                | |                                                             ||
+||                                | |                                                             ||
+||                                | |                                                             ||
+||                                | |                                                             ||
+||                                | |                                                             ||
+||                                | |                                                             ||
+||                                | |                                                             ||
+||                                | |                                                             ||
+||                                | |                                                             ||
+||                                | |                                                             ||
+||                                | |                                                             ||
+||                                | |                                                             ||
+||                                | |                                                             ||
+||                                | |                                                             ||
+||                                | |                                                             ||
+||                                | |                                                             ||
+|+- COMMAND --------------------------------------------------------------------------------------+|
+||lattice generate --seed 42???                                                                   ||
+|+------------------------------------------------------------------------------------------------+|
++-tab next field  enter commit  esc leave field  ctrl-c quit---------------------------------------+

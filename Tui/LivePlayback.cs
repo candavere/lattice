@@ -264,9 +264,13 @@ public sealed class LivePlayback : ICockpitCursor
     /// <inheritdoc />
     public bool Apply(TuiKey key)
     {
-        SnapToTheFrontier();
+        // What the frame looked like before anything in this pass touched it, read
+        // before the frontier is snapped: a tick the reader asked for can arrive
+        // between two passes, and moving onto it is a change the host must be told
+        // about or the screen keeps showing the frame before it.
         var before = _index;
         var notice = Notice();
+        SnapToTheFrontier();
         var changed = ApplyCore(key);
 
         // A key can end the episode or throw it away, which moves the frontier
@@ -327,9 +331,13 @@ public sealed class LivePlayback : ICockpitCursor
     /// <inheritdoc />
     public bool Advance(TimeSpan elapsed)
     {
-        SnapToTheFrontier();
+        // Before the snap, for the same reason as in Apply: a frame that arrived since
+        // the last pass moves the view, and a host that is not told moves nothing on
+        // screen. Reading "before" afterwards would report the tick the reader asked
+        // for as no change at all, and the one-tick key would look broken.
         var before = _index;
         var notice = Notice();
+        SnapToTheFrontier();
 
         if (_paused || elapsed <= TimeSpan.Zero)
         {

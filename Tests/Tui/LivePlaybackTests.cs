@@ -342,7 +342,63 @@ public class LivePlaybackTests
         }
     }
 
-    private static TuiKey Character(char glyph) => new(TuiKeyKind.Character, glyph);
+    /// <summary>
+        /// A frame the reader asked for arrives after the pass that asked for it, on the
+        /// stepper's own thread — and the screen has to redraw for it.
+        /// </summary>
+        /// <remarks>
+        /// The other stand-in here answers a request inside the call, so the frame is
+        /// already there when the cursor looks. A real episode is not like that, and the
+        /// difference is invisible to every other test in this file: what the host acts
+        /// on is whether the cursor says it changed, so a cursor that moves the view
+        /// and then reports no change leaves the reader pressing a key that appears to
+        /// do nothing.
+        /// </remarks>
+        [Fact]
+        public void AFrameThatArrivesAfterTheRequestStillTellsTheHostToRedraw()
+        {
+            var episode = new FakeEpisode { Deferred = true };
+            var cursor = new LivePlayback(episode);
+
+            // The reader asks for one tick by name. Nothing has been produced yet, so
+            // there is nothing new to draw and the host is right to write nothing.
+            cursor.Apply(Character('n'));
+            Assert.Equal(1, episode.RequestedTicks);
+            Assert.Equal(0, cursor.Index);
+
+            // The stepper's thread finishes the turn, and only now does the frame exist.
+            episode.Settle();
+            Assert.Equal(1, episode.Frames.Count - 1);
+
+            // The next pass is the one that can show it. It has to say so: this is the
+            // value the host turns into a composed frame.
+            var redraw = cursor.Advance(TimeSpan.FromMilliseconds(150));
+
+            Assert.Equal(1, cursor.Index);
+            Assert.True(redraw, "the cursor moved onto the frame it asked for and reported no change, so nothing was drawn.");
+        }
+
+        [Fact]
+        public void AKeyPressedOnThePassALateFrameArrivesStillTellsTheHostToRedraw()
+        {
+            var episode = new FakeEpisode { Deferred = true };
+            var cursor = new LivePlayback(episode);
+
+            cursor.Apply(Character('n'));
+            episode.Settle();
+
+            // The same late arrival, but the pass that notices it carries a key: the
+            // reader asks for another tick before the screen has shown the first one.
+            // The view has moved and must be redrawn even though the key's own effect
+            // was nothing.
+            var redraw = cursor.Apply(Character('n'));
+
+            Assert.Equal(1, cursor.Index);
+            Assert.Equal(2, episode.RequestedTicks);
+            Assert.True(redraw, "the cursor reached the frame it had asked for and reported no change, so the tick never appeared.");
+        }
+
+        private static TuiKey Character(char glyph) => new(TuiKeyKind.Character, glyph);
 
     /// <summary>
     /// A stepper stand-in: frames it produces on request, a frontier the test
@@ -367,6 +423,9 @@ public class LivePlaybackTests
                 Add(tick, isStart: false);
             }
         }
+
+        /// <summary>Whether a request is answered now or when the stepper's thread gets to it.</summary>
+        internal bool Deferred { get; init; }
 
         /// <summary>How many frames each request produces.</summary>
         internal int TicksPerRequest { get; init; } = 1;
@@ -428,6 +487,16 @@ public class LivePlaybackTests
                 return;
             }
 
+            RequestedTicks += Deferred ? TicksPerRequest : 0;
+
+            if (Deferred)
+            {
+                // Outstanding until the stepper's thread gets to it, as a real request
+                // is: the caller is a different thread and the tick is not ready yet.
+                _outstanding = TicksPerRequest;
+                return;
+            }
+
             for (var i = 0; i < TicksPerRequest; i++)
             {
                 RequestedTicks++;
@@ -451,7 +520,15 @@ public class LivePlaybackTests
         /// <summary>Lets the cursor see whatever the episode has produced.</summary>
         internal void Settle()
         {
+            while (_outstanding > 0)
+            {
+                _outstanding--;
+                Add(++Produced, isStart: false);
+            }
         }
+
+        private int _outstanding;
+        private int Produced;
 
         private void Add(int tick, bool isStart) =>
             _frames.Add(new ReplayFrame(

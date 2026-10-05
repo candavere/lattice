@@ -216,7 +216,7 @@ public static class CliApp
     /// without a real terminal.
     /// </summary>
     /// <remarks>
-    /// The two overloads exist so that the eight existing subcommands keep
+    /// The overloads exist so that the eight existing subcommands keep
     /// their exact stdout bytes and exit codes for every current caller: the
     /// three-argument form resolves the terminal from the writer it was given,
     /// and a <see cref="StringWriter"/> — what the tests and any redirecting
@@ -226,7 +226,22 @@ public static class CliApp
     /// <param name="stdout">Where the command's own output goes, byte for byte as before.</param>
     /// <param name="stderr">Where diagnostics and the lifecycle lines go.</param>
     /// <param name="terminal">What the CLI believes about the attached terminal.</param>
-    public static int Run(string[] args, TextWriter stdout, TextWriter stderr, CliTerminal terminal)
+    public static int Run(string[] args, TextWriter stdout, TextWriter stderr, CliTerminal terminal) =>
+        Run(args, stdout, stderr, terminal, TuiConsole.Default);
+
+    /// <summary>
+    /// The overload that also names the viewer's console, so the interactive
+    /// subcommands can be driven with a setting and a key source a test owns. The
+    /// seam exists for the same reason as the one above: the process-wide console
+    /// input mode cannot be exercised from a test host that has no console, and
+    /// "the run never reached it" is a claim that needs a stand-in to assert.
+    /// </summary>
+    /// <param name="args">The command line.</param>
+    /// <param name="stdout">Where the command's own output goes, byte for byte as before.</param>
+    /// <param name="stderr">Where diagnostics and the lifecycle lines go.</param>
+    /// <param name="terminal">What the CLI believes about the attached terminal.</param>
+    /// <param name="console">The console <c>lattice tui</c> is composed from.</param>
+    internal static int Run(string[] args, TextWriter stdout, TextWriter stderr, CliTerminal terminal, TuiConsole console)
     {
         if (args.Length == 0)
         {
@@ -286,7 +301,7 @@ public static class CliApp
             "benchmark" => lifecycle.Run(() => RunBenchmark(args[1..], stdout, commandErrors)),
             "evaluate" => lifecycle.Run(() => Evaluate(args[1..], stdout, commandErrors, lifecycle)),
             "validate-scenario" => lifecycle.Run(() => ValidateScenario(args[1..], stdout, commandErrors)),
-            "tui" => lifecycle.Run(() => Tui(args[1..], stdout, commandErrors)),
+            "tui" => lifecycle.Run(() => Tui(args[1..], stdout, commandErrors, console)),
             _ => UnknownCommand(args[0], stderr),
         };
     }
@@ -312,7 +327,7 @@ public static class CliApp
     /// reason and the usage status.
     /// </para>
     /// </remarks>
-    private static int Tui(string[] args, TextWriter stdout, TextWriter stderr)
+    private static int Tui(string[] args, TextWriter stdout, TextWriter stderr, TuiConsole console)
     {
         try
         {
@@ -324,7 +339,7 @@ public static class CliApp
 
             if (args.Length > 0 && args[0] == "simulate")
             {
-                return TuiSimulate(rest, ascii, stdout, stderr);
+                return TuiSimulate(rest, ascii, stdout, stderr, console);
             }
 
             if (args.Length == 0 || args[0] != "replay")
@@ -347,21 +362,85 @@ public static class CliApp
             // malformed file is rejected here rather than by the viewer.
             var document = ReplaySource.ReadFile(positionals[0]);
 
-            using var keys = new KeyQueue(ConsoleKeyReader.FromConsole());
-            return TuiHost.Run(new TuiHostRequest(
+            return StartViewer(
                 document,
                 stdout,
                 stderr,
                 CapabilityDetector.Detect(),
                 ascii,
-                new TerminalGuardSessionFactory(),
-                keys,
-                new MonotonicClock())).ExitCode;
+                console,
+                cursor: null).ExitCode;
         }
         catch (Exception ex)
         {
             return Report(ex, stderr);
         }
+    }
+
+    /// <summary>
+    /// The one place an interactive viewer run is started, for both subcommands, in
+    /// the one order that is safe.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The refusal is asked of the host's own predicate before anything is built.
+    /// It cannot be left to <see cref="TuiHost.Run"/>, because the host is handed a
+    /// key source that does not exist yet — and building one is what asks the
+    /// process's console for its input mode. On Windows that ask throws when
+    /// standard input is redirected, which turned a run that should have been
+    /// refused with the usage status into a runtime failure instead.
+    /// </para>
+    /// <para>
+    /// So: refuse, or there is no key source, no reading thread and no console
+    /// property touched at all. After that the key source is built, then the
+    /// Ctrl-C-as-input setting is taken for the run — it is a process-wide setting,
+    /// so the scope that takes it gives the prior value back on every ending, and
+    /// gives it back after the terminal is restored and before the reading thread is
+    /// disposed.
+    /// </para>
+    /// </remarks>
+    /// <param name="document">The replay to show.</param>
+    /// <param name="stdout">Where frames go.</param>
+    /// <param name="stderr">Where a refusal goes.</param>
+    /// <param name="capabilities">What the terminal can do, resolved once.</param>
+    /// <param name="ascii">Whether the caller asked for ASCII glyphs.</param>
+    /// <param name="console">The console the run is composed from.</param>
+    /// <param name="cursor">The live cursor, or null to play the recording.</param>
+    /// <param name="session">The terminal seam; the guard's by default.</param>
+    /// <param name="clock">How elapsed time is measured.</param>
+    internal static TuiRunResult StartViewer(
+        ReplayDocument document,
+        TextWriter stdout,
+        TextWriter stderr,
+        TerminalCapabilities capabilities,
+        bool ascii,
+        TuiConsole console,
+        ICockpitCursor? cursor,
+        ITerminalSessionFactory? session = null,
+        IUiClock? clock = null)
+    {
+        var refusal = TuiHost.RefusalFor(capabilities);
+        if (refusal is not null)
+        {
+            stderr.WriteLine(refusal);
+            return new TuiRunResult(UsageError.ExitCode, refusal);
+        }
+
+        // Declared first so it is disposed last: the setting goes back before the
+        // reading thread is left to the process.
+        using var keys = console.Keys();
+        using var controlC = ControlCAsInputScope.Enter(console.ControlCAsInput);
+
+        return TuiHost.Run(new TuiHostRequest(
+            document,
+            stdout,
+            stderr,
+            capabilities,
+            ascii,
+            session ?? new TerminalGuardSessionFactory(),
+            keys,
+            clock ?? new MonotonicClock(),
+            Cursor: cursor));
     }
 
     /// <summary>
@@ -384,14 +463,16 @@ public static class CliApp
     /// before.
     /// </para>
     /// </remarks>
-    private static int TuiSimulate(string[] args, bool ascii, TextWriter stdout, TextWriter stderr)
+    private static int TuiSimulate(string[] args, bool ascii, TextWriter stdout, TextWriter stderr, TuiConsole console)
     {
         var setup = BuildLiveSetup(args, stderr);
 
         // The terminal is settled before the stepper is: a redirected run must
         // leave nothing running and nothing on screen, which is only true if the
         // check comes first. The host refuses it, with the same one-line reason and
-        // the same status the replay viewer uses.
+        // the same status the replay viewer uses. Asked again inside StartViewer,
+        // where the key source is built; the answer is the same either way and only
+        // one of the two checks has anything running behind it.
         var capabilities = CapabilityDetector.Detect();
         if (TuiHost.RefusalFor(capabilities) is { } refusal)
         {
@@ -401,22 +482,15 @@ public static class CliApp
 
         using var episode = new LiveEpisode(setup);
         var cursor = new LivePlayback(episode);
-        var session = new TerminalGuardSessionFactory();
 
-        TuiRunResult result;
-        using (var keys = new KeyQueue(ConsoleKeyReader.FromConsole()))
-        {
-            result = TuiHost.Run(new TuiHostRequest(
-                cursor.Document,
-                stdout,
-                stderr,
-                capabilities,
-                ascii,
-                session,
-                keys,
-                new MonotonicClock(),
-                Cursor: cursor));
-        }
+        var result = StartViewer(
+            cursor.Document,
+            stdout,
+            stderr,
+            capabilities,
+            ascii,
+            console,
+            cursor);
 
         if (result.Refusal is not null)
         {

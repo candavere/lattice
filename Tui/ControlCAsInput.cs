@@ -1,0 +1,113 @@
+namespace Lattice.Tui;
+
+/// <summary>
+/// The process-wide console setting that decides whether Ctrl-C arrives as a key
+/// or only as a signal. A seam rather than a call into <see cref="Console"/>, for
+/// two reasons that are the same reason.
+/// </summary>
+/// <remarks>
+/// <para>
+/// It is a setting rather than a mode the reader owns: it belongs to the process,
+/// so a run that changes it has to give back what it found. And on Windows the
+/// setter needs a real console input handle — it calls <c>GetConsoleMode</c> on
+/// standard input and throws when standard input is a file or a pipe. A run that
+/// is going to be refused anyway must therefore never reach it.
+/// </para>
+/// </remarks>
+public interface IControlCAsInput
+{
+    /// <summary>The setting as the process currently has it.</summary>
+    bool Get();
+
+    /// <summary>Makes the process-wide setting so.</summary>
+    void Set(bool value);
+}
+
+/// <summary>
+/// <see cref="IControlCAsInput"/> over the process's own console. The only
+/// implementation a real run uses.
+/// </summary>
+public sealed class ConsoleControlCAsInput : IControlCAsInput
+{
+    /// <inheritdoc />
+    public bool Get() => Console.TreatControlCAsInput;
+
+    /// <inheritdoc />
+    public void Set(bool value) => Console.TreatControlCAsInput = value;
+}
+
+/// <summary>
+/// One interactive viewer's claim on the Ctrl-C-as-input setting: taken for the
+/// length of the run, and given back the value it found.
+/// </summary>
+/// <remarks>
+/// <para>
+/// The scope exists so the setting cannot outlive the run that wanted it. Every
+/// ending restores it — a quit key, a Ctrl-C, the end of the episode, a failed
+/// stepper, an exception during start-up — because every one of those paths
+/// disposes the scope, and the restore does not wait on the reading thread.
+/// </para>
+/// <para>
+/// The restore puts back what <see cref="Enter"/> read, so a process that had
+/// already asked for Ctrl-C as input keeps it. The restore also swallows a
+/// console that has gone away: a failure to tidy up must not replace the status
+/// the run actually ended with.
+/// </para>
+/// <para>
+/// <b>Call this only after the redirected-stream refusal.</b> Reading the prior
+/// value is itself a console input property, and on a redirected console it
+/// throws exactly as setting it does.
+/// </para>
+/// </remarks>
+public sealed class ControlCAsInputScope : IDisposable
+{
+    private readonly IControlCAsInput _controlC;
+    private readonly bool _prior;
+    private bool _restored;
+
+    private ControlCAsInputScope(IControlCAsInput controlC, bool prior)
+    {
+        _controlC = controlC;
+        _prior = prior;
+    }
+
+    /// <summary>
+    /// Reads the setting the process currently has, asks for Ctrl-C as input, and
+    /// hands back a scope that will return the value it found.
+    /// </summary>
+    public static ControlCAsInputScope Enter(IControlCAsInput controlC)
+    {
+        ArgumentNullException.ThrowIfNull(controlC);
+
+        var prior = controlC.Get();
+        controlC.Set(true);
+        return new ControlCAsInputScope(controlC, prior);
+    }
+
+    /// <summary>
+    /// Puts the prior value back, exactly once, whether or not the reading thread
+    /// has finished. A console that is no longer there is a console the viewer is
+    /// already leaving, so the failure is swallowed rather than raised over the
+    /// status the run ended with.
+    /// </summary>
+    public void Dispose()
+    {
+        if (_restored)
+        {
+            return;
+        }
+
+        _restored = true;
+
+        try
+        {
+            _controlC.Set(_prior);
+        }
+        catch (Exception exception) when (exception is IOException
+            or InvalidOperationException
+            or PlatformNotSupportedException
+            or System.ComponentModel.Win32Exception)
+        {
+        }
+    }
+}

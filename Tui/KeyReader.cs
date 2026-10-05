@@ -202,16 +202,17 @@ public static class ConsoleKeyReader
     /// host treats as "nothing more will arrive" — is reported when the console
     /// cannot produce keys at all, as it cannot when standard input is redirected.
     /// </summary>
+    /// <remarks>
+    /// This asks the console for nothing and changes nothing: it builds a reader
+    /// and hands back a way to ask it for the next key. That is deliberate, because
+    /// on Windows asking a redirected console for its input mode throws, and a run
+    /// that is going to be refused must not throw on its way to saying so. The
+    /// setting that makes Ctrl-C arrive as a key is
+    /// <see cref="ControlCAsInputScope"/>'s, taken by the caller after the refusal
+    /// check and given back when the run ends.
+    /// </remarks>
     public static Func<TuiKey?> FromConsole()
     {
-        // Ctrl-C has to arrive as a key, not only as a signal. The guard puts the
-        // terminal in raw mode, which clears ISIG, so the tty generates no SIGINT
-        // from the control character — and .NET's ReadKey deliberately never
-        // returns Ctrl-C as a key unless this is set. Without it a Ctrl-C on a real
-        // terminal is swallowed: the viewer neither quits nor puts the terminal
-        // back. The CancelKeyPress path still covers a SIGINT from anywhere else.
-        Console.TreatControlCAsInput = true;
-
         return () =>
         {
             try

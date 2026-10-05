@@ -1,10 +1,10 @@
 ╭─LATTICE LAUNCHPAD  8 commands────────────────────────────────────────────────╮
 │╭─ COMMANDS ─────────────────────────────────────────────────────────────────╮│
 ││> generate Generate a valid map as JSON.                                    ││
-││  simulate Record an episode as trajectory JSONL.                           ││
+││  simulate Run an episode: watched live, or recorded as trajectory JSONL.   ││
 ││  render Render a recorded trajectory as ASCII or SVG.                      ││
 ││  analyze Report contention and turning points for a trajectory.            ││
-││  replay Re-run a recorded trajectory, or play it in the cockpit.           ││
+││  replay Play a recorded trajectory in the cockpit, or re-run it.           ││
 ││  benchmark Measure the five-case workload matrix.                          ││
 │╰────────────────────────────────────────────────────────────────────────────╯│
 │ terminal is 80x25; the full layout needs 100x30; resize for it               │

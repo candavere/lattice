@@ -330,6 +330,102 @@ public class LaunchpadRunTests
         Assert.Equal("restore", events[^3]);
     }
 
+    /// <summary>
+    /// A command's status is shown until the reader acknowledges it, and the key that
+    /// acknowledges it is consumed rather than acted on. Without the gate the first
+    /// keypress after a run — the one meant for "that is fine" — would be fed to the
+    /// form, where on a full-screen display it moves the selection out from under a
+    /// reader who was looking at the status.
+    /// </summary>
+    [Fact]
+    public void AStatusIsShownUntilAKeyAcknowledgesItAndThatKeyIsNotSpentOnTheForm()
+    {
+        var events = new List<string>();
+        var surface = new RecordingSurface(events);
+        var keys = new ScriptedKeys(events);
+
+        foreach (var key in RenderWithTrajectory())
+        {
+            keys.Queue(key);
+        }
+
+        // The first key is one that would move the selection if it reached the form.
+        // The gate consumes it, so the selection stays where the reader left it.
+        keys.Queue(new TuiKey(TuiKeyKind.Character, 'j'));
+        keys.Queue(new TuiKey(TuiKeyKind.Character, 'q'));
+
+        var result = LaunchpadHost.Run(new LaunchpadHostRequest(
+            Commands: LaunchpadCatalog.Commands,
+            Output: TextWriter.Null,
+            Errors: TextWriter.Null,
+            Capabilities: Interactive,
+            Console: new(new RecordingControlC(events), () => keys),
+            Session: surface,
+            Clock: new StaticClock(),
+            Runner: new StubRunner(events),
+            TrailingIdleFrames: 0));
+
+        Assert.Equal(0, result.ExitCode);
+
+        // The status was drawn, and after the acknowledging key the selection had not
+        // moved: 'j' would have taken it to the second command.
+        Assert.Contains("exit 0", surface.Written, StringComparison.Ordinal);
+
+        // The 'j' was spent acknowledging the status, so the selection never moved:
+        // render is still the command on show after it.
+        var afterStatus = Strip(surface.Written[surface.Written.IndexOf("exit 0", StringComparison.Ordinal)..]);
+        Assert.DoesNotContain("> analyze", afterStatus, StringComparison.Ordinal);
+        Assert.DoesNotContain("> render", afterStatus, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A status from a command does not shadow a field error for ever. Once the
+    /// reader has read it, the form's own message is what they see.
+    /// </summary>
+    [Fact]
+    public void AStatusIsClearedOnceItHasBeenShownSoAFieldErrorIsNotShadowed()
+    {
+        var events = new List<string>();
+        var surface = new RecordingSurface(events);
+        var keys = new ScriptedKeys(events);
+
+        foreach (var key in RenderWithTrajectory())
+        {
+            keys.Queue(key);
+        }
+
+        // Acknowledge the status, walk back to a command with a required field, and
+        // focus it. The form's own message now belongs on the screen.
+        keys.Queue(new TuiKey(TuiKeyKind.Character, ' '));
+        keys.Queue(new TuiKey(TuiKeyKind.Character, 'k'));
+        keys.Queue(new TuiKey(TuiKeyKind.Character, 'k'));
+        keys.Queue(new TuiKey(TuiKeyKind.Tab));
+        keys.Queue(new TuiKey(TuiKeyKind.Character, 'q'));
+
+        LaunchpadHost.Run(new LaunchpadHostRequest(
+            Commands: LaunchpadCatalog.Commands,
+            Output: TextWriter.Null,
+            Errors: TextWriter.Null,
+            Capabilities: Interactive,
+            Console: new(new RecordingControlC(events), () => keys),
+            Session: surface,
+            Clock: new StaticClock(),
+            Runner: new StubRunner(events),
+            TrailingIdleFrames: 0));
+
+        // The form's own refusal is on the screen: the status from the run was shown
+        // once and cleared rather than shadowing it for the rest of the session.
+        Assert.Contains("missing required flag", surface.Written, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The text of a written frame, with the escape sequences removed, so a search
+    /// for what was on screen is not looking for a literal string the renderer broke
+    /// up with cursor positioning.
+    /// </summary>
+    private static string Strip(string written) =>
+        System.Text.RegularExpressions.Regex.Replace(written, "\\u001b\\[[0-9;?]*[A-Za-z]", "");
+
     /// <summary>The keys that select render and type a trajectory into its field.</summary>
     private static IReadOnlyList<TuiKey> RenderWithTrajectory()
     {

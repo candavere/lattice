@@ -245,15 +245,13 @@ public static class TuiHost
         var quit = false;
         host.Interrupted += () => quit = true;
 
-        var size = host.Size;
-        var glyphs = host.Glyphs;
         var fill = request.Capabilities.PanelFill;
         var playback = request.Cursor ?? new ReplayPlayback(request.Document);
         var frameInterval = TimeSpan.FromSeconds(1.0 / request.MaxFramesPerSecond);
 
         // The first frame is always written: a viewer that shows nothing until the
         // reader presses a key looks broken.
-        Compose(request, playback, size, glyphs, fill, host);
+        Compose(request, playback, fill, host);
         var lastTickAt = request.Clock.Now;
 
         while (!quit && !playback.IsFinished)
@@ -295,7 +293,7 @@ public static class TuiHost
 
                 if (playback.Apply(key))
                 {
-                    Compose(request, playback, size, glyphs, fill, host);
+                    Compose(request, playback, fill, host);
                 }
 
                 continue;
@@ -307,7 +305,7 @@ public static class TuiHost
 
             if (playback.Advance(elapsed))
             {
-                Compose(request, playback, size, glyphs, fill, host);
+                Compose(request, playback, fill, host);
             }
         }
 
@@ -343,16 +341,14 @@ public static class TuiHost
     private static void Compose(
         TuiHostRequest request,
         ICockpitCursor playback,
-        PaneSize size,
-        GlyphMode glyphs,
         Rgb? fill,
         ScreenHost host)
     {
         host.Present(CockpitLayout.Render(new CockpitRequest(
             playback.Document,
             playback.Index,
-            size,
-            glyphs,
+            host.Size,
+            host.Glyphs,
             fill,
             playback.Phase,
             new PlaybackState(playback.IsPaused, playback.StepsPerSecond),

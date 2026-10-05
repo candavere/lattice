@@ -118,6 +118,30 @@ public sealed class LaunchpadForm
     /// <summary>Whether the reader has asked for the form to be run.</summary>
     public bool WantsToRun => _wantsToRun;
 
+    /// <summary>The ways the selected command can be started, in the order they are offered.</summary>
+    public IReadOnlyList<string> RunModes => Current.Ways;
+
+    /// <summary>
+    /// How the reader asked for the selected command to run: watched as a screen, or
+    /// run as typed. Read from the run-mode field, so it is the reader's choice and
+    /// not the host's default.
+    /// </summary>
+    public RunMode ChosenMode
+    {
+        get
+        {
+            var mode = Field(LaunchpadCatalog.RunModeLabel);
+            return Current.ModeNamedBy(mode is null ? Current.Ways[0] : Value(mode));
+        }
+    }
+
+    /// <summary>
+    /// The run-mode field, or <c>null</c> for a command that has only one way to be
+    /// run and so is not asked.
+    /// </summary>
+    private LaunchpadField? Field(string label) =>
+        Fields.FirstOrDefault(entry => entry.Label == label);
+
     /// <summary>
     /// Reports that a run has been started, so the screen stops asking. The values
     /// stay: a reader whose command failed comes back to the form they filled in, not
@@ -141,40 +165,14 @@ public sealed class LaunchpadForm
     {
         get
         {
-            var parts = new List<string> { Executable, Current.Name };
-            var extra = LaunchpadCatalog.ExtraArgumentsLabel;
+            var parts = new List<string> { Executable };
 
-            foreach (var entry in Fields)
-            {
-                // The tail is appended after the loop, verbatim, so its own words
-                // cannot be reflowed into tokens the reader did not type.
-                if (entry.Kind == LaunchpadFieldKind.ExtraArguments)
-                {
-                    continue;
-                }
-
-                var text = Chosen(entry);
-                if (text.Length == 0)
-                {
-                    continue;
-                }
-
-                if (entry.Kind == LaunchpadFieldKind.Flag)
-                {
-                    parts.Add(entry.Label);
-                }
-
-                parts.Add(text);
-            }
-
-            var joined = string.Join(' ', parts);
-
-            // The tail is appended last and verbatim, and any run of whitespace in it
-            // collapsed, so a reader who typed a stray space has not produced a
-            // command line with a doubled space in it.
-            return string.IsNullOrEmpty(_values.GetValueOrDefault(extra))
-                ? joined
-                : $"{joined} {Collapse(_values[extra])}".TrimEnd();
+            // The command name, then its arguments, then the raw tail verbatim. The
+            // text and the vector are the same walk, so they cannot disagree about
+            // what the form adds up to.
+            parts.Add(Current.Name);
+            AppendArguments(parts);
+            return string.Join(' ', parts);
         }
     }
 
@@ -184,33 +182,49 @@ public sealed class LaunchpadForm
         get
         {
             var arguments = new List<string> { Current.Name };
-            var extra = LaunchpadCatalog.ExtraArgumentsLabel;
-
-            foreach (var entry in Fields)
-            {
-                var text = Chosen(entry);
-                if (text.Length == 0)
-                {
-                    continue;
-                }
-
-                if (entry.Kind == LaunchpadFieldKind.Flag)
-                {
-                    arguments.Add(entry.Label);
-                }
-
-                arguments.Add(text);
-            }
-
-            if (_values.TryGetValue(extra, out var tail) && tail.Length > 0)
-            {
-                foreach (var token in Collapse(tail).Split(' ', StringSplitOptions.RemoveEmptyEntries))
-                {
-                    arguments.Add(token);
-                }
-            }
-
+            AppendArguments(arguments);
             return [.. arguments];
+        }
+    }
+
+    /// <summary>
+    /// Appends the form's own arguments to a list, in field order: the flag's name and
+    /// then its value for a flag, the value alone for a path.
+    /// <para>
+    /// Neither the run mode nor the raw tail is an argument. The mode decides which
+    /// path the command takes rather than naming an argument, and the tail is the
+    /// reader's own words, appended verbatim below so they cannot be reflowed into
+    /// tokens they did not type.
+    /// </para>
+    /// </summary>
+    private void AppendArguments(List<string> into)
+    {
+        foreach (var entry in Fields)
+        {
+            if (entry.Kind is LaunchpadFieldKind.ExtraArguments or LaunchpadFieldKind.RunMode)
+            {
+                continue;
+            }
+
+            var text = Chosen(entry);
+            if (text.Length == 0)
+            {
+                continue;
+            }
+
+            if (entry.Kind == LaunchpadFieldKind.Flag)
+            {
+                into.Add(entry.Label);
+            }
+
+            into.Add(text);
+        }
+
+        // Any run of whitespace in the tail is collapsed, so a reader who typed a
+        // stray space has not produced a command line with a doubled space in it.
+        if (_values.GetValueOrDefault(LaunchpadCatalog.ExtraArgumentsLabel) is { Length: > 0 } tail)
+        {
+            into.AddRange(Collapse(tail).Split(' ', StringSplitOptions.RemoveEmptyEntries));
         }
     }
 
@@ -276,6 +290,11 @@ public sealed class LaunchpadForm
                 Validate();
                 return;
 
+            case TuiKeyKind.BackTab:
+                MoveField(-1);
+                Validate();
+                return;
+
             case TuiKeyKind.Backspace:
                 Erase(field, text, _carets[field.Label] - 1);
                 return;
@@ -337,6 +356,10 @@ public sealed class LaunchpadForm
 
             case TuiKeyKind.Tab:
                 Focus(0);
+                return;
+
+            case TuiKeyKind.BackTab:
+                Focus(Fields.Count - 1);
                 return;
 
             case TuiKeyKind.Enter:
@@ -578,8 +601,13 @@ public sealed class LaunchpadForm
                 if (field.Choices is { Length: > 0 } choices
                     && !choices.Contains(text, StringComparer.OrdinalIgnoreCase))
                 {
+                    // The run-mode field names a choice about how to run, not a flag,
+                    // and the wording says so: a reader who mistypes it is not being
+                    // told about a flag this command does not have.
                     throw new UsageError(
-                        $"invalid {field.Label} '{text}' (expected {Choices(choices)}).");
+                        field.Kind == LaunchpadFieldKind.RunMode
+                            ? $"invalid {field.Label} '{text}' (expected {Choices(choices)})."
+                            : $"invalid {field.Label} '{text}' (expected {Choices(choices)}).");
                 }
 
                 return;

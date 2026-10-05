@@ -153,9 +153,9 @@ public static class CellText
 
     /// <summary>
     /// The character a rune that is not one column is replaced with in this
-    /// vocabulary. Exposed so a caller that has to assert a replacement happened —
-    /// a test, or a layout that counts them — reads the same one this type uses
-    /// rather than writing the code point out again.
+    /// vocabulary. Exposed so a caller asserting that a replacement happened reads
+    /// the same one this type uses rather than writing the code point out again;
+    /// the assertion is what keeps the two vocabularies from drifting apart.
     /// </summary>
     public static char ReplacementFor(GlyphMode glyphs) => Replacement(glyphs);
 

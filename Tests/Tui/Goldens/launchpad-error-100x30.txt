@@ -1,10 +1,10 @@
 ╭─LATTICE LAUNCHPAD  8 commands────────────────────────────────────────────────────────────────────╮
 │╭─ COMMANDS ─────────────────────╮ ╭─ FORM ──────────────────────────────────────────────────────╮│
 ││> generate Generate a valid map…│ │--seed*         x                                            ││
-││  simulate Record an episode as…│ │--min-fairness  (unset)                                      ││
+││  simulate Run an episode: watc…│ │--min-fairness  (unset)                                      ││
 ││  render Render a recorded traj…│ │--out           (unset)                                      ││
 ││  analyze Report contention and…│ │extra arguments (unset)                                      ││
-││  replay Re-run a recorded traj…│ │flag '--seed' expects an unsigned integer, got 'x'.          ││
+││  replay Play a recorded trajec…│ │flag '--seed' expects an unsigned integer, got 'x'.          ││
 ││  benchmark Measure the five-ca…│ │                                                             ││
 ││  evaluate Run the paired MCTS-…│ │                                                             ││
 ││  validate-scenario Check a sce…│ │                                                             ││

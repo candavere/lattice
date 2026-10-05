@@ -2,6 +2,22 @@ using Lattice.Tui;
 
 namespace Lattice.Cli.Presentation;
 
+/// <summary>Whether the reader asked to watch a command or to run it.</summary>
+public enum RunMode
+{
+    /// <summary>
+    /// Watch it: the command becomes a screen. A live episode runs in the cockpit
+    /// under the reader's own controls, and nothing is written to a file.
+    /// </summary>
+    Screen,
+
+    /// <summary>
+    /// Record it: the command runs as typed, on an ordinary terminal, writing
+    /// whatever artifact its <c>--out</c> names.
+    /// </summary>
+    Run,
+}
+
 /// <summary>One field of one command's form.</summary>
 /// <param name="Label">The flag's own name, or the field's own name where there is no flag.</param>
 /// <param name="Kind">What the field holds.</param>
@@ -28,14 +44,37 @@ public sealed record LaunchpadField(
 /// </param>
 /// <param name="RequiredFlags">The flags whose absence is a usage error.</param>
 /// <param name="TakesPositionalPath">Whether the command takes a bare path token.</param>
+/// <param name="RunModes">
+/// The ways this command can be started, in the order the form offers them. A
+/// command with one is not a choice the reader has to make.
+/// </param>
 public sealed record LaunchpadCommand(
     string Name,
     string Summary,
     IReadOnlyList<LaunchpadField> Fields,
     string[] AllowedFlags,
     string[] RequiredFlags,
-    bool TakesPositionalPath = false)
+    bool TakesPositionalPath = false,
+    string[]? RunModes = null)
 {
+    /// <summary>
+    /// The ways this command can be started. Watch first where there is a choice: a
+    /// screen is the reason a reader came to the Launchpad at all, and a command
+    /// that can only be run has one way and no field to choose it.
+    /// </summary>
+    public IReadOnlyList<string> Ways =>
+        RunModes is { Length: > 0 } ? RunModes : ["run"];
+
+    /// <summary>
+    /// The run mode a way's name names, defaulting to the first. A name this catalog
+    /// does not know is a run rather than a screen: an unrecognised word must not
+    /// silently open a full-screen viewer.
+    /// </summary>
+    public RunMode ModeNamedBy(string? way) =>
+        string.Equals(way, "screen", StringComparison.OrdinalIgnoreCase) ? RunMode.Screen : RunMode.Run;
+
+    /// <summary>
+    /// The text a field starts with: its own default when it has one, and the empty
     /// <summary>
     /// The text a field starts with: its own default when it has one, and the empty
     /// string otherwise. Exposed so a caller building a form does not re-decide
@@ -68,6 +107,22 @@ public static class LaunchpadCatalog
     /// <summary>The raw tail field's label, the one every command carries.</summary>
     public const string ExtraArgumentsLabel = "extra arguments";
 
+    /// <summary>The run-mode field's label, on the commands that can be run two ways.</summary>
+    public const string RunModeLabel = "run mode";
+
+    /// <summary>
+    /// The two ways a command that can be watched can also be recorded. In the
+    /// order the form offers them: watching first, because a screen is the reason a
+    /// reader came to the Launchpad at all.
+    /// </summary>
+    public static readonly string[] BothRunModes = ["screen", "run"];
+
+    /// <summary>
+    /// The one way a read-only viewer can be run. A replay has no artifact to write,
+    /// so offering it a choice would be offering one option dressed as two.
+    /// </summary>
+    public static readonly string[] ScreenOnly = ["screen"];
+
     /// <summary>The path field's label, on the two commands that take a bare path.</summary>
     public const string PositionalPathLabel = "path";
 
@@ -87,8 +142,8 @@ public static class LaunchpadCatalog
             ["--seed"]),
         new(
             "simulate",
-            "Record an episode as trajectory JSONL.",
-            Form(
+            "Run an episode: watched live, or recorded as trajectory JSONL.",
+            Watchable(
                 Flag("--seed", Required: true, Format: LaunchpadValueFormat.UnsignedInteger,
                     Help: "The seed the episode runs from."),
                 Flag("--steps", Format: LaunchpadValueFormat.PositiveInteger, Default: "100",
@@ -101,7 +156,8 @@ public static class LaunchpadCatalog
                 Flag("--quiet", Help: "Suppress the dashboard and the lifecycle line."),
                 Flag("--rules", Help: "A JSON DynamicMapRuleSet to run the episode under.")),
             ["--seed", "--steps", "--agent", "--scenario", "--out", "--quiet", "--rules"],
-            ["--seed"]),
+            ["--seed"],
+            RunModes: BothRunModes),
         new(
             "render",
             "Render a recorded trajectory as ASCII or SVG.",
@@ -123,15 +179,16 @@ public static class LaunchpadCatalog
             []),
         new(
             "replay",
-            "Re-run a recorded trajectory, or play it in the cockpit.",
-            Form(
+            "Play a recorded trajectory in the cockpit, or re-run it.",
+            Watched(
                 Path("The trajectory to re-run."),
                 Flag("--trajectory", Help: "The same path, named explicitly."),
                 Flag("--verify", Help: "Assert tick-by-tick equivalence instead of re-serializing."),
                 Flag("--out", Help: "Write the re-serialized trajectory here.")),
             ["--trajectory", "--verify", "--out"],
             [],
-            TakesPositionalPath: true),
+            TakesPositionalPath: true,
+            RunModes: ScreenOnly),
         new(
             "benchmark",
             "Measure the five-case workload matrix.",
@@ -194,13 +251,52 @@ public static class LaunchpadCatalog
         new(PositionalPathLabel, LaunchpadFieldKind.PositionalPath, Help: Help);
 
     /// <summary>
-    /// A command's fields, with the raw tail appended. Every command gets one, and
-    /// it is the reason no flag is unreachable: the tail is passed through
-    /// unexamined for anything the catalog does not model.
+    /// A command's fields: whatever the caller listed, then the raw tail every
+    /// command carries. The tail is the reason no flag is unreachable — it is passed
+    /// through unexamined for anything the catalog does not model.
     /// </summary>
     private static IReadOnlyList<LaunchpadField> Form(params LaunchpadField[] fields) =>
-        [.. fields, new LaunchpadField(
+        WithModes(fields, ["run"]);
+
+    /// <summary>
+    /// The same list, for a command that can be watched as well as run: the run-mode
+    /// field goes after the flags and before the tail.
+    /// </summary>
+    private static IReadOnlyList<LaunchpadField> Watchable(params LaunchpadField[] fields) =>
+        WithModes(fields, BothRunModes);
+
+    /// <summary>A command that can only be watched, so the field says so and is not a choice.</summary>
+    private static IReadOnlyList<LaunchpadField> Watched(params LaunchpadField[] fields) =>
+        WithModes(fields, ScreenOnly);
+
+    /// <summary>
+    /// The mode field is inserted only where there is a choice to make. A command
+    /// with one way is not given a row that says "run" over and over: a form that
+    /// asks a question with only one answer is a form with a row of noise on it.
+    /// </summary>
+    private static IReadOnlyList<LaunchpadField> WithModes(LaunchpadField[] fields, string[] ways) =>
+        ways.Length > 1 ? [.. fields, Mode(ways), Tail()] : [.. fields, Tail()];
+
+    /// <summary>The raw tail field, the one every command carries and never fills.</summary>
+    private static LaunchpadField Tail() =>
+        new(
             ExtraArgumentsLabel,
             LaunchpadFieldKind.ExtraArguments,
-            Help: "Anything else, passed through as typed.")];
+            Help: "Anything else, passed through as typed.");
+
+    /// <summary>
+    /// The run-mode field, for a command that can be started more than one way. It
+    /// sits with the other fields and before the tail, so Tab reaches it in reading
+    /// order rather than at the end.
+    /// </summary>
+    private static LaunchpadField Mode(string[] ways) =>
+        new(
+            RunModeLabel,
+            LaunchpadFieldKind.RunMode,
+            Default: ways[0],
+            ValueFormat: LaunchpadValueFormat.Choice,
+            Choices: ways,
+            Help: ways.Length > 1
+                ? "Watch it on screen, or run it and write what it produces."
+                : "This command is watched, not recorded.");
 }

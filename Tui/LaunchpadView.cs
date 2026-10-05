@@ -10,6 +10,13 @@ public enum LaunchpadFieldKind
     PositionalPath,
 
     /// <summary>
+    /// How the command runs: watched as a screen, or run as typed on an ordinary
+    /// terminal. Not a flag, because it appears nowhere in the command line — it
+    /// decides which of the command's two paths is taken.
+    /// </summary>
+    RunMode,
+
+    /// <summary>
     /// The raw tail: everything after the fields, passed through unexamined, so a
     /// flag nobody modelled is still reachable.
     /// </summary>
@@ -44,6 +51,11 @@ public readonly record struct LaunchpadCommandView(string Name, string Summary, 
 /// <summary>One row of the form, as the layout reads it.</summary>
 /// <param name="Label">The flag's name, or the field's own name.</param>
 /// <param name="Kind">What the field holds.</param>
+/// <param name="RunMode">
+/// How the command runs, chosen from <see cref="LaunchpadCommand.Ways"/>. Carried
+/// beside the form rather than inside the argument vector, because the vector is the
+/// reader's command line and a mode is a choice about how to run it.
+/// </param>
 /// <param name="Required">Whether the command refuses without it.</param>
 /// <param name="Value">What the reader has in it, defaults included.</param>
 /// <param name="ShowsDefault">Whether <paramref name="Value"/> is still the command's own default.</param>

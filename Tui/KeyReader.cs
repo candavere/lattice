@@ -48,6 +48,13 @@ public enum TuiKeyKind
     /// <summary>The tab key: the field-to-field key on a form.</summary>
     Tab,
 
+    /// <summary>
+    /// Shift-Tab, which goes the other way along the same fields. Its own kind
+    /// because the modifier is not carried on a key: a form has to tell "move on"
+    /// from "move back", and a Tab that did not say which would do one of them.
+    /// </summary>
+    BackTab,
+
     /// <summary>The backspace key: delete the character before the caret.</summary>
     Backspace,
 
@@ -260,6 +267,13 @@ public static class ConsoleKeyReader
         if (key.KeyChar == ControlC)
         {
             return new TuiKey(TuiKeyKind.Interrupt);
+        }
+
+        // Shift-Tab before Tab: the console reports it as a Tab with the Shift
+        // modifier, and the modifier is the only thing that tells the two apart.
+        if (key.Key == ConsoleKey.Tab && key.Modifiers.HasFlag(ConsoleModifiers.Shift))
+        {
+            return new TuiKey(TuiKeyKind.BackTab);
         }
 
         // The control characters a text-entry screen binds are recognised from the

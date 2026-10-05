@@ -52,6 +52,33 @@ public class LaunchpadFormTests
         return form;
     }
 
+    /// <summary>
+    /// Puts a field under focus by name: Tab once to enter the form, then Tab until
+    /// the wanted field is reached. The count comes from the field's own index rather
+    /// than from a number written here, so a new field cannot silently break it.
+    /// </summary>
+    private static LaunchpadForm Focus(LaunchpadForm form, string label)
+    {
+        var index = form.Fields.ToList().FindIndex(entry => entry.Label == label);
+        Assert.True(index >= 0, $"there is no {label} field on {form.Selected}.");
+
+        // Navigation mode first, because Tab counts from the start of the form and a
+        // Tab inside one would move on from wherever it was.
+        if (form.Mode == LaunchpadMode.Editing)
+        {
+            Drive(form, new TuiKey(TuiKeyKind.Escape));
+        }
+
+        Drive(form, new TuiKey(TuiKeyKind.Tab));
+        for (var i = 0; i < index; i++)
+        {
+            Drive(form, new TuiKey(TuiKeyKind.Tab));
+        }
+
+        Assert.Equal(label, form.FocusedField);
+        return form;
+    }
+
     /// <summary>Selects a command by moving the selection down to it.</summary>
     private static LaunchpadForm Select(LaunchpadForm form, string name)
     {
@@ -721,6 +748,102 @@ public class LaunchpadFormTests
         var form = Drive(Form(), new TuiKey(TuiKeyKind.Escape));
 
         Assert.True(form.HasQuit);
+    }
+
+    /// <summary>
+    /// A command can be run in more than one way, and the form says which. A
+    /// simulate is either watched live in the cockpit or recorded to a file, and
+    /// which one is chosen is the reader's: defaulting to one of them would make the
+    /// other's flags unreachable.
+    /// </summary>
+    [Fact]
+    public void ACommandWithTwoWaysToRunSaysSoAndStartsOnTheFirst()
+    {
+        var form = Select(Form(), "simulate");
+        var mode = form.Fields.Single(field => field.Kind == LaunchpadFieldKind.RunMode);
+
+        Assert.Equal(form.RunModes.ToArray(), mode.Choices);
+        Assert.Equal(RunMode.Screen, form.ChosenMode);
+    }
+
+    /// <summary>
+    /// A replay is only ever watched, so it is offered one way and the field is not
+    /// a choice the reader has to make.
+    /// </summary>
+    [Fact]
+    public void ACommandWithOneWayToRunOffersOnlyThat()
+    {
+        var form = Select(Form(), "replay");
+
+        Assert.Equal(new[] { "screen" }, form.RunModes.ToArray());
+        Assert.Equal(RunMode.Screen, form.ChosenMode);
+    }
+
+    [Fact]
+    public void TheChosenModeFollowsTheFieldItIsTakenFrom()
+    {
+        var form = Select(Form(), "simulate");
+        Focus(form, LaunchpadCatalog.RunModeLabel);
+
+        Assert.Equal(RunMode.Screen, form.ChosenMode);
+
+        Type(form, "run");
+
+        Assert.Equal(RunMode.Run, form.ChosenMode);
+    }
+
+    /// <summary>
+    /// The mode travels with the run, because the runner is what has to honour it.
+    /// It is not in the argument vector: the vector is the reader's command line,
+    /// and a mode is a choice about how to run it.
+    /// </summary>
+    [Fact]
+    public void TheModeTravelsWithTheRunRatherThanInTheArguments()
+    {
+        var form = Select(Form(), "simulate");
+        Focus(form, "--seed");
+        Type(form, "42");
+        Focus(form, LaunchpadCatalog.RunModeLabel);
+        Type(form, "run");
+
+        var request = new LaunchpadRunRequest(
+            form.Arguments,
+            form.CommandLine,
+            TextWriter.Null,
+            TextWriter.Null,
+            form.ChosenMode);
+
+        Assert.Equal(RunMode.Run, request.Mode);
+        Assert.Equal(["simulate", "--seed", "42"], request.Arguments);
+        Assert.DoesNotContain("run", request.Arguments);
+    }
+
+    /// <summary>
+    /// Shift-Tab goes back along the fields. It is named rather than left as a Tab
+    /// with a modifier, because the form has to tell "move on" from "move back" and
+    /// a key with no modifier of its own cannot.
+    /// </summary>
+    [Fact]
+    public void ShiftTabMovesBackAlongTheFields()
+    {
+        var form = Drive(Form(), new TuiKey(TuiKeyKind.Tab));
+        Drive(form, new TuiKey(TuiKeyKind.Tab));
+        Assert.Equal("--min-fairness", form.FocusedField);
+
+        Drive(form, new TuiKey(TuiKeyKind.BackTab));
+
+        Assert.Equal("--seed", form.FocusedField);
+    }
+
+    [Fact]
+    public void ShiftTabFromTheFirstFieldIsTheLast()
+    {
+        var form = Drive(Form(), new TuiKey(TuiKeyKind.Tab));
+        Assert.Equal("--seed", form.FocusedField);
+
+        Drive(form, new TuiKey(TuiKeyKind.BackTab));
+
+        Assert.Equal(LaunchpadCatalog.ExtraArgumentsLabel, form.FocusedField);
     }
 
     /// <summary>

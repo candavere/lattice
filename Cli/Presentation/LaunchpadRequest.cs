@@ -11,11 +11,17 @@ namespace Lattice.Cli.Presentation;
 /// <param name="CommandLine">The same command line as text, for diagnostics.</param>
 /// <param name="Output">Where the command's own stdout goes. In a real run, the process's own.</param>
 /// <param name="Errors">Where the command's own stderr goes. In a real run, the process's own.</param>
+/// <param name="Mode">
+/// How the reader asked for it: watched as a screen, or run as typed. Beside the
+/// argument vector and not inside it, because the vector is the reader's command
+/// line and the mode is a choice about which of the command's two paths is taken.
+/// </param>
 public readonly record struct LaunchpadRunRequest(
     string[] Arguments,
     string CommandLine,
     TextWriter Output,
-    TextWriter Errors)
+    TextWriter Errors,
+    RunMode Mode = RunMode.Run)
 {
     /// <summary>
     /// The same request with a different argument vector. Used by the one place that

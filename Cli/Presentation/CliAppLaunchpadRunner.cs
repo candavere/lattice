@@ -75,7 +75,10 @@ public sealed class CliAppLaunchpadRunner : ILaunchpadRunner
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return IsCockpit(request.Arguments)
+        // The reader's choice of how to run it, not the command's name: a simulate
+        // watched live is a screen and a simulate recorded is a command, and only the
+        // reader knows which they filled the form for.
+        return request.Mode == RunMode.Screen
             ? _cockpit.Run(request.WithArguments(CockpitArguments(request.Arguments)))
             : CliApp.Run(request.Arguments, request.Output, request.Errors, _terminal, _console);
     }
@@ -90,9 +93,9 @@ public sealed class CliAppLaunchpadRunner : ILaunchpadRunner
         arguments.Count > 0 && arguments[0] == Tui ? [.. arguments] : [Tui, .. arguments];
 
     /// <summary>
-    /// Whether these arguments name a screen rather than a run. <c>replay</c> is the
-    /// cockpit's read-only viewer and <c>simulate</c> may be watched live, so both
-    /// go through the cockpit; everything else is a run.
+    /// Whether an argument vector names a screen by default. <c>replay</c> is the
+    /// cockpit's read-only viewer and <c>simulate</c> can be watched live, so both
+    /// open the cockpit unless the reader asked otherwise.
     /// <para>
     /// The decision is on the command's own name and nothing else. A near miss here
     /// would run a viewer as a command and print its frames into a file, so the
@@ -112,6 +115,11 @@ public sealed class CliAppCockpitRunner : ICockpitRunner
 {
     private readonly TuiConsole _console;
 
+    /// <summary>The cockpit over the CLI's own <c>lattice tui</c> command.</summary>
+    /// <param name="console">
+    /// The console the cockpit reads keys from. Defaults to the real one, so a
+    /// Launchpad run reads keys from the reader's own terminal.
+    /// </param>
     public CliAppCockpitRunner(TuiConsole? console = null) =>
         _console = console ?? TuiConsole.Default;
 

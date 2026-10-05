@@ -48,8 +48,9 @@ public static class LaunchpadHost
         var refusal = TuiHost.RefusalFor(request.Capabilities);
         if (refusal is not null)
         {
-            request.Errors.WriteLine(Refusal(refusal));
-            return new TuiRunResult(UsageRefused, Refusal(refusal));
+            var reported = Refusal(refusal);
+            request.Errors.WriteLine(reported);
+            return new TuiRunResult(UsageRefused, reported);
         }
 
         // Declared first so it is disposed last, and the setting second so it goes
@@ -108,6 +109,14 @@ public static class LaunchpadHost
 
         /// <summary>How many waits have passed with no key since the last one.</summary>
         internal int Idle { get; set; }
+
+        /// <summary>
+        /// Whether a command's status is on screen and waiting to be acknowledged.
+        /// The acknowledging key is consumed rather than acted on: on a full-screen
+        /// display, a keypress meant for "that is fine" would otherwise move the
+        /// selection out from under a reader who was looking at the status.
+        /// </summary>
+        internal bool AwaitingAcknowledgement { get; set; }
     }
 
     private static void Loop(State state, ScreenHost host)
@@ -116,13 +125,20 @@ public static class LaunchpadHost
 
         while (true)
         {
-            // The notice is drawn once and then cleared: a reader who comes back to
-            // the form is looking at the form, not at the last run's status.
             host.Present(Frame(state, host));
 
             if (form.HasQuit)
             {
                 return;
+            }
+
+            // The status from the last command is shown once and then cleared, so a
+            // reader who comes back to the form is looking at the form rather than at
+            // the last run's exit code — which would otherwise outrank every field
+            // error for the rest of the session.
+            if (state.Notice is not null)
+            {
+                state.Notice = null;
             }
 
             var outcome = state.Keys.Wait(IdleWait, out var key);
@@ -150,6 +166,13 @@ public static class LaunchpadHost
             }
 
             state.Idle = 0;
+
+            if (state.AwaitingAcknowledgement)
+            {
+                state.AwaitingAcknowledgement = false;
+                continue;
+            }
+
             form.Apply(key);
 
             if (!form.WantsToRun)
@@ -163,6 +186,7 @@ public static class LaunchpadHost
             form.Acknowledge();
             var status = RunOutsideTheScreen(state, host);
             state.Notice = status;
+            state.AwaitingAcknowledgement = true;
             host = Reenter(state.Request, host);
         }
     }
@@ -191,7 +215,8 @@ public static class LaunchpadHost
                     state.Form.Arguments,
                     state.Form.CommandLine,
                     state.Request.Output,
-                    state.Request.Errors));
+                    state.Request.Errors,
+                    state.Form.ChosenMode));
 
                 return $"exit {Invariant(status)}";
             }
@@ -217,11 +242,8 @@ public static class LaunchpadHost
     /// </summary>
     private static ScreenHost Reenter(LaunchpadHostRequest request, ScreenHost previous)
     {
-        var opened = ScreenHost.Open(request.Session, request.Capabilities, request.Ascii, request.Output);
-
-        if (opened.Screen is not { } screen)
+        if (TryEnter(request) is not { } screen)
         {
-            request.Errors.WriteLine(Refusal(opened.Refusal!));
             return previous;
         }
 
@@ -237,18 +259,32 @@ public static class LaunchpadHost
     /// is reported rather than thrown, because the alternative is a stack trace over a
     /// reader's terminal.
     /// </summary>
-    private static ScreenHost Enter(LaunchpadHostRequest request)
+    private static ScreenHost Enter(LaunchpadHostRequest request) =>
+        TryEnter(request) ?? throw new LaunchpadRefused(Refused(request));
+
+    /// <summary>
+    /// The alternate screen, or <c>null</c> with the one-line reason already printed.
+    /// The single place the screen is entered, so the refusal is worded and placed the
+    /// same way for the first entry and for the one after a command.
+    /// </summary>
+    private static ScreenHost? TryEnter(LaunchpadHostRequest request)
     {
         var opened = ScreenHost.Open(request.Session, request.Capabilities, request.Ascii, request.Output);
 
         if (opened.Screen is not { } screen)
         {
-            request.Errors.WriteLine(Refusal(opened.Refusal!));
-            throw new LaunchpadRefused(opened.Refusal!);
+            request.Errors.WriteLine(Refused(request));
+            return null;
         }
 
         return screen;
     }
+
+    /// <summary>
+    /// The one line a refusal is reported with, for the capability set that refused.
+    /// </summary>
+    private static string Refused(LaunchpadHostRequest request) =>
+        Refusal(TuiHost.RefusalFor(request.Capabilities) ?? "the terminal cannot carry the launchpad.");
 
     /// <summary>
     /// The frame for the screen's current state, composed from the form rather than
@@ -296,6 +332,7 @@ public static class LaunchpadHost
 /// </summary>
 public sealed class LaunchpadRefused : InvalidOperationException
 {
+    /// <summary>The one line the terminal refused with, which is the message.</summary>
     public LaunchpadRefused(string refusal)
         : base(refusal)
     {

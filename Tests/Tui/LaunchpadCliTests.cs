@@ -114,32 +114,38 @@ public class LaunchpadCliTests
     /// cockpit itself applies.
     /// </summary>
     [Fact]
-    public void ReplayIsTheOneCommandTheCockpitIsAskedFor()
+    public void ACommandTheReaderAskedToWatchIsReachedThroughTheCockpit()
     {
-        var asked = 0;
-        var runner = CliAppRunner(new CapturingCockpit(() => asked++));
+        LaunchpadRunRequest? seen = null;
+        var runner = CliAppRunner(new CapturingCockpit(request => seen = request));
 
-        var run = runner.Run(new LaunchpadRunRequest(
+        var status = runner.Run(new LaunchpadRunRequest(
             ["replay", "site/demo.jsonl"],
             "lattice replay site/demo.jsonl",
             TextWriter.Null,
-            TextWriter.Null));
+            TextWriter.Null,
+            RunMode.Screen));
 
-        Assert.Equal(1, asked);
-        Assert.Equal(0, run);
+        Assert.Equal(0, status);
+        Assert.NotNull(seen);
+
+        // The cockpit is reached through its own command line, so the reader's
+        // arguments are the ones a reader of `lattice tui replay` types.
+        Assert.Equal(["tui", "replay", "site/demo.jsonl"], seen!.Value.Arguments);
     }
 
     [Fact]
     public void LiveSimulateIsAlsoAskedThroughTheCockpit()
     {
         var asked = 0;
-        var runner = CliAppRunner(new CapturingCockpit(() => asked++));
+        var runner = CliAppRunner(new CapturingCockpit(_ => asked++));
 
         runner.Run(new LaunchpadRunRequest(
             ["simulate", "--seed", "42", "--steps", "2"],
             "lattice simulate --seed 42 --steps 2",
             TextWriter.Null,
-            TextWriter.Null));
+            TextWriter.Null,
+            RunMode.Screen));
 
         Assert.Equal(1, asked);
     }
@@ -172,7 +178,7 @@ public class LaunchpadCliTests
     public void EveryOtherCommandGoesThroughCliAppRun()
     {
         var asked = 0;
-        var runner = CliAppRunner(new CapturingCockpit(() => asked++));
+        var runner = CliAppRunner(new CapturingCockpit(_ => asked++));
 
         runner.Run(new LaunchpadRunRequest(
             ["generate", "--seed", "42"],
@@ -181,6 +187,31 @@ public class LaunchpadCliTests
             TextWriter.Null));
 
         Assert.Equal(0, asked);
+    }
+
+    /// <summary>
+    /// A simulate the reader asked to record is not a screen. Recording writes the
+    /// artifact the batch command writes, and routing it through the cockpit would
+    /// refuse its <c>--out</c> by name — which is how a field on the form becomes a
+    /// dead end.
+    /// </summary>
+    [Fact]
+    public void ASimulateTheReaderAskedToRecordIsNotAScreen()
+    {
+        var asked = 0;
+        var runner = CliAppRunner(new CapturingCockpit(_ => asked++));
+
+        using var stdout = new StringWriter();
+        var exit = runner.Run(new LaunchpadRunRequest(
+            ["simulate", "--seed", "42", "--steps", "4"],
+            "lattice simulate --seed 42 --steps 4",
+            stdout,
+            TextWriter.Null,
+            RunMode.Run));
+
+        Assert.Equal(0, asked);
+        Assert.Equal(0, exit);
+        Assert.NotEqual("", stdout.ToString());
     }
 
     private static ILaunchpadRunner CliAppRunner(ICockpitRunner cockpit) =>
@@ -232,11 +263,11 @@ public class LaunchpadCliTests
     /// cockpit run would be refused, and these cases are about the argument vector
     /// rather than about what the cockpit draws.
     /// </summary>
-    private sealed class CapturingCockpit(Action asked) : ICockpitRunner
+    private sealed class CapturingCockpit(Action<LaunchpadRunRequest> capture) : ICockpitRunner
     {
         public int Run(LaunchpadRunRequest request)
         {
-            asked();
+            capture(request);
             return 0;
         }
     }

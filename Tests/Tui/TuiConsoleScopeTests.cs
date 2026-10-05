@@ -31,6 +31,42 @@ namespace Lattice.Tests.Tui;
 /// </remarks>
 public class TuiConsoleScopeTests
 {
+    /// <summary>
+    /// How a viewer run ended. A named set rather than a repeated string, so the
+    /// case a test drives and the case its assertions describe cannot drift apart.
+    /// </summary>
+    public enum Ending
+    {
+        /// <summary>The reader pressed the quit key.</summary>
+        Quit,
+
+        /// <summary>The reader pressed Ctrl-C.</summary>
+        ControlC,
+
+        /// <summary>The keys ran out, and the host read the end of its input.</summary>
+        EndOfInput,
+
+        /// <summary>
+        /// An episode whose own agent threw inside its decide, so the stepper failed
+        /// while the viewer was still up.
+        /// </summary>
+        FailingAgent,
+    }
+
+    /// <summary>The setting's own calls on a run that took it and gave it back.</summary>
+    private static readonly string[] TakenAndRestored = ["get", "set true", "set false"];
+
+    /// <summary>
+    /// Everything one accepted viewer run did, in order: the key source built first,
+    /// then the setting taken, then the terminal asked for UTF-8 and entered, a frame
+    /// written, the terminal restored, the setting given back, and only then the key
+    /// source disposed.
+    /// </summary>
+    private static readonly string[] AnAcceptedRun =
+    [
+        "keys built", "get", "set true", "utf8", "enter", "frame", "restore", "set false", "keys disposed",
+    ];
+
     /// <summary>A terminal that can carry the cockpit, which a test host's own is not.</summary>
     private static readonly TerminalCapabilities Interactive = new(
         ColorDepth.TrueColor,
@@ -91,24 +127,31 @@ public class TuiConsoleScopeTests
     /// whichever way the run ends.
     /// </summary>
     [Theory]
-    [InlineData("quit")]
-    [InlineData("ctrl-c")]
-    [InlineData("a failing agent")]
-    public void TheOriginalValueIsRestoredExactlyOnceOnEveryEnding(string ending)
+    [InlineData(Ending.Quit)]
+    [InlineData(Ending.ControlC)]
+    [InlineData(Ending.FailingAgent)]
+    public void TheOriginalValueIsRestoredExactlyOnceOnEveryEnding(Ending ending)
     {
         var controlC = new RecordingControlC(original: false);
 
-        var (result, surface) = Start(original: false, ending: ending, controlC: controlC);
+        var run = Start(ending, controlC);
 
         // Whatever ended the run, the terminal was put back first and the setting
         // was given back after it: the reader's terminal is usable again before
         // anything else is tidied up.
-        Assert.Equal(0, result.ExitCode);
-        Assert.Equal(
-            new[] { "keys built", "get", "set true", "utf8", "enter", "frame", "restore", "set false", "keys disposed" },
-            surface.Events);
-        Assert.Equal(new[] { "get", "set true", "set false" }, controlC.Calls);
+        Assert.Equal(0, run.Result.ExitCode);
+        Assert.Equal(AnAcceptedRun, run.Surface.Events);
+        Assert.Equal(TakenAndRestored, controlC.Calls);
         Assert.False(controlC.Value);
+
+        // A failing agent is the one ending that has to be shown to have happened:
+        // without this the case would pass on a run whose agent never failed, which
+        // is the same test as no case at all.
+        if (ending == Ending.FailingAgent)
+        {
+            Assert.NotNull(run.Episode!.Failure);
+            Assert.Equal("the agent gave up", run.Episode.Failure!.Message);
+        }
     }
 
     /// <summary>
@@ -120,10 +163,10 @@ public class TuiConsoleScopeTests
     {
         var controlC = new RecordingControlC(original: false);
 
-        var (result, _) = Start(original: false, ending: "end of input", controlC: controlC);
+        var run = Start(Ending.EndOfInput, controlC);
 
-        Assert.Equal(0, result.ExitCode);
-        Assert.Equal(new[] { "get", "set true", "set false" }, controlC.Calls);
+        Assert.Equal(0, run.Result.ExitCode);
+        Assert.Equal(TakenAndRestored, controlC.Calls);
         Assert.False(controlC.Value);
     }
 
@@ -136,11 +179,13 @@ public class TuiConsoleScopeTests
     {
         var controlC = new RecordingControlC(original: true);
 
-        var (result, _) = Start(original: true, ending: "quit", controlC: controlC);
+        var run = Start(Ending.Quit, controlC);
 
-        Assert.Equal(0, result.ExitCode);
+        Assert.Equal(0, run.Result.ExitCode);
         Assert.True(controlC.Value);
-        Assert.Equal(new[] { "get", "set true", "set true" }, controlC.Calls);
+
+        // Taken and put back to the value it found, which is the same value.
+        Assert.Equal(["get", "set true", "set true"], controlC.Calls);
     }
 
     /// <summary>
@@ -159,14 +204,14 @@ public class TuiConsoleScopeTests
             new StringWriter(),
             Interactive,
             ascii: false,
-            Console(controlC, events, Keys("quit")),
+            Composed(controlC, events, Keys()),
             cursor: null,
             FailingSession(),
             new StaticClock()));
 
         Assert.Equal("the terminal would not start", thrown.Message);
         Assert.False(controlC.Value);
-        Assert.Equal(new[] { "get", "set true", "set false" }, controlC.Calls);
+        Assert.Equal(TakenAndRestored, controlC.Calls);
     }
 
     /// <summary>
@@ -191,7 +236,7 @@ public class TuiConsoleScopeTests
                 stderr,
                 Interactive with { InputRedirected = true },
                 ascii: false,
-                Console(refused, refusedEvents, () => refusedKeys),
+                Composed(refused, refusedEvents, () => refusedKeys),
                 cursor: null,
                 FailingSession(),
                 new StaticClock());
@@ -218,7 +263,7 @@ public class TuiConsoleScopeTests
                 stderr,
                 Interactive,
                 ascii: false,
-                Console(accepted, events, keys),
+                Composed(accepted, events, keys),
                 cursor: null,
                 surface,
                 new StaticClock());
@@ -226,23 +271,21 @@ public class TuiConsoleScopeTests
             Assert.Equal(0, result.ExitCode);
         }
 
-        Assert.Equal(
-            new[]
-            {
-                "keys built", "get", "set true", "utf8", "enter", "frame", "restore", "set false", "keys disposed",
-            },
-            events);
+        Assert.Equal(AnAcceptedRun, events);
     }
+
+    /// <summary>What one driven viewer run left behind.</summary>
+    /// <param name="Result">The status and refusal the run returned.</param>
+    /// <param name="Surface">The terminal, and the order it was used in.</param>
+    /// <param name="Episode">The episode the cursor was reading, if there was one.</param>
+    private sealed record ViewerRun(TuiRunResult Result, RecordingSurface Surface, LiveEpisode? Episode);
 
     /// <summary>
     /// One viewer run, driven the way the host drives one: a scripted key sequence,
     /// a terminal that records what was done to it, and — for the failing-agent
     /// case — an episode whose own agent throws inside its decide.
     /// </summary>
-    private static (TuiRunResult Result, RecordingSurface Surface) Start(
-        bool original,
-        string ending,
-        RecordingControlC controlC)
+    private static ViewerRun Start(Ending ending, RecordingControlC controlC)
     {
         var events = new List<string>();
         controlC.Events = events;
@@ -252,7 +295,7 @@ public class TuiConsoleScopeTests
 
         // A failing agent is only a failing agent if the episode is the real one: the
         // stepper's own thread has to be the thing that fails.
-        var roster = ending == "a failing agent"
+        var roster = ending == Ending.FailingAgent
             ? new IAgent[] { new ThrowingAgent(0, "the agent gave up"), new WaitingAgent(1) }
             : new IAgent[] { new WaitingAgent(0), new WaitingAgent(1) };
 
@@ -271,24 +314,22 @@ public class TuiConsoleScopeTests
 
         switch (ending)
         {
-            case "quit":
+            case Ending.Quit:
                 keys.Queue(Character('q'));
                 break;
-            case "ctrl-c":
+            case Ending.ControlC:
                 keys.Queue(new TuiKey(TuiKeyKind.Interrupt));
                 break;
-            case "end of input":
+            case Ending.EndOfInput:
                 keys.Close();
                 break;
-            case "a failing agent":
-                // The step has to be asked for: a run that only reads keys never
-                // advances the episode on its own, so there would be no decide to
-                // fail and the run would simply wait.
+            default:
+                // A failing agent is only a failing agent if the episode is the real
+                // one, and only once a step has been asked for: a run that reads
+                // keys and presses nothing else never advances the episode, so there
+                // would be no decide to fail and the run would simply wait.
                 keys.Queue(Character('n'));
                 keys.QuitWhen(() => episode.Failure is not null);
-                break;
-            default:
-                Assert.Fail($"unknown ending '{ending}'.");
                 break;
         }
 
@@ -298,39 +339,35 @@ public class TuiConsoleScopeTests
             stderr,
             Interactive,
             ascii: false,
-            Console(controlC, events, keys),
+            Composed(controlC, events, keys),
             cursor,
             surface,
             new StaticClock());
 
         episode.Stop();
 
-        return (result, surface);
+        return new ViewerRun(result, surface, episode);
     }
 
     /// <summary>
     /// The console a run is composed from, whose key factory records the fact that
     /// it was asked for one — which is the event a refused run must never reach.
     /// </summary>
-    private static TuiConsole Console(IControlCAsInput controlC, List<string> events, RecordingKeys keys) =>
-        Console(controlC, events, () => keys);
+    private static TuiConsole Composed(IControlCAsInput controlC, List<string> events, RecordingKeys keys) =>
+        Composed(controlC, events, () => keys);
 
-    private static TuiConsole Console(IControlCAsInput controlC, List<string> events, Func<IKeySource> keys) =>
+    private static TuiConsole Composed(IControlCAsInput controlC, List<string> events, Func<IKeySource> keys) =>
         new(controlC, () =>
         {
             events.Add("keys built");
             return keys();
         });
 
-    private static RecordingKeys Keys(string ending)
+    /// <summary>A key source that hands over the quit key and then nothing.</summary>
+    private static RecordingKeys Keys()
     {
-        var keys = new RecordingKeys(new List<string>());
-
-        if (ending == "quit")
-        {
-            keys.Queue(Character('q'));
-        }
-
+        var keys = new RecordingKeys([]);
+        keys.Queue(Character('q'));
         return keys;
     }
 
@@ -339,7 +376,7 @@ public class TuiConsoleScopeTests
         using var stdout = new StringWriter();
         using var stderr = new StringWriter();
         return (
-            CliApp.Run(args, stdout, stderr, CliTerminal.For(stderr), TuiConsole.Of(controlC)),
+            CliApp.Run(args, stdout, stderr, CliTerminal.For(stderr), TuiConsole.Default with { ControlCAsInput = controlC }),
             stdout.ToString(),
             stderr.ToString());
     }
@@ -415,8 +452,6 @@ public class TuiConsoleScopeTests
         private bool _closed;
 
         internal RecordingKeys(List<string> events) => _events = events;
-
-        internal List<TuiKey> Queued { get; init; } = new();
 
         internal void Queue(params TuiKey[] keys)
         {

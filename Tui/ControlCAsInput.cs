@@ -16,10 +16,20 @@ namespace Lattice.Tui;
 /// </remarks>
 public interface IControlCAsInput
 {
-    /// <summary>The setting as the process currently has it.</summary>
+    /// <summary>
+    /// Reads the setting the process is running with. Safe to ask on any console,
+    /// but only ever worth asking after the redirected-stream refusal: it is a
+    /// console input property, and on Windows it is the same call the setter makes.
+    /// </summary>
     bool Get();
 
-    /// <summary>Makes the process-wide setting so.</summary>
+    /// <summary>
+    /// Makes the process-wide setting so. On Windows this needs a real console
+    /// input handle: it calls <c>GetConsoleMode</c> on standard input and then
+    /// <c>SetConsoleMode</c>, throwing <see cref="System.ComponentModel.Win32Exception"/>
+    /// when standard input is a file or a pipe. Nothing may call this on the way to
+    /// refusing a run.
+    /// </summary>
     void Set(bool value);
 }
 
@@ -75,6 +85,16 @@ public sealed class ControlCAsInputScope : IDisposable
     /// Reads the setting the process currently has, asks for Ctrl-C as input, and
     /// hands back a scope that will return the value it found.
     /// </summary>
+    /// <remarks>
+    /// Ctrl-C has to arrive as a key, not only as a signal. The terminal guard puts
+    /// the console in raw mode, which clears ISIG, so the console generates no
+    /// interrupt from the control character — and .NET's
+    /// <see cref="Console.ReadKey(bool)"/> deliberately never returns Ctrl-C as a key
+    /// unless this is set. Without it a Ctrl-C on a real terminal is swallowed: the
+    /// viewer neither quits nor puts the terminal back. The
+    /// <see cref="Console.CancelKeyPress"/> path still covers an interrupt raised
+    /// from anywhere else.
+    /// </remarks>
     public static ControlCAsInputScope Enter(IControlCAsInput controlC)
     {
         ArgumentNullException.ThrowIfNull(controlC);
@@ -99,15 +119,21 @@ public sealed class ControlCAsInputScope : IDisposable
 
         _restored = true;
 
+        // Deliberately unguarded by type. This restore's only contract is that it
+        // does not throw: it runs while the run is unwinding, so anything it raised
+        // would travel out in place of the status the run actually ended with — and a
+        // console that is gone reports that in more ways than there are exception
+        // types to enumerate. The Windows setter alone throws Win32Exception,
+        // IOException or InvalidOperationException depending on which handle went
+        // away first.
         try
         {
             _controlC.Set(_prior);
         }
-        catch (Exception exception) when (exception is IOException
-            or InvalidOperationException
-            or PlatformNotSupportedException
-            or System.ComponentModel.Win32Exception)
+        catch (Exception)
         {
+            // Nothing to report: the process is leaving the terminal, and a failure
+            // to tidy up is not a failure of the run.
         }
     }
 }

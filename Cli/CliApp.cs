@@ -408,6 +408,12 @@ public static class CliApp
     /// <param name="cursor">The live cursor, or null to play the recording.</param>
     /// <param name="session">The terminal seam; the guard's by default.</param>
     /// <param name="clock">How elapsed time is measured.</param>
+    /// <remarks>
+    /// The parameters are spelled out rather than taken as a
+    /// <see cref="TuiHostRequest"/> because the key source is the one member that does
+    /// not exist yet: it is built here, after the refusal. Handing the host a record
+    /// with that member already filled would mean building it first.
+    /// </remarks>
     internal static TuiRunResult StartViewer(
         ReplayDocument document,
         TextWriter stdout,
@@ -426,8 +432,9 @@ public static class CliApp
             return new TuiRunResult(UsageError.ExitCode, refusal);
         }
 
-        // Declared first so it is disposed last: the setting goes back before the
-        // reading thread is left to the process.
+        // The key source is declared first so it is disposed LAST, and the scope
+        // second so it is disposed FIRST: the setting goes back before the reading
+        // thread is left to the process, and both happen after the terminal is back.
         using var keys = console.Keys();
         using var controlC = ControlCAsInputScope.Enter(console.ControlCAsInput);
 
@@ -467,12 +474,12 @@ public static class CliApp
     {
         var setup = BuildLiveSetup(args, stderr);
 
-        // The terminal is settled before the stepper is: a redirected run must
-        // leave nothing running and nothing on screen, which is only true if the
-        // check comes first. The host refuses it, with the same one-line reason and
-        // the same status the replay viewer uses. Asked again inside StartViewer,
-        // where the key source is built; the answer is the same either way and only
-        // one of the two checks has anything running behind it.
+        // The terminal is settled before the stepper is: a redirected run must leave
+        // nothing running and nothing on screen, and that is only true if the check
+        // comes first. StartViewer asks the same question again before it builds
+        // anything, and the answer is the same — this one exists because the episode
+        // is about to start a thread, and StartViewer's is because a key source is
+        // about to be built. Neither is reachable when the other has already run.
         var capabilities = CapabilityDetector.Detect();
         if (TuiHost.RefusalFor(capabilities) is { } refusal)
         {

@@ -127,23 +127,19 @@ public static class CockpitLayout
         $"the cockpit needs {MinimumWidth}x{MinimumHeight}; resize for the full layout";
 
     /// <summary>
-    /// The title row's mode word: what kind of run the reader is looking at. Read
-    /// from the same one fact the timeline's LIVE label and the live key hints read
-    /// — whether the frame carries live state — because a title that calls a live
-    /// run a replay is contradicted by the row directly underneath it, and a second
-    /// flag passed in alongside <see cref="LiveState"/> could fall out of step with
-    /// it. Lower case to match the rest of the row, and the same word the LIVE
+    /// The title row: the product, what kind of run this is, and the recording's own
+    /// name.
+    /// </summary>
+    /// <remarks>
+    /// The mode word comes from the same one fact the timeline's LIVE label and the
+    /// live key hints read — whether the frame carries live state. A title calling a
+    /// live run a replay is contradicted by the row directly underneath it, and a
+    /// second flag passed in alongside <see cref="LiveState"/> could fall out of step
+    /// with it. Lower case to match the rest of the row, and the same word the LIVE
     /// label uses.
-    /// </summary>
-    public static string ModeWord(LiveState? live) => live is not null ? "live" : "replay";
-
-    /// <summary>
-    /// The title row: the product, what kind of run this is, and the recording's
-    /// own name. Clipped to the terminal, so a narrow one loses the name rather than
-    /// the mode word.
-    /// </summary>
-    public static string TitleRow(LiveState? live, string recordingTitle) =>
-        $"LATTICE TUI  {ModeWord(live)}  {recordingTitle}";
+    /// </remarks>
+    private static string TitleRow(LiveState? live, string recordingTitle) =>
+        $"LATTICE TUI  {(live is not null ? "live" : "replay")}  {recordingTitle}";
 
     /// <summary>Draws one cockpit frame.</summary>
     /// <remarks>

@@ -6,8 +6,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-No unreleased work is recorded above the 3.1.0 section at this revision. The next
-version's section is created when work lands on `main`.
+### Fixed
+
+- `lattice tui replay` on a redirected run reported a runtime failure (exit 1)
+  where the usage status (`2`) is correct, on Windows only. The replay path built
+  its key reader — which asks the console for its input mode — before the viewer
+  had decided whether the terminal could carry it, and that ask throws when
+  standard input is redirected. Both subcommands now decide the refusal from the
+  detected capabilities before anything is built, so a redirected run touches no
+  console input property at all.
+- `Console.TreatControlCAsInput` is now set for the lifetime of the interactive
+  viewer and the prior value is put back on every way out — a quit, a Ctrl-C, the
+  end of the input, a failed simulation, an exception during start-up — instead of
+  being left changed for the rest of the process.
+- The cockpit title row said `replay` for every run. It now reads `live` when the
+  frame carries live state, which is the same fact the timeline's `LIVE` label and
+  the live key hints already read. Replay frames still read `replay`.
 
 ## [3.1.0] - 2026-10-01
 

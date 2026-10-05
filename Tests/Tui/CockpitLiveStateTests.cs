@@ -224,58 +224,32 @@ public class CockpitLiveStateTests
     }
 
     /// <summary>
-    /// The title row names what kind of run the reader is looking at, and it names
-    /// it from the same single fact the timeline and the hint row read: whether the
-    /// frame carries live state. A live run calling itself a replay is the one claim
-    /// on this screen that is contradicted by the row underneath it.
+    /// The title row names what kind of run the reader is looking at, and it names it
+    /// from the same single fact the timeline and the hint row read: whether the frame
+    /// carries live state. A live run calling itself a replay is the one claim on this
+    /// screen that the row underneath it contradicts.
     /// </summary>
+    /// <remarks>
+    /// The two cases share a recording named <c>live-episode</c> on purpose. The
+    /// recording's own title therefore contains the word "live" in both cases, so a
+    /// check that merely looked for "live" somewhere in the row would pass on the
+    /// replay frame too and prove nothing. The mode word is compared as the whole
+    /// title instead: a live row is one title and a replay row is the other.
+    /// </remarks>
     [Fact]
-    public void TheTitleRowNamesTheRunAndTheModeWordIsReadAsItsOwnField()
+    public void TheTitleRowNamesTheKindOfRunAndTheWholeTitleReachesTheRow()
     {
-        // The word is its own field, not a substring of the whole title: a replay is
-        // titled "live-episode" in these fixtures, so a test that searched the title
-        // for "live" would be asserting nothing at all.
-        Assert.Equal("live", Mode(Render(new LiveState(6, 30, Seed: 42))[0]));
-        Assert.Equal("replay", Mode(Render(Live: null)[0]));
+        var live = Render(new LiveState(6, 30))[0];
+        var replay = Render(Live: null)[0];
 
-        Assert.Contains("LATTICE TUI  live  live-episode", string.Join("\n", Render(new LiveState(6, 30), frameIndex: 0)), StringComparison.Ordinal);
-        Assert.Contains("LATTICE TUI  replay  live-episode", string.Join("\n", Render(null, frameIndex: 0)), StringComparison.Ordinal);
-    }
+        Assert.StartsWith("╭─LATTICE TUI  live  live-episode─", live, StringComparison.Ordinal);
+        Assert.StartsWith("╭─LATTICE TUI  replay  live-episode─", replay, StringComparison.Ordinal);
 
-    /// <summary>
-    /// The title row at the minimum terminal shows the whole title: a mode word that
-    /// pushed the episode's name off the row would name the kind of run and lose the
-    /// run.
-    /// </summary>
-    [Fact]
-    public void TheWholeTitleFitsOnTheTitleRowAtTheMinimumTerminal()
-    {
-        foreach (var live in new[] { true, false })
-        {
-            // The whole row from its corner, not the title field alone: a title that
-            // had been clipped would still start with the product name, so the check
-            // has to reach the last column of the name itself.
-            var row = live ? Render(new LiveState(6, 30))[0] : Render(Live: null)[0];
-            var title = "LATTICE TUI  " + (live ? "live" : "replay") + "  live-episode";
-
-            Assert.Equal("╭─", row[..2]);
-            Assert.Equal(title, row.Substring(2, title.Length));
-
-            // And nothing of it was cut: the border starts immediately after the name,
-            // so every column of the title reached the row.
-            Assert.Equal('─', row[2 + title.Length]);
-        }
-    }
-
-    /// <summary>
-    /// The mode word: the field between the product name and the episode's own name,
-    /// taken off the title row with the border trimmed off the end of it.
-    /// </summary>
-    private static string Mode(string titleRow)
-    {
-        var fields = titleRow[2..].TrimEnd('─').Split("  ", StringSplitOptions.RemoveEmptyEntries);
-        Assert.True(fields.Length >= 2, $"the title row names no mode word: '{titleRow}'");
-        return fields[1];
+        // The border starts immediately after the name in each, so every column of
+        // the title reached the row: a clipped title would lose the end of the name
+        // and the border would be standing where the name was.
+        Assert.Equal('─', live["╭─LATTICE TUI  live  live-episode".Length]);
+        Assert.Equal('─', replay["╭─LATTICE TUI  replay  live-episode".Length]);
     }
 
     private static string Hints(string[] rows, string expected) =>

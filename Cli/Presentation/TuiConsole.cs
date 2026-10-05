@@ -16,6 +16,8 @@ namespace Lattice.Cli.Presentation;
 /// <para>
 /// The key source is a factory rather than an instance because each run gets a
 /// reader and disposes it: a queue, and the thread behind it, belong to one run.
+/// A caller with its own setting takes <see cref="Default"/> with that one member
+/// replaced, rather than rebuilding the key reader too.
 /// </para>
 /// </remarks>
 /// <param name="ControlCAsInput">The Ctrl-C-as-input setting the run owns while it lasts.</param>
@@ -26,7 +28,4 @@ public sealed record TuiConsole(IControlCAsInput ControlCAsInput, Func<IKeySourc
     public static TuiConsole Default { get; } = new(
         new ConsoleControlCAsInput(),
         () => new KeyQueue(ConsoleKeyReader.FromConsole()));
-
-    /// <summary>A console whose setting a test supplies, over the real key reader.</summary>
-    public static TuiConsole Of(IControlCAsInput controlCAsInput) => Default with { ControlCAsInput = controlCAsInput };
 }

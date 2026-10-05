@@ -226,25 +226,34 @@ public static class TuiHost
                 "A host must be allowed at least one frame per second.");
         }
 
-        // Once per run, and before the alternate screen: see the remarks.
-        request.Session.RequestUtf8Output();
+        // The screen seam owns the refusal's second half — the order in which a
+        // terminal is entered and put back — so a screen that is not a replay gets
+        // that order without re-deriving it. The refusal above is asked first
+        // because this call builds nothing until it has answered.
+        var opened = ScreenHost.Open(
+            request.Session,
+            request.Capabilities,
+            request.ForceAscii,
+            request.Output);
 
-        using var session = request.Session.Enter(request.Output);
+        if (opened.Screen is not { } screen)
+        {
+            return new TuiRunResult(UsageRefused, opened.Refusal);
+        }
+
+        using var host = screen;
         var quit = false;
-        session.Interrupted += () => quit = true;
+        host.Interrupted += () => quit = true;
 
-        var size = new PaneSize(
-            Math.Max(1, request.Capabilities.Width),
-            Math.Max(1, request.Capabilities.Height));
-        var glyphs = GlyphModes.Resolve(request.Capabilities.Utf8, request.ForceAscii);
+        var size = host.Size;
+        var glyphs = host.Glyphs;
         var fill = request.Capabilities.PanelFill;
         var playback = request.Cursor ?? new ReplayPlayback(request.Document);
         var frameInterval = TimeSpan.FromSeconds(1.0 / request.MaxFramesPerSecond);
-        var written = (CellBuffer?)null;
 
         // The first frame is always written: a viewer that shows nothing until the
         // reader presses a key looks broken.
-        written = Compose(request, playback, size, glyphs, fill, written, session);
+        Compose(request, playback, size, glyphs, fill, host);
         var lastTickAt = request.Clock.Now;
 
         while (!quit && !playback.IsFinished)
@@ -286,7 +295,7 @@ public static class TuiHost
 
                 if (playback.Apply(key))
                 {
-                    written = Compose(request, playback, size, glyphs, fill, written, session);
+                    Compose(request, playback, size, glyphs, fill, host);
                 }
 
                 continue;
@@ -298,7 +307,7 @@ public static class TuiHost
 
             if (playback.Advance(elapsed))
             {
-                written = Compose(request, playback, size, glyphs, fill, written, session);
+                Compose(request, playback, size, glyphs, fill, host);
             }
         }
 
@@ -328,21 +337,18 @@ public static class TuiHost
     }
 
     /// <summary>
-    /// Composes the cockpit, writes only what differs from what is on screen, and
-    /// hands back the grid it composed. A terminal that has gone away costs the
-    /// run nothing: the failure is swallowed and the previous grid is kept, so the
-    /// loop carries on quietly until the reader quits.
+    /// Composes the cockpit and hands it to the screen seam, which writes only what
+    /// differs from what is on show.
     /// </summary>
-    private static CellBuffer? Compose(
+    private static void Compose(
         TuiHostRequest request,
         ICockpitCursor playback,
         PaneSize size,
         GlyphMode glyphs,
         Rgb? fill,
-        CellBuffer? previous,
-        ITerminalSession session)
+        ScreenHost host)
     {
-        var composed = CockpitLayout.Render(new CockpitRequest(
+        host.Present(CockpitLayout.Render(new CockpitRequest(
             playback.Document,
             playback.Index,
             size,
@@ -350,23 +356,6 @@ public static class TuiHost
             fill,
             playback.Phase,
             new PlaybackState(playback.IsPaused, playback.StepsPerSecond),
-            playback.Live));
-
-        var diff = FrameDiff.Render(previous, composed, request.Capabilities.Depth);
-        if (diff.Length == 0)
-        {
-            return composed;
-        }
-
-        try
-        {
-            session.Write(diff);
-        }
-        catch (Exception exception) when (exception is IOException or ObjectDisposedException)
-        {
-            return previous;
-        }
-
-        return composed;
+            playback.Live)));
     }
 }

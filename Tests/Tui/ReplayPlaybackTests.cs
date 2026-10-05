@@ -165,6 +165,31 @@ public class ReplayPlaybackTests
         }
     }
 
+    /// <summary>
+    /// Naming Enter, Tab, Backspace, Delete and Escape as their own kinds is a
+    /// change to the input vocabulary, and the cockpit is the one consumer that
+    /// must not notice: it has no field to commit and no text to edit, so each of
+    /// them has to leave the cursor exactly where it was.
+    /// </summary>
+    [Fact]
+    public void TheTextEntryKeysMoveTheCockpitCursorNothing()
+    {
+        foreach (var kind in new[]
+                 {
+                     TuiKeyKind.Enter, TuiKeyKind.Tab, TuiKeyKind.Backspace,
+                     TuiKeyKind.Delete, TuiKeyKind.Escape,
+                 })
+        {
+            var playback = new ReplayPlayback(Document());
+            playback.TogglePause();
+            playback.StepForward();
+            var before = (playback.Index, playback.IsPaused, playback.StepsPerSecond);
+
+            Assert.False(playback.Apply(new TuiKey(kind)));
+            Assert.Equal(before, (playback.Index, playback.IsPaused, playback.StepsPerSecond));
+        }
+    }
+
     private static ReplayDocument Document()
     {
         var frames = new List<ReplayFrame>();

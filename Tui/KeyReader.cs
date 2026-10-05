@@ -37,6 +37,30 @@ public enum TuiKeyKind
     /// for it and a host must treat it as a request to leave.
     /// </summary>
     Interrupt,
+
+    /// <summary>
+    /// The return key. A named kind because a screen with text fields has to be
+    /// able to commit or run on it, and a host that only saw the <c>\r</c> it
+    /// used to arrive as would have to guess at which one was meant.
+    /// </summary>
+    Enter,
+
+    /// <summary>The tab key: the field-to-field key on a form.</summary>
+    Tab,
+
+    /// <summary>The backspace key: delete the character before the caret.</summary>
+    Backspace,
+
+    /// <summary>The delete key: delete the character at the caret.</summary>
+    Delete,
+
+    /// <summary>
+    /// The escape key: leave what is in progress without discarding it. Named
+    /// rather than carried as <c></c> because the control character it
+    /// arrives as is indistinguishable from the start of an escape sequence the
+    /// terminal has not finished sending.
+    /// </summary>
+    Escape,
 }
 
 /// <summary>One key press: what it was, and the character when it was one.</summary>
@@ -248,6 +272,11 @@ public static class ConsoleKeyReader
             ConsoleKey.End => new TuiKey(TuiKeyKind.End),
             ConsoleKey.PageUp => new TuiKey(TuiKeyKind.PageUp),
             ConsoleKey.PageDown => new TuiKey(TuiKeyKind.PageDown),
+            ConsoleKey.Enter => new TuiKey(TuiKeyKind.Enter),
+            ConsoleKey.Tab => new TuiKey(TuiKeyKind.Tab),
+            ConsoleKey.Backspace => new TuiKey(TuiKeyKind.Backspace),
+            ConsoleKey.Delete => new TuiKey(TuiKeyKind.Delete),
+            ConsoleKey.Escape => new TuiKey(TuiKeyKind.Escape),
             _ => new TuiKey(TuiKeyKind.Character, key.KeyChar),
         };
     }

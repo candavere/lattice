@@ -90,6 +90,54 @@ public class KeyReaderTests
         }
     }
 
+    /// <summary>
+    /// The keys a text-entry screen binds but the cockpit has no use for. They are
+    /// named here for the same reason the navigation keys are: a host has to be
+    /// able to tell Enter from a character, or every field would commit on the
+    /// first letter typed.
+    /// </summary>
+    [Fact]
+    public void TheTextEntryKeysKeepTheirIdentityThroughTheMapping()
+    {
+        var cases = new (ConsoleKey Key, TuiKeyKind Expected)[]
+        {
+            (ConsoleKey.Enter, TuiKeyKind.Enter),
+            (ConsoleKey.Tab, TuiKeyKind.Tab),
+            (ConsoleKey.Backspace, TuiKeyKind.Backspace),
+            (ConsoleKey.Delete, TuiKeyKind.Delete),
+            (ConsoleKey.Escape, TuiKeyKind.Escape),
+        };
+
+        foreach (var (key, expected) in cases)
+        {
+            var mapped = ConsoleKeyReader.Map(new ConsoleKeyInfo(
+                '\0',
+                key,
+                shift: false,
+                alt: false,
+                control: false));
+
+            Assert.Equal(expected, mapped.Kind);
+        }
+    }
+
+    /// <summary>
+    /// Naming those keys must not take the control characters they used to arrive
+    /// as away from the cockpit: <c>ReplayPlayback.Apply</c> matches on
+    /// <see cref="TuiKeyKind.Character"/> and ignored every one of them, so each
+    /// still has to be a kind the cockpit does nothing with rather than becoming
+    /// a character it would try to act on.
+    /// </summary>
+    [Fact]
+    public void TheTextEntryKeysCarryNoGlyph()
+    {
+        foreach (var key in new[] { TuiKeyKind.Enter, TuiKeyKind.Tab, TuiKeyKind.Backspace, TuiKeyKind.Delete, TuiKeyKind.Escape })
+        {
+            Assert.Equal('\0', new TuiKey(key).Glyph);
+            Assert.False(new TuiKey(key).IsQuit);
+        }
+    }
+
     [Fact]
     public void CharactersAndTheInterruptKeepTheirIdentityThroughTheMapping()
     {

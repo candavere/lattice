@@ -682,7 +682,8 @@ public class LiveEpisodeInvariantTests
                 _rig = rig;
             }
 
-            public AgentAction Decide(Observation observation)
+            /// <summary>Hides the base's, so this agent counts the decide it is inside.</summary>
+            public new AgentAction Decide(Observation observation)
             {
                 Interlocked.Increment(ref _rig.Deciding);
                 try

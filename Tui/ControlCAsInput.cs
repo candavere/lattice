@@ -74,6 +74,7 @@ public sealed class ControlCAsInputScope : IDisposable
     private readonly IControlCAsInput _controlC;
     private readonly bool _prior;
     private bool _restored;
+    private bool _suspended;
 
     private ControlCAsInputScope(IControlCAsInput controlC, bool prior)
     {
@@ -105,6 +106,40 @@ public sealed class ControlCAsInputScope : IDisposable
     }
 
     /// <summary>
+    /// Gives the setting back while the scope is still alive, and takes it again on
+    /// <see cref="Resume"/>.
+    /// <para>
+    /// This is for a screen that also starts plain commands. A command is not a
+    /// viewer: it must run under the process's own prior setting, so Ctrl-C reaches
+    /// it as a signal and interrupts it, rather than arriving as a key the command
+    /// would ignore. Resuming re-reads nothing — it re-applies the value this scope
+    /// took — so a command that changed the setting does not get to keep it.
+    /// </para>
+    /// </summary>
+    public void Suspend()
+    {
+        if (_suspended)
+        {
+            return;
+        }
+
+        _suspended = true;
+        Restore();
+    }
+
+    /// <summary>Takes the setting again after a <see cref="Suspend"/>.</summary>
+    public void Resume()
+    {
+        if (!_suspended)
+        {
+            return;
+        }
+
+        _suspended = false;
+        Try(() => _controlC.Set(true));
+    }
+
+    /// <summary>
     /// Puts the prior value back, exactly once, whether or not the reading thread
     /// has finished. A console that is no longer there is a console the viewer is
     /// already leaving, so the failure is swallowed rather than raised over the
@@ -119,16 +154,26 @@ public sealed class ControlCAsInputScope : IDisposable
 
         _restored = true;
 
-        // Deliberately unguarded by type. This restore's only contract is that it
-        // does not throw: it runs while the run is unwinding, so anything it raised
-        // would travel out in place of the status the run actually ended with — and a
-        // console that is gone reports that in more ways than there are exception
-        // types to enumerate. The Windows setter alone throws Win32Exception,
-        // IOException or InvalidOperationException depending on which handle went
-        // away first.
+        Restore();
+    }
+
+    /// <summary>
+    /// Puts the prior value back, swallowing a console that has gone away. The
+    /// restore's only contract is that it does not throw: it runs while the run is
+    /// unwinding, so anything it raised would travel out in place of the status the
+    /// run actually ended with — and a console that is gone reports that in more ways
+    /// than there are exception types to enumerate. The Windows setter alone throws
+    /// Win32Exception, IOException or InvalidOperationException depending on which
+    /// handle went away first.
+    /// </summary>
+    private void Restore() => Try(() => _controlC.Set(_prior));
+
+    /// <summary>Runs one console write, swallowing every failure for the reason above.</summary>
+    private static void Try(Action write)
+    {
         try
         {
-            _controlC.Set(_prior);
+            write();
         }
         catch (Exception)
         {

@@ -189,6 +189,69 @@ public class TuiConsoleScopeTests
     }
 
     /// <summary>
+    /// A screen that also starts plain commands has to give the setting back while
+    /// they run: a command is not a viewer, and Ctrl-C has to reach it the way it
+    /// reaches the same command typed at a shell. Suspending puts back what was
+    /// found and resuming takes it again — so a command that changed the setting does
+    /// not get to keep it.
+    /// </summary>
+    [Fact]
+    public void SuspendingGivesTheSettingBackAndResumingTakesItAgain()
+    {
+        var controlC = new RecordingControlC(original: false);
+
+        using (var scope = ControlCAsInputScope.Enter(controlC))
+        {
+            controlC.Calls.Clear();
+
+            scope.Suspend();
+            Assert.False(controlC.Value);
+
+            scope.Resume();
+            Assert.True(controlC.Value);
+
+            // Given back, taken again: read once and set true on the way in, then
+            // set false and set true across the pair, and the dispose puts the
+            // original value back at the end.
+            Assert.Equal(["set false", "set true"], controlC.Calls);
+        }
+
+        Assert.Equal(["set false", "set true", "set false"], controlC.Calls);
+        Assert.False(controlC.Value);
+    }
+
+    /// <summary>
+    /// A suspended scope that is disposed must still put the value back, and must not
+    /// leave the process with Ctrl-C as input for the rest of its life.
+    /// </summary>
+    [Fact]
+    public void AScopeDisposedWhileSuspendedStillRestoresTheValue()
+    {
+        var controlC = new RecordingControlC(original: false);
+
+        using (var scope = ControlCAsInputScope.Enter(controlC))
+        {
+            scope.Suspend();
+        }
+
+        Assert.False(controlC.Value);
+        Assert.Equal("set false", controlC.Calls[^1]);
+    }
+
+    [Fact]
+    public void ASuspendAndAResumeThatAreNotPairedDoNotThrow()
+    {
+        var controlC = new RecordingControlC(original: false);
+        using var scope = ControlCAsInputScope.Enter(controlC);
+
+        scope.Resume();
+        scope.Suspend();
+        scope.Resume();
+
+        Assert.True(controlC.Value);
+    }
+
+    /// <summary>
     /// A start-up that throws leaves nothing of the run behind: the setting goes
     /// back, and the failure is the caller's rather than a swallowed one.
     /// </summary>

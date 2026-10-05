@@ -118,6 +118,14 @@ public sealed class LaunchpadForm
     /// <summary>Whether the reader has asked for the form to be run.</summary>
     public bool WantsToRun => _wantsToRun;
 
+    /// <summary>
+    /// Reports that a run has been started, so the screen stops asking. The values
+    /// stay: a reader whose command failed comes back to the form they filled in, not
+    /// to an empty one, and re-typing a trajectory is the worst thing this screen
+    /// could ask of them.
+    /// </summary>
+    public void Acknowledge() => _wantsToRun = false;
+
     /// <summary>Whether the reader has asked to leave.</summary>
     public bool HasQuit => _quit;
 

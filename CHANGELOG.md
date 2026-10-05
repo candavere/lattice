@@ -20,6 +20,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   field, including `q`, `j` and `k`; Backspace, Delete, arrows, Home and End edit;
   Enter or Tab commits; Esc leaves the field and keeps the text. A navigation
   shortcut never fires while a field has focus.
+- A command that can be run two ways says so, and the reader chooses. `simulate` is
+  either watched live in the cockpit or recorded to a file as `lattice simulate` does;
+  the run mode appears as a field on the form only where there is a choice to make, is
+  dimmed while it is untouched, and never appears in the command line — it decides
+  which path the command takes rather than naming an argument.
+- A command's exit status is shown until the reader presses a key to acknowledge it.
+  That key is consumed rather than acted on, so the keypress meant for "that is fine"
+  does not move the selection underneath a reader who was looking at the status.
 - Replay and `simulate` open the existing cockpit. Every other command leaves the
   alternate screen, restores the terminal, runs through the same `CliApp.Run` path
   with the process's own stdout and stderr, and shows its exit status when it

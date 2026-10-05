@@ -126,6 +126,25 @@ public static class CockpitLayout
         $"terminal is {Invariant(size.Width)}x{Invariant(size.Height)}; " +
         $"the cockpit needs {MinimumWidth}x{MinimumHeight}; resize for the full layout";
 
+    /// <summary>
+    /// The title row's mode word: what kind of run the reader is looking at. Read
+    /// from the same one fact the timeline's LIVE label and the live key hints read
+    /// — whether the frame carries live state — because a title that calls a live
+    /// run a replay is contradicted by the row directly underneath it, and a second
+    /// flag passed in alongside <see cref="LiveState"/> could fall out of step with
+    /// it. Lower case to match the rest of the row, and the same word the LIVE
+    /// label uses.
+    /// </summary>
+    public static string ModeWord(LiveState? live) => live is not null ? "live" : "replay";
+
+    /// <summary>
+    /// The title row: the product, what kind of run this is, and the recording's
+    /// own name. Clipped to the terminal, so a narrow one loses the name rather than
+    /// the mode word.
+    /// </summary>
+    public static string TitleRow(LiveState? live, string recordingTitle) =>
+        $"LATTICE TUI  {ModeWord(live)}  {recordingTitle}";
+
     /// <summary>Draws one cockpit frame.</summary>
     /// <remarks>
     /// A terminal too small to frame — one cell, or a shape with no room for a box —
@@ -156,7 +175,7 @@ public static class CockpitLayout
         cells.DrawText(
             2,
             0,
-            Clip(request, "LATTICE TUI  replay  " + Title(request.Document), Math.Max(0, size.Width - 4)),
+            Clip(request, TitleRow(request.Live, Title(request.Document)), Math.Max(0, size.Width - 4)),
             new Cell(' ', palette.Accent, request.PanelFill));
 
         if (IsCockpit(size))

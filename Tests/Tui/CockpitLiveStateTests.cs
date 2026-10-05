@@ -170,9 +170,14 @@ public class CockpitLiveStateTests
         // frames and are identical. The provenance row is not, and must not be: a
         // live episode has not been recorded, so it has no schema version and no
         // digest to name.
+        // Two rows and no more: the provenance row, which says what a live episode
+        // has not been recorded with, and the title row, which now names the kind of
+        // run rather than always naming a replay.
+        var expectedToDiffer = new HashSet<int> { 0, 17 };
+
         for (var row = 0; row < Cockpit.Height - 4; row++)
         {
-            if (row == 17)
+            if (expectedToDiffer.Contains(row))
             {
                 Assert.NotEqual(recording[row], live[row]);
                 continue;
@@ -216,6 +221,61 @@ public class CockpitLiveStateTests
 
         Assert.Equal("LIVE tick 0/0 of 30", rows[TimelineRow].Substring(2, 19));
         Assert.Equal(0, rows[TimelineRow].Count(glyph => glyph == '\u2588'));
+    }
+
+    /// <summary>
+    /// The title row names what kind of run the reader is looking at, and it names
+    /// it from the same single fact the timeline and the hint row read: whether the
+    /// frame carries live state. A live run calling itself a replay is the one claim
+    /// on this screen that is contradicted by the row underneath it.
+    /// </summary>
+    [Fact]
+    public void TheTitleRowNamesTheRunAndTheModeWordIsReadAsItsOwnField()
+    {
+        // The word is its own field, not a substring of the whole title: a replay is
+        // titled "live-episode" in these fixtures, so a test that searched the title
+        // for "live" would be asserting nothing at all.
+        Assert.Equal("live", Mode(Render(new LiveState(6, 30, Seed: 42))[0]));
+        Assert.Equal("replay", Mode(Render(Live: null)[0]));
+
+        Assert.Contains("LATTICE TUI  live  live-episode", string.Join("\n", Render(new LiveState(6, 30), frameIndex: 0)), StringComparison.Ordinal);
+        Assert.Contains("LATTICE TUI  replay  live-episode", string.Join("\n", Render(null, frameIndex: 0)), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The title row at the minimum terminal shows the whole title: a mode word that
+    /// pushed the episode's name off the row would name the kind of run and lose the
+    /// run.
+    /// </summary>
+    [Fact]
+    public void TheWholeTitleFitsOnTheTitleRowAtTheMinimumTerminal()
+    {
+        foreach (var live in new[] { true, false })
+        {
+            // The whole row from its corner, not the title field alone: a title that
+            // had been clipped would still start with the product name, so the check
+            // has to reach the last column of the name itself.
+            var row = live ? Render(new LiveState(6, 30))[0] : Render(Live: null)[0];
+            var title = "LATTICE TUI  " + (live ? "live" : "replay") + "  live-episode";
+
+            Assert.Equal("╭─", row[..2]);
+            Assert.Equal(title, row.Substring(2, title.Length));
+
+            // And nothing of it was cut: the border starts immediately after the name,
+            // so every column of the title reached the row.
+            Assert.Equal('─', row[2 + title.Length]);
+        }
+    }
+
+    /// <summary>
+    /// The mode word: the field between the product name and the episode's own name,
+    /// taken off the title row with the border trimmed off the end of it.
+    /// </summary>
+    private static string Mode(string titleRow)
+    {
+        var fields = titleRow[2..].TrimEnd('─').Split("  ", StringSplitOptions.RemoveEmptyEntries);
+        Assert.True(fields.Length >= 2, $"the title row names no mode word: '{titleRow}'");
+        return fields[1];
     }
 
     private static string Hints(string[] rows, string expected) =>

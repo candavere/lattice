@@ -128,7 +128,10 @@ public class LiveCockpitGoldenTests
     private static void AssertFrameAndTitles(string[] lines)
     {
         Assert.Equal("\u256d", lines[0][..1]);
-        Assert.Equal("LATTICE TUI  replay  live-episode", lines[0].Substring(2, 33));
+        // "LATTICE TUI" is eleven columns, and the live mode word is four where
+        // "replay" was six — the whole title is thirty-one columns at 100 wide, and
+        // the border takes the two the shorter word leaves over.
+        Assert.Equal("LATTICE TUI  live  live-episode", lines[0].Substring(2, 31));
         Assert.Equal("\u256e", lines[0][^1..]);
         Assert.Equal(" WORLD ", lines[1].Substring(3, 7));
         Assert.Equal(" SCOREBOARD ", lines[1].Substring(69, 12));

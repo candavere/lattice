@@ -262,6 +262,32 @@ public static class ConsoleKeyReader
             return new TuiKey(TuiKeyKind.Interrupt);
         }
 
+        // The control characters a text-entry screen binds are recognised from the
+        // character as well as from the key name. A Unix console hands them over as
+        // the bare control character with no key name at all, so a mapping that only
+        // asked <see cref="ConsoleKey"/> would let Escape through as a character,
+        // where it is not printable and is dropped — a form with no way to leave a
+        // field. Matched before the key-name switch so both paths agree.
+        if (key.KeyChar is '\u001b')
+        {
+            return new TuiKey(TuiKeyKind.Escape);
+        }
+
+        if (key.KeyChar is '\t')
+        {
+            return new TuiKey(TuiKeyKind.Tab);
+        }
+
+        if (key.KeyChar is '\r' or '\n')
+        {
+            return new TuiKey(TuiKeyKind.Enter);
+        }
+
+        if (key.KeyChar is '\b' or '\u007f')
+        {
+            return new TuiKey(TuiKeyKind.Backspace);
+        }
+
         return key.Key switch
         {
             ConsoleKey.LeftArrow => new TuiKey(TuiKeyKind.Left),

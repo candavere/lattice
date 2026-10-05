@@ -138,6 +138,59 @@ public class KeyReaderTests
         }
     }
 
+    /// <summary>
+    /// Escape is recognised from its character as well as from its key name, because
+    /// a Unix console hands it over as the bare control character with no key name at
+    /// all. Without this a screen that binds Escape never sees it there: it arrives
+    /// as a character, is not printable, and is dropped — which is how Escape came to
+    /// do nothing on macOS while working on Windows.
+    /// <para>
+    /// Ctrl-C is not affected: it is matched first and keeps its own kind.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void EscapeIsRecognisedFromItsCharacterWhereTheConsoleNamesNoKey()
+    {
+        var mapped = ConsoleKeyReader.Map(new ConsoleKeyInfo('\u001b', 0, false, false, false));
+
+        Assert.Equal(TuiKeyKind.Escape, mapped.Kind);
+        Assert.Equal('\0', mapped.Glyph);
+    }
+
+    /// <summary>
+    /// The other control characters are recognised the same way, because the same
+    /// console names none of them: a form that could commit but not erase would be a
+    /// form with no backspace.
+    /// </summary>
+    [Theory]
+    [InlineData('\t', TuiKeyKind.Tab)]
+    [InlineData('\r', TuiKeyKind.Enter)]
+    [InlineData('\n', TuiKeyKind.Enter)]
+    [InlineData('\b', TuiKeyKind.Backspace)]
+    [InlineData('\u007f', TuiKeyKind.Backspace)]
+    public void TheTextEntryControlCharactersAreRecognisedWhereTheConsoleNamesNoKey(char typed, TuiKeyKind expected)
+    {
+        var mapped = ConsoleKeyReader.Map(new ConsoleKeyInfo(typed, 0, false, false, false));
+
+        Assert.Equal(expected, mapped.Kind);
+    }
+
+    /// <summary>
+    /// The space bar and an ordinary letter keep their own identity through the same
+    /// path: this is what stops the recognition above swallowing every character.
+    /// </summary>
+    [Fact]
+    public void AnOrdinaryCharacterIsStillACharacterWhereTheConsoleNamesNoKey()
+    {
+        Assert.Equal(
+            new TuiKey(TuiKeyKind.Character, 'x'),
+            ConsoleKeyReader.Map(new ConsoleKeyInfo('x', 0, false, false, false)));
+
+        Assert.Equal(
+            new TuiKey(TuiKeyKind.Character, ' '),
+            ConsoleKeyReader.Map(new ConsoleKeyInfo(' ', 0, false, false, false)));
+    }
+
     [Fact]
     public void CharactersAndTheInterruptKeepTheirIdentityThroughTheMapping()
     {

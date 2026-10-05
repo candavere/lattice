@@ -296,6 +296,40 @@ public class LaunchpadRunTests
         Assert.Contains("restore", run.Events);
     }
 
+    /// <summary>
+    /// A wait that times out is not the end of the input, and must not end the
+    /// screen. This is the failure a pty check on a real terminal finds and a test
+    /// over a scripted queue cannot: the real reader times out on every pause and
+    /// never reports end of input, so a screen that treats a timeout as an ending
+    /// closes on the first pause the reader takes to think.
+    /// </summary>
+    [Fact]
+    public void APauseIsNotTheEndOfTheInput()
+    {
+        var events = new List<string>();
+        var controlC = new RecordingControlC(events);
+        var surface = new RecordingSurface(events);
+        var keys = new ScriptedKeys(events) { IdleBeforeClosing = 40 };
+
+        var result = LaunchpadHost.Run(new LaunchpadHostRequest(
+            Commands: LaunchpadCatalog.Commands,
+            Output: TextWriter.Null,
+            Errors: TextWriter.Null,
+            Capabilities: Interactive,
+            Console: new(controlC, () => keys),
+            Session: surface,
+            Clock: new StaticClock(),
+            Runner: new StubRunner(events),
+            TrailingIdleFrames: 0));
+
+        Assert.Equal(0, result.ExitCode);
+
+        // The screen stayed up through every one of those pauses and then closed,
+        // rather than closing on the first.
+        Assert.True(keys.TimedOutWaits >= 40, $"only {keys.TimedOutWaits} waits timed out.");
+        Assert.Equal("restore", events[^3]);
+    }
+
     /// <summary>The keys that select render and type a trajectory into its field.</summary>
     private static IReadOnlyList<TuiKey> RenderWithTrajectory()
     {
@@ -318,6 +352,80 @@ public class LaunchpadRunTests
     }
 
     private static IReadOnlyList<TuiKey> Quit() => [new TuiKey(TuiKeyKind.Character, 'q')];
+
+    /// <summary>
+    /// Every key the reader produces reaches the form, including one that arrives
+    /// after a wait has already timed out. A loop that waits a second time to check
+    /// for the end of its input, and throws away whatever that wait produced, loses
+    /// keys at exactly the rate a reader thinks — which is how a screen that works
+    /// when you type steadily drops a character when you hesitate. Only a real
+    /// terminal finds this: a scripted queue answers instantly and hides it.
+    /// </summary>
+    [Fact]
+    public void AKeyThatArrivesAfterATimedOutWaitStillReachesTheForm()
+    {
+        var events = new List<string>();
+        var surface = new RecordingSurface(events);
+        var keys = new SlowKeys();
+
+        // Tab first, so the letters are typed into a field rather than steering.
+        keys.Queue(new TuiKey(TuiKeyKind.Tab));
+        foreach (var glyph in "abc")
+        {
+            keys.Queue(new TuiKey(TuiKeyKind.Character, glyph));
+        }
+
+        keys.Queue(new TuiKey(TuiKeyKind.Escape));
+        keys.Queue(new TuiKey(TuiKeyKind.Character, 'q'));
+
+        LaunchpadHost.Run(new LaunchpadHostRequest(
+            Commands: LaunchpadCatalog.Commands,
+            Output: TextWriter.Null,
+            Errors: TextWriter.Null,
+            Capabilities: Interactive,
+            Console: new(new RecordingControlC(events), () => keys),
+            Session: surface,
+            Clock: new StaticClock(),
+            Runner: new StubRunner(events),
+            TrailingIdleFrames: 0));
+
+        // Every key was handed over, and the screen drew the form with all three
+        // letters typed into the field — so none was dropped on the way.
+        Assert.Equal(6, keys.HandedOver);
+        Assert.Contains("abc", surface.Written, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A key source that answers every other wait with nothing and only produces on
+    /// the next, which is the shape that loses a key.
+    /// </summary>
+    private sealed class SlowKeys : IKeySource
+    {
+        private readonly Queue<TuiKey> _keys = new();
+        private bool _timed;
+
+        internal int HandedOver { get; private set; }
+
+        internal void Queue(TuiKey key) => _keys.Enqueue(key);
+
+        public KeyWait Wait(TimeSpan timeout, out TuiKey key)
+        {
+            _timed = !_timed;
+            if (_timed || _keys.Count == 0)
+            {
+                key = default;
+                return KeyWait.TimedOut;
+            }
+
+            HandedOver++;
+            key = _keys.Dequeue();
+            return KeyWait.Key;
+        }
+
+        public void Dispose()
+        {
+        }
+    }
 
     /// <summary>One driven run, and everything it did.</summary>
     private sealed record Run(
@@ -489,6 +597,15 @@ public class LaunchpadRunTests
 
         internal Action? OnWait { get; init; }
 
+        /// <summary>
+        /// How many waits report a timeout before the input ends, which is what a real
+        /// terminal's reader does on every pause and never otherwise.
+        /// </summary>
+        internal int IdleBeforeClosing { get; init; }
+
+        /// <summary>How many waits have timed out, so the screen's patience can be asserted.</summary>
+        internal int TimedOutWaits { get; private set; }
+
         internal void Queue(params TuiKey[] keys)
         {
             foreach (var key in keys)
@@ -508,6 +625,13 @@ public class LaunchpadRunTests
             }
 
             key = default;
+
+            if (TimedOutWaits < IdleBeforeClosing)
+            {
+                TimedOutWaits++;
+                return KeyWait.TimedOut;
+            }
+
             return KeyWait.Closed;
         }
 

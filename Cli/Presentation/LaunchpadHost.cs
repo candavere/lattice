@@ -125,15 +125,27 @@ public static class LaunchpadHost
                 return;
             }
 
-            if (state.Keys.Wait(IdleWait, out var key) != KeyWait.Key)
+            var outcome = state.Keys.Wait(IdleWait, out var key);
+
+            if (outcome == KeyWait.Closed)
             {
-                // Nothing arrived. A real terminal's reader blocks rather than ending,
-                // so this is the path a closed stdin or a driven test arrives on.
+                // <b>Only the end of the input ends the screen.</b> A wait that timed
+                // out is not that: a real terminal's reader blocks on the next key for
+                // as long as the reader sits there and reports nothing until one
+                // arrives. Treating a timeout as an ending would close the Launchpad on
+                // the first pause, which is every pause.
                 if (++state.Idle > state.Request.TrailingIdleFrames)
                 {
                     return;
                 }
 
+                continue;
+            }
+
+            if (outcome != KeyWait.Key)
+            {
+                // A timeout with the reader still going: nothing to do but look again,
+                // which is also what catches a terminal resized under the screen.
                 continue;
             }
 

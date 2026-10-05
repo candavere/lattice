@@ -332,6 +332,30 @@ public class LiveEpisodeInvariantTests
         }
     }
 
+    [Fact]
+    public void AnEpisodeBuildsOneRosterAndNeverBuildsOneItWillNotDispose()
+    {
+        // Every call to the factory builds a fresh pair of agents, and an agent that
+        // is built and never used is an agent nothing ever disposes. The count is the
+        // only honest way to see it: the pairs that decided, against the pairs that
+        // exist.
+        var rig = new CountingRig();
+        using var episode = Episode(rig.NewRoster, GenerousBudget);
+        var cursor = new LivePlayback(episode);
+
+        cursor.Apply(Character('n'));
+        WaitFor(() => Produced(episode) >= 1);
+        Assert.Equal(1, rig.Built);
+
+        cursor.Apply(Character('r'));
+        WaitFor(() => Produced(episode) == 0);
+
+        // One more pair for the new episode, and not one more: asking the setup
+        // whether its roster can carry perceptions must not be answered by building
+        // another roster.
+        Assert.Equal(2, rig.Built);
+    }
+
     private static int Produced(LiveEpisode episode) => episode.Frames.Count - 1;
 
     private static void Produce(LiveEpisode episode, int ticks)
@@ -526,7 +550,14 @@ public class LiveEpisodeInvariantTests
 
         internal int Decides { get; private set; }
 
-        internal IAgent[] NewRoster() => new IAgent[] { new Fake(this, 0), new Fake(this, 1) };
+        /// <summary>How many pairs the factory has built, however many were used.</summary>
+        internal int Built { get; private set; }
+
+        internal IAgent[] NewRoster()
+        {
+            Built++;
+            return new IAgent[] { new Fake(this, 0), new Fake(this, 1) };
+        }
 
         internal AgentAction Decide(int agentId)
         {

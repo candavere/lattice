@@ -118,6 +118,18 @@ public class CockpitLiveStateTests
     }
 
     [Fact]
+    public void ABlankEndReasonIsAnAbsenceInBothPanes()
+    {
+        // Whitespace is not a reason. The scoreboard row and the timeline have to read
+        // it the same way, or one pane claims an ending the other says was never
+        // recorded — and here they would, if the row tested for null alone.
+        var text = string.Join("\n", Render(new LiveState(6, 6), frameIndex: 6, terminalReason: "   "));
+
+        Assert.Contains("end     " + CockpitEpisodes.NotRecorded, text, StringComparison.Ordinal);
+        Assert.DoesNotContain("finished:   ", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ALiveKeyHintRowIsAsciiAndNamesEveryLiveControl()
     {
         var hints = Hints(Render(new LiveState(1, 30)), CockpitLayout.LiveKeyHints);

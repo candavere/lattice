@@ -82,6 +82,38 @@ public class LiveArgumentParityTests
         }
     }
 
+    [Fact]
+    public void RulesWithAScenarioFileIsAcceptedByBothCommandsOrNeither()
+    {
+        // `simulate` accepts --rules with a scenario file and does not apply it: the
+        // descriptor owns the topology. A live run that refused the same combination
+        // would refuse exactly what the batch command runs, which is the opposite of
+        // parity. Checked against both commands rather than against my reading of one.
+        var rules = Committed("scenarios/skeleton-with-override.json");
+        var scenario = Committed(Descriptor);
+
+        using var batchOut = new StringWriter();
+        using var batchErr = new StringWriter();
+        var batch = CliApp.Run(
+            ["simulate", "--quiet", "--seed", Seed.ToString(), "--scenario", scenario, "--rules", rules],
+            batchOut,
+            batchErr);
+        Assert.Equal(0, batch);
+
+        using var liveOut = new StringWriter();
+        using var liveErr = new StringWriter();
+        var live = CliApp.Run(
+            ["tui", "simulate", "--seed", Seed.ToString(), "--scenario", scenario, "--rules", rules],
+            liveOut,
+            liveErr);
+
+        // The live run gets as far as the viewer, which refuses a redirected stream, so
+        // what came back is the viewer's own status and not a refusal of the flag.
+        Assert.DoesNotContain("--rules cannot be used", liveErr.ToString(), StringComparison.Ordinal);
+        Assert.Contains("redirected", liveErr.ToString(), StringComparison.Ordinal);
+        Assert.Equal(UsageError.ExitCode, live);
+    }
+
     /// <summary>
     /// The batch command's own recorded trajectory for a descriptor file, read with
     /// the repository's reader. This is the artifact an independent run produced.

@@ -101,7 +101,8 @@ public interface ILiveEpisode
     /// <summary>
     /// Asks for exactly one more tick. Implementations produce at most one tick
     /// beyond what the viewer has consumed, and nothing at all while the viewer is
-    /// paused: this is the only way a tick is ever asked for.
+    /// paused — the single exception is the one tick the <c>n</c> key asks for by
+    /// name. This and that one call are the only ways a tick is ever asked for.
     /// </summary>
     void RequestTick();
 

@@ -316,8 +316,12 @@ public static class CockpitLayout
 
         if (frame.IsTerminal)
         {
-            // The recorded end of the episode, in the recording's own words.
-            facts.Add("end     " + (frame.TerminalReason ?? "not recorded"));
+            // The recorded end of the episode, in the recording's own words — and,
+            // for a live episode, the same value the timeline shows, read through the
+            // one helper both panes use. A blank reason is not a reason, and a live
+            // episode's reason is the episode's rather than the frame's, so the two
+            // panes cannot end up saying different things about the same ending.
+            facts.Add("end     " + EndReason(request, frame));
             facts.Add("winner  " + (frame.WinnerSlot is { } winner ? Invariant(winner) : "none"));
         }
 
@@ -343,6 +347,16 @@ public static class CockpitLayout
                 new Cell(' ', palette.TextPrimary, request.PanelFill));
         }
     }
+
+    /// <summary>
+    /// The end value the scoreboard prints: the one helper both panes read. A live
+    /// episode's reason is the episode's own, so this row and the timeline cannot
+    /// disagree about how the episode ended; a recording's is the frame's, and
+    /// whitespace is not a reason — <see cref="CockpitEpisodes.FinishedReason"/> is
+    /// the only test either pane applies.
+    /// </summary>
+    private static string EndReason(CockpitRequest request, ReplayFrame frame) =>
+        CockpitEpisodes.FinishedReason(frame, request.Live);
 
     /// <summary>
     /// A recorded role in its own column: made column-safe and cut to exactly the

@@ -386,7 +386,7 @@ public static class CliApp
     /// </remarks>
     private static int TuiSimulate(string[] args, bool ascii, TextWriter stdout, TextWriter stderr)
     {
-        var setup = BuildLiveSetup(args);
+        var setup = BuildLiveSetup(args, stderr);
 
         // The terminal is settled before the stepper is: a redirected run must
         // leave nothing running and nothing on screen, which is only true if the
@@ -456,7 +456,7 @@ public static class CliApp
     /// nothing, and silently ignoring a request to write a file would be worse than
     /// saying so.
     /// </summary>
-    private static LiveEpisodeSetup BuildLiveSetup(string[] args)
+    private static LiveEpisodeSetup BuildLiveSetup(string[] args, TextWriter stderr)
     {
         // --quiet is a boolean switch, exactly as it is for the batch command: it is
         // stripped before the key/value parser so it never demands a value. A live
@@ -496,16 +496,27 @@ public static class CliApp
                     "--agent cannot be used with a scenario file: the roster is declared by the descriptor's 'Slots'.");
             }
 
-            if (flags.ContainsKey("--rules"))
-            {
-                throw new UsageError(
-                    "--rules cannot be used with a scenario file: the descriptor owns its topology.");
-            }
-
             if (flags.ContainsKey("--steps"))
             {
+                // The batch command refuses this too, for the same reason: the
+                // descriptor declares the budget, and overriding it would make the
+                // live episode's budget differ from the declared one.
                 throw new UsageError(
                     "--steps cannot be combined with a scenario file: the descriptor declares 'Simulation.StepLimit'.");
+            }
+
+            if (flags.ContainsKey("--rules"))
+            {
+                // The batch command accepts this combination: the descriptor owns
+                // the map, so the rules file is not applied there either. Refusing it
+                // here would make the live command refuse something `simulate` runs,
+                // which is the opposite of parity — and it would be refused for doing
+                // exactly what the batch command does. Said out loud instead of
+                // refused, because a flag that is accepted and has no effect is
+                // something the reader is entitled to be told.
+                stderr.WriteLine(
+                    "lattice tui simulate: --rules has no effect with a scenario file; " +
+                    "the descriptor owns the topology, exactly as in 'lattice simulate'.");
             }
 
             return LiveEpisodeSetup.FromDescriptorFile(scenarioText, seed);

@@ -124,7 +124,6 @@ public sealed record LiveEpisodeSetup(
             descriptor.AgentCount,
             descriptor.StepLimit,
             TransitSpeed: descriptor.TransitSpeed);
-        var roster = CliApp.BuildRoster(descriptor, config, seed, out _);
         var map = descriptor.BuildMap(seed);
 
         return new LiveEpisodeSetup(
@@ -139,15 +138,24 @@ public sealed record LiveEpisodeSetup(
     }
 
     /// <summary>A stepper over this episode, with nothing run yet.</summary>
-    public ScenarioStepper NewStepper() =>
-        new(Map, Config, Roster, MaxSteps, Rules, recordPerceptions: RecordsPerceptions);
+    public ScenarioStepper NewStepper()
+    {
+        var roster = Roster;
+        return new(Map, Config, roster, MaxSteps, Rules, recordPerceptions: RecordsPerceptions(roster));
+    }
 
     /// <summary>
-    /// Whether this episode's roster can carry decision-time perceptions, which is
-    /// a property of the roster rather than a per-slot choice.
+    /// Whether these agents can carry decision-time perceptions, which is a property
+    /// of the roster rather than a per-slot choice.
     /// </summary>
-    public bool RecordsPerceptions =>
-        Roster.All(agent => agent is IDecidesFromPerception);
+    /// <remarks>
+    /// Asked about a roster, never about <see cref="Roster"/>: the property belongs to
+    /// the agents themselves, and reading it off the factory would build a second set
+    /// of them on every construction — agents that decide nothing and are disposed
+    /// by nobody.
+    /// </remarks>
+    public static bool RecordsPerceptions(IAgent[] roster) =>
+        roster.All(agent => agent is IDecidesFromPerception);
 }
 
 /// <summary>
@@ -504,7 +512,13 @@ public sealed class LiveEpisode : ILiveEpisode, IDisposable
     /// same instances.
     /// </summary>
     private ScenarioStepper NewStepperOver(IAgent[] roster) =>
-        new(_setup.Map, _setup.Config, roster, _setup.MaxSteps, _setup.Rules, recordPerceptions: _setup.RecordsPerceptions);
+        new(
+            _setup.Map,
+            _setup.Config,
+            roster,
+            _setup.MaxSteps,
+            _setup.Rules,
+            recordPerceptions: LiveEpisodeSetup.RecordsPerceptions(roster));
 
     /// <summary>
     /// Disposes every agent in a roster that owns an external resource, once each.

@@ -1,4 +1,4 @@
-╭─LATTICE LAUNCHPAD  8 commands────────────────────────────────────────────────╮
+╭─LATTICE LAUNCHPAD  9 commands────────────────────────────────────────────────╮
 │╭─ COMMANDS ─────────────────────────────────────────────────────────────────╮│
 ││> generate Generate a valid map as JSON.                                    ││
 ││  simulate Run an episode: watched live, or recorded as trajectory JSONL.   ││

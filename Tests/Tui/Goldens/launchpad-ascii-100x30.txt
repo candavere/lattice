@@ -1,4 +1,4 @@
-+-LATTICE LAUNCHPAD  8 commands--------------------------------------------------------------------+
++-LATTICE LAUNCHPAD  9 commands--------------------------------------------------------------------+
 |+- COMMANDS ---------------------+ +- FORM ------------------------------------------------------+|
 ||> generate Generate a valid m...| |--seed*         42???                                        ||
 ||  simulate Run an episode: wa...| |--min-fairness  (unset)                                      ||
@@ -8,7 +8,7 @@
 ||  benchmark Measure the five-...| |                                                             ||
 ||  evaluate Run the paired MCT...| |                                                             ||
 ||  validate-scenario Check a s...| |                                                             ||
-||                                | |                                                             ||
+||  ledger Show evaluation arti...| |                                                             ||
 ||                                | |                                                             ||
 ||                                | |                                                             ||
 ||                                | |                                                             ||

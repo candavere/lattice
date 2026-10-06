@@ -19,16 +19,53 @@ namespace Lattice.Tests.Tui;
 /// </remarks>
 public class LaunchpadCatalogTests
 {
-    /// <summary>The eight commands the CLI dispatches, in the order the usage text lists them.</summary>
+    /// <summary>
+    /// The eight commands the CLI dispatches, in the order the usage text lists them.
+    /// </summary>
     private static readonly string[] Commands =
     [
         "generate", "simulate", "render", "analyze", "replay", "benchmark", "evaluate", "validate-scenario",
     ];
 
+    /// <summary>
+    /// The screens that are not top-level commands of their own, reached through
+    /// <c>lattice tui</c>. Listed after the commands so the list reads as "the commands,
+    /// then the screens" — which is the order a reader meets them in.
+    /// </summary>
+    private static readonly string[] Viewers = ["ledger"];
+
+    /// <summary>
+    /// Every command the usage text lists is on the list exactly once, and so is every
+    /// viewer <c>lattice tui</c> offers. Asserted as two sets rather than one list
+    /// because they are two different things: the first eight are commands a reader can
+    /// type on their own, and the rest are subcommands of <c>lattice tui</c>.
+    /// </summary>
     [Fact]
     public void EveryCommandTheUsageTextListsIsOnTheScreenOnce()
     {
-        Assert.Equal(Commands, LaunchpadCatalog.Commands.Select(entry => entry.Name).ToArray());
+        Assert.Equal(
+            [.. Commands, .. Viewers],
+            LaunchpadCatalog.Commands.Select(entry => entry.Name).ToArray());
+    }
+
+    /// <summary>
+    /// A viewer that is not a top-level command is reached through <c>lattice tui</c>,
+    /// and the catalog says so rather than leaving the reader to type a line that would
+    /// report an unknown command.
+    /// </summary>
+    [Fact]
+    public void EveryViewerIsReachedThroughTheTuiPrefixAndNoCommandIs()
+    {
+        foreach (var name in Viewers)
+        {
+            var viewer = Assert.Single(LaunchpadCatalog.Commands, entry => entry.Name == name);
+            Assert.Equal(LaunchpadCatalog.TuiPrefix, viewer.Prefix.ToArray());
+        }
+
+        foreach (var name in Commands)
+        {
+            Assert.Empty(LaunchpadCatalog.Commands.Single(entry => entry.Name == name).Prefix);
+        }
     }
 
     [Fact]
@@ -91,11 +128,34 @@ public class LaunchpadCatalogTests
     {
         Assert.True(LaunchpadCatalog.Commands.Single(entry => entry.Name == "replay").TakesPositionalPath);
         Assert.True(LaunchpadCatalog.Commands.Single(entry => entry.Name == "validate-scenario").TakesPositionalPath);
+        Assert.True(LaunchpadCatalog.Commands.Single(entry => entry.Name == "ledger").TakesPositionalPath);
 
         foreach (var entry in LaunchpadCatalog.Commands.Where(entry => !entry.TakesPositionalPath))
         {
             Assert.DoesNotContain(entry.Fields, field => field.Kind == LaunchpadFieldKind.PositionalPath);
         }
+    }
+
+    /// <summary>
+    /// A screen that takes more than one artifact has a field for each, because a field
+    /// is addressed by its label and two paths cannot share one. The first is required
+    /// because the command refuses without any at all.
+    /// </summary>
+    [Fact]
+    public void TheViewerOfSeveralArtifactsHasAFieldForEach()
+    {
+        var ledger = LaunchpadCatalog.Commands.Single(entry => entry.Name == "ledger");
+
+        var paths = ledger.Fields.Where(field => field.Kind == LaunchpadFieldKind.PositionalPath).ToArray();
+        Assert.Equal(2, paths.Length);
+        Assert.Equal(LaunchpadCatalog.PositionalPathLabel, paths[0].Label);
+        Assert.Equal(LaunchpadCatalog.SecondPathLabel, paths[1].Label);
+
+        Assert.True(paths[0].Required);
+        Assert.False(paths[1].Required);
+
+        // The two labels are distinct, which is what keeps the second field addressable.
+        Assert.NotEqual(paths[0].Label, paths[1].Label);
     }
 
     /// <summary>

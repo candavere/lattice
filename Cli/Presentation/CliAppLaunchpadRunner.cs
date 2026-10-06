@@ -92,16 +92,27 @@ public sealed class CliAppLaunchpadRunner : ILaunchpadRunner
 
     /// <summary>
     /// Whether an argument vector names a screen by default. <c>replay</c> is the
-    /// cockpit's read-only viewer and <c>simulate</c> can be watched live, so both
-    /// open the cockpit unless the reader asked otherwise.
+    /// cockpit's read-only viewer, <c>simulate</c> can be watched live, and
+    /// <c>ledger</c> is the Ledger — so all three open a screen unless the reader asked
+    /// otherwise.
     /// <para>
-    /// The decision is on the command's own name and nothing else. A near miss here
-    /// would run a viewer as a command and print its frames into a file, so the
-    /// recognised set is written out rather than derived.
+    /// The decision is on the subcommand's own name and nothing else, and a leading
+    /// <c>tui</c> is stepped over first because that is the form the Launchpad builds for
+    /// a screen that is not a top-level command. A near miss here would run a viewer as
+    /// a command and print its frames into a file, so the recognised set is written out
+    /// rather than derived.
     /// </para>
     /// </summary>
-    public static bool IsCockpit(IReadOnlyList<string> arguments) =>
-        arguments.Count >= 1 && arguments[0] is "replay" or "simulate";
+    public static bool IsCockpit(IReadOnlyList<string> arguments)
+    {
+        if (arguments.Count == 0)
+        {
+            return false;
+        }
+
+        var subcommand = arguments[0] == Tui && arguments.Count > 1 ? arguments[1] : arguments[0];
+        return subcommand is "replay" or "simulate" or "ledger";
+    }
 }
 
 /// <summary>

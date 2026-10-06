@@ -8,8 +8,36 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Typing bare `lattice` in a terminal opens the Launchpad: a screen listing all eight
-  commands, with the selected command's real flags as a form, the equivalent
+- `lattice tui ledger <artifact.json> [<artifact.json> ...] [--ascii]` opens a read-only
+  screen over one or more `evaluate --out` artifacts: where and on what each was
+  produced, one row per suite with its seed and match counts, mean paired delta with its
+  95% confidence interval, win/draw/loss/timeout counts with their rates and mean choke
+  contention, the artifact's own verdict, and the per-seed rows with the four seat-scores
+  each paired delta is built from. A second artifact is put beside the first with the
+  suites aligned by name and a protocol line per suite stating whether rollouts, max
+  steps and seed count match — and, when they do not, naming which did and showing each
+  one's values. Tab and the arrows move between artifacts, up/down or `j`/`k` between
+  suites, the page and home/end keys through the seed rows, `c` swaps the detail band
+  between the seed rows and the comparison, and `q`, Escape and Ctrl-C leave.
+- The Ledger carries the artifact's own numbers and the artifact's own verdict, and
+  derives nothing. A verdict is the label the artifact's own decision sentence begins
+  with, so a study the decision rule declined to grade is shown as not graded rather
+  than as a failure. A match outcome is stored from Team A's side and the two mirrored
+  matches seat the target policy in opposite columns, so each is decoded from the target
+  policy's own seat — the mapping the study's own analyzer applies. With two or more
+  artifacts the screen shows their numbers side by side and a protocol check, and says no
+  more than that: it never reports one policy or one artifact as better than another.
+- Reading an artifact is read-only and bounded. A field the reader does not know is
+  ignored, so an artifact written by a later build still shows the parts of it this build
+  understands; a field it needs and cannot find is refused by name rather than drawn as a
+  row of zeroes; a file past 8388608 bytes is refused by its size; and every refusal is
+  one line naming the file and the first problem. A run whose streams cannot carry a
+  screen is refused before any artifact is opened, with the same predicate and the same
+  status as the cockpit's, and with the same rule that nothing is built and no console
+  input property is read first.
+- Typing bare `lattice` in a terminal opens the Launchpad: a screen listing every
+  command `lattice` can run and every screen `lattice tui` opens, with the selected
+  command's real flags as a form, the equivalent
   `lattice ...` command line shown live underneath, and inline validation that is
   the CLI parser's own — the same helpers, on the same values, with the same
   messages. A form with more fields than the pane has rows scrolls and says how many
@@ -41,6 +69,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- The `lattice tui` usage line now names the Ledger between `replay` and `simulate`.
 - The usage text gained one paragraph saying what a bare `lattice` does. On a
   terminal it opens the Launchpad; with any argument, or on a redirected stream, it
   does exactly what it always did, and prints the usage on stderr with the usage

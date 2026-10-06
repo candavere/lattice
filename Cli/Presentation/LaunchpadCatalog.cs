@@ -48,6 +48,13 @@ public sealed record LaunchpadField(
 /// The ways this command can be started, in the order the form offers them. A
 /// command with one is not a choice the reader has to make.
 /// </param>
+/// <param name="InvocationPrefix">
+/// The leading argument tokens in front of <paramref name="Name"/>, for the one screen
+/// that is not a top-level command of its own. Empty for every command the CLI
+/// dispatches, and <c>["tui"]</c> for a screen that is reached through
+/// <c>lattice tui</c> — so the command line shown under the form is the line a reader
+/// would actually type, rather than a line that would report an unknown command.
+/// </param>
 public sealed record LaunchpadCommand(
     string Name,
     string Summary,
@@ -55,8 +62,15 @@ public sealed record LaunchpadCommand(
     string[] AllowedFlags,
     string[] RequiredFlags,
     bool TakesPositionalPath = false,
-    string[]? RunModes = null)
+    string[]? RunModes = null,
+    string[]? InvocationPrefix = null)
 {
+    /// <summary>
+    /// The leading tokens in front of the command's own name, empty for a command the
+    /// CLI dispatches directly.
+    /// </summary>
+    public IReadOnlyList<string> Prefix => InvocationPrefix is { Length: > 0 } prefix ? prefix : [];
+
     /// <summary>
     /// The ways this command can be started. Watch first where there is a choice: a
     /// screen is the reason a reader came to the Launchpad at all, and a command
@@ -123,6 +137,19 @@ public static class LaunchpadCatalog
 
     /// <summary>The path field's label, on the two commands that take a bare path.</summary>
     public const string PositionalPathLabel = "path";
+
+    /// <summary>
+    /// The second path field's label, on the one command that takes more than one. A
+    /// field is addressed by its label, so two paths cannot share one.
+    /// </summary>
+    public const string SecondPathLabel = "path 2";
+
+    /// <summary>
+    /// The leading argument token in front of a screen that is not a top-level command.
+    /// It is what a reader types, so the command line the form shows is a line that
+    /// works rather than one that would report an unknown command.
+    /// </summary>
+    public static readonly string[] TuiPrefix = ["tui"];
 
     /// <summary>The command table, in the order the usage text lists the commands.</summary>
     public static readonly IReadOnlyList<LaunchpadCommand> Commands =
@@ -230,6 +257,24 @@ public static class LaunchpadCatalog
             ["--out"],
             [],
             TakesPositionalPath: true),
+        new(
+            "ledger",
+            "Show evaluation artifacts side by side, read-only.",
+            Watched(
+                new(
+                    PositionalPathLabel,
+                    LaunchpadFieldKind.PositionalPath,
+                    Required: true,
+                    Help: "An 'evaluate --out' artifact to show."),
+                new(
+                    SecondPathLabel,
+                    LaunchpadFieldKind.PositionalPath,
+                    Help: "A second artifact to put beside the first.")),
+            [],
+            [],
+            TakesPositionalPath: true,
+            RunModes: ScreenOnly,
+            InvocationPrefix: TuiPrefix),
     ];
 
     /// <summary>The command with this name, or <c>null</c>.</summary>

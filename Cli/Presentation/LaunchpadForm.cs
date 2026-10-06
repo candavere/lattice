@@ -167,21 +167,24 @@ public sealed class LaunchpadForm
         {
             var parts = new List<string> { Executable };
 
-            // The command name, then its arguments, then the raw tail verbatim. The
-            // text and the vector are the same walk, so they cannot disagree about
-            // what the form adds up to.
+            // The command's leading tokens, then its name, then its arguments, then the
+            // raw tail verbatim. The text and the vector are the same walk, so they
+            // cannot disagree about what the form adds up to.
+            parts.AddRange(Current.Prefix);
             parts.Add(Current.Name);
             AppendArguments(parts);
             return string.Join(' ', parts);
         }
     }
 
-    /// <summary>The arguments after the command name, for handing to <c>CliApp.Run</c>.</summary>
+    /// <summary>The arguments after the executable, for handing to <c>CliApp.Run</c>.</summary>
     public string[] Arguments
     {
         get
         {
-            var arguments = new List<string> { Current.Name };
+            var arguments = new List<string>();
+            arguments.AddRange(Current.Prefix);
+            arguments.Add(Current.Name);
             AppendArguments(arguments);
             return [.. arguments];
         }

@@ -1,4 +1,4 @@
-╭─LATTICE LAUNCHPAD  8 commands────────────────────────────────────────────────────────────────────╮
+╭─LATTICE LAUNCHPAD  9 commands────────────────────────────────────────────────────────────────────╮
 │╭─ COMMANDS ─────────────────────╮ ╭─ FORM ──────────────────────────────────────────────────────╮│
 ││> generate Generate a valid map…│ │--seed*         x                                            ││
 ││  simulate Run an episode: watc…│ │--min-fairness  (unset)                                      ││
@@ -8,7 +8,7 @@
 ││  benchmark Measure the five-ca…│ │                                                             ││
 ││  evaluate Run the paired MCTS-…│ │                                                             ││
 ││  validate-scenario Check a sce…│ │                                                             ││
-││                                │ │                                                             ││
+││  ledger Show evaluation artifa…│ │                                                             ││
 ││                                │ │                                                             ││
 ││                                │ │                                                             ││
 ││                                │ │                                                             ││

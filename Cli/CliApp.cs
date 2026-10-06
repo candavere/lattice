@@ -451,6 +451,11 @@ public static class CliApp
                 return TuiSimulate(rest, ascii, stdout, stderr, console);
             }
 
+            if (args.Length > 0 && args[0] == "ledger")
+            {
+                return TuiLedger(rest, ascii, stdout, stderr, console);
+            }
+
             if (args.Length == 0 || args[0] != "replay")
             {
                 WriteTuiUsage(stderr);
@@ -750,11 +755,58 @@ public static class CliApp
     }
 
     /// <summary>
+    /// Runs the Ledger over one or more evaluation artifacts: a read-only screen showing
+    /// what each artifact recorded, and how two of them line up when more than one is
+    /// named.
+    /// <para>
+    /// <b>The refusal is asked before the artifacts are read.</b> A run whose streams
+    /// cannot carry a screen has no viewer to be given, so it is refused before a single
+    /// file is opened — the same refusal, from the same predicate and with the same
+    /// status as the cockpit's, and the same rule that nothing is built and no console
+    /// input property is read before it.
+    /// </para>
+    /// </summary>
+    private static int TuiLedger(string[] args, bool ascii, TextWriter stdout, TextWriter stderr, TuiConsole console)
+    {
+        // Everything decidable from the command line alone is decided first, exactly as
+        // every other command in this file does: no subcommand path, an unknown flag, or
+        // no artifact at all are usage errors and report the usage status with nothing
+        // run and nothing read.
+        var (_, positionals) = ParseFlags(args);
+
+        if (positionals.Count == 0)
+        {
+            WriteTuiUsage(stderr);
+            return UsageError.ExitCode;
+        }
+
+        try
+        {
+            // The host writes its own refusal line before it returns it, so nothing here
+            // prints it a second time: two copies of one line of reason is one line too
+            // many on a reader's terminal.
+            return LedgerHost.Run(new LedgerHostRequest(
+                positionals,
+                stdout,
+                stderr,
+                CapabilityDetector.Detect(),
+                console,
+                new TerminalGuardSessionFactory(),
+                new MonotonicClock(),
+                ascii)).ExitCode;
+        }
+        catch (Exception ex)
+        {
+            return Report(ex, stderr);
+        }
+    }
+
+    /// <summary>
     /// The viewer's own usage line, on stderr only, and deliberately one line: a
     /// usage line is a diagnosis, not a manual.
     /// </summary>
     private static void WriteTuiUsage(TextWriter sink) =>
-        sink.WriteLine("usage: lattice tui replay <trajectory.jsonl> [--ascii] | lattice tui simulate --seed <n> [--steps <n>] [--agent <a>] [--scenario <infiltration|file>] [--rules <f>] [--ascii]");
+        sink.WriteLine("usage: lattice tui replay <trajectory.jsonl> [--ascii] | lattice tui ledger <artifact.json> [<artifact.json> ...] [--ascii] | lattice tui simulate --seed <n> [--steps <n>] [--agent <a>] [--scenario <infiltration|file>] [--rules <f>] [--ascii]");
 
     private static bool IsKnownCommand(string command) =>
         command is "generate" or "simulate" or "render" or "analyze"

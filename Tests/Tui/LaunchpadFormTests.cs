@@ -216,14 +216,16 @@ public class LaunchpadFormTests
             Drive(form, Character('k'));
         }
 
-        Assert.Equal("generate", form.Selected);
+        Assert.Equal(LaunchpadCatalog.Commands[0].Name, form.Selected);
 
         for (var i = 0; i < 40; i++)
         {
             Drive(form, Character('j'));
         }
 
-        Assert.Equal("validate-scenario", form.Selected);
+        // The last command in the catalog rather than a name: what this asserts is that
+        // the selection stops at the end of the list, which is true of whatever is last.
+        Assert.Equal(LaunchpadCatalog.Commands[^1].Name, form.Selected);
     }
 
     [Fact]
@@ -686,7 +688,7 @@ public class LaunchpadFormTests
             Drive(form, new TuiKey(TuiKeyKind.PageDown));
         }
 
-        Assert.Equal("validate-scenario", form.Selected);
+        Assert.Equal(LaunchpadCatalog.Commands[^1].Name, form.Selected);
 
         for (var i = 0; i < 5; i++)
         {

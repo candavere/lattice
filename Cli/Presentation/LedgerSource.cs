@@ -97,6 +97,7 @@ public static class LedgerSource
     /// <exception cref="ArgumentException"><paramref name="path"/> is null or empty.</exception>
     /// <exception cref="InvalidDataException">The file is not a readable artifact.</exception>
     /// <exception cref="System.IO.FileNotFoundException">There is no such file.</exception>
+    /// <exception cref="System.IO.DirectoryNotFoundException">A directory in the path does not exist.</exception>
     /// <exception cref="System.IO.IOException">The file could not be read.</exception>
     public static LedgerArtifact ReadFile(string path)
     {

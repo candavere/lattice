@@ -92,11 +92,64 @@ public class LaunchpadGoldens
     {
         var lines = Golden("launchpad-open-100x30", []);
 
-        Assert.Contains("LATTICE LAUNCHPAD  8 commands", lines[0][1..^1].Trim(BorderGlyphs.Rounded.Horizontal), StringComparison.Ordinal);
-        Assert.Equal(BorderGlyphs.Rounded.TopLeft, lines[0][0]);
+        Assert.Contains(TitleRow(), lines[0][1..^1].Trim(BorderGlyphs.Rounded.Horizontal), StringComparison.Ordinal);
+        Assert.Equal(new string(BorderGlyphs.Rounded.TopLeft, 1), lines[0][..1]);
         Assert.Equal($"{BorderGlyphs.Rounded.BottomLeft}{BorderGlyphs.Rounded.BottomRight}", BottomCorners(lines));
         Assert.Equal(LaunchpadLayout.NavigationHints, HintRow(lines));
         Assert.Equal(LaunchpadMode.Navigation, Drive([]).Mode);
+    }
+
+    /// <summary>The title row's command count, read from the catalog rather than written out.</summary>
+    private static string TitleRow() =>
+        $"LATTICE LAUNCHPAD  {LaunchpadCatalog.Commands.Count} commands";
+
+    /// <summary>
+    /// Every frozen frame that the Ledger catalog entry changed, named with the one
+    /// reason it changed.
+    /// <para>
+    /// Adding an entry to the catalog has exactly two visible effects on the screen: the
+    /// title row counts one more command, and the command list has one more row. This
+    /// asserts both of those on each affected frame, and — through the geometry of the
+    /// frames above — that nothing else about them moved.
+    /// </para>
+    /// <para>
+    /// <c>launchpad-fallback-80x25</c> changed its title only: at the fallback size the
+    /// list band is eight rows tall by the layout's own choice, so the ninth command is
+    /// reachable by scrolling rather than by being drawn where there was no row.
+    /// </para>
+    /// </summary>
+    [Theory]
+    [InlineData("launchpad-open-100x30", "the title counts the new entry")]
+    [InlineData("launchpad-filled-100x30", "the title counts it and the list shows it")]
+    [InlineData("launchpad-editing-100x30", "the title counts it and the list shows it")]
+    [InlineData("launchpad-error-100x30", "the title counts it and the list shows it")]
+    [InlineData("launchpad-long-value-100x30", "the title counts it and the list shows it")]
+    [InlineData("launchpad-ascii-100x30", "the title counts it and the list shows it in ASCII")]
+    [InlineData("launchpad-fallback-80x25", "the title counts it; the list band has no ninth row at this size")]
+    public void EveryFrameTheLedgerEntryChangedSaysWhyItChanged(string name, string because)
+    {
+        var lines = Frozen(name);
+        var ascii = name.Contains("ascii", StringComparison.Ordinal);
+        var frame = ascii ? BorderGlyphs.Ascii : BorderGlyphs.Rounded;
+
+        // The title, and only the title, carries the count. Trimmed with the framing
+        // this frame is drawn in, so an ASCII frame is read as an ASCII frame.
+        Assert.Equal(TitleRow(), lines[0][1..^1].Trim(frame.Horizontal));
+        Assert.Single(lines, line => line.Contains("commands", StringComparison.Ordinal));
+
+        if (!name.Contains("fallback", StringComparison.Ordinal))
+        {
+            // The new entry is on the list, in catalog order, in this frame's vocabulary.
+            var list = LaunchpadCatalog.Commands[^1];
+            var glyphs = ascii ? CellText.AsciiEllipsis : CellText.UnicodeEllipsis.ToString();
+            Assert.Contains(list.Name, string.Join('\n', lines), StringComparison.Ordinal);
+
+            // The summary beside it is cut to the list's own width and marked, so the
+            // row is as long as every other row and no longer.
+            Assert.Contains(glyphs, string.Join('\n', lines), StringComparison.Ordinal);
+        }
+
+        Assert.NotEqual("", because);
     }
 
     [Fact]
@@ -189,7 +242,7 @@ public class LaunchpadGoldens
     {
         var lines = Golden("launchpad-fallback-80x25", Typed("42"), Narrow);
 
-        Assert.Contains("LATTICE LAUNCHPAD  8 commands", lines[0], StringComparison.Ordinal);
+        Assert.Contains(TitleRow(), lines[0], StringComparison.Ordinal);
         Assert.Equal($"{BorderGlyphs.Rounded.BottomLeft}{BorderGlyphs.Rounded.BottomRight}", BottomCorners(lines));
 
         var notice = $"terminal is 80x25; the full layout needs {LaunchpadLayout.MinimumWidth}x{LaunchpadLayout.MinimumHeight}; resize for it";
@@ -336,6 +389,18 @@ public class LaunchpadGoldens
     /// pane rather than counted from the bottom, so a change to the pane heights
     /// cannot move the assertion off the row it is about.
     /// </summary>
+    /// <summary>
+    /// The frozen rows of a golden, without rendering it. Used by the test that names why
+    /// each affected frame changed: it is about what is in the file, not about whether
+    /// the renderer still agrees with it.
+    /// </summary>
+    private static string[] Frozen(string name)
+    {
+        var path = Committed("Tests", "Tui", "Goldens", name + ".txt");
+        Assert.True(File.Exists(path), $"{path} is missing.");
+        return File.ReadAllText(path).Split('\n', StringSplitOptions.RemoveEmptyEntries);
+    }
+
     private static string CommandLineRow(string[] lines)
     {
         var pane = LaunchpadLayout.Panes(Full).Last();

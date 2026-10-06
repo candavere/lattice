@@ -98,6 +98,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The cockpit title row said `replay` for every run. It now reads `live` when the
   frame carries live state, which is the same fact the timeline's `LIVE` label and
   the live key hints already read. Replay frames still read `replay`.
+- A screen started from the Launchpad shared console input with it: the
+  Launchpad's key reader kept blocking on the console while the nested screen
+  read the same stream, so keypresses went to one reader or the other. The
+  Launchpad now hands its key source off before a command runs and builds a
+  fresh one for the returned screen, and keys are read on demand rather than on
+  a background thread, so the nested screen is the only reader while it runs.
+  The screen a run returns to is restored on every exit, and a terminal that
+  dies mid-run ends the run instead of drawing to a dead screen.
 
 ## [3.1.0] - 2026-10-01
 

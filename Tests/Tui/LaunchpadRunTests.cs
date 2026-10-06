@@ -158,12 +158,13 @@ public class LaunchpadRunTests
         Assert.Equal(0, run.Result.ExitCode);
         Assert.True(run.Entries >= 2, $"the screen was entered {run.Entries} time(s); it should be entered again for the return.");
 
-        // The two events before the command are the whole ordering: the setting given
-        // back first, so Ctrl-C reaches the command as a signal, and the terminal
-        // restored second, so the command's own output has an ordinary terminal to
-        // land on.
+        // The three events before the command are the whole ordering: the setting given
+        // back first, so Ctrl-C reaches the command as a signal, then the terminal
+        // restored, so the command's own output has an ordinary terminal to land on,
+        // and then the parent's key source handed off, so a nested screen is the
+        // only reader while the command runs.
         var ran = run.Events.IndexOf("ran");
-        Assert.Equal(["set false", "restore"], run.Events[(ran - 2)..ran].ToArray());
+        Assert.Equal(["set false", "restore", "keys disposed"], run.Events[(ran - 3)..ran].ToArray());
         Assert.Contains("exit 1", Message(run), StringComparison.Ordinal);
     }
 

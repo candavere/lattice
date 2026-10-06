@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 
 namespace Lattice.Tui;
 
@@ -209,6 +210,102 @@ public sealed class KeyQueue : IKeySource
             _completion.TrySetResult();
         }
     }
+}
+
+/// <summary>
+/// Reads keys from the process console on demand: nothing is read except inside
+/// <see cref="Wait"/>, so a screen that is not waiting holds no blocked reader
+/// and two screens can never split one stdin between them. A host hands input
+/// off by disposing this source (or simply by not waiting on it) and the next
+/// screen reads from the same console without racing a leftover thread.
+/// </summary>
+/// <remarks>
+/// Construction asks the console for nothing and changes nothing, for the same
+/// reason <see cref="ConsoleKeyReader.FromConsole"/> builds without asking: a
+/// run that is going to be refused must not throw on its way to saying so.
+/// </remarks>
+public sealed class ConsoleKeySource : IKeySource
+{
+    private readonly Func<bool> _keyAvailable;
+    private readonly Func<ConsoleKeyInfo> _readKey;
+    private bool _disposed;
+
+    /// <summary>How long one wait sleeps between availability polls.</summary>
+    private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(5);
+
+    /// <summary>
+    /// A source over these console primitives, defaulting to the process's own.
+    /// The delegates are only ever invoked from <see cref="Wait"/>, never here.
+    /// </summary>
+    public ConsoleKeySource(Func<bool>? keyAvailable = null, Func<ConsoleKeyInfo>? readKey = null)
+    {
+        _keyAvailable = keyAvailable ?? (() => Console.KeyAvailable);
+        _readKey = readKey ?? (() => Console.ReadKey(intercept: true));
+    }
+
+    /// <summary>
+    /// Waits up to <paramref name="timeout"/> for one key, polling availability
+    /// in bounded slices. Returns <see cref="KeyWait.Closed"/> when the console
+    /// cannot produce keys at all — the same <see cref="InvalidOperationException"/>
+    /// and <see cref="IOException"/> the queued reader maps to end of input —
+    /// and after disposal, which stays inert rather than throwing.
+    /// </summary>
+    public KeyWait Wait(TimeSpan timeout, out TuiKey key)
+    {
+        if (_disposed)
+        {
+            key = default;
+            return KeyWait.Closed;
+        }
+
+        var elapsed = Stopwatch.StartNew();
+
+        while (true)
+        {
+            bool available;
+            try
+            {
+                available = _keyAvailable();
+            }
+            catch (Exception exception) when (exception is InvalidOperationException or IOException)
+            {
+                key = default;
+                return KeyWait.Closed;
+            }
+
+            if (available)
+            {
+                ConsoleKeyInfo info;
+                try
+                {
+                    info = _readKey();
+                }
+                catch (Exception exception) when (exception is InvalidOperationException or IOException)
+                {
+                    key = default;
+                    return KeyWait.Closed;
+                }
+
+                key = ConsoleKeyReader.Map(info);
+                return KeyWait.Key;
+            }
+
+            if (elapsed.Elapsed >= timeout)
+            {
+                key = default;
+                return KeyWait.TimedOut;
+            }
+
+            var remaining = timeout - elapsed.Elapsed;
+            Thread.Sleep(remaining < PollInterval ? remaining : PollInterval);
+        }
+    }
+
+    /// <summary>
+    /// Releases the source. There is no reader thread to stop: disposal only
+    /// marks it, so it is idempotent and safe to call on every handoff.
+    /// </summary>
+    public void Dispose() => _disposed = true;
 }
 
 /// <summary>

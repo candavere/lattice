@@ -500,7 +500,9 @@ names the way back first:
 
 ```
 LIVE  h show panels  space pause  n tick  p back  < > [ ] speed  r restart  q quit
-``` A live run records nothing: `--out` is refused, `--quiet` is
+```
+
+A live run records nothing: `--out` is refused, `--quiet` is
 accepted and does nothing, and a `--rules` file named beside a scenario file
 prints a notice that it has no effect and the run continues. A simulation that
 fails inside the viewer exits `1` with one line on stderr; a clean quit exits

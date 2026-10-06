@@ -14,6 +14,12 @@ namespace Lattice.Cli.Presentation;
 /// life, and given back before the key source is disposed.
 /// </para>
 /// <para>
+/// <b>One reader at a time.</b> The key source is handed off before a command runs
+/// and a fresh one is built for the returned screen, so a nested screen is the
+/// only reader of whatever the reader types next. A parent that kept reading
+/// while the command ran would split real input with it.
+/// </para>
+/// <para>
 /// <b>A command runs outside the screen.</b> When the reader asks to run, the setting
 /// is suspended and the alternate screen is left before the command starts, so
 /// Ctrl-C reaches it the way it reaches the same command typed at a shell, and its
@@ -53,23 +59,37 @@ public static class LaunchpadHost
             return new TuiRunResult(UsageRefused, reported);
         }
 
-        // Declared first so it is disposed last, and the setting second so it goes
-        // back first: the setting is restored before the reading thread is left to the
-        // process, and both happen after the terminal is back.
-        using var keys = request.Console.Keys();
-        using var controlC = ControlCAsInputScope.Enter(request.Console.ControlCAsInput);
-
-        var form = LaunchpadForm.For(request.Commands);
-        var state = new State(form, request, controlC, keys);
-        var host = Enter(request);
+        // Built first and released in the outer finally, after the setting taken
+        // below goes back: the terminal is put back, then the setting, then
+        // input — and a fresh source is built for every returned screen, so
+        // the released source is never the one the loop resumes on.
+        var keys = request.Console.Keys();
 
         try
         {
-            Loop(state, host);
+            using var controlC = ControlCAsInputScope.Enter(request.Console.ControlCAsInput);
+
+            var form = LaunchpadForm.For(request.Commands);
+            var state = new State(form, request, controlC, keys);
+            var host = Enter(request);
+
+            try
+            {
+                Loop(state, host);
+            }
+            finally
+            {
+                // The screen on show, not the one the run started with: a command
+                // run leaves the first screen behind and returns to a new one,
+                // and quitting there must put the terminal back rather than
+                // dispose an already-disposed screen a second time.
+                state.Host?.Dispose();
+                keys = state.Keys;
+            }
         }
         finally
         {
-            host.Dispose();
+            keys.Dispose();
         }
 
         return new TuiRunResult(0, null);
@@ -102,7 +122,34 @@ public static class LaunchpadHost
 
         internal ControlCAsInputScope ControlC { get; } = controlC;
 
-        internal IKeySource Keys { get; } = keys;
+        /// <summary>
+        /// The source the loop is currently waiting on. Replaced across a command
+        /// run (see <see cref="ReplaceKeys"/>): the source a run started with is
+        /// never the source the returned screen reads from.
+        /// </summary>
+        internal IKeySource Keys { get; private set; } = keys;
+
+        /// <summary>
+        /// The screen on show. Replaced on every reentry: the screen a command
+        /// ran under is already disposed by then, and quitting must restore the
+        /// current one rather than the first.
+        /// </summary>
+        internal ScreenHost? Host { get; set; }
+
+        /// <summary>
+        /// Hands input off before a command runs and takes a fresh source for the
+        /// returned screen. The parent never reads while the command runs, so a
+        /// nested screen is the only reader of whatever the reader types next.
+        /// Disposing first is safe for a shared scripted source too: disposal is
+        /// an ownership signal, and the factory hands the same instance back.
+        /// </summary>
+        internal void ReplaceKeys(IKeySource next)
+        {
+            ArgumentNullException.ThrowIfNull(next);
+
+            Keys.Dispose();
+            Keys = next;
+        }
 
         /// <summary>The line under the form about the last command that ran.</summary>
         internal string? Notice { get; set; }
@@ -121,6 +168,7 @@ public static class LaunchpadHost
 
     private static void Loop(State state, ScreenHost host)
     {
+        state.Host = host;
         var form = state.Form;
 
         while (true)
@@ -187,7 +235,18 @@ public static class LaunchpadHost
             var status = RunOutsideTheScreen(state, host);
             state.Notice = status;
             state.AwaitingAcknowledgement = true;
-            host = Reenter(state.Request, host);
+
+            if (Reenter(state.Request) is not { } next)
+            {
+                // The terminal is gone and the previous screen with it: there is
+                // nothing to draw back to, so the run stops rather than drawing
+                // to a disposed screen. The command already ran and the terminal
+                // is already back, so stopping here is a clean quit.
+                return;
+            }
+
+            host = state.Host = next;
+            state.ReplaceKeys(state.Request.Console.Keys());
         }
     }
 
@@ -195,10 +254,14 @@ public static class LaunchpadHost
     /// Runs the command with the terminal fully restored, and reports what happened.
     /// <para>
     /// The order is the whole point and it is fixed: the setting suspended, then the
-    /// screen left, then the command started. Suspending first means there is no
-    /// window in which the reader's Ctrl-C would arrive as a key the command ignores;
-    /// leaving the screen second means the command's own output and progress land on
-    /// an ordinary terminal rather than inside a full-screen view.
+    /// screen left, then the parent's key source handed off, then the command
+    /// started. Suspending first means there is no window in which the reader's
+    /// Ctrl-C would arrive as a key the command ignores; leaving the screen second
+    /// means the command's own output and progress land on an ordinary terminal
+    /// rather than inside a full-screen view; handing off third means a nested
+    /// screen is the only reader while the command runs. Disposal is an ownership
+    /// signal rather than a shutdown — a fresh source is built on return — so a
+    /// shared scripted source keeps working after it.
     /// </para>
     /// </summary>
     private static string RunOutsideTheScreen(State state, ScreenHost host)
@@ -208,6 +271,7 @@ public static class LaunchpadHost
         try
         {
             host.Dispose();
+            state.Keys.Dispose();
 
             try
             {
@@ -235,22 +299,32 @@ public static class LaunchpadHost
     }
 
     /// <summary>
-    /// Enters the alternate screen for a run that has not been refused — and which
-    /// cannot be, since the check already passed. A refusal here would mean the
-    /// terminal changed its mind mid-run, and reporting that over a terminal the
-    /// reader is looking at is better than throwing out of the loop.
+    /// Enters the alternate screen for the run to return to, or <c>null</c> when
+    /// the terminal is gone. A refusal here means the terminal changed its mind
+    /// mid-run; the caller stops rather than throwing, because the command
+    /// already ran and the terminal the reader is looking at is already back.
     /// </summary>
-    private static ScreenHost Reenter(LaunchpadHostRequest request, ScreenHost previous)
+    private static ScreenHost? Reenter(LaunchpadHostRequest request)
     {
-        if (TryEnter(request) is not { } screen)
+        try
         {
-            return previous;
-        }
+            var screen = TryEnter(request);
 
-        // The screen came back, so whatever the previous one drew is no longer what is
-        // on the terminal: the whole frame is repainted rather than diffed.
-        screen.RepaintEverything();
-        return screen;
+            // The screen came back, so whatever the previous one drew is no longer what is
+            // on the terminal: the whole frame is repainted rather than diffed.
+            screen?.RepaintEverything();
+            return screen;
+        }
+        catch (Exception exception) when (exception is IOException
+            or InvalidOperationException
+            or ObjectDisposedException
+            or UnauthorizedAccessException)
+        {
+            // The terminal died while the command ran. The command already ran
+            // and the previous screen is already gone, so there is nothing to
+            // draw back to; the caller stops instead of drawing to it.
+            return null;
+        }
     }
 
     /// <summary>

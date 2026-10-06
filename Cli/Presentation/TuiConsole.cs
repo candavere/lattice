@@ -21,11 +21,19 @@ namespace Lattice.Cli.Presentation;
 /// </para>
 /// </remarks>
 /// <param name="ControlCAsInput">The Ctrl-C-as-input setting the run owns while it lasts.</param>
-/// <param name="Keys">Builds the run's key source.</param>
+/// <param name="Keys">
+/// Builds the run's key source. Each build is owned by the run that builds it:
+/// a host that hands input to another screen disposes its source first and
+/// builds a fresh one when it resumes, so at most one source ever reads.
+/// </param>
 public sealed record TuiConsole(IControlCAsInput ControlCAsInput, Func<IKeySource> Keys)
 {
-    /// <summary>The real console: the process's own, read a key at a time.</summary>
+    /// <summary>
+    /// The real console: the process's own, read a key at a time and only while
+    /// waited on. No reader thread is started, so handing input to another
+    /// screen leaves nothing blocked behind.
+    /// </summary>
     public static TuiConsole Default { get; } = new(
         new ConsoleControlCAsInput(),
-        () => new KeyQueue(ConsoleKeyReader.FromConsole()));
+        () => new ConsoleKeySource());
 }

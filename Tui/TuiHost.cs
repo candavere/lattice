@@ -143,6 +143,10 @@ public sealed class MonotonicClock : IUiClock
 /// A live episode hands its own cursor in; a recording lets the host build a
 /// <see cref="ReplayPlayback"/>, because a recording needs nothing else.
 /// </param>
+/// <param name="HidePanels">
+/// Whether the run opens with the side panes hidden. Display only: the host
+/// flips it on the hide key without ever touching the cursor.
+/// </param>
 public sealed record TuiHostRequest(
     ReplayDocument Document,
     TextWriter Output,
@@ -153,7 +157,8 @@ public sealed record TuiHostRequest(
     IKeySource Keys,
     IUiClock Clock,
     int MaxFramesPerSecond = TuiHost.DefaultMaxFramesPerSecond,
-    ICockpitCursor? Cursor = null);
+    ICockpitCursor? Cursor = null,
+    bool HidePanels = false);
 
 /// <summary>How a host run ended: the status to return, and why it refused if it did.</summary>
 /// <param name="ExitCode">0 on a normal quit, 2 on a refusal.</param>
@@ -194,6 +199,15 @@ public static class TuiHost
     /// is better served by a frame it can finish than by the newest one it cannot.
     /// </summary>
     public const int DefaultMaxFramesPerSecond = 30;
+
+    /// <summary>
+    /// The character that hides the side panes and shows them again. Chosen
+    /// because neither cursor binds it: a replay answers space, n, p, the speed
+    /// and scrub characters and the navigation keys, and a live episode answers
+    /// those plus r — so the host can consume this one before either cursor ever
+    /// sees it, which is what keeps the toggle display only.
+    /// </summary>
+    public const char HidePanelsKey = 'h';
 
     /// <summary>The status a refused run reports: the invocation named no terminal.</summary>
     private const int UsageRefused = 2;
@@ -248,10 +262,11 @@ public static class TuiHost
         var fill = request.Capabilities.PanelFill;
         var playback = request.Cursor ?? new ReplayPlayback(request.Document);
         var frameInterval = TimeSpan.FromSeconds(1.0 / request.MaxFramesPerSecond);
+        var hidePanels = request.HidePanels;
 
         // The first frame is always written: a viewer that shows nothing until the
         // reader presses a key looks broken.
-        Compose(request, playback, fill, host);
+        Compose(request, playback, fill, host, hidePanels);
         var lastTickAt = request.Clock.Now;
 
         while (!quit && !playback.IsFinished)
@@ -291,9 +306,20 @@ public static class TuiHost
                     continue;
                 }
 
+                // The panels key is the host's own, not the cursor's: hiding is
+                // display only, so it flips the flag and recomposes without ever
+                // reaching the cursor — whose position, pause and speed state are
+                // exactly what they were before the keypress.
+                if (key.Kind == TuiKeyKind.Character && key.Glyph == HidePanelsKey)
+                {
+                    hidePanels = !hidePanels;
+                    Compose(request, playback, fill, host, hidePanels);
+                    continue;
+                }
+
                 if (playback.Apply(key))
                 {
-                    Compose(request, playback, fill, host);
+                    Compose(request, playback, fill, host, hidePanels);
                 }
 
                 continue;
@@ -305,7 +331,7 @@ public static class TuiHost
 
             if (playback.Advance(elapsed))
             {
-                Compose(request, playback, fill, host);
+                Compose(request, playback, fill, host, hidePanels);
             }
         }
 
@@ -342,7 +368,8 @@ public static class TuiHost
         TuiHostRequest request,
         ICockpitCursor playback,
         Rgb? fill,
-        ScreenHost host)
+        ScreenHost host,
+        bool hidePanels)
     {
         host.Present(CockpitLayout.Render(new CockpitRequest(
             playback.Document,
@@ -352,6 +379,7 @@ public static class TuiHost
             fill,
             playback.Phase,
             new PlaybackState(playback.IsPaused, playback.StepsPerSecond),
-            playback.Live)));
+            playback.Live,
+            HidePanels: hidePanels)));
     }
 }

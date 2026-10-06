@@ -24,6 +24,11 @@ public readonly record struct PlaybackState(bool IsPaused, double StepsPerSecond
 /// the difference: the world, scoreboard and log are drawn from the same frames
 /// either way, and only the timeline and the key hints read this.
 /// </param>
+/// <param name="HidePanels">
+/// Whether the side panes are hidden so the world pane gets the room. Display
+/// only: it changes which panes are drawn and nothing about the frames, the
+/// cursor or the recording behind them.
+/// </param>
 public sealed record CockpitRequest(
     ReplayDocument Document,
     int FrameIndex,
@@ -32,7 +37,8 @@ public sealed record CockpitRequest(
     Rgb? PanelFill,
     double Phase,
     PlaybackState Playback,
-    LiveState? Live = null);
+    LiveState? Live = null,
+    bool HidePanels = false);
 
 /// <summary>
 /// The cockpit: the world, the scoreboard, the event log, the timeline and the
@@ -188,6 +194,12 @@ public static class CockpitLayout
 
     private static void DrawCockpit(CockpitRequest request, CellBuffer cells, BorderGlyphs frame, PaletteRoles palette)
     {
+        if (request.HidePanels)
+        {
+            DrawHiddenCockpit(request, cells, frame, palette);
+            return;
+        }
+
         var size = request.Size;
         var world = new Rect(1, 1, size.Width - 2 - RightColumnWidth - 1, size.Height - 5);
         var scoreboard = new Rect(world.X + world.Width + 1, 1, RightColumnWidth, ScoreboardHeight);
@@ -204,7 +216,24 @@ public static class CockpitLayout
         DrawScoreboard(request, cells, palette, scoreboard);
         DrawEventLog(request, cells, palette, log);
         DrawTimeline(request, cells, palette, timeline);
-        DrawKeyHints(request, cells, palette);
+        DrawKeyHints(request, cells, palette, hidden: false);
+    }
+
+    /// <summary>
+    /// The hidden-panels cockpit: the world pane alone, over the whole terminal
+    /// minus the screen's own frame, with the key hints still on the bottom
+    /// border. The scoreboard, the event log and the timeline are not drawn —
+    /// and nothing else changes: the same world at a bigger size, the same
+    /// frame, the same title, and a hint row that names the way back.
+    /// </summary>
+    private static void DrawHiddenCockpit(CockpitRequest request, CellBuffer cells, BorderGlyphs frame, PaletteRoles palette)
+    {
+        var size = request.Size;
+        var world = new Rect(1, 1, size.Width - 2, size.Height - 2);
+
+        DrawPane(request, cells, frame, palette, world, "WORLD");
+        DrawWorld(request, cells, world);
+        DrawKeyHints(request, cells, palette, hidden: true);
     }
 
     private static void DrawFallback(CockpitRequest request, CellBuffer cells, BorderGlyphs frame, PaletteRoles palette)
@@ -230,7 +259,7 @@ public static class CockpitLayout
         // The controls stay on screen at this size too. A reader who cannot see
         // them cannot use them, and the hint row costs one line of a pane that is
         // not there anyway.
-        DrawKeyHints(request, cells, palette);
+        DrawKeyHints(request, cells, palette, hidden: false);
     }
 
     /// <summary>
@@ -546,12 +575,12 @@ public static class CockpitLayout
     /// ASCII unconditionally, so the one row that explains the keys is never the
     /// row a terminal cannot encode.
     /// </summary>
-    private static void DrawKeyHints(CockpitRequest request, CellBuffer cells, PaletteRoles palette)
+    private static void DrawKeyHints(CockpitRequest request, CellBuffer cells, PaletteRoles palette, bool hidden)
     {
         cells.DrawText(
             2,
             KeyHintRow(request.Size),
-            KeyHintsFor(request.Live is not null),
+            KeyHintsFor(request.Live is not null, hidden),
             new Cell(' ', palette.TextDim, request.PanelFill));
     }
 
@@ -570,10 +599,38 @@ public static class CockpitLayout
         "LIVE  space pause  n tick  p back  < > speed  [ ] speed  home/end jump  r restart  q quit";
 
     /// <summary>
+    /// The controls while the side panes are hidden: the way back first, then the
+    /// core controls. Short by design, so the row fits the smallest cockpit with
+    /// room to spare; the full control list is one keypress away in normal mode.
+    /// </summary>
+    public const string HiddenKeyHints =
+        "h show panels  space pause  n/p step  < > speed  [ ] scrub  q quit";
+
+    /// <summary>
+    /// The controls a live episode has while the side panes are hidden: the way
+    /// back first, then the core live controls. Says LIVE, as the normal live row
+    /// does, so the reader knows the episode is still being computed.
+    /// </summary>
+    public const string HiddenLiveKeyHints =
+        "LIVE  h show panels  space pause  n tick  p back  < > [ ] speed  r restart  q quit";
+
+    /// <summary>
     /// The hint row this frame draws, from the one place that decides, so a caller
     /// and the renderer can never disagree about which row is on screen.
     /// </summary>
-    public static string KeyHintsFor(bool live) => live ? LiveKeyHints : KeyHints;
+    public static string KeyHintsFor(bool live) => KeyHintsFor(live, hidden: false);
+
+    /// <summary>
+    /// The hint row this frame draws when the side panes may be hidden. A hidden
+    /// frame names the way back; a normal frame draws exactly what it always drew.
+    /// </summary>
+    public static string KeyHintsFor(bool live, bool hidden) => (live, hidden) switch
+    {
+        (false, false) => KeyHints,
+        (true, false) => LiveKeyHints,
+        (false, true) => HiddenKeyHints,
+        (true, true) => HiddenLiveKeyHints,
+    };
 
     private static void DrawPane(
         CockpitRequest request,

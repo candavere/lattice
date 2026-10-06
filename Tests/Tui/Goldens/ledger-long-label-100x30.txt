@@ -1,0 +1,30 @@
+╭─LATTICE TUI  ledger  LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL…─╮
+│╭─ ARTIFACT ─────────────────────────────────────────────────────────────────────────────────────╮│
+││commit abc1234   created 2026-09-25 19:41:20Z   runtime TestRuntime 1.0                         ││
+││os TestOs 1.0   cores 4   arch X64   external agent none                                        ││
+│╰────────────────────────────────────────────────────────────────────────────────────────────────╯│
+│                                                                                                  │
+│╭─ STUDIES ──────────────────────────────────────────────────────────────────────────────────────╮│
+││   SUITE     SEEDS MATCH    MEAN        95% CI VERDICT      W/D/L/T       WIN%/D%/L%/T%   SAT   ││
+││>  heldout       3     6       1         [0,0] Pass         3/0/3/0     0.5/0.0/0.5/0.0   0.2   ││
+│╰────────────────────────────────────────────────────────────────────────────────────────────────╯│
+│                                                                                                  │
+│╭─ PER-SEED heldout  MCTS vs Scout  W/L = policy's seat ─────────────────────────────────────────╮│
+││        SEED  POL0 BASE0  POL1 BASE1   DELTA   M0   M1                                          ││
+││>       2001     1     4     5     0       1    L    W                                          ││
+││        2002     1     4     5     0       1    L    W                                          ││
+││        2003     1     4     5     0       1    L    W                                          ││
+││                                                                                                ││
+││                                                                                                ││
+││                                                                                                ││
+││                                                                                                ││
+││                                                                                                ││
+││                                                                                                ││
+││                                                                                                ││
+││                                                                                                ││
+││                                                                                                ││
+││                                                                                                ││
+││                                                                                                ││
+│╰────────────────────────────────────────────────────────────────────────────────────────────────╯│
+│                                                                                                  │
+╰─tab artifact  up/down suite  pgup/pgdn/home/end seed  c compare  q quit──────────────────────────╯

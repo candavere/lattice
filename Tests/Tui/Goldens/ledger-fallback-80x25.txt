@@ -1,0 +1,25 @@
+╭─LATTICE TUI  ledger  results.json────────────────────────────────────────────╮
+│ terminal is 80x25; the full layout needs 100x30; resize for it               │
+│╭─ ARTIFACT ─────────────────────────────────────────────────────────────────╮│
+││commit abc1234   created 2026-09-25 19:41:20Z   runtime TestRuntime 1.0     ││
+││os TestOs 1.0   cores 4   arch X64   external agent scored                  ││
+│╰────────────────────────────────────────────────────────────────────────────╯│
+│                                                                              │
+│╭─ EXTERNAL AGENT ───────────────────────────────────────────────────────────╮│
+││command python3 agent.py   step 5000ms   match 20000ms   void runs 3        ││
+││failures timeout_step 1, agent_crashed 2                                    ││
+││forfeits 2: seed 1001 seat 0 (timeout_step); seed 1001 seat 1 (timeout_step)││
+│╰────────────────────────────────────────────────────────────────────────────╯│
+│                                                                              │
+│╭─ STUDIES ──────────────────────────────────────────────────────────────────╮│
+││   SUITE     SEEDS MATCH    MEAN        95% CI VERDICT      W/D/L/T WIN%/D%…││
+││>  heldout       3     6       1         [0,0] Pass         3/0/3/0 0.5/0.0…││
+│╰────────────────────────────────────────────────────────────────────────────╯│
+│                                                                              │
+│╭─ PER-SEED heldout  MCTS vs Scout  W/L = policy's seat ─────────────────────╮│
+││        SEED  POL0 BASE0  POL1 BASE1   DELTA   M0   M1                      ││
+││>       2001     1     4     5     0       1    L    W                      ││
+││+2 more; pgdn reaches them                                                  ││
+│╰────────────────────────────────────────────────────────────────────────────╯│
+│                                                                              │
+╰─tab artifact  up/down suite  pgup/pgdn/home/end seed  c compare  q quit──────╯

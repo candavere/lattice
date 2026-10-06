@@ -272,6 +272,51 @@ public class LaunchpadInputOwnershipTests
     }
 
     /// <summary>
+    /// Two runs in one process restore three sessions, one each, and every
+    /// queued key still reaches its consumer in order: both runs report
+    /// their status and the quit at the end lands on the form, not on a
+    /// leftover. The loop-carried screen and source replacement over multiple
+    /// returns is the discipline under test.
+    /// </summary>
+    [Fact]
+    public void TwoRunsInOneProcessRestoreThreeSessionsAndDeliverEveryKey()
+    {
+        var events = new List<string>();
+        var sessions = new MultiSession(events);
+        var keys = new ScriptedKeys(events);
+        foreach (var key in RunRenderKeys())
+        {
+            keys.Queue(key);
+        }
+
+        keys.Queue(Character(' '));
+        keys.Queue(new TuiKey(TuiKeyKind.Enter));
+        keys.Queue(Character(' '));
+        keys.Queue(Character('q'));
+
+        var result = LaunchpadHost.Run(new LaunchpadHostRequest(
+            LaunchpadCatalog.Commands,
+            TextWriter.Null,
+            TextWriter.Null,
+            Interactive,
+            new TuiConsole(new RecordingControlC(events), () => Built(events, keys)),
+            sessions,
+            new StaticClock(),
+            new StubRunner(events),
+            TrailingIdleFrames: 0));
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal(2, events.Count(entry => entry == "ran"));
+        Assert.Equal(3, sessions.Entries);
+        Assert.All(sessions.Sessions, session => Assert.Equal(1, session.Disposes));
+        Assert.DoesNotContain(events, entry => entry.StartsWith("write-after-dispose", StringComparison.Ordinal));
+        Assert.Equal(3, events.Count(entry => entry.StartsWith("restore", StringComparison.Ordinal)));
+        Assert.True(
+            sessions.Written.Split("exit 0", StringSplitOptions.None).Length - 1 >= 2,
+            "both runs should have shown their status.");
+    }
+
+    /// <summary>
     /// A redirected run builds no key source at all.
     /// </summary>
     [Fact]

@@ -464,13 +464,20 @@ world, the scoreboard, the event log and the timeline; the hint row reads
 space pause  n/p step  < > speed  [ ] scrub  home/end jump  q quit
 ```
 
-`space` pauses, `n`/`p` step one frame forward/back, the arrows do the same,
-`up`/`down` and `<`/`>` (also `+`/`-`) change speed, `[`/`]` scrub a tenth of
-the recording, `home`/`end` jump to the first/last frame, `h` hides the side
-panes so the world pane gets the room and `h` again brings them back, and
-`q` (or Ctrl-C) quits. Hiding is display only: it never moves the replay
-position, the speed or the pause state. Below 100x30 the cockpit is replaced
-by the world alone with a line naming the size the cockpit needs.
+`space` pauses, `n`/`p` step one frame forward/back, `left`/`right` and
+`pgup`/`pgdn` do the same, `up`/`down` and `<`/`>` (also `+`/`-`) change speed,
+`[`/`]` scrub a tenth of the recording, `home`/`end` jump to the first/last
+frame, `h` hides the side panes so the world pane gets the room and `h` again
+brings them back, and `q` (or Ctrl-C) quits. Hiding is display only: it never
+moves the replay position, the speed or the pause state. While hidden, the hint
+row names the way back first:
+
+```
+h show panels  space pause  n/p step  < > speed  [ ] scrub  q quit
+```
+
+Below 100x30 the cockpit is replaced by the world alone with a line naming
+the size the cockpit needs; the flag changes nothing there.
 
 ### tui simulate
 
@@ -484,10 +491,16 @@ LIVE  space pause  n tick  p back  < > speed  [ ] speed  home/end jump  r restar
 ```
 
 `space` pauses, `n` asks for one tick at the frontier, `p` steps back over
-produced frames, the brackets and angle brackets change speed, `home` goes to
-the start, `end` goes as far as the frames produced so far, `r` restarts the
-episode from the same seed, `h` hides and shows the side panes, and `q` (or
-Ctrl-C) quits. A live run records nothing: `--out` is refused, `--quiet` is
+produced frames, `left`/`right` and `pgup`/`pgdn` step one produced frame
+back or forward, `up`/`down` and the brackets, angle brackets, `+` and `-`
+change speed, `home` goes to the start, `end` goes as far as the frames
+produced so far, `r` restarts the episode from the same seed, `h` hides and
+shows the side panes, and `q` (or Ctrl-C) quits. While hidden, the hint row
+names the way back first:
+
+```
+LIVE  h show panels  space pause  n tick  p back  < > [ ] speed  r restart  q quit
+``` A live run records nothing: `--out` is refused, `--quiet` is
 accepted and does nothing, and a `--rules` file named beside a scenario file
 prints a notice that it has no effect and the run continues. A simulation that
 fails inside the viewer exits `1` with one line on stderr; a clean quit exits
@@ -536,8 +549,10 @@ own stdout and stderr.
 
 A viewer whose input or output is redirected is not a viewer: entering the
 alternate screen would put control sequences into whatever the redirect was
-for. The run prints one line of reason on stderr and exits `2`, having touched
-nothing — no key source, no console input property, no file. The cockpit says
+for. The run prints one line of reason on stderr and exits `2`. Nothing is
+built first: no key source, and no console input property is read or set — the
+refusal is decided from the detected capabilities alone. (The Ledger
+additionally refuses before opening any artifact file.) The cockpit says
 `lattice tui: standard input is redirected; ...`, `lattice tui: standard
 output is redirected; ...`, or names both; the Ledger says the same with `the
 ledger` for the noun, and the Launchpad with `the launchpad` under the

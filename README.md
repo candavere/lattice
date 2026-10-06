@@ -323,6 +323,12 @@ lattice replay Tests/fixtures/golden_trajectory.jsonl --verify
 dotnet tool uninstall -g lattice                             # back to the zero-install path
 ```
 
+The `-g` install is also what puts the bare `lattice` launcher on `PATH`: the
+same shim the throwaway `--tool-path` install makes, but for the current user.
+If the shell answers `lattice: command not found` afterwards, the global-tools
+directory (`~/.dotnet/tools`) is not on `PATH`; export it and open a new shell.
+Nothing here edits a shell profile: that export is yours to make.
+
 On a Homebrew .NET install the `lattice` launcher can fail with `You must
 install .NET to run this application.` even though `dotnet` itself works,
 because the launcher resolves the runtime from `DOTNET_ROOT` or a registered
@@ -719,6 +725,25 @@ everywhere else.
 
 The flag-by-flag reference, every flag, its semantics, and worked examples,
 lives in [`docs/CLI.md`](docs/CLI.md).
+
+## Interactive terminal screens
+
+Typing bare `lattice` in a terminal opens the Launchpad, where every command
+and every screen below is configured from its own flags and started; on a
+redirected stream, or with any argument, behaviour is exactly as `--help`
+says. `lattice tui` opens three full-screen viewers that read keys and draw on
+the terminal: `replay <trajectory.jsonl>` plays a recording and runs no
+simulation, `simulate --seed <n>` runs a live episode in the same cockpit, and
+`ledger <artifact.json> [...]` reads one or more `evaluate --out` artifacts
+side by side and derives nothing. In the cockpit `h` hides the scoreboard,
+event log and timeline so the world pane gets the room, and `h` again brings
+them back without moving the replay or the episode; `--hide-panels` opens the
+viewer hidden, and `--ascii` forces ASCII glyphs on all three screens. A viewer
+whose input or output is redirected prints one line of reason and exits `2`
+without entering the alternate screen; quitting any screen exits `0`. The eight
+commands above still run directly, non-interactively, for scripts. Keys,
+refusals and exit codes are stated per screen in
+[`docs/CLI.md#tui`](docs/CLI.md#tui).
 
 ## Declarative scenario files
 

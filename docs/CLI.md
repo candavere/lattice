@@ -437,3 +437,109 @@ followed by a `decision` line carrying the same verdict string the in-process
 study records under `Decision` in its artifact — the same analyzer's words, not a
 second phrasing of them. If voids leave fewer than 30 valid seeds the run is "Not
 graded", and the summary says that the exclusion is why.
+
+## tui
+
+`tui` is outside the eight commands above: it opens full-screen viewers that
+read keys and draw on the terminal, so it refuses redirected streams where the
+eight keep working. With no arguments at all, `lattice` opens the Launchpad
+when standard input and standard output are both a terminal; on a redirected
+stream, or with any argument, it behaves exactly as the `--help` text says.
+The eight commands still run directly for scripts, with the stdout bytes and
+exit codes this page documents.
+
+```sh
+dotnet run --project Cli -- tui replay site/demo.jsonl
+dotnet run --project Cli -- tui simulate --seed 42 --steps 100
+dotnet run --project Cli -- tui ledger benchmarks/mcts_evaluation_results.json
+```
+
+### tui replay
+
+`replay <trajectory.jsonl> [--ascii] [--hide-panels]` plays a recorded
+trajectory in a read-only cockpit and runs no simulation. The screen shows the
+world, the scoreboard, the event log and the timeline; the hint row reads
+
+```
+space pause  n/p step  < > speed  [ ] scrub  home/end jump  q quit
+```
+
+`space` pauses, `n`/`p` step one frame forward/back, the arrows do the same,
+`up`/`down` and `<`/`>` (also `+`/`-`) change speed, `[`/`]` scrub a tenth of
+the recording, `home`/`end` jump to the first/last frame, `h` hides the side
+panes so the world pane gets the room and `h` again brings them back, and
+`q` (or Ctrl-C) quits. Hiding is display only: it never moves the replay
+position, the speed or the pause state. Below 100x30 the cockpit is replaced
+by the world alone with a line naming the size the cockpit needs.
+
+### tui simulate
+
+`simulate --seed <n> [--steps <n>] [--agent <a>] [--scenario <infiltration|file>] [--rules <f>] [--quiet] [--ascii] [--hide-panels]`
+runs a live episode in the same cockpit. The roster, map, rules, seed and tick
+budget are the ones `lattice simulate` would use for the same arguments. The
+hint row reads
+
+```
+LIVE  space pause  n tick  p back  < > speed  [ ] speed  home/end jump  r restart  q quit
+```
+
+`space` pauses, `n` asks for one tick at the frontier, `p` steps back over
+produced frames, the brackets and angle brackets change speed, `home` goes to
+the start, `end` goes as far as the frames produced so far, `r` restarts the
+episode from the same seed, `h` hides and shows the side panes, and `q` (or
+Ctrl-C) quits. A live run records nothing: `--out` is refused, `--quiet` is
+accepted and does nothing, and a `--rules` file named beside a scenario file
+prints a notice that it has no effect and the run continues. A simulation that
+fails inside the viewer exits `1` with one line on stderr; a clean quit exits
+`0`.
+
+### tui ledger
+
+`ledger <artifact.json> [<artifact.json> ...] [--ascii]` opens a read-only
+screen over one or more `evaluate --out` artifacts: where and on what each was
+produced, one row per suite, and the per-seed rows each paired delta is built
+from, with two artifacts put side by side and a protocol line per suite. The
+hint row reads
+
+```
+tab artifact  up/down suite  pgup/pgdn/home/end seed  c compare  q quit
+```
+
+`tab`/`right` move to the next artifact, `backtab`/`left` to the previous,
+`down`/`j` and `up`/`k` move between suites, `pgdn`/`pgup` move through the
+seed rows by a page, `home`/`end` jump to the first/last seed row, `c` swaps
+the detail band between the seed rows and the comparison, and `esc`, `q` (or
+Ctrl-C) leaves. The Ledger has no hide mode: `--hide-panels` is refused as an
+unknown flag.
+
+### bare lattice: the Launchpad
+
+With no command, and standard input and standard output both a terminal,
+`lattice` opens the Launchpad: every command and every `tui` screen with its
+real flags as a form, the equivalent `lattice ...` command line shown live
+underneath, and inline validation from the CLI parser itself. Two key modes:
+
+```
+j/k or arrows command  tab form  enter run  q quit
+tab next field  enter commit  esc leave field  ctrl-c quit
+```
+
+Navigation: `j`/`k` or the arrows move, `tab` enters the form, `enter` runs,
+`q` or `esc` leaves. Editing: every printable character types into the field,
+including `q`, `j` and `k`; `backspace`, `delete`, the arrows, `home` and
+`end` edit; `enter` or `tab` commits; `esc` leaves the field and keeps the
+text. A command run from the Launchpad leaves the alternate screen, restores
+the terminal, and runs through the same `CliApp.Run` path with the process's
+own stdout and stderr.
+
+### Refusals and exit codes
+
+A viewer whose input or output is redirected is not a viewer: entering the
+alternate screen would put control sequences into whatever the redirect was
+for. The run prints one line of reason on stderr and exits `2`, having touched
+nothing — no key source, no console input property, no file. The cockpit says
+`lattice tui: standard input is redirected; ...`, `lattice tui: standard
+output is redirected; ...`, or names both; the Ledger says the same with `the
+ledger` for the noun, and the Launchpad with `the launchpad` under the
+`lattice:` prefix. `--ascii` forces ASCII glyphs on all three screens whatever
+the locale says. Quitting any screen exits `0`.

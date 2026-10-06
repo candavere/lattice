@@ -448,7 +448,11 @@ public static class CliApp
 
             if (args.Length > 0 && args[0] == "simulate")
             {
-                return TuiSimulate(rest, ascii, stdout, stderr, console);
+                // --hide-panels is stripped per cockpit subcommand rather than here:
+                // the Ledger has no hide mode, so it must refuse the flag as unknown
+                // rather than silently ignore it.
+                var simulateArgs = WithoutFlag(rest, "--hide-panels", out var simulateHidden);
+                return TuiSimulate(simulateArgs, ascii, simulateHidden, stdout, stderr, console);
             }
 
             if (args.Length > 0 && args[0] == "ledger")
@@ -462,7 +466,8 @@ public static class CliApp
                 return UsageError.ExitCode;
             }
 
-            var (_, positionals) = ParseFlags(rest);
+            var replayArgs = WithoutFlag(rest, "--hide-panels", out var replayHidden);
+            var (_, positionals) = ParseFlags(replayArgs);
 
             if (positionals.Count == 0)
             {
@@ -483,7 +488,8 @@ public static class CliApp
                 CapabilityDetector.Detect(),
                 ascii,
                 console,
-                cursor: null).ExitCode;
+                cursor: null,
+                hidePanels: replayHidden).ExitCode;
         }
         catch (Exception ex)
         {
@@ -520,6 +526,7 @@ public static class CliApp
     /// <param name="ascii">Whether the caller asked for ASCII glyphs.</param>
     /// <param name="console">The console the run is composed from.</param>
     /// <param name="cursor">The live cursor, or null to play the recording.</param>
+    /// <param name="hidePanels">Whether the run opens with the side panes hidden.</param>
     /// <param name="session">The terminal seam; the guard's by default.</param>
     /// <param name="clock">How elapsed time is measured.</param>
     /// <remarks>
@@ -537,7 +544,8 @@ public static class CliApp
         TuiConsole console,
         ICockpitCursor? cursor,
         ITerminalSessionFactory? session = null,
-        IUiClock? clock = null)
+        IUiClock? clock = null,
+        bool hidePanels = false)
     {
         var refusal = TuiHost.RefusalFor(capabilities);
         if (refusal is not null)
@@ -561,7 +569,8 @@ public static class CliApp
             session ?? new TerminalGuardSessionFactory(),
             keys,
             clock ?? new MonotonicClock(),
-            Cursor: cursor));
+            Cursor: cursor,
+            HidePanels: hidePanels));
     }
 
     /// <summary>
@@ -584,7 +593,7 @@ public static class CliApp
     /// before.
     /// </para>
     /// </remarks>
-    private static int TuiSimulate(string[] args, bool ascii, TextWriter stdout, TextWriter stderr, TuiConsole console)
+    private static int TuiSimulate(string[] args, bool ascii, bool hidePanels, TextWriter stdout, TextWriter stderr, TuiConsole console)
     {
         var setup = BuildLiveSetup(args, stderr);
 
@@ -611,7 +620,8 @@ public static class CliApp
             capabilities,
             ascii,
             console,
-            cursor);
+            cursor,
+            hidePanels: hidePanels);
 
         if (result.Refusal is not null)
         {
@@ -802,11 +812,22 @@ public static class CliApp
     }
 
     /// <summary>
+    /// Splits a boolean switch out of an argument list, reporting whether it was
+    /// there. The switch is recognised anywhere in the list, exactly as
+    /// <c>--ascii</c> is, so it can never be mistaken for a value or a path.
+    /// </summary>
+    private static string[] WithoutFlag(string[] args, string flag, out bool present)
+    {
+        present = args.Contains(flag, StringComparer.Ordinal);
+        return present ? args.Where(argument => argument != flag).ToArray() : args;
+    }
+
+    /// <summary>
     /// The viewer's own usage line, on stderr only, and deliberately one line: a
     /// usage line is a diagnosis, not a manual.
     /// </summary>
     private static void WriteTuiUsage(TextWriter sink) =>
-        sink.WriteLine("usage: lattice tui replay <trajectory.jsonl> [--ascii] | lattice tui ledger <artifact.json> [<artifact.json> ...] [--ascii] | lattice tui simulate --seed <n> [--steps <n>] [--agent <a>] [--scenario <infiltration|file>] [--rules <f>] [--ascii]");
+        sink.WriteLine("usage: lattice tui replay <trajectory.jsonl> [--ascii] [--hide-panels] | lattice tui ledger <artifact.json> [<artifact.json> ...] [--ascii] | lattice tui simulate --seed <n> [--steps <n>] [--agent <a>] [--scenario <infiltration|file>] [--rules <f>] [--ascii] [--hide-panels]");
 
     private static bool IsKnownCommand(string command) =>
         command is "generate" or "simulate" or "render" or "analyze"

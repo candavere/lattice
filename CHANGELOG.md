@@ -66,10 +66,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   arriving as unnamed control characters. What the cockpit does with them is
   unchanged: it has no field to commit and no text to edit, so each leaves the
   cursor exactly where it was.
+- The cockpit hides its side panes on `h`. The scoreboard, event log and timeline
+  are not drawn and the world pane takes the whole terminal, and `h` again brings
+  them back; hiding is display only and changes neither the cursor nor the
+  recording. `lattice tui replay` and `lattice tui simulate` accept
+  `--hide-panels` to open hidden. The Ledger and the Launchpad have no hide mode,
+  and the normal-mode hint row is unchanged.
 
 ### Changed
 
-- The `lattice tui` usage line now names the Ledger between `replay` and `simulate`.
+- The `lattice tui` usage line now names the Ledger between `replay` and `simulate`,
+  and `--hide-panels` after `--ascii` on `replay` and `simulate`.
 - The usage text gained one paragraph saying what a bare `lattice` does. On a
   terminal it opens the Launchpad; with any argument, or on a redirected stream, it
   does exactly what it always did, and prints the usage on stderr with the usage

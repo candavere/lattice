@@ -294,7 +294,18 @@ public class BareLaunchTests
 
         private sealed class Session : ITerminalSession
         {
-            public event Action? Interrupted;
+            /// <summary>
+            /// Explicitly inert rather than simply declared: this double never raises
+            /// an interrupt, and <c>ScreenHost</c> subscribes and unsubscribes around the
+            /// screen's whole life. Handing it real handlers would let a test believe an
+            /// interrupt had been delivered here when this session never delivers one,
+            /// so the accessors are empty on purpose and say so.
+            /// </summary>
+            public event Action? Interrupted
+            {
+                add { }
+                remove { }
+            }
 
             public void Write(string text)
             {

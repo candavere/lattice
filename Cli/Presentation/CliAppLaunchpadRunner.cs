@@ -73,8 +73,6 @@ public sealed class CliAppLaunchpadRunner : ILaunchpadRunner
     /// <inheritdoc />
     public int Run(LaunchpadRunRequest request)
     {
-        ArgumentNullException.ThrowIfNull(request);
-
         // The reader's choice of how to run it, not the command's name: a simulate
         // watched live is a screen and a simulate recorded is a command, and only the
         // reader knows which they filled the form for.
@@ -126,8 +124,6 @@ public sealed class CliAppCockpitRunner : ICockpitRunner
     /// <inheritdoc />
     public int Run(LaunchpadRunRequest request)
     {
-        ArgumentNullException.ThrowIfNull(request);
-
         return CliApp.Run(request.Arguments, request.Output, request.Errors, CliTerminal.For(request.Errors), _console);
     }
 }

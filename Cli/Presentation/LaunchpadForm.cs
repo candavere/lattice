@@ -246,8 +246,6 @@ public sealed class LaunchpadForm
     /// </summary>
     public void Apply(TuiKey key)
     {
-        ArgumentNullException.ThrowIfNull(key);
-
         if (_quit || _wantsToRun)
         {
             return;

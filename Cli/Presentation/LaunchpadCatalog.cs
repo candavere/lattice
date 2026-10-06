@@ -75,8 +75,6 @@ public sealed record LaunchpadCommand(
 
     /// <summary>
     /// The text a field starts with: its own default when it has one, and the empty
-    /// <summary>
-    /// The text a field starts with: its own default when it has one, and the empty
     /// string otherwise. Exposed so a caller building a form does not re-decide
     /// what "no default" means.
     /// </summary>

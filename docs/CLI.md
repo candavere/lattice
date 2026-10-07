@@ -16,7 +16,7 @@ is the full flag-by-flag reference; the landing page keeps a
 
 Every command in this reference can also be invoked as `lattice <command>` if
 you have installed the CLI as a .NET global tool (`dotnet pack Cli -c Release`
-then `dotnet tool install -g --add-source ./Cli/bin/Release lattice`; see
+then `dotnet tool install -g --add-source ./Cli/bin/Release --version 3.1.0 lattice`; see
 [the README](../README.md#or-install-the-cli-once-as-a-net-global-tool)). That
 is the same compiled binary under a launcher name, so the flags, output and exit
 codes below are identical either way; every example on this page uses the

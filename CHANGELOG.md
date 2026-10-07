@@ -92,6 +92,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   terminal it opens the Launchpad; with any argument, or on a redirected stream, it
   does exactly what it always did, and prints the usage on stderr with the usage
   status.
+- Production preparation without a release: the README install path now shows the
+  throwaway `--tool-path` install alongside `-g`, states cloning alone does not
+  put `lattice` on `PATH`, pins installs to `--version 3.1.0`, keeps `dotnet run`
+  as the no-install alternative with the Homebrew `DOTNET_ROOT` caveat, and
+  distinguishes unreleased `main` TUI from published `v3.0.0`. `docs/CLI.md` pins
+  its install example the same way. The release tag-parity gate now checks all
+  ten versioned projects including `Protocol` and `Tui`. See the new
+  `docs/RELEASE_READINESS.md` checklist. No version bump, tag, release or
+  publication.
 
 ### Fixed
 

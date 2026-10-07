@@ -309,18 +309,35 @@ evaluation artifacts is documented in
 ### Or install the CLI once as a .NET global tool
 
 The commands above are the **zero-install path**: nothing to install, just the
-SDK and a checkout. If you would rather type `lattice <command>` than repeat the
-`dotnet run --project Cli --` prefix, pack the CLI and install it as a global
-tool:
+SDK and a checkout. Cloning alone does not put `lattice` on `PATH`. If you
+would rather type `lattice <command>` than repeat the
+`dotnet run --project Cli --` prefix, pack the CLI and install it:
 
 ```sh
 dotnet pack Cli -c Release                                  # produces Cli/bin/Release/lattice.3.1.0.nupkg
-dotnet tool install -g --add-source ./Cli/bin/Release lattice
+dotnet tool install -g --add-source ./Cli/bin/Release --version 3.1.0 lattice
 lattice replay Tests/fixtures/golden_trajectory.jsonl --verify
+```
+
+A throwaway install that leaves the user profile alone (verified in
+`docs/RELEASE_READINESS.md` from a clean checkout at the current commit):
+
+```sh
+dotnet pack Cli -c Release --no-build --output ./pkg-source
+dotnet tool install --tool-path ./tool-path --version 3.1.0 --add-source ./pkg-source lattice
+./tool-path/lattice --version                               # 3.1.0
+./tool-path/lattice replay Tests/fixtures/golden_trajectory.jsonl --verify
 ```
 
 ```sh
 dotnet tool uninstall -g lattice                             # back to the zero-install path
+```
+
+Try one replay and one evidence view, then quit each screen with `q`:
+
+```sh
+lattice replay site/demo.jsonl --verify                     # headless, exit 0
+dotnet run --project Cli -- tui ledger benchmarks/mcts_evaluation_results.json
 ```
 
 The `-g` install is also what puts the bare `lattice` launcher on `PATH`: the
@@ -339,13 +356,17 @@ above is unaffected, so if the launcher fails, use the zero-install path instead
 This is **packaging, not a second implementation**. The tool is the same
 compiled binary with a launcher named `lattice`; every command, flag, output and
 exit code is the one documented above, because it is the same code. It adds **no
-dependency**: the eight production projects still declare zero
+dependency**: the nine production projects still declare zero
 `PackageReference` items, and the packed `.nuspec` declares no dependencies at
-all — the package carries Lattice's own assemblies and asks for the .NET
-runtime, which you already have for the commands above. CI proves the two entry
+all — the package carries Lattice's own assemblies (including `Tui` and
+`Protocol`) and asks for the .NET
+runtime, which you already have for the commands above. A package version still
+saying 3.1.0 does not mean untagged main-branch changes were released. CI proves the two entry
 points agree: the `build-test` matrix packs, installs the tool into a
 throwaway tool path on Ubuntu, Windows and macOS, and fails if the installed
-`lattice` and `dotnet run` differ by a single byte on the golden replay.
+`lattice` and `dotnet run` differ by a single byte on the golden replay. The
+TUI on `main` is unreleased work; the latest published release remains `v3.0.0`
+until a `v3.1.0` tag and GitHub Release are verified.
 
 `--add-source` points NuGet at the package you just built. NuGet may still
 consult your other configured sources, so pass `--version 3.1.0` as well if you

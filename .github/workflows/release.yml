@@ -37,11 +37,13 @@ jobs:
             exit 1
           fi
 
-          # The 8 production/test projects that must agree with the tag. The
+          # The 10 production/test projects that must agree with the tag. The
           # reference/ scaffold is intentionally excluded: it is not shipped.
           PROJECTS="
             Environment/Lattice.Environment.csproj
             Agents/Lattice.Agents.csproj
+            Protocol/Lattice.Protocol.csproj
+            Tui/Lattice.Tui.csproj
             Trajectories/Lattice.Trajectories.csproj
             Analytics/Lattice.Analytics.csproj
             Visualization/Lattice.Visualization.csproj

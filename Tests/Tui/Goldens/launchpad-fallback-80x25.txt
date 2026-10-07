@@ -20,6 +20,6 @@
 ││                                                                            ││
 ││                                                                            ││
 ││                                                                            ││
-│─lattice generate --seed 42───────────────────────────────────────────────────│
+│─$ lattice generate --seed 42─────────────────────────────────────────────────│
 │                                                                              │
 ╰─tab next field  enter commit  esc leave field  ctrl-c quit───────────────────╯

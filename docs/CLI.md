@@ -454,6 +454,18 @@ dotnet run --project Cli -- tui simulate --seed 42 --steps 100
 dotnet run --project Cli -- tui ledger benchmarks/mcts_evaluation_results.json
 ```
 
+Display: the charcoal/olive panels, lime/sage/pink identity and logo colours are
+unchanged. Titles and pane titles are Bold; the Launchpad command preview reads
+`$ lattice ...` in Bold; instructions, table headers, key hints, defaults and
+required values use the readable secondary `#a8b0a3` (at least 4.5:1 on the
+panel fill, standard sRGB) and errors use the readable `#e88a80`; the sampled
+dim `#696f65` is reserved for decoration and disabled content. Selection is
+lime on the raised surface with Bold, focus keeps its `>`/caret/Reverse cue,
+and PASS/FAIL/not-graded, LIVE/paused/playing and choke marks are words and
+glyphs as well as colour. Panels are painted only under TrueColor; on
+256/16-colour and no-colour the terminal's own background is left alone and
+hierarchy comes from Bold, markers, spacing and words.
+
 ### tui replay
 
 `replay <trajectory.jsonl> [--ascii] [--hide-panels]` plays a recorded

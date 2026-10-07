@@ -93,6 +93,41 @@ public static class Theme
     public static Rgb SelectionBackground => Palette.Raised;
 
     /// <summary>
+    /// Derived readable secondary text: a lightened sage that meets 4.5:1 on
+    /// <see cref="Palette.PanelBackground"/> and on <see cref="Palette.Raised"/>.
+    /// Mixed for this project; not sampled. Use for instructions, column headers,
+    /// required metadata and values the user must read. <see cref="Palette.TextDim"/>
+    /// stays reserved for decoration and genuinely disabled content.
+    /// </summary>
+    public static Rgb SecondaryText => Rgb.FromHex("#a8b0a3");
+
+    /// <summary>
+    /// Headings: body text colour, distinguished by weight and position rather
+    /// than by a different hue. 11.9:1 on the panel fill.
+    /// </summary>
+    public static Rgb Heading => Palette.TextPrimary;
+
+    /// <summary>Keyboard hints: must be read, so the readable secondary, not dim.</summary>
+    public static Rgb KeyHint => SecondaryText;
+
+    /// <summary>Table column headers: the readable secondary, drawn Bold at call sites.</summary>
+    public static Rgb TableHeader => SecondaryText;
+
+    /// <summary>
+    /// Derived readable error text: a lightened error that meets 4.5:1 on the
+    /// panel fill. Mixed for this project; not sampled. <see cref="Palette.Error"/>
+    /// remains the mark colour for small glyphs where 3:1 non-text contrast applies.
+    /// </summary>
+    public static Rgb ErrorText => Rgb.FromHex("#e88a80");
+
+    /// <summary>
+    /// Truly dim styling, reserved for decoration and genuinely disabled content.
+    /// 3.05:1 on the panel fill: never use for instructions, headers, required
+    /// metadata or values the user must read.
+    /// </summary>
+    public static Rgb Decoration => Palette.TextDim;
+
+    /// <summary>
     /// The background a panel should be filled with, or <c>null</c> to leave the
     /// terminal's own background alone. Panels are painted only when truecolor
     /// is available: on 256- and 16-colour terminals the palette has no entry

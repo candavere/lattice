@@ -194,7 +194,7 @@ public class WorldRendererTests
         Assert.Equal(Glyphs.FilledCircle, cells[31, 0].Glyph);
         Assert.Equal(Palette.AccentBright, cells[31, 0].Foreground);
         Assert.Equal(Glyphs.HollowCircle, cells[62, 11].Glyph);
-        Assert.Equal(Palette.TextDim, cells[62, 11].Foreground);
+        Assert.Equal(Theme.SecondaryText, cells[62, 11].Foreground);
     }
 
     [Fact]

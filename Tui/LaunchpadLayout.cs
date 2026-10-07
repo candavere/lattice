@@ -157,7 +157,7 @@ public static class LaunchpadLayout
             2,
             0,
             Clip(request, TitleRow(request), Math.Max(0, size.Width - 4)),
-            new Cell(' ', Palette.Accent, request.PanelFill));
+            new Cell(' ', Palette.Accent, request.PanelFill, CellAttributes.Bold));
 
         if (size.Height >= 4)
         {
@@ -224,8 +224,8 @@ public static class LaunchpadLayout
         cells.DrawText(
             2,
             row,
-            Clip(request, request.CommandLine, Math.Max(0, request.Size.Width - 4)),
-            new Cell(' ', Palette.AccentBright, request.PanelFill));
+            Clip(request, "$ " + request.CommandLine, Math.Max(0, request.Size.Width - 4)),
+            new Cell(' ', Palette.AccentBright, request.PanelFill, CellAttributes.Bold));
     }
 
     /// <summary>
@@ -244,7 +244,7 @@ public static class LaunchpadLayout
             2,
             form.Y - 1,
             Clip(request, ResizeNotice(request.Size), Math.Max(0, request.Size.Width - 4)),
-            new Cell(' ', Palette.TextDim, request.PanelFill));
+            new Cell(' ', Theme.SecondaryText, request.PanelFill));
     }
 
     /// <summary>
@@ -293,7 +293,7 @@ public static class LaunchpadLayout
                 row++,
                 Clip(request, text, width),
                 selected
-                    ? new Cell(' ', Theme.SelectionForeground, Theme.SelectionBackground)
+                    ? new Cell(' ', Theme.SelectionForeground, Theme.SelectionBackground, CellAttributes.Bold)
                     : new Cell(' ', Palette.TextPrimary, request.PanelFill));
         }
     }
@@ -356,7 +356,7 @@ public static class LaunchpadLayout
             var field = request.Fields[index];
             var focused = index == request.FocusedIndex;
             var style = focused
-                ? new Cell(' ', Theme.SelectionForeground, Theme.SelectionBackground)
+                ? new Cell(' ', Theme.SelectionForeground, Theme.SelectionBackground, CellAttributes.Bold)
                 : new Cell(' ', Palette.TextPrimary, request.PanelFill);
             var value = Value(request, field, valueWidth);
 
@@ -374,7 +374,7 @@ public static class LaunchpadLayout
                 row,
                 value,
                 field.ShowsDefault && !field.WasTyped && !focused
-                    ? new Cell(' ', Palette.TextDim, request.PanelFill)
+                    ? new Cell(' ', Theme.SecondaryText, request.PanelFill)
                     : style);
 
             if (focused)
@@ -400,7 +400,7 @@ public static class LaunchpadLayout
                 pane.X + 1,
                 row++,
                 Clip(request, $"+{Invariant(dropped)} more; tab reaches them", pane.Width - 2),
-                new Cell(' ', Palette.TextDim, request.PanelFill));
+                new Cell(' ', Theme.SecondaryText, request.PanelFill));
         }
 
         if (request.Error is { Length: > 0 } error && row < pane.Y + pane.Height - 1)
@@ -409,7 +409,7 @@ public static class LaunchpadLayout
                 pane.X + 1,
                 row,
                 Clip(request, error, pane.Width - 2),
-                new Cell(' ', Palette.Error, request.PanelFill));
+                new Cell(' ', Theme.ErrorText, request.PanelFill, CellAttributes.Bold));
         }
     }
 
@@ -451,8 +451,8 @@ public static class LaunchpadLayout
         cells.DrawText(
             pane.X + 1,
             pane.Y + 1,
-            Clip(request, request.CommandLine, pane.Width - 2),
-            new Cell(' ', Palette.AccentBright, request.PanelFill));
+            Clip(request, "$ " + request.CommandLine, pane.Width - 2),
+            new Cell(' ', Palette.AccentBright, request.PanelFill, CellAttributes.Bold));
     }
 
     private static void DrawPane(
@@ -468,7 +468,7 @@ public static class LaunchpadLayout
             pane.X + 2,
             pane.Y,
             Clip(request, PaneTitle(title), Math.Max(0, pane.Width - 4)),
-            new Cell(' ', Palette.Accent, request.PanelFill));
+            new Cell(' ', Palette.Accent, request.PanelFill, CellAttributes.Bold));
     }
 
     private static void DrawKeyHints(LaunchpadRequest request, CellBuffer cells)
@@ -477,7 +477,7 @@ public static class LaunchpadLayout
             2,
             request.Size.Height - KeyHintRowFromBottom,
             request.Editing ? EditingHints : NavigationHints,
-            new Cell(' ', Palette.TextDim, request.PanelFill));
+            new Cell(' ', Theme.KeyHint, request.PanelFill));
     }
 
     private static string TitleRow(LaunchpadRequest request) =>

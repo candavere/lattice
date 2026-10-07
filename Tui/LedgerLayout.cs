@@ -341,7 +341,7 @@ public static class LedgerLayout
             2,
             0,
             Clip(request, Title(request), Math.Max(0, size.Width - 4)),
-            new Cell(' ', Palette.Accent, request.PanelFill));
+            new Cell(' ', Palette.Accent, request.PanelFill, CellAttributes.Bold));
 
         if (size.Height >= 4)
         {
@@ -353,7 +353,7 @@ public static class LedgerLayout
                 2,
                 size.Height - KeyHintRowFromBottom,
                 Clip(request, NavigationHints, Math.Max(0, size.Width - 4)),
-                new Cell(' ', Palette.TextDim, request.PanelFill));
+                new Cell(' ', Theme.KeyHint, request.PanelFill));
 
             if (!IsFull(size))
             {
@@ -492,7 +492,7 @@ public static class LedgerLayout
             return;
         }
 
-        DrawTable(request, cells, pane, pane.Area.Y + 1, inner, StudyColumns, Headers(StudyColumns), Palette.TextDim);
+        DrawTable(request, cells, pane, pane.Area.Y + 1, inner, StudyColumns, Headers(StudyColumns), Theme.TableHeader);
 
         if (capacity == 0)
         {
@@ -595,7 +595,7 @@ public static class LedgerLayout
             return;
         }
 
-        DrawTable(request, cells, pane, row, inner, SeedColumns, Headers(SeedColumns), Palette.TextDim);
+        DrawTable(request, cells, pane, row, inner, SeedColumns, Headers(SeedColumns), Theme.TableHeader);
         row++;
 
         var seeds = study.PerSeed;
@@ -636,7 +636,7 @@ public static class LedgerLayout
         if (dropped > 0 && row < pane.Area.Y + pane.Area.Height - 1)
         {
             Draw(request, cells, pane.Area.X + 1, row, inner,
-                $"+{Invariant(dropped)} more; pgdn reaches them", Palette.TextDim);
+                $"+{Invariant(dropped)} more; pgdn reaches them", Theme.SecondaryText);
         }
     }
 
@@ -695,7 +695,7 @@ public static class LedgerLayout
             header.Append(' ');
         }
 
-        Draw(request, cells, pane.Area.X + 1, row, inner, header.ToString(), Palette.TextDim);
+        Draw(request, cells, pane.Area.X + 1, row, inner, header.ToString(), Theme.TableHeader);
         row++;
 
         foreach (var suite in Suites(artifacts))
@@ -928,7 +928,7 @@ public static class LedgerLayout
             pane.Area.X + 2,
             pane.Area.Y,
             Clip(request, $" {title} ", Math.Max(0, pane.Area.Width - 4)),
-            new Cell(' ', Palette.Accent, request.PanelFill));
+            new Cell(' ', Palette.Accent, request.PanelFill, CellAttributes.Bold));
     }
 
     /// <summary>

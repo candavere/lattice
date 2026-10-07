@@ -178,7 +178,7 @@ public static class CockpitLayout
             2,
             0,
             Clip(request, TitleRow(request.Live, Title(request.Document)), Math.Max(0, size.Width - 4)),
-            new Cell(' ', palette.Accent, request.PanelFill));
+            new Cell(' ', palette.Accent, request.PanelFill, CellAttributes.Bold));
 
         if (IsCockpit(size))
         {
@@ -318,7 +318,7 @@ public static class CockpitLayout
         var width = pane.Width - 2;
         var row = pane.Y + 1;
 
-        // The column headings, dimmed: a scoreboard whose columns are only
+        // The column headings: a scoreboard whose columns are only
         // discoverable by counting is a scoreboard nobody reads. They stand under
         // the same indent the rows use, so each heading is over its own column.
         cells.DrawText(
@@ -331,7 +331,7 @@ public static class CockpitLayout
                     $"{new string(' ', RowIndentWidth)}{"slot",-SlotColumnWidth}{"role",-RoleColumnWidth}" +
                     $"{"zone",-ZoneColumnWidth}{"score",ScoreColumnWidth}"),
                 width),
-            new Cell(' ', palette.TextDim, request.PanelFill));
+            new Cell(' ', palette.TableHeader, request.PanelFill, CellAttributes.Bold));
 
         foreach (var (text, accent) in rows)
         {
@@ -447,7 +447,7 @@ public static class CockpitLayout
                     request,
                     request.Live is null ? "start of recording" : "start of episode",
                     pane.Width - 2),
-                new Cell(' ', palette.TextDim, request.PanelFill));
+                new Cell(' ', palette.Secondary, request.PanelFill));
             row++;
         }
 
@@ -457,7 +457,7 @@ public static class CockpitLayout
             var current = index == request.FrameIndex;
             var line = $"{Invariant(frame.Tick),3}  {frame.Actions}";
             var style = current
-                ? new Cell(' ', Theme.SelectionForeground, Theme.SelectionBackground)
+                ? new Cell(' ', Theme.SelectionForeground, Theme.SelectionBackground, CellAttributes.Bold)
                 : new Cell(' ', palette.TextPrimary, request.PanelFill);
 
             cells.DrawText(pane.X + 1, row++, Clip(request, line, pane.Width - 2), style);
@@ -479,7 +479,7 @@ public static class CockpitLayout
                 pane.X + 1,
                 row,
                 Clip(request, provenance, pane.Width - 2),
-                new Cell(' ', palette.TextDim, request.PanelFill));
+                new Cell(' ', palette.Secondary, request.PanelFill));
         }
     }
 
@@ -581,7 +581,7 @@ public static class CockpitLayout
             2,
             KeyHintRow(request.Size),
             KeyHintsFor(request.Live is not null, hidden),
-            new Cell(' ', palette.TextDim, request.PanelFill));
+            new Cell(' ', palette.KeyHint, request.PanelFill));
     }
 
     /// <summary>
@@ -646,7 +646,7 @@ public static class CockpitLayout
             pane.X + 2,
             pane.Y,
             Clip(request, PaneTitle(title), Math.Max(0, pane.Width - 4)),
-            new Cell(' ', palette.Accent, request.PanelFill));
+            new Cell(' ', palette.Accent, request.PanelFill, CellAttributes.Bold));
     }
 
     /// <summary>
@@ -702,6 +702,12 @@ public static class CockpitLayout
         internal Rgb TextPrimary => Palette.TextPrimary;
 
         internal Rgb TextDim => Palette.TextDim;
+
+        internal Rgb Secondary => Theme.SecondaryText;
+
+        internal Rgb TableHeader => Theme.TableHeader;
+
+        internal Rgb KeyHint => Theme.KeyHint;
     }
 
     /// <summary>A pane's rectangle, in cells.</summary>

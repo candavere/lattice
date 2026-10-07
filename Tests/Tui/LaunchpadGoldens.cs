@@ -204,7 +204,7 @@ public class LaunchpadGoldens
     {
         var lines = Golden("launchpad-filled-100x30", Typed("42"));
 
-        Assert.Equal("lattice generate --seed 42", CommandLineRow(lines));
+        Assert.Equal("$ lattice generate --seed 42", CommandLineRow(lines));
     }
 
     [Fact]
@@ -213,7 +213,7 @@ public class LaunchpadGoldens
         var lines = Golden("launchpad-editing-100x30", Typed(""));
 
         Assert.Equal(LaunchpadLayout.EditingHints, HintRow(lines));
-        Assert.Equal("lattice generate", CommandLineRow(lines));
+        Assert.Equal("$ lattice generate", CommandLineRow(lines));
         Assert.Equal(
             Pad("--seed*", GenerateLabelWidth),
             Slice(lines[ContentFirstRow], FormContentLeft, GenerateLabelWidth));
@@ -232,7 +232,7 @@ public class LaunchpadGoldens
         // the reader typed, so the two cannot disagree about what is on the form.
         Assert.Equal("flag '--seed' expects an unsigned integer, got 'x'.", form.ValidationError);
         Assert.Contains(lines, row => row.Contains(form.ValidationError!, StringComparison.Ordinal));
-        Assert.Equal("lattice generate --seed x", CommandLineRow(lines));
+        Assert.Equal("$ lattice generate --seed x", CommandLineRow(lines));
         Assert.Equal("x", ValueOn(lines, ContentFirstRow).Trim());
         Assert.False(form.CanRun);
     }
@@ -290,7 +290,7 @@ public class LaunchpadGoldens
         Assert.Equal(
             $"{BorderGlyphs.Ascii.BottomLeft}{BorderGlyphs.Ascii.BottomRight}",
             BottomCorners(lines, ascii: true));
-        Assert.Equal("lattice generate --seed 42???", CommandLineRow(lines));
+        Assert.Equal("$ lattice generate --seed 42???", CommandLineRow(lines));
     }
 
     /// <summary>

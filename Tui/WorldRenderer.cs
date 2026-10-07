@@ -446,7 +446,7 @@ public static class WorldRenderer
                 row,
                 new Cell(
                     GlyphModes.Glyph(claimed ? Glyphs.FilledCircle : Glyphs.HollowCircle, request.Glyphs),
-                    claimed ? Palette.AccentBright : Palette.TextDim,
+                    claimed ? Palette.AccentBright : Theme.SecondaryText,
                     request.PanelFill),
                 PriorityResource);
         }

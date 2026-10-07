@@ -75,6 +75,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- The TUI keeps its Launchpad, cockpit, Ledger and hide-panels structure and its
+  charcoal/olive, lime, sage and pink identity, but essential text is now painted
+  in readable semantic roles: secondary text `#a8b0a3` and error text `#e88a80`
+  (both derived, both at least 4.5:1 on the panel fill), headings and key hints
+  in readable roles with Bold, selection in lime on the raised surface with Bold,
+  and the sampled dim `#696f65` reserved for decoration and disabled content.
+  The Launchpad command preview is shown as `$ lattice ...` in Bold, titles and
+  pane titles are Bold, and focus keeps its marker/caret/Reverse cue while
+  verdicts, LIVE/paused/playing and contention keep their words and glyphs as
+  well as colour. Unclaimed world resources use the readable secondary. No
+  commands, flags, outputs or exit codes change.
 - The `lattice tui` usage line now names the Ledger between `replay` and `simulate`,
   and `--hide-panels` after `--ascii` on `replay` and `simulate`.
 - The usage text gained one paragraph saying what a bare `lattice` does. On a

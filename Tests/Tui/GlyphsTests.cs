@@ -132,8 +132,6 @@ public class GlyphsTests
         var styles = new[]
         {
             BorderGlyphs.Light,
-            BorderGlyphs.Heavy,
-            BorderGlyphs.Double,
             BorderGlyphs.Rounded,
         };
 

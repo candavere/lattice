@@ -72,16 +72,6 @@ public sealed class CellBuffer
         }
     }
 
-    /// <summary>Resets every cell to the terminal defaults with a space glyph.</summary>
-    public void Clear()
-    {
-        var blank = Cell.Blank;
-        for (var i = 0; i < _cells.Length; i++)
-        {
-            _cells[i] = blank;
-        }
-    }
-
     /// <summary>
     /// Fills the rectangle with one cell style. The whole rectangle is checked
     /// before the first cell is written, so a rectangle that does not fit throws

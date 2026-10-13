@@ -60,9 +60,6 @@ public static class Glyphs
     /// <summary>A small filled square, used for a closed edge.</summary>
     public const char ClosedMark = '▪';
 
-    /// <summary>A small hollow square, used for an open edge.</summary>
-    public const char OpenMark = '▫';
-
     /// <summary>A filled diamond, used for an agent at rest.</summary>
     public const char FilledDiamond = '◆';
 
@@ -77,18 +74,6 @@ public static class Glyphs
 
     /// <summary>A hollow diamond, used for an agent in transit.</summary>
     public const char HollowDiamond = '◇';
-
-    /// <summary>A left-pointing triangle, used for an inbound edge.</summary>
-    public const char LeftTriangle = '◀';
-
-    /// <summary>A right-pointing triangle, used for an outbound edge.</summary>
-    public const char RightTriangle = '▶';
-
-    /// <summary>An up-pointing triangle.</summary>
-    public const char UpTriangle = '▲';
-
-    /// <summary>A down-pointing triangle.</summary>
-    public const char DownTriangle = '▼';
 
     /// <summary>
     /// Every glyph in the set with its fallback. This is the authority the

@@ -14,7 +14,6 @@ public class ThemeTests
     public void SampledColoursMatchTheReferenceImage()
     {
         Assert.Equal("#1f2420", Palette.PanelBackground.ToHex());
-        Assert.Equal("#272b22", Palette.PanelBackgroundAlt.ToHex());
         Assert.Equal("#2c3625", Palette.Raised.ToHex());
         Assert.Equal("#81897d", Palette.Border.ToHex());
         Assert.Equal("#dde1dc", Palette.TextPrimary.ToHex());
@@ -29,7 +28,6 @@ public class ThemeTests
     {
         Assert.Equal("#e6c84a", Palette.Warning.ToHex());
         Assert.Equal("#d9645a", Palette.Error.ToHex());
-        Assert.Equal("#6fd0c8", Palette.Info.ToHex());
         Assert.Equal("#a1c35e", Palette.Success.ToHex());
     }
 

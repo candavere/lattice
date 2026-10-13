@@ -151,6 +151,4 @@ public sealed class ScreenHost : IDisposable
 /// <param name="Refusal">The one line to print and the status to return, or <c>null</c> when a screen was entered.</param>
 public readonly record struct ScreenOpenResult(ScreenHost? Screen, string? Refusal)
 {
-    /// <summary>Whether a screen was entered.</summary>
-    public bool Entered => Screen is not null;
 }

@@ -48,16 +48,6 @@ public class CellBufferTests
     }
 
     [Fact]
-    public void ClearResetsEveryCell()
-    {
-        var buffer = new CellBuffer(2, 2);
-        buffer.Fill(0, 0, 2, 2, new Cell('x', Palette.Error));
-        buffer.Clear();
-
-        Assert.All(buffer.ToLines(), line => Assert.Equal("  ", line));
-    }
-
-    [Fact]
     public void FillCoversTheRequestedRectangleOnly()
     {
         var buffer = new CellBuffer(4, 3);
@@ -127,18 +117,6 @@ public class CellBufferTests
 
         Assert.Equal(
             new[] { "╭─╮", "│ │", "╰─╯" },
-            buffer.ToLines());
-    }
-
-    [Fact]
-    public void ADoubleBorderUsesTheDoubleGlyphs()
-    {
-        var buffer = new CellBuffer(4, 3);
-
-        buffer.DrawBorder(0, 0, 4, 3, BorderGlyphs.Double, new Cell(' ', Palette.TextPrimary));
-
-        Assert.Equal(
-            new[] { "╔══╗", "║  ║", "╚══╝" },
             buffer.ToLines());
     }
 

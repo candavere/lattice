@@ -40,12 +40,6 @@ public class ReadabilityContrastTests
     }
 
     [Fact]
-    public void HeadingMeetsFourPointFiveOnPanelBackground()
-    {
-        Assert.True(Contrast(Theme.Heading, Palette.PanelBackground) >= 4.5);
-    }
-
-    [Fact]
     public void KeyHintMeetsFourPointFiveOnPanelBackground()
     {
         Assert.True(Contrast(Theme.KeyHint, Palette.PanelBackground) >= 4.5);
@@ -76,11 +70,5 @@ public class ReadabilityContrastTests
         Assert.Equal("#1f2420", Palette.PanelBackground.ToHex());
         Assert.Equal("#696f65", Palette.TextDim.ToHex());
         Assert.Equal("#adcb66", Palette.Accent.ToHex());
-    }
-
-    [Fact]
-    public void DecorationRemainsTheSampledDim()
-    {
-        Assert.Equal(Palette.TextDim, Theme.Decoration);
     }
 }

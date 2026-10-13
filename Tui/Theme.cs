@@ -15,9 +15,6 @@ public static class Palette
     /// <summary>Sampled: the deepest panel fill.</summary>
     public static readonly Rgb PanelBackground = Rgb.FromHex("#1f2420");
 
-    /// <summary>Sampled: the second panel fill, one step up from the deepest.</summary>
-    public static readonly Rgb PanelBackgroundAlt = Rgb.FromHex("#272b22");
-
     /// <summary>Sampled: the raised surface used for selection.</summary>
     public static readonly Rgb Raised = Rgb.FromHex("#2c3625");
 
@@ -46,9 +43,6 @@ public static class Palette
 
     /// <summary>Derived: error.</summary>
     public static readonly Rgb Error = Rgb.FromHex("#d9645a");
-
-    /// <summary>Derived: informational cyan.</summary>
-    public static readonly Rgb Info = Rgb.FromHex("#6fd0c8");
 
     /// <summary>Derived: success.</summary>
     public static readonly Rgb Success = Rgb.FromHex("#a1c35e");
@@ -101,12 +95,6 @@ public static class Theme
     /// </summary>
     public static Rgb SecondaryText => Rgb.FromHex("#a8b0a3");
 
-    /// <summary>
-    /// Headings: body text colour, distinguished by weight and position rather
-    /// than by a different hue. 11.9:1 on the panel fill.
-    /// </summary>
-    public static Rgb Heading => Palette.TextPrimary;
-
     /// <summary>Keyboard hints: must be read, so the readable secondary, not dim.</summary>
     public static Rgb KeyHint => SecondaryText;
 
@@ -119,13 +107,6 @@ public static class Theme
     /// remains the mark colour for small glyphs where 3:1 non-text contrast applies.
     /// </summary>
     public static Rgb ErrorText => Rgb.FromHex("#e88a80");
-
-    /// <summary>
-    /// Truly dim styling, reserved for decoration and genuinely disabled content.
-    /// 3.05:1 on the panel fill: never use for instructions, headers, required
-    /// metadata or values the user must read.
-    /// </summary>
-    public static Rgb Decoration => Palette.TextDim;
 
     /// <summary>
     /// The background a panel should be filled with, or <c>null</c> to leave the

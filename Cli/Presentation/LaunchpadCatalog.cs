@@ -277,10 +277,6 @@ public static class LaunchpadCatalog
             InvocationPrefix: TuiPrefix),
     ];
 
-    /// <summary>The command with this name, or <c>null</c>.</summary>
-    public static LaunchpadCommand? Find(string name) =>
-        Commands.FirstOrDefault(command => command.Name == name);
-
     private static LaunchpadField Flag(
         string name,
         bool Required = false,

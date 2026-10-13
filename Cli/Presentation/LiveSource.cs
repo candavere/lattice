@@ -257,9 +257,6 @@ public sealed class LiveEpisode : ILiveEpisode, IDisposable
         _thread.Start();
     }
 
-    /// <summary>The episode being played, as the CLI built it.</summary>
-    public LiveEpisodeSetup Setup => _setup;
-
     /// <inheritdoc />
     public WorldMap Map => _map;
 

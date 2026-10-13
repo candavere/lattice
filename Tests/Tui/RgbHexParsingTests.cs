@@ -65,7 +65,6 @@ public class RgbHexParsingTests
     public void EveryPaletteColourParsesToItsLiteralChannels()
     {
         Assert.Equal(new Rgb(0x1F, 0x24, 0x20), Palette.PanelBackground);
-        Assert.Equal(new Rgb(0x27, 0x2B, 0x22), Palette.PanelBackgroundAlt);
         Assert.Equal(new Rgb(0x2C, 0x36, 0x25), Palette.Raised);
         Assert.Equal(new Rgb(0x81, 0x89, 0x7D), Palette.Border);
         Assert.Equal(new Rgb(0xDD, 0xE1, 0xDC), Palette.TextPrimary);
@@ -75,7 +74,6 @@ public class RgbHexParsingTests
         Assert.Equal(new Rgb(0xE8, 0xA7, 0xBC), Palette.AccentSecondary);
         Assert.Equal(new Rgb(0xE6, 0xC8, 0x4A), Palette.Warning);
         Assert.Equal(new Rgb(0xD9, 0x64, 0x5A), Palette.Error);
-        Assert.Equal(new Rgb(0x6F, 0xD0, 0xC8), Palette.Info);
         Assert.Equal(new Rgb(0xA1, 0xC3, 0x5E), Palette.Success);
     }
 

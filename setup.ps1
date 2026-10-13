@@ -25,6 +25,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$RepoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+Set-Location $RepoRoot
+
 # ============================================================================
 # Opt-in lattice launcher (Windows). Only runs when a launcher switch above
 # selected it. PowerShell 5.1 compatible: no ternary, no ??, no &&/|| chains.

@@ -21,6 +21,12 @@ public readonly record struct GlyphMapping(char Unicode, char Ascii);
 /// would read more naturally, because their presence varies far more between
 /// terminals.
 ///
+/// Narrow Braille exception: the dotted console wordmark needs Braille Patterns
+/// (U+2800-U+28FF), which this set deliberately excludes. That exception lives
+/// only in Tui/Wordmark.cs, is pinned by Tests/Tui/WordmarkTests.cs, and does not
+/// relax this policy for anything else: no Braille entry is added to Mappings below,
+/// and every other production file emits no Braille.
+///
 /// Each entry carries a single-character ASCII stand-in for terminals that
 /// cannot encode UTF-8, because a wider fallback would break the column
 /// alignment the grid is built on.

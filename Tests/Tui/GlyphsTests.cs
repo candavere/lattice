@@ -147,4 +147,18 @@ public class GlyphsTests
             }
         }
     }
+
+    [Fact]
+    public void MappingsContainNoBrailleTheWordmarkExceptionAddsNone()
+    {
+        foreach (var mapping in Glyphs.Mappings)
+        {
+            var point = (int)mapping.Unicode;
+            Assert.False(
+                point >= 0x2800 && point <= 0x28FF,
+                $"U+{point:X4} is Braille: the wordmark exception lives only in Tui/Wordmark.cs.");
+        }
+
+        Assert.Throws<KeyNotFoundException>(() => Glyphs.ToAscii('⣿'));
+    }
 }

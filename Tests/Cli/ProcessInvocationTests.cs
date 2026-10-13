@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 using System.Text.Json.Nodes;
 using Lattice.Cli;
 using Lattice.Cli.Presentation;
@@ -194,8 +195,17 @@ public class ProcessInvocationTests
     }
 
     [Fact]
-    public void UnicodePathsReachTheChildUnchanged()
+    public void MissingNonBmpPathMatchesAPlainRedirectedRun()
     {
+        // A missing non-BMP path: the exit code and stdout are encoding-free and
+        // must match the in-process run. Stderr is compared against a CONTROL run
+        // (the same invocation started plainly, same redirects, same ArgumentList,
+        // no encoding overrides) — that is what "bytes equal a plain redirected
+        // run" means. Argv fidelity itself is proven losslessly by
+        // ArgumentListTransmitsEveryByteLosslessly and
+        // GenerateWritesUnicodeNamedArtifactsByteIdentical; replacement of
+        // characters the code page cannot represent on a redirected Windows
+        // console is existing CLI behaviour, not changed by this console.
         using var temp = new TempDir();
         var missing = Path.Combine(temp.Path, "täst-😀.json");
         string[] argv = ["validate-scenario", missing];
@@ -208,9 +218,89 @@ public class ProcessInvocationTests
         var exit = CliApp.Run(argv, stdout, stderr);
 
         Assert.Equal(exit, finished.ExitCode);
+        Assert.Equal(1, finished.ExitCode);
+        Assert.Equal(stdout.ToString(), finished.Stdout);
+
+        var control = ControlRun(argv, temp.Path);
+        Assert.Equal(control.ExitCode, finished.ExitCode);
+        Assert.Equal(control.Stdout, finished.Stdout);
+        Assert.Equal(control.Stderr, finished.Stderr);
+    }
+
+    [Fact]
+    public void BmpUnicodePathMatchesInProcessRun()
+    {
+        // BMP umlauts are representable on the redirected consoles of the CI
+        // matrix (rows 437/1252 on en-US Windows, UTF-8 elsewhere), so the full
+        // stderr bytes must match the in-process run here.
+        using var temp = new TempDir();
+        var missing = Path.Combine(temp.Path, "täst-ü.json");
+        string[] argv = ["validate-scenario", missing];
+
+        var runner = new SlashConsoleProcessRunner();
+        var finished = runner.StartCaptured(new CapturedRunRequest(argv, "lattice validate-scenario", temp.Path, ChildInvocation())).Finish();
+
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var exit = CliApp.Run(argv, stdout, stderr);
+
+        Assert.Equal(exit, finished.ExitCode);
+        Assert.Equal(1, finished.ExitCode);
         Assert.Equal(stdout.ToString(), finished.Stdout);
         Assert.Equal(stderr.ToString(), finished.Stderr);
-        Assert.Contains("täst-😀.json", finished.Stderr, StringComparison.Ordinal);
+        Assert.Contains("täst-ü.json", finished.Stderr, StringComparison.Ordinal);
+    }
+
+    public static IEnumerable<object[]> ProbeCases()
+    {
+        yield return new object[] { new[] { "" } };
+        yield return new object[] { new[] { "--flag=value with spaces" } };
+        yield return new object[] { new[] { "a\"b" } };
+        yield return new object[] { new[] { "dir\\sub dir\\file.json" } };
+        yield return new object[] { new[] { "täst-😀.json" } };
+        yield return new object[] { new[] { "日本語テスト.json" } };
+        yield return new object[] { new[] { "\U0001D4B3abc" } };
+        yield return new object[] { new[] { "C:\\Program Files\\agent\\bin\\" } };
+        yield return new object[] { new[] { "alpha", "", "beta gamma", "täst-😀", "--flag=value with spaces" } };
+    }
+
+    [Theory]
+    [MemberData(nameof(ProbeCases))]
+    public void ArgumentListTransmitsEveryByteLosslessly(string[] argv)
+    {
+        // No console encoding anywhere in this path: the probe writes the UTF-8
+        // hex of each argument it received into a result file, and the file is
+        // read back and compared element by element. An empty argument stays the
+        // distinct empty string and a dropped or re-split argument changes the
+        // array length, so any ArgumentList mangling fails here on any OS.
+        var python = FindPython();
+        Assert.False(string.IsNullOrEmpty(python), "a python on PATH is required for the probe.");
+        RequirePython3(python!);
+
+        using var temp = new TempDir();
+        var probe = Path.Combine(temp.Path, "probe.py");
+        var result = Path.Combine(temp.Path, "result.json");
+        File.WriteAllText(probe,
+            "import sys, json\n" +
+            "out = sys.argv[1]\n" +
+            "arr = [a.encode(\"utf-8\", errors=\"strict\").hex() for a in sys.argv[2:]]\n" +
+            "open(out, \"w\", encoding=\"utf-8\").write(json.dumps(arr))\n");
+
+        var runner = new SlashConsoleProcessRunner();
+        var args = new[] { probe, result }.Concat(argv).ToArray();
+        var finished = runner.StartCaptured(new CapturedRunRequest(
+            args, "probe", temp.Path, new ProcessInvocation(python!, []))).Finish();
+
+        Assert.Equal(0, finished.ExitCode);
+        var actual = JsonNode.Parse(File.ReadAllText(result))!.AsArray();
+        Assert.Equal(argv.Length, actual.Count);
+        for (var i = 0; i < argv.Length; i++)
+        {
+            Assert.Equal(
+                Convert.ToHexString(Encoding.UTF8.GetBytes(argv[i])),
+                actual[i]!.GetValue<string>(),
+                ignoreCase: true);
+        }
     }
 
     [Fact]
@@ -225,6 +315,65 @@ public class ProcessInvocationTests
 
         Assert.Equal(0, result.ExitCode);
         Assert.True(result.Elapsed >= TimeSpan.Zero);
+    }
+
+    [Theory]
+    [InlineData("täst-😀.json")]
+    [InlineData("sp ace-😀 ü.json")]
+    public void GenerateWritesUnicodeNamedArtifactsByteIdentical(string name)
+    {
+        // The artifact bytes (LF-normalized JSON written by the child) prove the
+        // --out path reached the child intact, without any console text in the
+        // comparison. Baseline bytes come from an in-process run in a separate
+        // directory; child stderr text is deliberately not asserted here.
+        using var childDir = new TempDir();
+        using var baselineDir = new TempDir();
+        var runner = new SlashConsoleProcessRunner();
+
+        var finished = runner.StartCaptured(new CapturedRunRequest(
+            ["generate", "--seed", "42", "--out", name], "lattice generate", childDir.Path, ChildInvocation())).Finish();
+        Assert.Equal(0, finished.ExitCode);
+
+        var entries = Directory.EnumerateFileSystemEntries(childDir.Path).ToList();
+        var actualName = Path.GetFileName(Assert.Single(entries));
+        if (!string.Equals(actualName, name, StringComparison.Ordinal))
+        {
+            // A filesystem may return a different Unicode normalisation form
+            // (macOS): compare FormC on both sides, still requiring the non-BMP
+            // code point to survive.
+            Assert.Equal(name.Normalize(NormalizationForm.FormC), actualName.Normalize(NormalizationForm.FormC));
+        }
+
+        Assert.Contains("😀", actualName, StringComparison.Ordinal);
+
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var baselineOut = Path.Combine(baselineDir.Path, "baseline.json");
+        var exit = CliApp.Run(["generate", "--seed", "42", "--out", baselineOut], stdout, stderr);
+        Assert.Equal(0, exit);
+        Assert.Equal(
+            File.ReadAllBytes(baselineOut),
+            File.ReadAllBytes(Path.Combine(childDir.Path, actualName)));
+    }
+
+    [Fact]
+    public void ValidateScenarioUnicodePathMatchesOriginalExitCode()
+    {
+        // An existing valid fixture copied to a Unicode name: the child must
+        // report the same exit code on both paths. No console text compared.
+        using var temp = new TempDir();
+        var original = Committed("scenarios", "collection-skirmish.json");
+        var unicode = Path.Combine(temp.Path, "s cenario-😀.json");
+        File.Copy(original, unicode);
+
+        var runner = new SlashConsoleProcessRunner();
+        var unicodeRun = runner.StartCaptured(new CapturedRunRequest(
+            ["validate-scenario", unicode], "lattice validate-scenario", temp.Path, ChildInvocation())).Finish();
+        var originalRun = runner.StartCaptured(new CapturedRunRequest(
+            ["validate-scenario", original], "lattice validate-scenario", temp.Path, ChildInvocation())).Finish();
+
+        Assert.Equal(originalRun.ExitCode, unicodeRun.ExitCode);
+        Assert.Equal(0, unicodeRun.ExitCode);
     }
 
     [Fact]
@@ -310,16 +459,77 @@ public class ProcessInvocationTests
         // Tests/bin/<config>/net10.0 -> repo/Cli/bin/<config>/net10.0/lattice.dll.
         var baseDir = AppContext.BaseDirectory;
         var config = Directory.GetParent(baseDir)?.Parent?.Name ?? "Release";
-        var root = baseDir;
+        var root = RepoRoot();
+
+        var dll = Path.Combine(root, "Cli", "bin", config, "net10.0", "lattice.dll");
+        Assert.True(File.Exists(dll), $"expected a built CLI at {dll}; build in {config} first.");
+        return dll;
+    }
+
+    private static string RepoRoot()
+    {
+        var root = AppContext.BaseDirectory;
         while (root is not null && !File.Exists(Path.Combine(root, "Lattice.sln")))
         {
             root = Directory.GetParent(root)?.FullName;
         }
 
         Assert.True(root is not null, "could not locate the repository root.");
-        var dll = Path.Combine(root!, "Cli", "bin", config, "net10.0", "lattice.dll");
-        Assert.True(File.Exists(dll), $"expected a built CLI at {dll}; build in {config} first.");
-        return dll;
+        return root!;
+    }
+
+    private static string Committed(params string[] parts) =>
+        Path.Combine(new[] { RepoRoot() }.Concat(parts).ToArray());
+
+    private static void RequirePython3(string python)
+    {
+        var start = new ProcessStartInfo
+        {
+            FileName = python,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+        start.ArgumentList.Add("-c");
+        start.ArgumentList.Add("import sys; assert sys.version_info[0]==3");
+        using var process = Process.Start(start)!;
+        process.StandardOutput.ReadToEnd();
+        process.WaitForExit();
+        Assert.True(process.ExitCode == 0, $"expected Python 3 at {python}.");
+    }
+
+    private static (int ExitCode, string Stdout, string Stderr) ControlRun(string[] argv, string cwd)
+    {
+        // The same invocation started plainly: same redirects, same ArgumentList,
+        // no encoding overrides. What "a plain redirected run" prints, byte for byte.
+        var invocation = ChildInvocation();
+        var start = new ProcessStartInfo
+        {
+            FileName = invocation.FileName,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            RedirectStandardInput = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            WorkingDirectory = cwd,
+        };
+        foreach (var prefix in invocation.PrefixArguments)
+        {
+            start.ArgumentList.Add(prefix);
+        }
+
+        foreach (var argument in argv)
+        {
+            start.ArgumentList.Add(argument);
+        }
+
+        using var process = Process.Start(start)!;
+        process.StandardInput.Close();
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEndAsync();
+        process.WaitForExit();
+        return (process.ExitCode, stdout.GetAwaiter().GetResult(), stderr.GetAwaiter().GetResult());
     }
 
     private static string? FindPython()

@@ -278,34 +278,9 @@ public sealed class LauncherSetupTests
         };
         Directory.CreateDirectory(env["LOCALAPPDATA"]);
         var curPath = System.Environment.GetEnvironmentVariable("PATH") ?? "";
-        env["PATH"] = string.Join(Path.PathSeparator, curPath.Split(Path.PathSeparator)
-            .Where(d =>
-            {
-                try
-                {
-                    if (d.Contains("lattice", StringComparison.OrdinalIgnoreCase))
-                    {
-                        return false;
-                    }
-                    var trimmed = d.Trim();
-                    if (string.IsNullOrEmpty(trimmed))
-                    {
-                        return true;
-                    }
-                    foreach (var ext in new[] { "", ".exe", ".cmd", ".bat", ".ps1" })
-                    {
-                        if (File.Exists(Path.Combine(trimmed, "lattice" + ext)))
-                        {
-                            return false;
-                        }
-                    }
-                    return true;
-                }
-                catch
-                {
-                    return true;
-                }
-            }));
+        // Keep the full PATH so tooling resolves; a conflict is exercised
+        // separately by prepending a directory containing a 'lattice' shim.
+        env["PATH"] = curPath;
 
         // dry run
         var (dryCode, dryOut, dryErr) = Run(shell, new[] { "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", setup, "-InstallLauncher", "-DryRun" }, scope.Work, env);

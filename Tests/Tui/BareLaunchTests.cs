@@ -1,3 +1,4 @@
+using System.Text;
 using Lattice.Cli;
 using Lattice.Cli.Presentation;
 using Lattice.Tui;
@@ -95,13 +96,15 @@ public class BareLaunchTests
     /// of printing usage. The status is success: nothing failed, the reader quit.
     /// </summary>
     [Fact]
-    public void ABareRunOnATerminalOpensTheLaunchpad()
+    public void ABareRunOnATerminalOpensTheConsole()
     {
         var result = Bare(Terminal);
 
-        Assert.True(result.Opened, "the Launchpad was not opened on an interactive terminal.");
+        Assert.True(result.Opened, "the console was not opened on an interactive terminal.");
         Assert.Equal(0, result.Exit);
         Assert.Equal("", result.Stdout);
+        Assert.Contains("Type / to see commands", result.Screen, StringComparison.Ordinal);
+        Assert.Contains("lattice", result.Screen, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -234,19 +237,21 @@ public class BareLaunchTests
     }
 
     /// <summary>What one bare run did, and where it put it.</summary>
-    private readonly record struct BareRun(bool Opened, int Exit, string Stdout, string Stderr);
+    private readonly record struct BareRun(bool Opened, int Exit, string Stdout, string Stderr, string Screen);
 
     /// <summary>
-    /// A bare run with the capabilities named, and a Launchpad that only records that
-    /// it was opened rather than drawing anything: what it draws is asserted by the
-    /// layout and host tests, and a real screen here would need a real terminal.
+    /// A bare run with the capabilities named, and a console that records the bytes it
+    /// draws: the frame is asserted here for its console markers, and every deeper
+    /// behaviour through the layout and host tests. A real screen would need a real
+    /// terminal.
     /// </summary>
     private static BareRun Bare(TerminalCapabilities capabilities)
     {
         using var stdout = new StringWriter();
         using var stderr = new StringWriter();
         var opened = 0;
-        var keys = new QuitImmediately();
+        var keys = new InterruptImmediately();
+        var session = new RecordingSessionFactory();
 
         var exit = CliApp.Run(
             [],
@@ -255,18 +260,18 @@ public class BareLaunchTests
             CliTerminal.For(stderr),
             new TuiConsole(new RecordingControlC(), () => keys),
             capabilities,
-            session: new RecordingSessionFactory(),
-            onLaunchpad: () => opened++);
+            session: session,
+            onConsole: () => opened++);
 
-        return new BareRun(opened > 0, exit, stdout.ToString(), stderr.ToString());
+        return new BareRun(opened > 0, exit, stdout.ToString(), stderr.ToString(), session.Written);
     }
 
-    /// <summary>Keys that end the screen at once: the Launchpad's first key is read as quit.</summary>
-    private sealed class QuitImmediately : IKeySource
+    /// <summary>Keys that end the screen at once: the console's first key is read as leave.</summary>
+    private sealed class InterruptImmediately : IKeySource
     {
         public KeyWait Wait(TimeSpan timeout, out TuiKey key)
         {
-            key = new TuiKey(TuiKeyKind.Character, 'q');
+            key = new TuiKey(TuiKeyKind.Interrupt);
             return KeyWait.Key;
         }
 
@@ -285,15 +290,33 @@ public class BareLaunchTests
         }
     }
 
-    /// <summary>A terminal that accepts the screen and does nothing with it.</summary>
+    /// <summary>A terminal that accepts the screen and records the bytes it draws.</summary>
     private sealed class RecordingSessionFactory : ITerminalSessionFactory
     {
+        private readonly StringBuilder _written = new();
+
+        /// <summary>Every byte the screen wrote, in order.</summary>
+        public string Written
+        {
+            get
+            {
+                lock (_written)
+                {
+                    return _written.ToString();
+                }
+            }
+        }
+
         public bool RequestUtf8Output() => true;
 
-        public ITerminalSession Enter(TextWriter output) => new Session();
+        public ITerminalSession Enter(TextWriter output) => new Session(_written);
 
         private sealed class Session : ITerminalSession
         {
+            private readonly StringBuilder _written;
+
+            internal Session(StringBuilder written) => _written = written;
+
             /// <summary>
             /// Explicitly inert rather than simply declared: this double never raises
             /// an interrupt, and <c>ScreenHost</c> subscribes and unsubscribes around the
@@ -309,6 +332,10 @@ public class BareLaunchTests
 
             public void Write(string text)
             {
+                lock (_written)
+                {
+                    _written.Append(text);
+                }
             }
 
             public void Dispose()

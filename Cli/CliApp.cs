@@ -245,7 +245,7 @@ public static class CliApp
     /// The overload that also names the terminal's capabilities, so the bare
     /// invocation can be decided from them.
     /// <para>
-    /// <b>This is the only path that opens the Launchpad.</b> A zero-argument run
+    /// <b>This is the only path that opens the console.</b> A zero-argument run
     /// reaches a screen only when the caller has said the streams are a terminal's.
     /// Deciding that from <see cref="Console"/> inside the three-argument overload
     /// would mean a test — which hands it a <see cref="StringWriter"/> and is itself
@@ -262,11 +262,11 @@ public static class CliApp
     /// <param name="capabilities">What the attached terminal can carry.</param>
     /// <param name="session">The terminal seam; the guard's by default.</param>
     /// <param name="clock">How elapsed time is measured on a screen.</param>
-    /// <param name="runner">How a command is started from the Launchpad.</param>
-    /// <param name="onLaunchpad">
-    /// Called once, after the Launchpad has opened, for a caller that wants to know
+    /// <param name="runner">How a command is started from the console.</param>
+    /// <param name="onConsole">
+    /// Called once, after the console has opened, for a caller that wants to know
     /// it did. Not a hook into the screen itself: the screen's behaviour is asserted
-    /// through <see cref="LaunchpadHost"/>, and this exists so a test can tell an
+    /// through <see cref="SlashConsoleHost"/>, and this exists so a test can tell an
     /// opened screen from a usage line without a terminal to draw one on.
     /// </param>
     internal static int Run(
@@ -278,8 +278,8 @@ public static class CliApp
         TerminalCapabilities capabilities,
         ITerminalSessionFactory? session = null,
         IUiClock? clock = null,
-        ILaunchpadRunner? runner = null,
-        Action? onLaunchpad = null)
+        ISlashConsoleRunner? runner = null,
+        Action? onConsole = null)
     {
         if (args.Length == 0)
         {
@@ -287,7 +287,7 @@ public static class CliApp
             // and only for a terminal that can carry a screen. Everywhere else the
             // behaviour is exactly what it was before this screen existed.
             return CanOpenLaunchpad(capabilities)
-                ? RunLaunchpad(stdout, stderr, capabilities, console, session, clock, runner, onLaunchpad)
+                ? RunSlashConsole(stdout, stderr, capabilities, console, session, clock, runner, onConsole)
                 : NoCommand(stdout, stderr);
         }
 
@@ -307,40 +307,42 @@ public static class CliApp
     }
 
     /// <summary>
-    /// Whether these capabilities can carry the Launchpad: standard input and
+    /// Whether these capabilities can carry the console: standard input and
     /// standard output both have to be the terminal, because the screen reads keys
     /// from one and draws on the other, and a screen that drew into a redirect would
-    /// put escape sequences into whatever the redirect was for.
+    /// put escape sequences into whatever the redirect was for. Kept under its
+    /// Launchpad-era name so the predicate's callers and tests keep reading.
     /// </summary>
     public static bool CanOpenLaunchpad(TerminalCapabilities capabilities) =>
         !capabilities.InputRedirected && !capabilities.OutputRedirected;
 
     /// <summary>
-    /// Opens the Launchpad and runs it to the reader's quit. The screen takes the
+    /// Opens the slash console and runs it to the reader's quit. The screen takes the
     /// process's own writers: a screen that drew anywhere but the real stdout would
-    /// not be the screen a reader sees.
+    /// not be the screen a reader sees. The Launchpad code stays for its own seams;
+    /// the bare route opens this console.
     /// </summary>
-    private static int RunLaunchpad(
+    private static int RunSlashConsole(
         TextWriter stdout,
         TextWriter stderr,
         TerminalCapabilities capabilities,
         TuiConsole console,
         ITerminalSessionFactory? session,
         IUiClock? clock,
-        ILaunchpadRunner? runner,
-        Action? onLaunchpad)
+        ISlashConsoleRunner? runner,
+        Action? onConsole)
     {
-        onLaunchpad?.Invoke();
+        onConsole?.Invoke();
 
-        var result = LaunchpadHost.Run(new LaunchpadHostRequest(
-            LaunchpadCatalog.Commands,
+        var result = SlashConsoleHost.Run(new SlashConsoleHostRequest(
             stdout,
             stderr,
             capabilities,
             console,
             session ?? new TerminalGuardSessionFactory(),
             clock ?? new MonotonicClock(),
-            runner ?? new CliAppLaunchpadRunner()));
+            runner ?? new SlashConsoleProcessRunner(),
+            System.Environment.CurrentDirectory));
 
         if (result.Refusal is not null)
         {

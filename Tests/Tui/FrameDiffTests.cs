@@ -11,7 +11,7 @@ namespace Lattice.Tests.Tui;
 /// </summary>
 public class FrameDiffTests
 {
-    private const string TrueColorSgr = "\u001b[0;38;2;173;203;102m";
+    private const string TrueColorSgr = "\u001b[0;38;2;250;178;131m";
 
     private static CellBuffer Blank(int width, int height) => new(width, height);
 
@@ -92,7 +92,7 @@ public class FrameDiffTests
 
         var rendered = FrameDiff.Render(previous, next, ColorDepth.TrueColor);
 
-        Assert.Equal("\u001b[1;1H\u001b[0;1;38;2;173;203;102ma", rendered);
+        Assert.Equal("\u001b[1;1H\u001b[0;1;38;2;250;178;131ma", rendered);
     }
 
     [Fact]

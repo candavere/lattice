@@ -105,7 +105,7 @@ public class WorldRendererTests
         var cells = RenderStraightEdge(WorldMap.UnlimitedCapacity);
 
         Assert.Equal(Glyphs.Horizontal, cells[31, 0].Glyph);
-        Assert.Equal(Theme.Sage, cells[31, 0].Foreground);
+        Assert.Equal(Theme.OpenEdge, cells[31, 0].Foreground);
     }
 
     [Fact]

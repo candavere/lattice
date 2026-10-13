@@ -48,8 +48,8 @@ public class RgbHexParsingTests
     [Fact]
     public void SixHexDigitsParseToTheChannelValues()
     {
-        Assert.Equal(new Rgb(0x1F, 0x24, 0x20), Rgb.FromHex("#1f2420"));
-        Assert.Equal(new Rgb(0xAD, 0xCB, 0x66), Rgb.FromHex("#adcb66"));
+        Assert.Equal(new Rgb(0x14, 0x14, 0x14), Rgb.FromHex("#141414"));
+        Assert.Equal(new Rgb(0xFA, 0xB2, 0x83), Rgb.FromHex("#fab283"));
         Assert.Equal(new Rgb(0x00, 0x00, 0x00), Rgb.FromHex("#000000"));
         Assert.Equal(new Rgb(0xFF, 0xFF, 0xFF), Rgb.FromHex("#ffffff"));
     }
@@ -64,17 +64,21 @@ public class RgbHexParsingTests
     [Fact]
     public void EveryPaletteColourParsesToItsLiteralChannels()
     {
-        Assert.Equal(new Rgb(0x1F, 0x24, 0x20), Palette.PanelBackground);
-        Assert.Equal(new Rgb(0x2C, 0x36, 0x25), Palette.Raised);
-        Assert.Equal(new Rgb(0x81, 0x89, 0x7D), Palette.Border);
-        Assert.Equal(new Rgb(0xDD, 0xE1, 0xDC), Palette.TextPrimary);
-        Assert.Equal(new Rgb(0x69, 0x6F, 0x65), Palette.TextDim);
-        Assert.Equal(new Rgb(0xAD, 0xCB, 0x66), Palette.Accent);
-        Assert.Equal(new Rgb(0xC8, 0xDB, 0x73), Palette.AccentBright);
-        Assert.Equal(new Rgb(0xE8, 0xA7, 0xBC), Palette.AccentSecondary);
-        Assert.Equal(new Rgb(0xE6, 0xC8, 0x4A), Palette.Warning);
-        Assert.Equal(new Rgb(0xD9, 0x64, 0x5A), Palette.Error);
-        Assert.Equal(new Rgb(0xA1, 0xC3, 0x5E), Palette.Success);
+        Assert.Equal(new Rgb(0x0A, 0x0A, 0x0A), Palette.Background);
+        Assert.Equal(new Rgb(0x14, 0x14, 0x14), Palette.PanelBackground);
+        Assert.Equal(new Rgb(0x1E, 0x1E, 0x1E), Palette.Raised);
+        Assert.Equal(new Rgb(0x3C, 0x3C, 0x3C), Palette.DepthStep);
+        Assert.Equal(new Rgb(0x48, 0x48, 0x48), Palette.Border);
+        Assert.Equal(new Rgb(0xEE, 0xEE, 0xEE), Palette.TextPrimary);
+        Assert.Equal(new Rgb(0x80, 0x80, 0x80), Palette.TextDim);
+        Assert.Equal(new Rgb(0xFA, 0xB2, 0x83), Palette.Accent);
+        Assert.Equal(new Rgb(0xFF, 0xC0, 0x9F), Palette.AccentBright);
+        Assert.Equal(new Rgb(0x5C, 0x9C, 0xF5), Palette.AccentSecondary);
+        Assert.Equal(new Rgb(0x9D, 0x7C, 0xD8), Palette.Violet);
+        Assert.Equal(new Rgb(0xF5, 0xA7, 0x42), Palette.Warning);
+        Assert.Equal(new Rgb(0xE0, 0x6C, 0x75), Palette.Error);
+        Assert.Equal(new Rgb(0x7F, 0xD8, 0x8F), Palette.Success);
+        Assert.Equal(new Rgb(0x56, 0xB6, 0xC2), Palette.Info);
     }
 
     [Fact]

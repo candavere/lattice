@@ -67,8 +67,8 @@ public class ReadabilityContrastTests
     [Fact]
     public void SampledPaletteLiteralsAreUnchanged()
     {
-        Assert.Equal("#1f2420", Palette.PanelBackground.ToHex());
-        Assert.Equal("#696f65", Palette.TextDim.ToHex());
-        Assert.Equal("#adcb66", Palette.Accent.ToHex());
+        Assert.Equal("#141414", Palette.PanelBackground.ToHex());
+        Assert.Equal("#808080", Palette.TextDim.ToHex());
+        Assert.Equal("#fab283", Palette.Accent.ToHex());
     }
 }

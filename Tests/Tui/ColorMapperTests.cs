@@ -27,8 +27,8 @@ public class ColorMapperTests
     public void TrueColorBackgroundUsesThe48Prefix()
     {
         Assert.Equal(
-            "\u001b[0;48;2;31;36;32m",
-            ColorMapper.Background(Rgb.FromHex("#1f2420"), ColorDepth.TrueColor));
+            "\u001b[0;48;2;20;20;20m",
+            ColorMapper.Background(Rgb.FromHex("#141414"), ColorDepth.TrueColor));
     }
 
     [Theory]
@@ -69,7 +69,7 @@ public class ColorMapperTests
     [Fact]
     public void NoDepthEmitsNoEscapeAtAll()
     {
-        var color = Rgb.FromHex("#adcb66");
+        var color = Rgb.FromHex("#fab283");
 
         Assert.Equal(string.Empty, ColorMapper.Foreground(color, ColorDepth.None));
         Assert.Equal(string.Empty, ColorMapper.Background(color, ColorDepth.None));
@@ -83,7 +83,7 @@ public class ColorMapperTests
     {
         var style = ColorMapper.Style(Palette.Accent, null, CellAttributes.None, ColorDepth.TrueColor);
 
-        Assert.Equal("\u001b[0;38;2;173;203;102m", style);
+        Assert.Equal("\u001b[0;38;2;250;178;131m", style);
     }
 
     [Fact]
@@ -96,7 +96,7 @@ public class ColorMapperTests
             ColorDepth.TrueColor);
 
         Assert.Equal(
-            "\u001b[0;1;2;4;7;38;2;173;203;102;48;2;44;54;37m",
+            "\u001b[0;1;2;4;7;38;2;250;178;131;48;2;30;30;30m",
             style);
     }
 

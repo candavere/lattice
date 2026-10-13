@@ -301,7 +301,7 @@ public static class WorldRenderer
             }
 
             var path = Line(from.X, from.Y, to.X, to.Y);
-            var color = edge.Capacity == 0 ? Theme.ClosedEdge : Theme.Sage;
+            var color = edge.Capacity == 0 ? Theme.ClosedEdge : Theme.OpenEdge;
             var glyph = GlyphModes.Glyph(EdgeGlyph(from, to), request.Glyphs);
 
             for (var i = 1; i < path.Count - 1; i++)

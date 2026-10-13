@@ -1,0 +1,20 @@
+  lattice                                                   
+                                                            
+                          lattice                           
+  terminal is 60x20; console needs 62x16 (62x30 with me...  
+│ Type / to see commands                                    
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+/Users/test/lattice                                         
+/ commands  /exit leave  ctrl-c quit                        

@@ -1,0 +1,32 @@
+  lattice                                                                                           
+                                                                                                    
+                                              lattice                                               
+                                                                                                    
+| Type / to see commands                                                                            
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+/Users/test/lattice                                                                                 
+/ commands  /exit leave  ctrl-c quit                                                                

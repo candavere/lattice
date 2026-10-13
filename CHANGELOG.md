@@ -8,6 +8,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Opt-in launcher setup via `./setup.sh --install-launcher` / `.\setup.ps1 -InstallLauncher` plus
+  `--add-to-path` / `-AddToPath` and `--dry-run` / `-DryRun`, install/uninstall round-trip through
+  an owned per-user tool directory with a validated manifest and atomic profile/registry edit
+  (undo via `--uninstall-launcher` / `-UninstallLauncher`).
+- The interactive TUI surface (wordmark, console, Cockpit, Ledger, Launchpad, lifecycle lines)
+  uses one shared OpenCode-style palette; the simulate stderr run dashboard keeps its basic
+  16-colour codes and byte contract; the dotted Braille wordmark has a plain-title fallback.
 - `lattice tui ledger <artifact.json> [<artifact.json> ...] [--ascii]` opens a read-only
   screen over one or more `evaluate --out` artifacts: where and on what each was
   produced, one row per suite with its seed and match counts, mean paired delta with its

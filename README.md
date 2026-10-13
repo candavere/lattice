@@ -340,11 +340,16 @@ lattice replay site/demo.jsonl --verify                     # headless, exit 0
 dotnet run --project Cli -- tui ledger benchmarks/mcts_evaluation_results.json
 ```
 
-The `-g` install is also what puts the bare `lattice` launcher on `PATH`: the
-same shim the throwaway `--tool-path` install makes, but for the current user.
-If the shell answers `lattice: command not found` afterwards, the global-tools
-directory (`~/.dotnet/tools`) is not on `PATH`; export it and open a new shell.
-Nothing here edits a shell profile: that export is yours to make.
+Opt-in launcher setup: `./setup.sh --install-launcher` (or `.\setup.ps1 -InstallLauncher`
+on Windows) packs a real build and installs `lattice` into an owned per-user directory
+(`$HOME/.lattice/bin` on macOS/Linux, `%LOCALAPPDATA%\\Lattice\\bin` on Windows). With
+`--add-to-path` / `-AddToPath` it records and (on Unix) appends one marked block to
+one profile, or (on Windows) appends the directory to the user `Path` only. Without that
+flag it prints the exact line instead and changes no profile or registry. Every effect is
+recorded in `install.json` and undone by `--uninstall-launcher` / `-UninstallLauncher`;
+dry-run changes nothing. Open a new terminal after PATH changes. On a Homebrew .NET
+install set `DOTNET_ROOT=/opt/homebrew/opt/dotnet/libexec` if the launcher complains; see
+below.
 
 On a Homebrew .NET install the `lattice` launcher can fail with `You must
 install .NET to run this application.` even though `dotnet` itself works,
@@ -365,8 +370,7 @@ saying 3.1.0 does not mean untagged main-branch changes were released. CI proves
 points agree: the `build-test` matrix packs, installs the tool into a
 throwaway tool path on Ubuntu, Windows and macOS, and fails if the installed
 `lattice` and `dotnet run` differ by a single byte on the golden replay. The
-TUI on `main` is unreleased work; the latest published release remains `v3.0.0`
-until a `v3.1.0` tag and GitHub Release are verified.
+The latest published release is `v3.1.0` (https://github.com/candavere/lattice/releases/tag/v3.1.0).
 
 `--add-source` points NuGet at the package you just built. NuGet may still
 consult your other configured sources, so pass `--version 3.1.0` as well if you

@@ -270,6 +270,32 @@ public sealed class LauncherSetupTests
         var expectedVersion = versionLine.Substring(versionLine.IndexOf("<Version>") + 9);
         expectedVersion = expectedVersion.Substring(0, expectedVersion.IndexOf("</Version>"));
 
+        // Capture the runner's USER Path (registry) BEFORE any effect so a
+        // failure mid-test cannot leak a PATH edit into later CI work; restored
+        // in the finally below.
+        Microsoft.Win32.RegistryKey? regBefore = Microsoft.Win32.Registry.CurrentUser.OpenSubKey("Environment", writable: false);
+        string originalRegRaw = (regBefore?.GetValue("Path", null, Microsoft.Win32.RegistryValueOptions.DoNotExpandEnvironmentNames) as string) ?? string.Empty;
+        Microsoft.Win32.RegistryValueKind originalRegKind;
+        try
+        {
+            originalRegKind = regBefore is null ? Microsoft.Win32.RegistryValueKind.String : regBefore.GetValueKind("Path");
+        }
+        catch
+        {
+            originalRegKind = Microsoft.Win32.RegistryValueKind.String;
+        }
+        if (originalRegKind is not (Microsoft.Win32.RegistryValueKind.String or Microsoft.Win32.RegistryValueKind.ExpandString))
+        {
+            originalRegKind = Microsoft.Win32.RegistryValueKind.String;
+        }
+        regBefore?.Dispose();
+
+        // Capture the runner's NuGet global packages cache before redirecting
+        // USERPROFILE, so `dotnet pack` under the redirected profile reuses the
+        // already-restored cache instead of re-downloading every dependency.
+        string originalUserProfile = System.Environment.GetEnvironmentVariable("USERPROFILE") ?? string.Empty;
+        string nugetGlobal = Path.Combine(originalUserProfile, ".nuget", "packages");
+
         using var scope = new TempScope();
         var env = new Dictionary<string, string>
         {
@@ -277,33 +303,61 @@ public sealed class LauncherSetupTests
             ["LOCALAPPDATA"] = Path.Combine(scope.Home, "AppData", "Local"),
         };
         Directory.CreateDirectory(env["LOCALAPPDATA"]);
+        if (Directory.Exists(nugetGlobal))
+        {
+            env["NUGET_PACKAGES"] = nugetGlobal;
+        }
         var curPath = System.Environment.GetEnvironmentVariable("PATH") ?? "";
         // Keep the full PATH so tooling resolves; a conflict is exercised
         // separately by prepending a directory containing a 'lattice' shim.
         env["PATH"] = curPath;
 
-        // dry run
-        var (dryCode, dryOut, dryErr) = Run(shell, new[] { "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", setup, "-InstallLauncher", "-DryRun" }, scope.Work, env);
-        Assert.Equal(0, dryCode);
-
-        // conflict
-        var fakeBin = Path.Combine(scope.Root, "fakebin");
-        Directory.CreateDirectory(fakeBin);
-        File.WriteAllText(Path.Combine(fakeBin, "lattice.cmd"), "@echo SHOULD-NOT-RUN\r\n");
-        var conflictEnv = new Dictionary<string, string>(env)
+        try
         {
-            ["PATH"] = fakeBin + Path.PathSeparator + (env.GetValueOrDefault("PATH") ?? "")
-        };
-        var (conflictCode, conflictOut, conflictErr) = Run(shell, new[] { "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", setup, "-InstallLauncher" }, scope.Work, conflictEnv);
-        Assert.NotEqual(0, conflictCode);
-        Assert.DoesNotContain("SHOULD-NOT-RUN", conflictOut + conflictErr);
+            // dry run
+            var (dryCode, dryOut, dryErr) = Run(shell, new[] { "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", setup, "-InstallLauncher", "-DryRun" }, scope.Work, env);
+            Assert.Equal(0, dryCode);
 
-        // install with registry path
-        var (installCode, installOut, installErr) = Run(shell, new[] { "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", setup, "-InstallLauncher", "-AddToPath" }, scope.Work, env);
-        Assert.True(installCode == 0, $"install failed: {installErr}\n{installOut}");
+            // conflict
+            var fakeBin = Path.Combine(scope.Root, "fakebin");
+            Directory.CreateDirectory(fakeBin);
+            File.WriteAllText(Path.Combine(fakeBin, "lattice.cmd"), "@echo SHOULD-NOT-RUN\r\n");
+            var conflictEnv = new Dictionary<string, string>(env)
+            {
+                ["PATH"] = fakeBin + Path.PathSeparator + (env.GetValueOrDefault("PATH") ?? "")
+            };
+            var (conflictCode, conflictOut, conflictErr) = Run(shell, new[] { "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", setup, "-InstallLauncher" }, scope.Work, conflictEnv);
+            Assert.NotEqual(0, conflictCode);
+            Assert.DoesNotContain("SHOULD-NOT-RUN", conflictOut + conflictErr);
 
-        // uninstall
-        var (uninstallCode, uninstallOut, uninstallErr) = Run(shell, new[] { "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", setup, "-UninstallLauncher" }, scope.Work, env);
-        Assert.True(uninstallCode == 0, $"uninstall failed: {uninstallErr}\n{uninstallOut}");
+            // install with registry path
+            var (installCode, installOut, installErr) = Run(shell, new[] { "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", setup, "-InstallLauncher", "-AddToPath" }, scope.Work, env);
+            Assert.True(installCode == 0, $"install failed: {installErr}\n{installOut}");
+
+            // uninstall
+            var (uninstallCode, uninstallOut, uninstallErr) = Run(shell, new[] { "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", setup, "-UninstallLauncher" }, scope.Work, env);
+            Assert.True(uninstallCode == 0, $"uninstall failed: {uninstallErr}\n{uninstallOut}");
+
+            // exact USER Path restoration
+            using (var regAfter = Microsoft.Win32.Registry.CurrentUser.OpenSubKey("Environment", writable: false))
+            {
+                var afterRaw = (regAfter?.GetValue("Path", null, Microsoft.Win32.RegistryValueOptions.DoNotExpandEnvironmentNames) as string) ?? string.Empty;
+                Assert.Equal(originalRegRaw, afterRaw);
+            }
+        }
+        finally
+        {
+            try
+            {
+                using var wkey = Microsoft.Win32.Registry.CurrentUser.OpenSubKey("Environment", writable: true);
+                if (wkey is not null)
+                {
+                    wkey.SetValue("Path", originalRegRaw, originalRegKind);
+                }
+            }
+            catch
+            {
+            }
+        }
     }
 }

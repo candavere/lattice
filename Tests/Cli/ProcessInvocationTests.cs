@@ -14,10 +14,26 @@ namespace Lattice.Tests.Cli;
 /// buffer bound, watch-screen inheritance, and whole-tree cancel with no leftover agent.
 /// These tests really spawn children (not dry runs) and run on all three CI operating
 /// systems; every install-adjacent assertion here uses temp directories and never the
-/// real profile, PATH or tools.
+/// real profile, PATH or tools. Child processes launch the CLI copy MSBuild deploys
+/// beside the test assembly (the build under test) rather than whatever a previous
+/// build left in the CLI project's own bin folder, which in-suite builds can rewrite.
 /// </summary>
 public class ProcessInvocationTests
 {
+    [Fact]
+    public void ChildLaunchesFromTheTestOutputDirectory()
+    {
+        // Structural guard: the child must launch from the CLI copy MSBuild
+        // deploys beside the test assembly, not from the CLI project's own
+        // bin tree that in-suite builds can rewrite.
+        var invocation = ChildInvocation();
+        var dll = Assert.Single(invocation.PrefixArguments);
+        var baseDir = Path.GetFullPath(AppContext.BaseDirectory);
+        var fullDll = Path.GetFullPath(dll);
+        Assert.StartsWith(baseDir, fullDll, StringComparison.Ordinal);
+        Assert.True(File.Exists(fullDll), $"expected a built CLI at {fullDll}.");
+    }
+
     [Fact]
     public void HostFormRunsDotnetWithTheDllFirst()
     {
@@ -93,7 +109,7 @@ public class ProcessInvocationTests
         using var stderr = new StringWriter();
         var exit = CliApp.Run(argv, stdout, stderr);
 
-        Assert.Equal(exit, finished.ExitCode);
+        Assert.True(exit == finished.ExitCode, $"exit mismatch: in-process={exit} child={finished.ExitCode}\n--- in-process stdout ---\n{stdout}\n--- in-process stderr ---\n{stderr}\n--- child stdout ---\n{finished.Stdout}\n--- child stderr ---\n{finished.Stderr}");
         Assert.Equal(stdout.ToString(), finished.Stdout);
         Assert.Equal(stderr.ToString(), finished.Stderr);
         Assert.False(finished.Cancelled);
@@ -117,8 +133,8 @@ public class ProcessInvocationTests
         using var stderr = new StringWriter();
         var exit = CliApp.Run(["generate", "--seed", "42", "--out", directOut], stdout, stderr);
 
-        Assert.Equal(0, finished.ExitCode);
-        Assert.Equal(exit, finished.ExitCode);
+        Assert.True(finished.ExitCode == 0, $"expected exit 0 but got {finished.ExitCode}\n--- child stdout ---\n{finished.Stdout}\n--- child stderr ---\n{finished.Stderr}");
+        Assert.True(exit == finished.ExitCode, $"exit mismatch: in-process={exit} child={finished.ExitCode}\n--- in-process stdout ---\n{stdout}\n--- in-process stderr ---\n{stderr}\n--- child stdout ---\n{finished.Stdout}\n--- child stderr ---\n{finished.Stderr}");
         Assert.Equal("", stdout.ToString());
         Assert.Equal("", finished.Stdout);
         Assert.Equal($"wrote {childOut}{System.Environment.NewLine}", finished.Stderr);
@@ -144,8 +160,8 @@ public class ProcessInvocationTests
         using var stderr = new StringWriter();
         var exit = CliApp.Run(argv, stdout, stderr);
 
-        Assert.Equal(exit, finished.ExitCode);
-        Assert.Equal(1, finished.ExitCode);
+        Assert.True(exit == finished.ExitCode, $"exit mismatch: in-process={exit} child={finished.ExitCode}\n--- in-process stdout ---\n{stdout}\n--- in-process stderr ---\n{stderr}\n--- child stdout ---\n{finished.Stdout}\n--- child stderr ---\n{finished.Stderr}");
+        Assert.True(finished.ExitCode == 1, $"expected exit 1 but got {finished.ExitCode} (in-process={exit})\n--- child stdout ---\n{finished.Stdout}\n--- child stderr ---\n{finished.Stderr}\n--- in-process stdout ---\n{stdout}\n--- in-process stderr ---\n{stderr}");
         Assert.Equal(stdout.ToString(), finished.Stdout);
         Assert.Equal(stderr.ToString(), finished.Stderr);
     }
@@ -169,8 +185,8 @@ public class ProcessInvocationTests
         // An empty seed, a --flag=value with spaces, and a quote all fail parsing the
         // same way in both: any ArgumentList mangling (dropped empties, re-split spaces,
         // stripped quotes) would parse differently and break this equality.
-        Assert.Equal(exit, finished.ExitCode);
-        Assert.Equal(2, finished.ExitCode);
+        Assert.True(exit == finished.ExitCode, $"exit mismatch: in-process={exit} child={finished.ExitCode}\n--- in-process stdout ---\n{stdout}\n--- in-process stderr ---\n{stderr}\n--- child stdout ---\n{finished.Stdout}\n--- child stderr ---\n{finished.Stderr}");
+        Assert.True(finished.ExitCode == 2, $"expected exit 2 but got {finished.ExitCode} (in-process={exit})\n--- child stdout ---\n{finished.Stdout}\n--- child stderr ---\n{finished.Stderr}\n--- in-process stdout ---\n{stdout}\n--- in-process stderr ---\n{stderr}");
         Assert.Equal(stdout.ToString(), finished.Stdout);
         Assert.Equal(stderr.ToString(), finished.Stderr);
     }
@@ -188,8 +204,8 @@ public class ProcessInvocationTests
         using var stderr = new StringWriter();
         var exit = CliApp.Run(argv, stdout, stderr);
 
-        Assert.Equal(exit, finished.ExitCode);
-        Assert.Equal(2, finished.ExitCode);
+        Assert.True(exit == finished.ExitCode, $"exit mismatch: in-process={exit} child={finished.ExitCode}\n--- in-process stdout ---\n{stdout}\n--- in-process stderr ---\n{stderr}\n--- child stdout ---\n{finished.Stdout}\n--- child stderr ---\n{finished.Stderr}");
+        Assert.True(finished.ExitCode == 2, $"expected exit 2 but got {finished.ExitCode} (in-process={exit})\n--- child stdout ---\n{finished.Stdout}\n--- child stderr ---\n{finished.Stderr}\n--- in-process stdout ---\n{stdout}\n--- in-process stderr ---\n{stderr}");
         Assert.Equal(stdout.ToString(), finished.Stdout);
         Assert.Equal(stderr.ToString(), finished.Stderr);
     }
@@ -217,12 +233,12 @@ public class ProcessInvocationTests
         using var stderr = new StringWriter();
         var exit = CliApp.Run(argv, stdout, stderr);
 
-        Assert.Equal(exit, finished.ExitCode);
-        Assert.Equal(1, finished.ExitCode);
+        Assert.True(exit == finished.ExitCode, $"exit mismatch: in-process={exit} child={finished.ExitCode}\n--- in-process stdout ---\n{stdout}\n--- in-process stderr ---\n{stderr}\n--- child stdout ---\n{finished.Stdout}\n--- child stderr ---\n{finished.Stderr}");
+        Assert.True(finished.ExitCode == 1, $"expected exit 1 but got {finished.ExitCode} (in-process={exit})\n--- child stdout ---\n{finished.Stdout}\n--- child stderr ---\n{finished.Stderr}\n--- in-process stdout ---\n{stdout}\n--- in-process stderr ---\n{stderr}");
         Assert.Equal(stdout.ToString(), finished.Stdout);
 
         var control = ControlRun(argv, temp.Path);
-        Assert.Equal(control.ExitCode, finished.ExitCode);
+        Assert.True(control.ExitCode == finished.ExitCode, $"control/child exit mismatch: control={control.ExitCode} child={finished.ExitCode} in-process={exit}\n--- control stdout ---\n{control.Stdout}\n--- control stderr ---\n{control.Stderr}\n--- child stdout ---\n{finished.Stdout}\n--- child stderr ---\n{finished.Stderr}\n--- in-process stdout ---\n{stdout}\n--- in-process stderr ---\n{stderr}");
         Assert.Equal(control.Stdout, finished.Stdout);
         Assert.Equal(control.Stderr, finished.Stderr);
     }
@@ -244,8 +260,8 @@ public class ProcessInvocationTests
         using var stderr = new StringWriter();
         var exit = CliApp.Run(argv, stdout, stderr);
 
-        Assert.Equal(exit, finished.ExitCode);
-        Assert.Equal(1, finished.ExitCode);
+        Assert.True(exit == finished.ExitCode, $"exit mismatch: in-process={exit} child={finished.ExitCode}\n--- in-process stdout ---\n{stdout}\n--- in-process stderr ---\n{stderr}\n--- child stdout ---\n{finished.Stdout}\n--- child stderr ---\n{finished.Stderr}");
+        Assert.True(finished.ExitCode == 1, $"expected exit 1 but got {finished.ExitCode} (in-process={exit})\n--- child stdout ---\n{finished.Stdout}\n--- child stderr ---\n{finished.Stderr}\n--- in-process stdout ---\n{stdout}\n--- in-process stderr ---\n{stderr}");
         Assert.Equal(stdout.ToString(), finished.Stdout);
         Assert.Equal(stderr.ToString(), finished.Stderr);
         Assert.Contains("täst-ü.json", finished.Stderr, StringComparison.Ordinal);
@@ -332,7 +348,7 @@ public class ProcessInvocationTests
 
         var finished = runner.StartCaptured(new CapturedRunRequest(
             ["generate", "--seed", "42", "--out", name], "lattice generate", childDir.Path, ChildInvocation())).Finish();
-        Assert.Equal(0, finished.ExitCode);
+        Assert.True(finished.ExitCode == 0, $"expected exit 0 but got {finished.ExitCode}\n--- child stdout ---\n{finished.Stdout}\n--- child stderr ---\n{finished.Stderr}");
 
         var entries = Directory.EnumerateFileSystemEntries(childDir.Path).ToList();
         var actualName = Path.GetFileName(Assert.Single(entries));
@@ -372,8 +388,8 @@ public class ProcessInvocationTests
         var originalRun = runner.StartCaptured(new CapturedRunRequest(
             ["validate-scenario", original], "lattice validate-scenario", temp.Path, ChildInvocation())).Finish();
 
-        Assert.Equal(originalRun.ExitCode, unicodeRun.ExitCode);
-        Assert.Equal(0, unicodeRun.ExitCode);
+        Assert.True(originalRun.ExitCode == unicodeRun.ExitCode, $"exit mismatch: original={originalRun.ExitCode} unicode={unicodeRun.ExitCode}\n--- original stdout ---\n{originalRun.Stdout}\n--- original stderr ---\n{originalRun.Stderr}\n--- unicode stdout ---\n{unicodeRun.Stdout}\n--- unicode stderr ---\n{unicodeRun.Stderr}");
+        Assert.True(unicodeRun.ExitCode == 0, $"expected exit 0 but got {unicodeRun.ExitCode} (original={originalRun.ExitCode})\n--- unicode stdout ---\n{unicodeRun.Stdout}\n--- unicode stderr ---\n{unicodeRun.Stderr}\n--- original stdout ---\n{originalRun.Stdout}\n--- original stderr ---\n{originalRun.Stderr}");
     }
 
     [Fact]
@@ -389,8 +405,8 @@ public class ProcessInvocationTests
         using var stderr = new StringWriter();
         var exit = CliApp.Run(argv, stdout, stderr);
 
-        Assert.Equal(exit, finished.ExitCode);
-        Assert.Equal(0, finished.ExitCode);
+        Assert.True(exit == finished.ExitCode, $"exit mismatch: in-process={exit} child={finished.ExitCode}\n--- in-process stdout ---\n{stdout}\n--- in-process stderr ---\n{stderr}\n--- child stdout ---\n{finished.Stdout}\n--- child stderr ---\n{finished.Stderr}");
+        Assert.True(finished.ExitCode == 0, $"expected exit 0 but got {finished.ExitCode} (in-process={exit})\n--- child stdout ---\n{finished.Stdout}\n--- child stderr ---\n{finished.Stderr}\n--- in-process stdout ---\n{stdout}\n--- in-process stderr ---\n{stderr}");
         Assert.Equal(NormalizeArtifact(stdout.ToString()), NormalizeArtifact(finished.Stdout));
     }
 
@@ -456,13 +472,11 @@ public class ProcessInvocationTests
 
     private static string LatticeDll()
     {
-        // Tests/bin/<config>/net10.0 -> repo/Cli/bin/<config>/net10.0/lattice.dll.
-        var baseDir = AppContext.BaseDirectory;
-        var config = Directory.GetParent(baseDir)?.Parent?.Name ?? "Release";
-        var root = RepoRoot();
-
-        var dll = Path.Combine(root, "Cli", "bin", config, "net10.0", "lattice.dll");
-        Assert.True(File.Exists(dll), $"expected a built CLI at {dll}; build in {config} first.");
+        // The built CLI, resolved from the test assembly's own output directory so
+        // it is the build under test rather than whatever a previous build left in
+        // the CLI project's own bin folder, which in-suite builds can rewrite.
+        var dll = Path.Combine(AppContext.BaseDirectory, "lattice.dll");
+        Assert.True(File.Exists(dll), $"the CLI was not found at '{dll}'.");
         return dll;
     }
 

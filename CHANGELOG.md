@@ -139,6 +139,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   The screen a run returns to is restored on every exit, and a terminal that
   dies mid-run ends the run instead of drawing to a dead screen.
 
+### Fixed
+
+- Child-process CLI tests now launch the CLI copy MSBuild deploys beside the test assembly instead of the CLI project's own bin tree, so in-suite builds can no longer rewrite the binary under a running child; exit-code mismatches dump both sides' exit codes, stdout and stderr. This hazard is consistent with the macOS CI exit 147, whose exact cause remains unproven.
+
 ## [3.1.0] - 2026-10-01
 
 Source version 3.1.0, the release line that follows `v3.0.0`. This section

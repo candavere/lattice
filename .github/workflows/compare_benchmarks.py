@@ -168,41 +168,197 @@ def _string_component(meta, key):
     return text or None
 
 
-def is_finite_positive(value) -> bool:
-    """A metric is valid only if a real, finite number greater than 0.
+def is_presentable_number(value) -> bool:
+    """A number formatting and arithmetic can touch without raising.
 
-    Rejects bools, non-numeric values, NaN, +/-inf, and anything <= 0, so a
-    corrupt measurement cannot slip through a path that skips adjudication.
+    Rejects bools, non-numeric values, NaN, +/-inf, and integers so large
+    they cannot convert to float, so unrepresentable values fail cleanly
+    before any numeric formatting runs.
     """
     if isinstance(value, bool):
         return False
     if not isinstance(value, (int, float)):
         return False
-    return math.isfinite(value) and value > 0
+    try:
+        as_float = float(value)
+    except (OverflowError, ValueError):
+        return False
+    return math.isfinite(as_float)
+
+
+def is_finite_positive(value) -> bool:
+    """A metric is valid only if a real, finite number greater than 0.
+
+    Rejects bools, non-numeric values, NaN, +/-inf, anything <= 0, and
+    unrepresentably large integers, so a corrupt measurement cannot slip
+    through a path that skips adjudication.
+    """
+    return is_presentable_number(value) and value > 0
 
 
 def describe_invalid_metric(value) -> str:
     """Printable form of a rejected metric for error messages."""
     if value is None:
         return "missing"
+    if isinstance(value, bool):
+        return repr(value)
     if isinstance(value, float) and math.isnan(value):
         return "nan"
     if isinstance(value, float) and math.isinf(value):
         return "inf" if value > 0 else "-inf"
     try:
         return f"{value:g}"
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return repr(value)
 
 
 def metric_error(name, field, value) -> str:
     """The error line for an invalid metric, keeping the legacy wording for
-    finite non-positive numbers and naming non-finite values explicitly."""
-    if (isinstance(value, (int, float)) and not isinstance(value, bool)
-            and math.isfinite(value)):
+    finite non-positive numbers and naming non-finite values explicitly.
+    Reads presentability through the safe helper because math.isfinite
+    itself raises on unrepresentably large integers."""
+    if is_presentable_number(value):
         return f"{name}: {field} must be positive, got {value:g}."
     return (f"{name}: {field} must be a finite positive number, "
             f"got {describe_invalid_metric(value)}.")
+
+
+# Fields the shared structural layer validates, mirroring
+# Analytics/Benchmarking/BenchmarkReport.cs and BenchmarkMetadata.cs. Only
+# these named fields are checked; unknown provenance extensions are untouched.
+REQUIRED_POSITIVE_METRICS = (
+    "MedianThroughputPerSecond", "MedianStepLatencyMicros")
+OPTIONAL_POSITIVE_METRICS = ("MeanThroughputPerSecond",)
+OPTIONAL_NONNEGATIVE_METRICS = (
+    "StdDevThroughputPerSecond", "AllocationsPerStepBytes",
+    "MeanStepLatencyMicros", "P95StepLatencyMicros")
+OPTIONAL_POSITIVE_COUNTS = ("Iterations", "StepsPerIteration")
+OPTIONAL_NONNEGATIVE_COUNTERS = (
+    "TotalGcGen0", "TotalGcGen1", "TotalGcGen2")
+
+
+def is_whole_number(value) -> bool:
+    """A JSON integer that is not a bool (True/1.0/"3" are not counts)."""
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _check_count(side, name, workload, field, errors, minimum):
+    if field not in workload:
+        return  # absent optional counts keep their current fallback behavior
+    value = workload[field]
+    if is_whole_number(value) and value >= minimum:
+        return
+    expectation = ("a positive integer"
+                   if minimum > 0 else "a non-negative integer")
+    errors.append(f"{side}.{name}: {field} must be {expectation}, "
+                  f"got {describe_invalid_metric(value)}.")
+
+
+def _check_workload(side, name, workload, errors):
+    qualified = f"{side}.{name}"
+    for field in REQUIRED_POSITIVE_METRICS:
+        value = workload.get(field)
+        if not is_finite_positive(value):
+            errors.append(metric_error(qualified, field, value))
+    for field in OPTIONAL_POSITIVE_METRICS:
+        if field in workload and not is_finite_positive(workload[field]):
+            errors.append(metric_error(
+                qualified, field, workload[field]))
+    for field in OPTIONAL_NONNEGATIVE_METRICS:
+        if field in workload:
+            value = workload[field]
+            if not (is_presentable_number(value) and value >= 0):
+                errors.append(
+                    f"{qualified}: {field} must be a finite non-negative "
+                    f"number, got {describe_invalid_metric(value)}.")
+    for field in OPTIONAL_POSITIVE_COUNTS:
+        _check_count(side, name, workload, field, errors, 1)
+    for field in OPTIONAL_NONNEGATIVE_COUNTERS:
+        _check_count(side, name, workload, field, errors, 0)
+
+
+def _check_metadata(side, meta, errors):
+    for field in ("Cores", "RamBytes"):
+        value = meta.get(field)
+        if value is None:
+            continue  # absent stays a fingerprint-level mismatch, never
+            # structural: only smoke requires these fields outright
+        if not (is_whole_number(value) and value > 0):
+            errors.append(f"{side} Metadata.{field} must be a positive "
+                          f"integer, got {describe_invalid_metric(value)}.")
+    for field in ("Os", "Architecture", "Runtime"):
+        value = meta.get(field)
+        if value is not None and not isinstance(value, str):
+            errors.append(f"{side} Metadata.{field} must be a string, "
+                          f"got {describe_invalid_metric(value)}.")
+
+
+def _index_workloads(side, workloads, errors):
+    """Name -> workload dict without silent duplicate collapse."""
+    indexed = {}
+    if not isinstance(workloads, list):
+        errors.append(f"{side} Workloads must be a list")
+        return indexed
+    seen = set()
+    for pos, entry in enumerate(workloads):
+        if not isinstance(entry, dict):
+            errors.append(f"{side} Workloads[{pos}] must be an object")
+            continue
+        name = entry.get("Name")
+        if not isinstance(name, str) or not name.strip():
+            errors.append(
+                f"{side} Workloads[{pos}] is missing a non-empty Name")
+            continue
+        if name in seen:
+            errors.append(f"{side} workload names are not unique: "
+                          f"{name!r} is duplicated")
+            continue
+        seen.add(name)
+        indexed[name] = entry
+    return indexed
+
+
+@dataclass(frozen=True)
+class ValidatedArtifacts:
+    base_meta: dict
+    curr_meta: dict
+    base_work: dict
+    curr_work: dict
+
+
+def validate_structure(baseline, current):
+    """One structural boundary for both artifacts, both sides.
+
+    Checks containers, names, required medians, supplied optional metrics,
+    counts and host integers before any fingerprinting, formatting or
+    arithmetic. Returns (ValidatedArtifacts or None, errors); a non-empty
+    error list must exit 1 with no verdict of any kind.
+    """
+    if not isinstance(baseline, dict):
+        return None, ["baseline artifact must be an object"]
+    if not isinstance(current, dict):
+        return None, ["current artifact must be an object"]
+    errors = []
+    base_meta = baseline.get("Metadata")
+    curr_meta = current.get("Metadata")
+    if not isinstance(base_meta, dict):
+        errors.append("baseline Metadata must be an object")
+        base_meta = {}
+    if not isinstance(curr_meta, dict):
+        errors.append("current Metadata must be an object")
+        curr_meta = {}
+    base_work = _index_workloads("baseline", baseline.get("Workloads"),
+                                 errors)
+    curr_work = _index_workloads("current", current.get("Workloads"),
+                                 errors)
+    _check_metadata("baseline", base_meta, errors)
+    _check_metadata("current", curr_meta, errors)
+    for name, workload in sorted(base_work.items()):
+        _check_workload("baseline", name, workload, errors)
+    for name, workload in sorted(curr_work.items()):
+        _check_workload("current", name, workload, errors)
+    return (ValidatedArtifacts(base_meta, curr_meta, base_work, curr_work),
+            errors)
 
 
 @dataclass(frozen=True)
@@ -424,20 +580,30 @@ class SmokeCheck:
     notes: list
 
 
+def _display_alloc(value):
+    """Allocations for display: valid numbers pass through, anything else
+    shows as absent instead of crashing numeric formatting."""
+    if is_presentable_number(value):
+        return value
+    return None
+
+
 def smoke_check(baseline, current) -> SmokeCheck:
     """Structural classification of a smoke artifact.
 
     No throughput ratio is adjudicated: a smoke pass may run tiny budgets on a
     different host/runtime than the full-protocol baseline, so its throughput is
-    not comparable. Only the matrix shape and sane, positive reported values are
-    checked, so a degenerate artifact can never be mistaken for a clean gate.
+    not comparable. Shape and numbers go through the shared structural layer
+    first, then smoke adds its own host-metadata requirements, so a degenerate
+    artifact can never be mistaken for a clean gate.
     """
-    base_meta, curr_meta = baseline["Metadata"], current["Metadata"]
-    base_work = {w["Name"]: w for w in baseline["Workloads"]}
-    curr_work = {w["Name"]: w for w in current["Workloads"]}
-
-    errors = []
+    structure, errors = validate_structure(baseline, current)
+    errors = list(errors)
     notes = []
+    if structure is None:
+        return SmokeCheck([], errors, notes)
+    base_meta, curr_meta = structure.base_meta, structure.curr_meta
+    base_work, curr_work = structure.base_work, structure.curr_work
     missing = set(base_work) - set(curr_work)
     extra = set(curr_work) - set(base_work)
     if missing:
@@ -453,13 +619,8 @@ def smoke_check(baseline, current) -> SmokeCheck:
         latency = workload.get("MedianStepLatencyMicros")
         rows.append((name, median if is_finite_positive(median) else 0.0,
                      latency if is_finite_positive(latency) else 0.0,
-                     workload.get("AllocationsPerStepBytes")))
-        if not is_finite_positive(median):
-            errors.append(metric_error(
-                name, "MedianThroughputPerSecond", median))
-        if not is_finite_positive(latency):
-            errors.append(metric_error(
-                name, "MedianStepLatencyMicros", latency))
+                     _display_alloc(
+                         workload.get("AllocationsPerStepBytes"))))
 
     if (curr_meta.get("RamBytes") or 0) <= 0:
         errors.append("Metadata.RamBytes must be positive.")
@@ -548,9 +709,16 @@ def main(argv=None) -> int:
     def emit_error(line: str) -> None:
         print(line if args.no_annotations else f"::error::{line}")
 
-    base_meta, curr_meta = baseline["Metadata"], current["Metadata"]
-    base_work = {w["Name"]: w for w in baseline["Workloads"]}
-    curr_work = {w["Name"]: w for w in current["Workloads"]}
+    # One structural boundary before every exit: malformed artifacts fail
+    # here with side/workload/field diagnostics and no verdict of any kind.
+    # Structural failure is not a throughput verdict.
+    structure, structural_errors = validate_structure(baseline, current)
+    if structural_errors:
+        for err in structural_errors:
+            emit_error(err)
+        return 1
+    base_meta, curr_meta = structure.base_meta, structure.curr_meta
+    base_work, curr_work = structure.base_work, structure.curr_work
 
     if args.smoke:
         fp = fingerprint(base_meta, curr_meta)
@@ -613,29 +781,6 @@ def main(argv=None) -> int:
     exact_covered, exact_reasons = compare_exact_environment(
         base_meta, curr_meta)
     if args.require_exact_environment and not exact_covered:
-        # Malformed data must not be masked by an uncovered environment: a
-        # corrupt measurement fails here, over every baseline workload
-        # including informational ones, exactly as a regression would fail
-        # a covered one.
-        malformed = []
-        for name in sorted(base_work):
-            workload = curr_work[name]
-            for field in ("MedianThroughputPerSecond",
-                          "MedianStepLatencyMicros"):
-                value = workload.get(field)
-                if not is_finite_positive(value):
-                    malformed.append(metric_error(name, field, value))
-        if malformed:
-            print(f"baseline fingerprint: {describe_fingerprint(base_meta)}")
-            print(f"current fingerprint : {describe_fingerprint(curr_meta)}")
-            print("environment classification: UNCALIBRATED - "
-                  f"{'; '.join(exact_reasons)}.")
-            print()
-            emit_error(
-                "malformed measurement on an uncalibrated environment:")
-            for message in malformed:
-                emit_error(message)
-            return 1
         print(f"baseline fingerprint: {describe_fingerprint(base_meta)}")
         print(f"current fingerprint : {describe_fingerprint(curr_meta)}")
         print(f"fingerprint match: {matched}  (strict gate armed: False)")

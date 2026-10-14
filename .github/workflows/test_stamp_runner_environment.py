@@ -103,27 +103,51 @@ class StampTests(unittest.TestCase):
         for key, value in before["Metadata"].items():
             self.assertEqual(after["Metadata"][key], value)
 
-    def test_falls_back_to_imagedata_json(self):
+    def test_prefers_release_tag_from_imagedata_json(self):
+        # Live macos-26 evidence: imagedata groups carry an Image Release
+        # URL whose tag is the canonical identity (no provisioner suffix).
         path = self._imagedata(
-            {"imageversion": "20261013.0424", "imagedate": "20261013"}
+            [
+                {"group": "Operating System", "detail": "macOS\n26.6.2"},
+                {
+                    "group": "Runner Image",
+                    "detail": "Image: macos-26-arm64\nVersion: 20260907.0351.1\n"
+                    "Image Release: https://github.com/actions/runner-images/releases/tag/macos-26-arm64%2F20260907.0351",
+                },
+            ]
         )
-        env = {"HOME": self._tmp.name}
+        env = {"ImageVersion": "20260907.0351.1", "HOME": self._tmp.name}
         with mock.patch.dict(os.environ, env, clear=True):
             rc = stamp.main(
                 [
-                    "--artifact",
-                    self.artifact,
-                    "--image-family",
-                    "macos-26-arm64",
-                    "--imagedata-path",
-                    path,
-                    "--sdk",
-                    "10.0.402",
+                    "--artifact", self.artifact,
+                    "--image-family", "macos-26-arm64",
+                    "--imagedata-path", path,
+                    "--sdk", "10.0.402",
                 ]
             )
         self.assertEqual(rc, 0)
         self.assertEqual(
-            self._read()["Metadata"]["RunnerImage"], "macos-26-arm64/20261013.0424"
+            self._read()["Metadata"]["RunnerImage"],
+            "macos-26-arm64/20260907.0351",
+        )
+
+    def test_env_fallback_is_verbatim(self):
+        env = {"ImageVersion": "20260907.0351.1", "HOME": self._tmp.name}
+        with mock.patch.dict(os.environ, env, clear=True):
+            rc = stamp.main(
+                [
+                    "--artifact", self.artifact,
+                    "--image-family", "macos-26-arm64",
+                    "--imagedata-path",
+                    os.path.join(self._tmp.name, "absent.json"),
+                    "--sdk", "10.0.402",
+                ]
+            )
+        self.assertEqual(rc, 0)
+        self.assertEqual(
+            self._read()["Metadata"]["RunnerImage"],
+            "macos-26-arm64/20260907.0351.1",
         )
 
     def test_refuses_conflicting_overwrite_leaving_file_untouched(self):

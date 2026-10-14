@@ -3,12 +3,15 @@
 
 Adds ONLY ``Metadata.RunnerImage`` and ``Metadata.Sdk`` to the artifact at
 ``--artifact``. Measured numbers are never touched. The image version (the
-part that drifts under a stable runner label) is read from the live runner:
-the ``ImageVersion`` environment variable first, then the ``imageversion``
-key of ``~/imagedata.json``. The image family (e.g. ``macos-26-arm64``) is a
-static property of the job's pinned runner and is passed explicitly with
-``--image-family``; it is a declared fact, not a measurement. The stamped
-value is ``{family}/{version}`` verbatim - no normalization, no defaults.
+part that drifts under a stable runner label) is read from the live runner,
+in this order: (1) the ``Image Release:`` URL in ``~/imagedata.json`` (its
+tag is the canonical release identity, exactly the form the reference record
+transcribes, e.g. ``macos-26-arm64/20260907.0351``); (2) the ``ImageVersion``
+environment variable combined with the static ``--image-family`` (verbatim -
+this can carry a provisioner revision suffix such as ``.1`` and then honestly
+will not equal the release tag); (3) absent with a stderr warning. The image
+family is a static property of the job's pinned runner, a declared fact, not
+a measurement. No normalization, no defaults, no guessing.
 
 Fail-closed rules: an existing differing value is never overwritten (exit 2,
 file untouched); when the image cannot be determined, ``RunnerImage`` stays
@@ -24,22 +27,42 @@ import subprocess
 import sys
 
 
-def read_image_version(environ, imagedata_path):
-    """The image version from the live runner, or None when undeterminable."""
-    version = (environ.get("ImageVersion") or "").strip()
-    if version:
-        return version
+def read_release_tag(text):
+    """The canonical ``family/version`` image identity from an
+    ``Image Release: .../releases/tag/{family}%2F{version}`` URL, or None."""
+    import re
+    import urllib.parse
+
+    match = re.search(r"releases/tag/(\S+)", text)
+    if not match:
+        return None
+    tag = urllib.parse.unquote(match.group(1)).strip()
+    if "/" not in tag:
+        return None
+    return tag
+
+
+def read_image_identity(environ, imagedata_path, image_family):
+    """The exact image identity from the live runner, or None.
+
+    Prefers the release tag embedded in imagedata.json (the canonical
+    release identity); falls back to ImageVersion + the static family.
+    """
     try:
         with open(imagedata_path, encoding="utf-8") as handle:
             data = json.load(handle)
     except (OSError, ValueError):
-        return None
-    if isinstance(data, dict):
-        for key in ("imageversion", "ImageVersion", "IMAGEVERSION"):
-            value = data.get(key)
-            if isinstance(value, str) and value.strip():
-                return value.strip()
-    return None
+        data = None
+    if isinstance(data, list):
+        for group in data:
+            if isinstance(group, dict):
+                tag = read_release_tag(str(group.get("detail") or ""))
+                if tag:
+                    return tag, "imagedata-release-tag"
+    version = (environ.get("ImageVersion") or "").strip()
+    if version:
+        return f"{image_family}/{version}", "ImageVersion-env"
+    return None, None
 
 
 def read_sdk_version(explicit):
@@ -99,16 +122,17 @@ def main(argv=None) -> int:
     imagedata_path = args.imagedata_path or os.path.join(
         os.path.expanduser("~"), "imagedata.json"
     )
-    version = read_image_version(os.environ, imagedata_path)
-    if version is None:
+    stamped, _source = read_image_identity(
+        os.environ, imagedata_path, args.image_family
+    )
+    if stamped is None:
         print(
-            "stamp_runner_environment: warning: image version "
-            "undeterminable (no ImageVersion env, no usable imagedata.json); "
-            "RunnerImage left absent",
+            "stamp_runner_environment: warning: image identity "
+            "undeterminable (no release tag in imagedata.json, no "
+            "ImageVersion env); RunnerImage left absent",
             file=sys.stderr,
         )
     else:
-        stamped = f"{args.image_family}/{version}"
         existing = metadata.get("RunnerImage")
         if (
             isinstance(existing, str)

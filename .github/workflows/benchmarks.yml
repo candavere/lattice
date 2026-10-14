@@ -135,15 +135,21 @@ jobs:
     # max/min there, too wide to separate a real regression from runner jitter,
     # so it is reported and never adjudicated. Recorded as a negative result in
     # docs/FINDINGS_LEDGER.md.
-    # The gate arms only on a full fingerprint match (OS family, architecture,
-    # .NET runtime major, logical cores, CPU model) and a matching recorded
-    # protocol; anything else degrades to an informational cross-host table.
+    # The gate arms only on an exact environment plus a full fingerprint
+    # match (OS family, architecture, .NET runtime major, logical cores, CPU
+    # model) and a matching recorded protocol: the fresh artifact's stamped
+    # RunnerImage must equal the record's, and the full Runtime strings must
+    # be equal (10.0.12 vs 10.0.13 does not match). Anything else is reported
+    # UNCALIBRATED (exit 0, no verdict), never passed or failed - a covered
+    # result means image+runtime match only, since the SDK is not recorded
+    # in the reference.
     #
     # The bounded retry is kept deliberately: a single re-measure clears a
     # transient dip, while a dip that persists across both passes is a real
     # signal. A pinned label is not a pinned image, so an image build that
-    # shifts throughput systematically will present here as a regression; the
-    # remedy is to re-collect the record (see benchmarks/runner_class_summary.md).
+    # shifts throughput systematically presents here as UNCALIBRATED, not as
+    # a regression; restoring enforcement needs a new valid cohort and
+    # separate baseline review (see benchmarks/runner_class_summary.md).
     name: Runner-class gate vs hosted-runner reference (macos-26 arm64)
     runs-on: macos-26
     steps:
@@ -167,6 +173,31 @@ jobs:
             --runs "$RUNS" --steps "$STEPS" --warmup "$WARMUP" \
             --out "$RUNNER_TEMP/runner-class.json"
 
+      # The fresh artifact must carry its actual image: the stamp only ADDS
+      # Metadata.RunnerImage/Sdk, never changes a measured number, and leaves
+      # RunnerImage absent (UNCALIBRATED downstream, never a pass) when the
+      # image cannot be determined. Refuses a conflicting overwrite.
+      - name: Stamp the measured runner environment
+        shell: bash
+        run: |
+          python3 .github/workflows/stamp_runner_environment.py \
+            --artifact "$RUNNER_TEMP/runner-class.json" \
+            --image-family macos-26-arm64
+
+      # Read-only environment evidence (no artifact writes): confirms which
+      # ImageOS/ImageVersion/imagedata.json values this runner provides so
+      # the stamp mapping stays honest. Secrets are never printed.
+      - name: Diagnose runner environment sources (read-only)
+        shell: bash
+        run: |
+          echo "ImageOS=${ImageOS:-<unset>}"
+          echo "ImageVersion=${ImageVersion:-<unset>}"
+          echo "RUNNER_ARCH=${RUNNER_ARCH:-<unset>}"
+          echo "RUNNER_OS=${RUNNER_OS:-<unset>}"
+          if [ -f ~/imagedata.json ]; then cat ~/imagedata.json; else echo "<no ~/imagedata.json>"; fi
+          dotnet --list-sdks | head -3
+          dotnet --list-runtimes | grep -i "NETCore" | head -3
+
       - name: Compare against the runner-class record (retry once on jitter)
         shell: bash
         run: |
@@ -183,7 +214,8 @@ jobs:
               --per-workload-threshold dynamic_contention_4agent=0.7804 \
               --per-workload-threshold stress_topology_4agent=0.8236 \
               --no-annotations \
-              --strict-if-matching
+              --strict-if-matching \
+              --require-exact-environment
           }
           FIRST="$(COMPARE)" && rc=0 || rc=$?
           if [ "$rc" -eq 0 ]; then
@@ -196,6 +228,9 @@ jobs:
           dotnet run -c Release --project Cli -- benchmark \
             --runs "$RUNS" --steps "$STEPS" --warmup "$WARMUP" \
             --out "$RUNNER_TEMP/runner-class.json"
+          python3 .github/workflows/stamp_runner_environment.py \
+            --artifact "$RUNNER_TEMP/runner-class.json" \
+            --image-family macos-26-arm64
           SECOND="$(COMPARE)" && rc=0 || rc=$?
           echo "$SECOND"
           exit "$rc"

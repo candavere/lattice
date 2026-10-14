@@ -196,6 +196,99 @@ class StampTests(unittest.TestCase):
         self.assertIn("warning", err.getvalue())
         self.assertIn("RunnerImage left absent", err.getvalue())
 
+    def _run_sdk(self, stdout="10.0.402\n", returncode=0, effect=None):
+        err = io.StringIO()
+        with mock.patch.object(
+            stamp.subprocess, "run",
+            return_value=mock.Mock(
+                returncode=returncode, stdout=stdout, stderr=""),
+        ) if effect is None else mock.patch.object(
+            stamp.subprocess, "run", side_effect=effect):
+            with redirect_stdout(io.StringIO()), redirect_stderr(err):
+                rc = stamp.main(
+                    [
+                        "--artifact", self.artifact,
+                        "--image-family", "macos-26-arm64",
+                        "--imagedata-path",
+                        os.path.join(self._tmp.name, "absent.json"),
+                    ]
+                )
+        return rc, err.getvalue()
+
+    def test_selected_sdk_wins_over_higher_installed(self):
+        # `dotnet --version` resolves the SDK the build actually uses;
+        # the max on disk would be a wrong claim under a floating pin.
+        # Any consultation of --list-sdks fails this test outright.
+        calls = []
+
+        def fake_run(argv, **kwargs):
+            calls.append(list(argv))
+            if argv[:2] == ["dotnet", "--version"]:
+                return mock.Mock(returncode=0, stdout="10.0.402\n",
+                                 stderr="")
+            raise AssertionError(f"must not consult {argv}")
+
+        env = {"HOME": self._tmp.name}
+        with mock.patch.dict(os.environ, env, clear=True):
+            with mock.patch.object(
+                stamp.subprocess, "run", side_effect=fake_run):
+                err = io.StringIO()
+                with redirect_stdout(io.StringIO()), redirect_stderr(err):
+                    rc = stamp.main(
+                        [
+                            "--artifact", self.artifact,
+                            "--image-family", "macos-26-arm64",
+                            "--imagedata-path",
+                            os.path.join(self._tmp.name, "absent.json"),
+                        ]
+                    )
+        self.assertEqual(rc, 0)
+        self.assertEqual(self._read()["Metadata"].get("Sdk"), "10.0.402")
+        self.assertTrue(all(c[:2] == ["dotnet", "--version"] for c in calls))
+
+    def test_sdk_absent_with_warning_when_dotnet_fails(self):
+        env = {"HOME": self._tmp.name}
+        with mock.patch.dict(os.environ, env, clear=True):
+            rc, err = self._run_sdk(effect=OSError("no dotnet"))
+        # _run_sdk patches run; re-run inline for env clarity
+        self.assertEqual(rc, 0)
+        self.assertNotIn("Sdk", self._read()["Metadata"])
+        self.assertIn("warning", err)
+
+    def test_sdk_absent_when_output_unparseable(self):
+        env = {"HOME": self._tmp.name}
+        with mock.patch.dict(os.environ, env, clear=True):
+            rc, err = self._run_sdk(stdout="not a version\n")
+        self.assertEqual(rc, 0)
+        self.assertNotIn("Sdk", self._read()["Metadata"])
+        self.assertIn("unparseable", err)
+
+    def test_refuses_conflicting_sdk_overwrite(self):
+        artifact = sample_artifact()
+        artifact["Metadata"]["Sdk"] = "10.0.100"
+        with open(self.artifact, "w", encoding="utf-8") as handle:
+            json.dump(artifact, handle)
+        before = open(self.artifact, encoding="utf-8").read()
+        env = {"HOME": self._tmp.name}
+        with mock.patch.dict(os.environ, env, clear=True):
+            with mock.patch.object(
+                stamp.subprocess, "run",
+                return_value=mock.Mock(
+                    returncode=0, stdout="10.0.402\n", stderr="")):
+                err = io.StringIO()
+                with redirect_stdout(io.StringIO()), redirect_stderr(err):
+                    rc = stamp.main(
+                        [
+                            "--artifact", self.artifact,
+                            "--image-family", "macos-26-arm64",
+                            "--imagedata-path",
+                            os.path.join(self._tmp.name, "absent.json"),
+                        ]
+                    )
+        self.assertEqual(rc, 2)
+        self.assertIn("refusing to overwrite", err.getvalue())
+        self.assertEqual(open(self.artifact, encoding="utf-8").read(), before)
+
     def test_malformed_artifact_fails_loudly(self):
         with open(self.artifact, "w", encoding="utf-8") as handle:
             handle.write("{not json")

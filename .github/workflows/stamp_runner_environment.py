@@ -17,12 +17,15 @@ Fail-closed rules: an existing differing value is never overwritten (exit 2,
 file untouched); when the image cannot be determined, ``RunnerImage`` stays
 absent and a warning goes to stderr (the comparator then reports
 UNCALIBRATED instead of adjudicating); a malformed artifact fails loudly.
-The SDK is informational only and is never compared by the gate.
+The SDK is the selected SDK (`dotnet --version` from the repo
+working directory, honoring global.json), informational only and never
+compared by the gate. If it cannot be determined, Sdk stays absent.
 """
 
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 
@@ -65,27 +68,50 @@ def read_image_identity(environ, imagedata_path, image_family):
     return None, None
 
 
+def looks_like_version(text) -> bool:
+    """Trimmed `dotnet --version` output counts only if version-shaped."""
+    return re.match(r"\d+\.\d+\.\d+", text.strip() or "") is not None
+
+
 def read_sdk_version(explicit):
-    """The SDK version: explicit --sdk wins, else `dotnet --list-sdks` max."""
+    """The selected SDK: explicit --sdk wins, else `dotnet --version`.
+
+    Never the max installed SDK: with a floating `dotnet-version` the
+    selected SDK can differ from the highest one on disk, so writing the
+    max would be a wrong claim. Unparseable output leaves Sdk absent.
+    """
     if explicit and explicit.strip():
         return explicit.strip()
     try:
         proc = subprocess.run(
-            ["dotnet", "--list-sdks"], capture_output=True, text=True, timeout=60
+            ["dotnet", "--version"], capture_output=True, text=True, timeout=60
         )
     except (OSError, subprocess.SubprocessError):
+        print(
+            "stamp_runner_environment: warning: `dotnet --version` failed; "
+            "Sdk left absent",
+            file=sys.stderr,
+        )
         return None
     if proc.returncode != 0:
+        print(
+            "stamp_runner_environment: warning: `dotnet --version` failed; "
+            "Sdk left absent",
+            file=sys.stderr,
+        )
         return None
-    versions = []
-    for line in proc.stdout.splitlines():
-        token = line.split()[0] if line.split() else ""
-        parts = token.split(".")
-        if len(parts) >= 3 and all(p.isdigit() for p in parts[:3]):
-            versions.append(token)
-    if not versions:
+    version = (proc.stdout or "").strip().splitlines()
+    version = version[0].strip() if version else ""
+    if not looks_like_version(version):
+        print(
+            "stamp_runner_environment: warning: `dotnet --version` output "
+            "unparseable; Sdk left absent",
+            file=sys.stderr,
+        )
         return None
-    return sorted(versions, key=lambda v: [int(p) for p in v.split(".")[:3]])[-1]
+    return version
+
+
 
 
 def main(argv=None) -> int:

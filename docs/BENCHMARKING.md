@@ -180,6 +180,19 @@ by single heavy decisions, and its iteration budget is small by design.
   A malformed artifact (non-finite or non-positive throughput/latency) fails
   even in an uncalibrated environment — an uncovered environment excuses a
   throughput verdict, never a corrupt measurement.
+  One shared structural layer (`validate_structure` in
+  `compare_benchmarks.py`) checks both artifacts on every path before any
+  fingerprinting, formatting or arithmetic: required medians and latencies
+  must be finite and greater than zero; supplied means, dispersions,
+  allocations and latencies must be finite (means positive, the rest
+  non-negative, so zero dispersion is valid); supplied protocol counts must
+  be positive integers and GC totals non-negative integers; supplied
+  `Cores`/`RamBytes` must be positive integers. Absent optional fields keep
+  their existing fallback behavior, and absent host fields keep the existing
+  cross-host classification outside smoke. Duplicate or missing workload
+  names and malformed containers fail with side/workload/field diagnostics
+  instead of a traceback. Valid data is unaffected: derivation, override
+  precedence, coverage, arming and all exit codes are unchanged.
   Tolerances were derived from the *measured between-run* spread rather
   than from within-run sample dispersion, which on this host class reads
   1.9–2.3× too tight for three of the five workloads.

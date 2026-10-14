@@ -9,6 +9,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - Runner-class gate now reports `UNCALIBRATED` (no verdict) instead of passing or failing when the measured image/runtime differs from the reference record. Hardened: a malformed artifact (non-finite or non-positive throughput/latency) now fails even in an uncalibrated environment, and the SDK stamp records the selected SDK from `dotnet --version` instead of the highest installed one.
+- Benchmark comparator now validates artifact structure (finite metrics, counts, names, containers) on both sides before any verdict on every path.
 
 ### Added
 

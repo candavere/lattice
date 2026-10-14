@@ -242,7 +242,7 @@ function Invoke-LatticeInstall {
         New-Item -ItemType Directory -Force -Path $packDir | Out-Null
         try {
             Write-Host "Packing the CLI (version $ver)..."
-            & dotnet pack Cli -c Release --output $packDir
+            & dotnet pack Cli -c Release --output $packDir --disable-build-servers
             if ($LASTEXITCODE -ne 0) {
                 Write-Error "dotnet pack failed; removing only this run's temp pack folder."
                 return 1

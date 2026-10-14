@@ -708,5 +708,148 @@ class RunnerClassGateTests(ComparatorTestCase):
         self.assertIn("missing workloads", out)
 
 
+ARMED_FOUR = [n for n in CANONICAL_NAMES if n != "policy_lookahead_mcts_32"]
+
+# The workflow's exact per-workload thresholds for the runner-class gate.
+RUNNER_CLASS_THRESHOLDS = [
+    "--per-workload-threshold", "micro_raw_2agent=0.7914",
+    "--per-workload-threshold", "facility_static_4agent=0.8416",
+    "--per-workload-threshold", "dynamic_contention_4agent=0.7804",
+    "--per-workload-threshold", "stress_topology_4agent=0.8236",
+]
+
+
+class ExactEnvironmentGateTests(ComparatorTestCase):
+    """--require-exact-environment (runner-class gate only): strict arming
+    additionally requires the baseline's RunnerImage and the current
+    RunnerImage both present and equal, and the full Runtime strings equal.
+    Anything else is UNCALIBRATED (exit 0, no verdict), never a pass."""
+
+    def covered(self, factor=1.0):
+        return (runner_artifact(armed=ARMED_FOUR),
+                runner_artifact(factor=factor))
+
+    def test_covered_healthy_environment_passes_strict(self):
+        base, curr = self.covered()
+        rc, out, err = self.run_comparator(
+            base, curr, "--strict-if-matching",
+            "--require-exact-environment", *RUNNER_CLASS_THRESHOLDS)
+        self.assertEqual(rc, 0)
+        self.assertIn("strict gate armed: True", out)
+        self.assertIn("strict comparison passed", out)
+        self.assertNotIn("UNCALIBRATED", out)
+        self.assertNotIn("::error::", out)
+
+    def test_covered_environment_regression_still_fails(self):
+        base, curr = self.covered(factor=0.5)
+        rc, out, err = self.run_comparator(
+            base, curr, "--strict-if-matching",
+            "--require-exact-environment", *RUNNER_CLASS_THRESHOLDS)
+        self.assertEqual(rc, 1)
+        self.assertIn("strict gate armed: True", out)
+        self.assertIn("workload regression on a matching host", out)
+        self.assertIn("::error::", out)
+
+    def test_runtime_patch_difference_is_uncalibrated(self):
+        base, curr = self.covered(factor=0.5)
+        curr["Metadata"]["Runtime"] = ".NET 10.0.13"
+        rc, out, err = self.run_comparator(
+            base, curr, "--strict-if-matching",
+            "--require-exact-environment", *RUNNER_CLASS_THRESHOLDS)
+        self.assertEqual(rc, 0)
+        self.assertIn("environment classification: UNCALIBRATED", out)
+        self.assertIn(".NET 10.0.12", out)
+        self.assertIn(".NET 10.0.13", out)
+        self.assertIn("strict gate armed: False", out)
+        self.assertNotIn("strict comparison passed", out)
+        self.assertNotIn("workload regression", out)
+        self.assertNotIn("::error::", out)
+
+    def test_different_image_is_uncalibrated_naming_both(self):
+        base, curr = self.covered(factor=0.5)
+        curr["Metadata"]["RunnerImage"] = "macos-26-arm64/20261013.0424"
+        rc, out, err = self.run_comparator(
+            base, curr, "--strict-if-matching",
+            "--require-exact-environment", *RUNNER_CLASS_THRESHOLDS)
+        self.assertEqual(rc, 0)
+        self.assertIn("environment classification: UNCALIBRATED", out)
+        self.assertIn("macos-26-arm64/20260907.0351", out)
+        self.assertIn("macos-26-arm64/20261013.0424", out)
+        self.assertIn("strict gate armed: False", out)
+        self.assertNotIn("strict comparison passed", out)
+        self.assertNotIn("::error::", out)
+
+    def test_missing_current_image_is_uncalibrated(self):
+        base, curr = self.covered(factor=2.0)
+        curr["Metadata"].pop("RunnerImage")
+        rc, out, err = self.run_comparator(
+            base, curr, "--strict-if-matching",
+            "--require-exact-environment", *RUNNER_CLASS_THRESHOLDS)
+        self.assertEqual(rc, 0)
+        self.assertIn("environment classification: UNCALIBRATED", out)
+        self.assertIn("current RunnerImage missing", out)
+        self.assertIn("strict gate armed: False", out)
+        self.assertNotIn("strict comparison passed", out)
+
+    def test_missing_baseline_image_is_uncalibrated(self):
+        base, curr = self.covered()
+        base["Metadata"].pop("RunnerImage")
+        rc, out, err = self.run_comparator(
+            base, curr, "--strict-if-matching",
+            "--require-exact-environment", *RUNNER_CLASS_THRESHOLDS)
+        self.assertEqual(rc, 0)
+        self.assertIn("environment classification: UNCALIBRATED", out)
+        self.assertIn("baseline RunnerImage missing", out)
+        self.assertNotIn("strict comparison passed", out)
+
+    def test_missing_image_without_flag_behaves_as_today(self):
+        base, curr = self.covered(factor=2.0)
+        curr["Metadata"].pop("RunnerImage")
+        rc, out, err = self.run_comparator(
+            base, curr, "--strict-if-matching", *RUNNER_CLASS_THRESHOLDS)
+        self.assertEqual(rc, 0)
+        self.assertIn("fingerprint match: True", out)
+        self.assertIn("strict comparison passed", out)
+        self.assertNotIn("UNCALIBRATED", out)
+
+    def test_structural_failure_is_not_masked_by_uncalibrated(self):
+        base, curr = self.covered()
+        curr["Metadata"].pop("RunnerImage")
+        curr["Workloads"] = [w for w in curr["Workloads"]
+                             if w["Name"] != "stress_topology_4agent"]
+        rc, out, err = self.run_comparator(
+            base, curr, "--strict-if-matching",
+            "--require-exact-environment", *RUNNER_CLASS_THRESHOLDS)
+        self.assertEqual(rc, 1)
+        self.assertIn("missing workloads", out)
+
+    def test_zero_median_is_not_masked_by_uncalibrated(self):
+        base, curr = self.covered()
+        curr["Metadata"].pop("RunnerImage")
+        for workload in curr["Workloads"]:
+            if workload["Name"] == "micro_raw_2agent":
+                workload["MedianThroughputPerSecond"] = 0
+        rc, out, err = self.run_comparator(
+            base, curr, "--strict-if-matching",
+            "--require-exact-environment", *RUNNER_CLASS_THRESHOLDS)
+        self.assertEqual(rc, 1)
+        self.assertIn("micro_raw_2agent", out)
+        self.assertIn("::error::", out)
+
+    def test_informational_workload_never_fails_either_way(self):
+        armed = ARMED_FOUR
+        rows = [(name,
+                 median * (0.5 if name == "policy_lookahead_mcts_32" else 1.0),
+                 stddev, latency, alloc)
+                for name, median, stddev, latency, alloc in BASELINE_ROWS]
+        for extra in (["--require-exact-environment"], []):
+            with self.subTest(flag=extra):
+                rc, out, err = self.run_comparator(
+                    runner_artifact(armed=armed), runner_artifact(rows=rows),
+                    "--strict-if-matching", *extra)
+                self.assertEqual(rc, 0)
+                self.assertIn("does not fail this gate", out)
+
+
 if __name__ == "__main__":
     unittest.main()

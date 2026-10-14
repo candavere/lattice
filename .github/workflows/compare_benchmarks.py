@@ -63,6 +63,7 @@ retry pass.
 
 import argparse
 import json
+import os
 import sys
 from dataclasses import dataclass
 
@@ -151,6 +152,9 @@ def describe_fingerprint(meta) -> str:
     image = _string_component(meta, "RunnerImage")
     if image:
         text += f" / image {image}"
+    sdk = _string_component(meta, "Sdk")
+    if sdk:
+        text += f" / SDK {sdk}"
     return text
 
 
@@ -200,6 +204,35 @@ def compare_optional_image(base_meta, curr_meta):
     if base and curr:
         return base.casefold() == curr.casefold(), base, curr
     return True, base, curr
+
+
+def compare_exact_environment(base_meta, curr_meta):
+    """Exact environment coverage for gates that opt in with
+    --require-exact-environment.
+
+    Covered only when the baseline's RunnerImage AND the current RunnerImage
+    are both present and equal (trimmed, case-folded) AND the full Runtime
+    strings are both present and equal (so 10.0.12 vs 10.0.13 does not
+    match). Missing on either side is not covered. Returns
+    (covered, reasons): reasons names every mismatch for the report.
+    """
+    reasons = []
+    base_image = _string_component(base_meta, "RunnerImage")
+    curr_image = _string_component(curr_meta, "RunnerImage")
+    if base_image is None:
+        reasons.append("baseline RunnerImage missing")
+    if curr_image is None:
+        reasons.append("current RunnerImage missing")
+    if (base_image is not None and curr_image is not None
+            and base_image.casefold() != curr_image.casefold()):
+        reasons.append(f"image {base_image} vs {curr_image}")
+    base_rt = _string_component(base_meta, "Runtime")
+    curr_rt = _string_component(curr_meta, "Runtime")
+    if base_rt is None or curr_rt is None:
+        reasons.append("runtime missing")
+    elif base_rt != curr_rt:
+        reasons.append(f"runtime {base_rt} vs {curr_rt}")
+    return (not reasons), tuple(reasons)
 
 
 def compare_protocol(base_work, curr_work):
@@ -431,6 +464,17 @@ def build_parser() -> argparse.ArgumentParser:
                              "fingerprint (OS family + architecture + runtime "
                              "major + logical cores + CPU model) matches the "
                              "baseline")
+    parser.add_argument("--require-exact-environment", action="store_true",
+                        help="additionally require the exact measured "
+                             "environment before adjudicating throughput: "
+                             "the baseline's RunnerImage and the current "
+                             "RunnerImage must both be present and equal, "
+                             "and the full Runtime strings must both be "
+                             "present and equal. A measurement from an "
+                             "environment the reference does not cover is "
+                             "reported UNCALIBRATED (exit 0, no verdict), "
+                             "never passed or failed. Without this flag "
+                             "behaviour is unchanged.")
     parser.add_argument("--per-workload-threshold", action="append",
                         default=[], metavar="NAME=RATIO",
                         help="override the threshold for one workload as "
@@ -525,6 +569,81 @@ def main(argv=None) -> int:
                 "the baseline record arms workloads that are not in its own "
                 f"workload matrix: {sorted(unknown)}")
             return 1
+
+    exact_covered, exact_reasons = compare_exact_environment(
+        base_meta, curr_meta)
+    if args.require_exact_environment and not exact_covered:
+        # Structural failures must not be masked by an uncovered
+        # environment: a degenerate measurement fails here, exactly as a
+        # regression would fail a covered one.
+        degenerate = [
+            (name, curr_work[name].get("MedianThroughputPerSecond") or 0.0)
+            for name in sorted(base_work)
+            if (curr_work[name].get("MedianThroughputPerSecond") or 0.0) <= 0
+        ]
+        if degenerate:
+            print(f"baseline fingerprint: {describe_fingerprint(base_meta)}")
+            print(f"current fingerprint : {describe_fingerprint(curr_meta)}")
+            print("environment classification: UNCALIBRATED - "
+                  f"{'; '.join(exact_reasons)}. No throughput verdict was made.")
+            print()
+            emit_error(
+                "degenerate measurement on an uncalibrated environment:")
+            for name, value in degenerate:
+                emit_error(
+                    f"{name}: MedianThroughputPerSecond must be positive, "
+                    f"got {value:g}.")
+            return 1
+        print(f"baseline fingerprint: {describe_fingerprint(base_meta)}")
+        print(f"current fingerprint : {describe_fingerprint(curr_meta)}")
+        print(f"fingerprint match: {matched}  (strict gate armed: False)")
+        if _string_component(base_meta, "Sdk") is None:
+            print("SDK: not recorded in the reference - a covered result "
+                  "means image+runtime match only, not full toolchain "
+                  "equivalence")
+        if per_workload:
+            print(f"per-workload thresholds: "
+                  f"{', '.join(f'{n}={v:g}' for n, v in sorted(per_workload.items()))}")
+        if armed is None:
+            print("armed workloads: all (the baseline record declares no "
+                  "Provenance.ArmedWorkloads set)")
+        else:
+            print(f"armed workloads (from the baseline record's "
+                  f"Provenance.ArmedWorkloads): {', '.join(sorted(armed))}")
+        print()
+        print("environment classification: UNCALIBRATED - "
+              f"{'; '.join(exact_reasons)}. Covered on image+runtime only "
+              "when both match; SDK not recorded in the reference. "
+              "No throughput verdict was made.")
+        print()
+        header = (f"{'workload':<28}{'baseline median':>16}"
+                  f"{'current median':>16}{'ratio':>9}{'verdict':>18}")
+        print(header)
+        for row in comparison.rows:
+            print(f"{row.name:<28}{row.base_value:>16,.0f}"
+                  f"{row.curr_value:>16,.0f}{row.ratio:>9.3f}{'uncalibrated':>18}")
+        print()
+        print("ratios above are informational only: the measured environment "
+              "is not the one the reference record covers, so no throughput "
+              "verdict was made.")
+        summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+        if summary_path:
+            try:
+                with open(summary_path, "a", encoding="utf-8") as summary:
+                    summary.write(
+                        "environment classification: UNCALIBRATED - "
+                        f"{'; '.join(exact_reasons)}. Covered on "
+                        "image+runtime only when both match; SDK not "
+                        "recorded in the reference. No throughput verdict "
+                        "was made.\n")
+            except OSError:
+                pass
+        return 0
+
+    if (args.require_exact_environment
+            and _string_component(base_meta, "Sdk") is None):
+        print("SDK: not recorded in the reference - a covered result "
+              "means image+runtime match only, not full toolchain equivalence")
 
     print(f"baseline fingerprint: {describe_fingerprint(base_meta)}")
     print(f"current fingerprint : {describe_fingerprint(curr_meta)}")

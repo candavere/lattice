@@ -400,16 +400,38 @@ function Invoke-LatticeUninstall {
             $raw = $regKey.GetValue('Path', '', 'DoNotExpandEnvironmentNames')
             if ($null -eq $raw) { $raw = '' }
             if (-not $doc.path.alreadyExisted) {
-                $kept = @($raw -split ';' | Where-Object { -not $_.Equals($owned, [StringComparison]::OrdinalIgnoreCase) })
-                $had = @($raw -split ';' | Where-Object { $_.Equals($owned, [StringComparison]::OrdinalIgnoreCase) })
-                if ($had.Count -eq 0) {
+                $allEntries = @($raw -split ';')
+                $hadCount = @($allEntries | Where-Object { $_.Equals($owned, [StringComparison]::OrdinalIgnoreCase) }).Count
+                if ($hadCount -eq 0) {
                     Write-Error "the user PATH entry we added is already gone; leaving the registry for inspection."
                     $regKey.Close()
                     return 1
                 }
-                $expected = $kept -join ';'
-                if ($raw.EndsWith(';') -and $expected.Length -gt 0) {
-                    $expected = $expected + ';'
+                # Remove exactly the entry this script added, preserving the
+                # original layout (including a trailing ';' the canonical
+                # Install step preserved) instead of re-joining all entries.
+                if ($raw.Equals($owned, [StringComparison]::OrdinalIgnoreCase)) {
+                    $expected = ''
+                }
+                elseif ($raw.EndsWith((';' + $owned), [StringComparison]::OrdinalIgnoreCase)) {
+                    $expected = $raw.Substring(0, $raw.Length - $owned.Length - 1)
+                }
+                elseif ($raw.StartsWith(($owned + ';'), [StringComparison]::OrdinalIgnoreCase)) {
+                    $expected = $raw.Substring($owned.Length + 1)
+                }
+                else {
+                    $needle = ';' + $owned + ';'
+                    $idx = $raw.IndexOf($needle, [StringComparison]::OrdinalIgnoreCase)
+                    if ($idx -ge 0) {
+                        $expected = $raw.Substring(0, $idx + 1) + $raw.Substring($idx + $needle.Length)
+                    }
+                    else {
+                        $kept = @($raw -split ';' | Where-Object { -not $_.Equals($owned, [StringComparison]::OrdinalIgnoreCase) })
+                        $expected = $kept -join ';'
+                        if ($raw.EndsWith(';') -and $expected.Length -gt 0) {
+                            $expected = $expected + ';'
+                        }
+                    }
                 }
                 try { $kind = $regKey.GetValueKind('Path') } catch { $kind = [Microsoft.Win32.RegistryValueKind]::String }
                 $regKey.SetValue('Path', $expected, $kind)

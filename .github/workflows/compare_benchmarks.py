@@ -63,6 +63,7 @@ retry pass.
 
 import argparse
 import json
+import math
 import os
 import sys
 from dataclasses import dataclass
@@ -165,6 +166,43 @@ def _string_component(meta, key):
         return None
     text = str(value).strip()
     return text or None
+
+
+def is_finite_positive(value) -> bool:
+    """A metric is valid only if a real, finite number greater than 0.
+
+    Rejects bools, non-numeric values, NaN, +/-inf, and anything <= 0, so a
+    corrupt measurement cannot slip through a path that skips adjudication.
+    """
+    if isinstance(value, bool):
+        return False
+    if not isinstance(value, (int, float)):
+        return False
+    return math.isfinite(value) and value > 0
+
+
+def describe_invalid_metric(value) -> str:
+    """Printable form of a rejected metric for error messages."""
+    if value is None:
+        return "missing"
+    if isinstance(value, float) and math.isnan(value):
+        return "nan"
+    if isinstance(value, float) and math.isinf(value):
+        return "inf" if value > 0 else "-inf"
+    try:
+        return f"{value:g}"
+    except (TypeError, ValueError):
+        return repr(value)
+
+
+def metric_error(name, field, value) -> str:
+    """The error line for an invalid metric, keeping the legacy wording for
+    finite non-positive numbers and naming non-finite values explicitly."""
+    if (isinstance(value, (int, float)) and not isinstance(value, bool)
+            and math.isfinite(value)):
+        return f"{name}: {field} must be positive, got {value:g}."
+    return (f"{name}: {field} must be a finite positive number, "
+            f"got {describe_invalid_metric(value)}.")
 
 
 @dataclass(frozen=True)
@@ -411,15 +449,17 @@ def smoke_check(baseline, current) -> SmokeCheck:
     rows = []
     for name in sorted(curr_work):
         workload = curr_work[name]
-        median = workload.get("MedianThroughputPerSecond") or 0.0
-        latency = workload.get("MedianStepLatencyMicros") or 0.0
-        rows.append((name, median, latency, workload.get("AllocationsPerStepBytes")))
-        if median <= 0:
-            errors.append(
-                f"{name}: MedianThroughputPerSecond must be positive, got {median:g}.")
-        if latency <= 0:
-            errors.append(
-                f"{name}: MedianStepLatencyMicros must be positive, got {latency:g}.")
+        median = workload.get("MedianThroughputPerSecond")
+        latency = workload.get("MedianStepLatencyMicros")
+        rows.append((name, median if is_finite_positive(median) else 0.0,
+                     latency if is_finite_positive(latency) else 0.0,
+                     workload.get("AllocationsPerStepBytes")))
+        if not is_finite_positive(median):
+            errors.append(metric_error(
+                name, "MedianThroughputPerSecond", median))
+        if not is_finite_positive(latency):
+            errors.append(metric_error(
+                name, "MedianStepLatencyMicros", latency))
 
     if (curr_meta.get("RamBytes") or 0) <= 0:
         errors.append("Metadata.RamBytes must be positive.")
@@ -573,34 +613,32 @@ def main(argv=None) -> int:
     exact_covered, exact_reasons = compare_exact_environment(
         base_meta, curr_meta)
     if args.require_exact_environment and not exact_covered:
-        # Structural failures must not be masked by an uncovered
-        # environment: a degenerate measurement fails here, exactly as a
-        # regression would fail a covered one.
-        degenerate = [
-            (name, curr_work[name].get("MedianThroughputPerSecond") or 0.0)
-            for name in sorted(base_work)
-            if (curr_work[name].get("MedianThroughputPerSecond") or 0.0) <= 0
-        ]
-        if degenerate:
+        # Malformed data must not be masked by an uncovered environment: a
+        # corrupt measurement fails here, over every baseline workload
+        # including informational ones, exactly as a regression would fail
+        # a covered one.
+        malformed = []
+        for name in sorted(base_work):
+            workload = curr_work[name]
+            for field in ("MedianThroughputPerSecond",
+                          "MedianStepLatencyMicros"):
+                value = workload.get(field)
+                if not is_finite_positive(value):
+                    malformed.append(metric_error(name, field, value))
+        if malformed:
             print(f"baseline fingerprint: {describe_fingerprint(base_meta)}")
             print(f"current fingerprint : {describe_fingerprint(curr_meta)}")
             print("environment classification: UNCALIBRATED - "
-                  f"{'; '.join(exact_reasons)}. No throughput verdict was made.")
+                  f"{'; '.join(exact_reasons)}.")
             print()
             emit_error(
-                "degenerate measurement on an uncalibrated environment:")
-            for name, value in degenerate:
-                emit_error(
-                    f"{name}: MedianThroughputPerSecond must be positive, "
-                    f"got {value:g}.")
+                "malformed measurement on an uncalibrated environment:")
+            for message in malformed:
+                emit_error(message)
             return 1
         print(f"baseline fingerprint: {describe_fingerprint(base_meta)}")
         print(f"current fingerprint : {describe_fingerprint(curr_meta)}")
         print(f"fingerprint match: {matched}  (strict gate armed: False)")
-        if _string_component(base_meta, "Sdk") is None:
-            print("SDK: not recorded in the reference - a covered result "
-                  "means image+runtime match only, not full toolchain "
-                  "equivalence")
         if per_workload:
             print(f"per-workload thresholds: "
                   f"{', '.join(f'{n}={v:g}' for n, v in sorted(per_workload.items()))}")
@@ -612,9 +650,7 @@ def main(argv=None) -> int:
                   f"Provenance.ArmedWorkloads): {', '.join(sorted(armed))}")
         print()
         print("environment classification: UNCALIBRATED - "
-              f"{'; '.join(exact_reasons)}. Covered on image+runtime only "
-              "when both match; SDK not recorded in the reference. "
-              "No throughput verdict was made.")
+              f"{'; '.join(exact_reasons)}. No throughput verdict was made.")
         print()
         header = (f"{'workload':<28}{'baseline median':>16}"
                   f"{'current median':>16}{'ratio':>9}{'verdict':>18}")
@@ -632,9 +668,7 @@ def main(argv=None) -> int:
                 with open(summary_path, "a", encoding="utf-8") as summary:
                     summary.write(
                         "environment classification: UNCALIBRATED - "
-                        f"{'; '.join(exact_reasons)}. Covered on "
-                        "image+runtime only when both match; SDK not "
-                        "recorded in the reference. No throughput verdict "
+                        f"{'; '.join(exact_reasons)}. No throughput verdict "
                         "was made.\n")
             except OSError:
                 pass

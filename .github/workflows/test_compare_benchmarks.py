@@ -836,6 +836,104 @@ class ExactEnvironmentGateTests(ComparatorTestCase):
         self.assertIn("micro_raw_2agent", out)
         self.assertIn("::error::", out)
 
+    def test_uncovered_throughput_nan_fails(self):
+        base, curr = self.covered()
+        curr["Metadata"]["RunnerImage"] = "macos-26-arm64/20261013.0424"
+        for workload in curr["Workloads"]:
+            if workload["Name"] == "micro_raw_2agent":
+                workload["MedianThroughputPerSecond"] = float("nan")
+        rc, out, err = self.run_comparator(
+            base, curr, "--strict-if-matching",
+            "--require-exact-environment", *RUNNER_CLASS_THRESHOLDS)
+        self.assertEqual(rc, 1)
+        self.assertIn("micro_raw_2agent", out)
+        self.assertIn("::error::", out)
+        self.assertNotIn("No throughput verdict was made", out)
+
+    def test_uncovered_throughput_inf_fails(self):
+        base, curr = self.covered()
+        curr["Metadata"]["RunnerImage"] = "macos-26-arm64/20261013.0424"
+        for workload in curr["Workloads"]:
+            if workload["Name"] == "facility_static_4agent":
+                workload["MedianThroughputPerSecond"] = float("inf")
+        rc, out, err = self.run_comparator(
+            base, curr, "--strict-if-matching",
+            "--require-exact-environment", *RUNNER_CLASS_THRESHOLDS)
+        self.assertEqual(rc, 1)
+        self.assertIn("facility_static_4agent", out)
+        self.assertIn("finite", out)
+        self.assertNotIn("No throughput verdict was made", out)
+
+    def test_uncovered_bad_latency_fails(self):
+        bad_values = [0, -1.5, float("nan"), float("inf")]
+        for bad in bad_values:
+            with self.subTest(latency=bad):
+                base, curr = self.covered()
+                curr["Metadata"]["RunnerImage"] = (
+                    "macos-26-arm64/20261013.0424")
+                for workload in curr["Workloads"]:
+                    if workload["Name"] == "stress_topology_4agent":
+                        workload["MedianStepLatencyMicros"] = bad
+                rc, out, err = self.run_comparator(
+                    base, curr, "--strict-if-matching",
+                    "--require-exact-environment", *RUNNER_CLASS_THRESHOLDS)
+                self.assertEqual(rc, 1)
+                self.assertIn("stress_topology_4agent", out)
+                self.assertIn("::error::", out)
+                self.assertNotIn("No throughput verdict was made", out)
+
+    def test_uncovered_missing_latency_fails(self):
+        base, curr = self.covered()
+        curr["Metadata"]["RunnerImage"] = "macos-26-arm64/20261013.0424"
+        for workload in curr["Workloads"]:
+            if workload["Name"] == "dynamic_contention_4agent":
+                workload.pop("MedianStepLatencyMicros")
+        rc, out, err = self.run_comparator(
+            base, curr, "--strict-if-matching",
+            "--require-exact-environment", *RUNNER_CLASS_THRESHOLDS)
+        self.assertEqual(rc, 1)
+        self.assertIn("dynamic_contention_4agent", out)
+        self.assertNotIn("No throughput verdict was made", out)
+
+    def test_uncovered_invalid_informational_workload_fails(self):
+        base, curr = self.covered()
+        curr["Metadata"]["RunnerImage"] = "macos-26-arm64/20261013.0424"
+        for workload in curr["Workloads"]:
+            if workload["Name"] == "policy_lookahead_mcts_32":
+                workload["MedianThroughputPerSecond"] = float("nan")
+        rc, out, err = self.run_comparator(
+            base, curr, "--strict-if-matching",
+            "--require-exact-environment", *RUNNER_CLASS_THRESHOLDS)
+        self.assertEqual(rc, 1)
+        self.assertIn("policy_lookahead_mcts_32", out)
+        self.assertIn("::error::", out)
+
+    def test_uncovered_valid_measurement_is_uncalibrated(self):
+        base, curr = self.covered(factor=0.5)
+        curr["Metadata"]["RunnerImage"] = "macos-26-arm64/20261013.0424"
+        rc, out, err = self.run_comparator(
+            base, curr, "--strict-if-matching",
+            "--require-exact-environment", *RUNNER_CLASS_THRESHOLDS)
+        self.assertEqual(rc, 0)
+        self.assertIn("environment classification: UNCALIBRATED", out)
+        self.assertIn("No throughput verdict was made", out)
+        self.assertNotIn("strict comparison passed", out)
+        self.assertNotIn("::error::", out)
+
+    def test_uncovered_classification_states_reasons_only(self):
+        base, curr = self.covered()
+        curr["Metadata"]["RunnerImage"] = "macos-26-arm64/20261013.0424"
+        rc, out, err = self.run_comparator(
+            base, curr, "--strict-if-matching",
+            "--require-exact-environment", *RUNNER_CLASS_THRESHOLDS)
+        self.assertEqual(rc, 0)
+        self.assertIn(
+            "environment classification: UNCALIBRATED - "
+            "image macos-26-arm64/20260907.0351 vs "
+            "macos-26-arm64/20261013.0424. No throughput verdict was made.",
+            out)
+        self.assertNotIn("Covered on image+runtime only", out)
+
     def test_informational_workload_never_fails_either_way(self):
         armed = ARMED_FOUR
         rows = [(name,

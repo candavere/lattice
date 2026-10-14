@@ -167,8 +167,16 @@ by single heavy decisions, and its iteration budget is small by design.
   every run's own image-release line reads `macos-26-arm64/20260907.0351`).
   The strict verdict needs the full fingerprint — OS family, architecture,
   .NET runtime major, logical cores, CPU model — **and** a matching recorded
-  protocol, so a shortened or smoke budget can never be adjudicated against
-  it. Tolerances were derived from the *measured between-run* spread rather
+  protocol, **and** the exact measured environment: the fresh artifact's
+  stamped runner image must equal the record's
+  (`macos-26-arm64/20260907.0351`) and the full .NET runtime strings must be
+  equal, so 10.0.12 vs 10.0.13 does not match
+  (`--require-exact-environment`, runner-class job only). A measurement from
+  any other image or runtime string is reported `UNCALIBRATED` (exit 0, no
+  throughput verdict), never passed or failed — a covered result means
+  image+runtime match only, since the SDK version is not recorded in the
+  reference. Restoring performance enforcement on a new environment needs a
+  new valid cohort and separate baseline review, not a relaxed threshold. Tolerances were derived from the *measured between-run* spread rather
   than from within-run sample dispersion, which on this host class reads
   1.9–2.3× too tight for three of the five workloads.
   **This gate adjudicates four of the five workloads.** The pre-registered

@@ -5,6 +5,7 @@ All notable changes to Lattice are recorded here. The format follows
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- Runner-class gate now reports `UNCALIBRATED` (no verdict) instead of passing or failing when the measured image/runtime differs from the reference record.
 
 ### Added
 

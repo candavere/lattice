@@ -116,7 +116,7 @@ function Test-LatticeManifest {
             $want = @('kind', 'file', 'block', 'existed', 'size', 'sha256')
         }
         elseif ($kind -eq 'user-env-path') {
-            $want = @('kind', 'entry', 'alreadyExisted')
+            $want = @('kind', 'entry', 'alreadyExisted', 'trailingSemicolon')
         }
         else {
             Write-Error "manifest path record has an unknown kind"
@@ -295,10 +295,12 @@ function Invoke-LatticeInstall {
                     $already = $true
                 }
             }
+            $trailingSemicolon = $regRaw.EndsWith(';')
             $pathRecord = [PSCustomObject][ordered]@{
                 kind = 'user-env-path'
                 entry = $owned
                 alreadyExisted = $already
+                trailingSemicolon = $trailingSemicolon
             }
             Write-LatticeManifest -Version $ver -BinDir $owned -PathRecord $pathRecord
             if (-not $already) {
@@ -407,13 +409,19 @@ function Invoke-LatticeUninstall {
                     $regKey.Close()
                     return 1
                 }
+                $trailing = $false
+                $tp = $doc.path.PSObject.Properties['trailingSemicolon']
+                if ($null -ne $tp) { $trailing = [bool]$tp.Value }
                 # Remove exactly the entry this script added, preserving the
-                # original layout (including a trailing ';' the canonical
-                # Install step preserved) instead of re-joining all entries.
+                # original layout (including a trailing ';' when the original
+                # ended with one) instead of re-joining all entries.
                 if ($raw.Equals($owned, [StringComparison]::OrdinalIgnoreCase)) {
                     $expected = ''
                 }
-                elseif ($raw.EndsWith((';' + $owned), [StringComparison]::OrdinalIgnoreCase)) {
+                elseif ($trailing -and $raw.EndsWith($owned, [StringComparison]::OrdinalIgnoreCase)) {
+                    $expected = $raw.Substring(0, $raw.Length - $owned.Length)
+                }
+                elseif ((-not $trailing) -and $raw.EndsWith((';' + $owned), [StringComparison]::OrdinalIgnoreCase)) {
                     $expected = $raw.Substring(0, $raw.Length - $owned.Length - 1)
                 }
                 elseif ($raw.StartsWith(($owned + ';'), [StringComparison]::OrdinalIgnoreCase)) {

@@ -176,7 +176,11 @@ by single heavy decisions, and its iteration budget is small by design.
   throughput verdict), never passed or failed — a covered result means
   image+runtime match only, since the SDK version is not recorded in the
   reference. Restoring performance enforcement on a new environment needs a
-  new valid cohort and separate baseline review, not a relaxed threshold. Tolerances were derived from the *measured between-run* spread rather
+  new valid cohort and separate baseline review, not a relaxed threshold.
+  A malformed artifact (non-finite or non-positive throughput/latency) fails
+  even in an uncalibrated environment — an uncovered environment excuses a
+  throughput verdict, never a corrupt measurement.
+  Tolerances were derived from the *measured between-run* spread rather
   than from within-run sample dispersion, which on this host class reads
   1.9–2.3× too tight for three of the five workloads.
   **This gate adjudicates four of the five workloads.** The pre-registered

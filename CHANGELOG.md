@@ -5,7 +5,10 @@ All notable changes to Lattice are recorded here. The format follows
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-- Runner-class gate now reports `UNCALIBRATED` (no verdict) instead of passing or failing when the measured image/runtime differs from the reference record.
+
+### Changed
+
+- Runner-class gate now reports `UNCALIBRATED` (no verdict) instead of passing or failing when the measured image/runtime differs from the reference record. Hardened: a malformed artifact (non-finite or non-positive throughput/latency) now fails even in an uncalibrated environment, and the SDK stamp records the selected SDK from `dotnet --version` instead of the highest installed one.
 
 ### Added
 

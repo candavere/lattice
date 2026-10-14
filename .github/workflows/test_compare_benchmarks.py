@@ -498,6 +498,9 @@ class SmokeClassificationTests(ComparatorTestCase):
         self.assertIn("stress_topology_4agent: MedianStepLatencyMicros", out)
 
     def test_degenerate_metadata_fails_smoke(self):
+        # Invalid host integers are structural and report before smoke's
+        # own empty-field requirements run; see
+        # test_empty_host_fields_fail_smoke for the Os/Runtime half.
         rc, out, err = self.run_comparator(
             make_artifact(),
             make_artifact(ram=0, cores=0, os_="", runtime=""),
@@ -505,6 +508,13 @@ class SmokeClassificationTests(ComparatorTestCase):
         self.assertEqual(rc, 1)
         self.assertIn("Metadata.RamBytes", out)
         self.assertIn("Metadata.Cores", out)
+
+    def test_empty_host_fields_fail_smoke(self):
+        rc, out, err = self.run_comparator(
+            make_artifact(),
+            make_artifact(os_="", runtime=""),
+            "--smoke")
+        self.assertEqual(rc, 1)
         self.assertIn("Metadata.Os", out)
         self.assertIn("Metadata.Runtime", out)
 
@@ -717,6 +727,353 @@ RUNNER_CLASS_THRESHOLDS = [
     "--per-workload-threshold", "dynamic_contention_4agent=0.7804",
     "--per-workload-threshold", "stress_topology_4agent=0.8236",
 ]
+
+
+INVALID_REQUIRED = [float("nan"), float("inf"), float("-inf"),
+                    0, -1, "fast", True]
+
+MODES = ("smoke", "covered", "exact_uncovered", "legacy_strict",
+         "legacy_crosshost")
+
+
+class StructuralValidationTests(ComparatorTestCase):
+    """One structural boundary before every exit: corrupt numbers fail in
+    smoke, covered strict, exact-uncovered, legacy strict and legacy
+    cross-host alike, instead of slipping through an unadjudicated path."""
+
+    def run_mode(self, mode, baseline, current):
+        if mode == "smoke":
+            return self.run_comparator(baseline, current, "--smoke")
+        if mode == "covered":
+            return self.run_comparator(
+                baseline, current, "--strict-if-matching",
+                *RUNNER_CLASS_THRESHOLDS)
+        if mode == "exact_uncovered":
+            current["Metadata"]["RunnerImage"] = (
+                "macos-26-arm64/20261013.0424")
+            return self.run_comparator(
+                baseline, current, "--strict-if-matching",
+                "--require-exact-environment", *RUNNER_CLASS_THRESHOLDS)
+        if mode == "legacy_strict":
+            return self.run_comparator(baseline, current,
+                                       "--strict-if-matching")
+        if mode == "legacy_crosshost":
+            current["Metadata"]["Cores"] = 8
+            return self.run_comparator(baseline, current,
+                                       "--strict-if-matching")
+        raise AssertionError(mode)
+
+    def healthy_pair(self):
+        return runner_artifact(armed=ARMED_FOUR), runner_artifact()
+
+    def assert_structural_failure(self, rc, out, name):
+        self.assertEqual(rc, 1)
+        self.assertIn(name, out)
+        self.assertIn("::error::", out)
+        self.assertNotIn("strict comparison passed", out)
+        self.assertNotIn("smoke classification passed", out)
+        self.assertNotIn("No throughput verdict was made", out)
+        self.assertNotIn("cross-host comparison (informational)", out)
+
+    def test_bad_required_median_fails_everywhere(self):
+        for mode in MODES:
+            for bad in INVALID_REQUIRED:
+                with self.subTest(mode=mode, value=bad):
+                    base, curr = self.healthy_pair()
+                    curr["Workloads"][0]["MedianThroughputPerSecond"] = bad
+                    self.assert_structural_failure(
+                        *self.run_mode(mode, base, curr)[:2],
+                        "micro_raw_2agent")
+
+    def test_missing_or_null_required_median_fails_everywhere(self):
+        for mode in MODES:
+            for variant in ("absent", "null"):
+                with self.subTest(mode=mode, variant=variant):
+                    base, curr = self.healthy_pair()
+                    if variant == "absent":
+                        curr["Workloads"][0].pop("MedianThroughputPerSecond")
+                    else:
+                        curr["Workloads"][0][
+                            "MedianThroughputPerSecond"] = None
+                    self.assert_structural_failure(
+                        *self.run_mode(mode, base, curr)[:2],
+                        "micro_raw_2agent")
+
+    def test_bad_latency_fails_everywhere(self):
+        for mode in MODES:
+            for bad in INVALID_REQUIRED:
+                with self.subTest(mode=mode, value=bad):
+                    base, curr = self.healthy_pair()
+                    curr["Workloads"][2]["MedianStepLatencyMicros"] = bad
+                    self.assert_structural_failure(
+                        *self.run_mode(mode, base, curr)[:2],
+                        "dynamic_contention_4agent")
+
+    def test_bad_informational_median_fails_everywhere(self):
+        for mode in MODES:
+            with self.subTest(mode=mode):
+                base, curr = self.healthy_pair()
+                curr["Workloads"][4]["MedianThroughputPerSecond"] = (
+                    float("nan"))
+                self.assert_structural_failure(
+                    *self.run_mode(mode, base, curr)[:2],
+                    "policy_lookahead_mcts_32")
+
+    def test_bad_extra_workload_fails_everywhere(self):
+        for mode in MODES:
+            with self.subTest(mode=mode):
+                base, curr = self.healthy_pair()
+                curr["Workloads"].append(
+                    {"Name": "brand_new_workload",
+                     "MedianThroughputPerSecond": float("inf"),
+                     "MedianStepLatencyMicros": 1.0})
+                self.assert_structural_failure(
+                    *self.run_mode(mode, base, curr)[:2],
+                    "brand_new_workload")
+
+    def test_bad_baseline_median_fails(self):
+        for mode in ("smoke", "covered", "exact_uncovered",
+                     "legacy_strict"):
+            for bad in (float("nan"), -1):
+                with self.subTest(mode=mode, value=bad):
+                    base, curr = self.healthy_pair()
+                    base["Workloads"][0]["MedianThroughputPerSecond"] = bad
+                    self.assert_structural_failure(
+                        *self.run_mode(mode, base, curr)[:2],
+                        "micro_raw_2agent")
+
+    def test_bad_baseline_dispersion_fails_before_derivation(self):
+        for bad in (float("nan"), float("inf"), -1):
+            with self.subTest(value=bad):
+                base, curr = self.healthy_pair()
+                base["Workloads"][0]["StdDevThroughputPerSecond"] = bad
+                rc, out, err = self.run_comparator(
+                    base, curr, "--strict-if-matching",
+                    *RUNNER_CLASS_THRESHOLDS)
+                self.assertEqual(rc, 1)
+                self.assertIn("micro_raw_2agent", out)
+                self.assertIn("StdDevThroughputPerSecond", out)
+                self.assertNotIn("strict comparison passed", out)
+
+    def test_bad_optional_metrics_fail(self):
+        cases = [
+            ("AllocationsPerStepBytes", float("nan")),
+            ("AllocationsPerStepBytes", "lots"),
+            ("AllocationsPerStepBytes", -5),
+            ("MeanThroughputPerSecond", 0),
+            ("MeanStepLatencyMicros", -2.0),
+            ("P95StepLatencyMicros", float("inf")),
+            ("MeanThroughputPerSecond", None),
+        ]
+        for mode in ("smoke", "covered", "exact_uncovered"):
+            for field, bad in cases:
+                with self.subTest(mode=mode, field=field, value=bad):
+                    base, curr = self.healthy_pair()
+                    curr["Workloads"][1][field] = bad
+                    self.assert_structural_failure(
+                        *self.run_mode(mode, base, curr)[:2],
+                        "facility_static_4agent")
+
+    def test_bad_counts_fail(self):
+        cases = [("Iterations", 0), ("Iterations", "10"),
+                 ("Iterations", True), ("StepsPerIteration", 10.5),
+                 ("TotalGcGen0", -1), ("TotalGcGen2", 2.5),
+                 ("Cores", "3"), ("RamBytes", float("nan"))]
+        for mode in ("smoke", "covered", "exact_uncovered",
+                     "legacy_strict"):
+            for field, bad in cases:
+                with self.subTest(mode=mode, field=field, value=bad):
+                    base, curr = self.healthy_pair()
+                    if field in ("Cores", "RamBytes"):
+                        curr["Metadata"][field] = bad
+                        name = "Metadata.%s" % field
+                    else:
+                        curr["Workloads"][3][field] = bad
+                        name = "stress_topology_4agent"
+                    self.assert_structural_failure(
+                        *self.run_mode(mode, base, curr)[:2], name)
+
+    def test_malformed_containers_fail(self):
+        base, curr = self.healthy_pair()
+        cases = [
+            ("baseline Metadata list",
+             lambda b, c: b.__setitem__("Metadata", []), "Metadata"),
+            ("current Workloads dict",
+             lambda b, c: c.__setitem__("Workloads", {}), "Workloads"),
+            ("non-object entry",
+             lambda b, c: c["Workloads"].__setitem__(1, "nope"),
+             "must be an object"),
+            ("missing Name",
+             lambda b, c: c["Workloads"][1].pop("Name"), "Name"),
+            ("empty Name",
+             lambda b, c: c["Workloads"][1].__setitem__("Name", "  "),
+             "Name"),
+            ("duplicate names",
+             lambda b, c: c["Workloads"].append(dict(c["Workloads"][1])),
+             "not unique"),
+            ("top-level list",
+             lambda b, c: None, "must be an object"),
+        ]
+        for label, tweak, needle in cases:
+            with self.subTest(label=label):
+                b, c = self.healthy_pair()
+                if label == "top-level list":
+                    base_path = self._write("baseline.json", [1, 2])
+                    curr_path = self._write("current.json", c)
+                    import io as _io
+                    from contextlib import redirect_stdout as _ro, redirect_stderr as _re
+                    import compare_benchmarks as _cb
+                    _out, _err = _io.StringIO(), _io.StringIO()
+                    with _ro(_out), _re(_err):
+                        rc = _cb.main([base_path, curr_path,
+                                       "--strict-if-matching"])
+                    out = _out.getvalue()
+                else:
+                    tweak(b, c)
+                    rc, out, err = self.run_comparator(
+                        b, c, "--strict-if-matching",
+                        *RUNNER_CLASS_THRESHOLDS)
+                self.assertEqual(rc, 1)
+                self.assertIn(needle, out)
+                self.assertNotIn("strict comparison passed", out)
+
+    def test_smoke_rejects_bad_ram_and_cores(self):
+        for field, bad in (("RamBytes", float("nan")),
+                           ("RamBytes", float("inf")),
+                           ("Cores", float("inf"))):
+            with self.subTest(field=field, value=bad):
+                base, curr = self.healthy_pair()
+                curr["Metadata"][field] = bad
+                rc, out, err = self.run_comparator(
+                    base, curr, "--smoke")
+                self.assertEqual(rc, 1)
+                self.assertIn("Metadata.%s" % field, out)
+                self.assertNotIn("smoke classification passed", out)
+
+    # -- direct helper behavior (a second implementation must not drift) --
+
+    def test_validate_structure_accepts_healthy_pair(self):
+        import compare_benchmarks as _cb
+        base, curr = self.healthy_pair()
+        structure, errors = _cb.validate_structure(base, curr)
+        self.assertEqual(errors, [])
+        self.assertEqual(sorted(structure.base_work), sorted(CANONICAL_NAMES))
+        self.assertEqual(sorted(structure.curr_work), sorted(CANONICAL_NAMES))
+
+    def test_validate_structure_names_duplicates(self):
+        import compare_benchmarks as _cb
+        base, curr = self.healthy_pair()
+        curr["Workloads"].append(dict(curr["Workloads"][0]))
+        _structure, errors = _cb.validate_structure(base, curr)
+        self.assertTrue(any("not unique" in e and "micro_raw_2agent" in e
+                            for e in errors))
+
+    def test_smoke_helper_checks_numbers_directly(self):
+        import compare_benchmarks as _cb
+        base, curr = self.healthy_pair()
+        check = _cb.smoke_check(base, curr)
+        self.assertEqual(check.errors, [])
+        curr["Metadata"]["RamBytes"] = float("nan")
+        check = _cb.smoke_check(base, curr)
+        self.assertTrue(any("RamBytes" in e for e in check.errors))
+
+    def test_unrepresentable_integers_fail_cleanly(self):
+        import compare_benchmarks as _cb
+        self.assertFalse(_cb.is_finite_positive(10 ** 1000))
+        base, curr = self.healthy_pair()
+        curr["Workloads"][0]["MedianThroughputPerSecond"] = 10 ** 1000
+        rc, out, err = self.run_comparator(
+            base, curr, "--strict-if-matching", *RUNNER_CLASS_THRESHOLDS)
+        self.assertEqual(rc, 1)
+        self.assertIn("micro_raw_2agent", out)
+        self.assertNotIn("Traceback", err + out)
+
+    def test_finite_positive_table(self):
+        import compare_benchmarks as _cb
+        self.assertTrue(_cb.is_finite_positive(1))
+        self.assertTrue(_cb.is_finite_positive(0.5))
+        for bad in (0, -1, float("nan"), float("inf"), float("-inf"),
+                    None, "1", True, False, [1]):
+            self.assertFalse(_cb.is_finite_positive(bad), bad)
+
+    def test_metric_error_wording(self):
+        import compare_benchmarks as _cb
+        self.assertIn("must be positive, got 0.",
+                      _cb.metric_error("w", "F", 0))
+        self.assertIn("finite positive number, got nan",
+                      _cb.metric_error("w", "F", float("nan")))
+        self.assertIn("finite positive number, got missing",
+                      _cb.metric_error("w", "F", None))
+
+    # -- positive controls: valid data keeps every verdict ---------------
+
+    def test_zero_optionals_and_absent_optionals_stay_valid(self):
+        base, curr = self.healthy_pair()
+        for workload in curr["Workloads"]:
+            workload["StdDevThroughputPerSecond"] = 0
+            workload["AllocationsPerStepBytes"] = 0
+            workload["TotalGcGen0"] = 0
+            workload["TotalGcGen1"] = 0
+            workload["TotalGcGen2"] = 0
+            workload.pop("MeanThroughputPerSecond", None)
+        rc, out, err = self.run_comparator(
+            base, curr, "--strict-if-matching", *RUNNER_CLASS_THRESHOLDS)
+        self.assertEqual(rc, 0)
+        self.assertIn("strict comparison passed", out)
+
+    def test_committed_baselines_validate_clean(self):
+        import json as _json
+        import os as _os
+        import compare_benchmarks as _cb
+        root = _os.path.dirname(_os.path.abspath(__file__))
+        for leaf in ("throughput_benchmark.json",
+                     "runner_class_throughput_benchmark.json"):
+            with self.subTest(baseline=leaf):
+                with open(_os.path.join(root, "..", "..", "benchmarks", leaf),
+                          encoding="utf-8") as handle:
+                    committed = _json.load(handle)
+                _structure, errors = _cb.validate_structure(
+                    committed, self.healthy_pair()[1])
+                self.assertEqual(errors, [])
+
+    def test_valid_uncovered_slowdown_stays_uncalibrated(self):
+        base = runner_artifact(armed=ARMED_FOUR)
+        curr = runner_artifact(factor=0.05)
+        curr["Metadata"]["RunnerImage"] = "macos-26-arm64/20261013.0424"
+        rc, out, err = self.run_comparator(
+            base, curr, "--strict-if-matching",
+            "--require-exact-environment", *RUNNER_CLASS_THRESHOLDS)
+        self.assertEqual(rc, 0)
+        self.assertIn("environment classification: UNCALIBRATED", out)
+        self.assertIn("No throughput verdict was made", out)
+
+    def test_covered_real_regression_still_fails(self):
+        rc, out, err = self.run_comparator(
+            runner_artifact(armed=ARMED_FOUR),
+            runner_artifact(factor=0.5),
+            "--strict-if-matching", *RUNNER_CLASS_THRESHOLDS)
+        self.assertEqual(rc, 1)
+        self.assertIn("workload regression on a matching host", out)
+
+    def test_valid_informational_slowdown_never_fails(self):
+        rows = [(name,
+                 median * (0.5 if name == "policy_lookahead_mcts_32" else 1.0),
+                 stddev, latency, alloc)
+                for name, median, stddev, latency, alloc in BASELINE_ROWS]
+        rc, out, err = self.run_comparator(
+            runner_artifact(armed=ARMED_FOUR), runner_artifact(rows=rows),
+            "--strict-if-matching", *RUNNER_CLASS_THRESHOLDS)
+        self.assertEqual(rc, 0)
+        self.assertIn("does not fail this gate", out)
+
+    def test_missing_image_still_uncalibrated(self):
+        base, curr = self.healthy_pair()
+        curr["Metadata"].pop("RunnerImage")
+        rc, out, err = self.run_comparator(
+            base, curr, "--strict-if-matching",
+            "--require-exact-environment", *RUNNER_CLASS_THRESHOLDS)
+        self.assertEqual(rc, 0)
+        self.assertIn("environment classification: UNCALIBRATED", out)
 
 
 class ExactEnvironmentGateTests(ComparatorTestCase):

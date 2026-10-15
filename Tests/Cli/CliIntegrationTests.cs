@@ -76,6 +76,16 @@ public class CliIntegrationTests
     }
 
     [Fact]
+    public void Generate_NoArguments_ReportsMissingSeedWithUsageExitCode()
+    {
+        // The shell contract the console must not change: a bare `lattice generate`
+        // refuses with the usage status and the parser's own words.
+        var (exit, _, stderr) = Run("generate");
+        Assert.Equal(2, exit);
+        Assert.Contains("missing required flag '--seed'", stderr);
+    }
+
+    [Fact]
     public void Generate_InvalidSeed_NonZeroExit()
     {
         var (exit, _, stderr) = Run("generate", "--seed", "oops");

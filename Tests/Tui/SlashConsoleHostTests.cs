@@ -210,6 +210,194 @@ public class SlashConsoleHostTests
     // ---- Host with fakes ----
 
     [Fact]
+    public void PickingGenerateFromTheMenuOpensAFormInsteadOfRunningBare()
+    {
+        // The reported failure: picking /generate from the menu and pressing Enter
+        // runs `lattice generate` with no arguments, and the child answers
+        // "exit 2: missing required flag '--seed'". The console must ask for the
+        // required inputs first, so Enter here must start no child at all.
+        var runner = new FakeRunner(_ => FakeCapturedRun.Done(0, "MAP\n", ""));
+        var (exit, _) = Drive(Text("/generate"), enter: true, runner: runner, extraKeys: 1);
+
+        Assert.Equal(0, exit);
+        Assert.Empty(runner.Captured);
+        Assert.Empty(runner.Watched);
+    }
+
+    [Fact]
+    public void FormConfirmWithSeedRunsCaptured()
+    {
+        var runner = new FakeRunner(_ => FakeCapturedRun.Done(0, "MAP\n", ""));
+        var keys = Text("/generate");
+        keys.Add(new TuiKey(TuiKeyKind.Enter));
+        keys.AddRange(Text("42"));
+        keys.Add(new TuiKey(TuiKeyKind.Enter));
+        keys.Add(new TuiKey(TuiKeyKind.Enter));
+        var (exit, screen) = Drive(keys, runner: runner);
+
+        Assert.Equal(0, exit);
+        var run = Assert.Single(runner.Captured);
+        Assert.Equal(["generate", "--seed", "42"], run.Arguments);
+        Assert.Contains("exit 0 ok", screen, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FormConfirmWithEmptyRequiredRunsNothing()
+    {
+        var runner = new FakeRunner(_ => FakeCapturedRun.Done(0, "MAP\n", ""));
+        var keys = Text("/generate");
+        keys.Add(new TuiKey(TuiKeyKind.Enter));
+        keys.Add(new TuiKey(TuiKeyKind.Enter));
+        keys.Add(new TuiKey(TuiKeyKind.Enter));
+        var (exit, screen) = Drive(keys, runner: runner);
+
+        Assert.Equal(0, exit);
+        Assert.Empty(runner.Captured);
+        Assert.Empty(runner.Watched);
+        Assert.Contains("--seed", screen, StringComparison.Ordinal);
+        Assert.Contains("missing required flag '--seed'.", screen, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FormEscapeReturnsToTheIntactLine()
+    {
+        var runner = new FakeRunner(_ => FakeCapturedRun.Done(0, "MAP\n", ""));
+        var keys = Text("/generate");
+        keys.Add(new TuiKey(TuiKeyKind.Enter));
+        keys.Add(new TuiKey(TuiKeyKind.Escape));
+        var (exit, screen) = Drive(keys, runner: runner);
+
+        Assert.Equal(0, exit);
+        Assert.Empty(runner.Captured);
+        Assert.Empty(runner.Watched);
+        Assert.Contains("/generate", screen, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FormDefaultModeWatchesASimulatableCommand()
+    {
+        var runner = new FakeRunner();
+        var keys = Text("/simulate");
+        keys.Add(new TuiKey(TuiKeyKind.Enter));
+        keys.AddRange(Text("7"));
+        keys.Add(new TuiKey(TuiKeyKind.Enter));
+        keys.Add(new TuiKey(TuiKeyKind.Enter));
+        var (exit, _) = Drive(keys, runner: runner, extraKeys: 1);
+
+        Assert.Equal(0, exit);
+        var watch = Assert.Single(runner.Watched);
+        Assert.Equal(["tui", "simulate", "--seed", "7"], watch.Arguments);
+    }
+
+    [Fact]
+    public void MenuPickOfCompleteCommandStillOpensForm()
+    {
+        // benchmark needs nothing, so a completeness rule alone would run it on
+        // the spot. Picking from the menu must ask first: the form opens valid,
+        // runs nothing, and a later Enter runs exactly what the form shows.
+        var runner = new FakeRunner(_ => FakeCapturedRun.Done(0, "", ""));
+        var (openedExit, _) = Drive(Text("/benchmark"), enter: true, runner: runner);
+
+        Assert.Equal(0, openedExit);
+        Assert.Empty(runner.Captured);
+        Assert.Empty(runner.Watched);
+
+        var keys = Text("/benchmark");
+        keys.Add(new TuiKey(TuiKeyKind.Enter));
+        keys.Add(new TuiKey(TuiKeyKind.Enter));
+        keys.Add(new TuiKey(TuiKeyKind.Enter));
+        var (exit, _) = Drive(keys, runner: runner);
+
+        Assert.Equal(0, exit);
+        var run = Assert.Single(runner.Captured);
+        Assert.Equal(["benchmark"], run.Arguments);
+    }
+
+    [Fact]
+    public void FormInterruptQuitsWithoutRunning()
+    {
+        var runner = new FakeRunner(_ => FakeCapturedRun.Done(0, "", ""));
+        var keys = Text("/generate");
+        keys.Add(new TuiKey(TuiKeyKind.Enter));
+        keys.Add(new TuiKey(TuiKeyKind.Interrupt));
+        var (exit, _) = Drive(keys, runner: runner);
+
+        Assert.Equal(0, exit);
+        Assert.Empty(runner.Captured);
+        Assert.Empty(runner.Watched);
+    }
+
+    [Fact]
+    public void RawCompleteLineWithAnExplicitRunWordRunsUnchanged()
+    {
+        var runner = new FakeRunner(_ => FakeCapturedRun.Done(0, "", ""));
+        var keys = Text("/simulate run --seed 7");
+        keys.Add(new TuiKey(TuiKeyKind.Enter));
+        var (exit, _) = Drive(keys, runner: runner);
+
+        Assert.Equal(0, exit);
+        var run = Assert.Single(runner.Captured);
+        Assert.Equal(["simulate", "--seed", "7"], run.Arguments);
+        Assert.Empty(runner.Watched);
+    }
+
+    [Fact]
+    public void FormRunChoiceGoesThroughTheCapturedPath()
+    {
+        var runner = new FakeRunner(_ => FakeCapturedRun.Done(0, "", ""));
+        var keys = Text("/simulate");
+        keys.Add(new TuiKey(TuiKeyKind.Enter));
+        keys.AddRange(Text("7"));
+        for (var i = 0; i < 7; i++)
+        {
+            keys.Add(new TuiKey(TuiKeyKind.Tab));
+        }
+
+        keys.AddRange(Text("run"));
+        keys.Add(new TuiKey(TuiKeyKind.Enter));
+        keys.Add(new TuiKey(TuiKeyKind.Enter));
+        var (exit, _) = Drive(keys, runner: runner);
+
+        Assert.Equal(0, exit);
+        var run = Assert.Single(runner.Captured);
+        Assert.Equal(["simulate", "--seed", "7"], run.Arguments);
+        Assert.Empty(runner.Watched);
+    }
+
+    [Fact]
+    public void RawIncompleteLineOpensTheFormWithExactPrefill()
+    {
+        var runner = new FakeRunner(_ => FakeCapturedRun.Done(0, "MAP\n", ""));
+        var keys = Text("/generate --out x.json");
+        keys.Add(new TuiKey(TuiKeyKind.Enter));
+        keys.AddRange(Text("5"));
+        keys.Add(new TuiKey(TuiKeyKind.Enter));
+        keys.Add(new TuiKey(TuiKeyKind.Enter));
+        var (exit, screen) = Drive(keys, runner: runner);
+
+        Assert.Equal(0, exit);
+        var run = Assert.Single(runner.Captured);
+        Assert.Equal(["generate", "--seed", "5", "--out", "x.json"], run.Arguments);
+        Assert.Contains("exit 0 ok", screen, StringComparison.Ordinal);
+        Assert.DoesNotContain("exit 2", screen, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RawLineWithAnUnknownFlagOpensAnEmptyForm()
+    {
+        var runner = new FakeRunner(_ => FakeCapturedRun.Done(0, "MAP\n", ""));
+        var keys = Text("/generate --bogus x");
+        keys.Add(new TuiKey(TuiKeyKind.Enter));
+        keys.Add(new TuiKey(TuiKeyKind.Escape));
+        var (exit, screen) = Drive(keys, runner: runner);
+
+        Assert.Equal(0, exit);
+        Assert.Empty(runner.Captured);
+        Assert.Empty(runner.Watched);
+        Assert.Contains("/generate --bogus x", screen, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TypingRunsACapturedCommandAndShowsItsResult()
     {
         var runner = new FakeRunner(_ => FakeCapturedRun.Done(0, "MAP\n", ""));
@@ -328,7 +516,7 @@ public class SlashConsoleHostTests
     public void AFailingRunShowsItsFailure()
     {
         var runner = new FakeRunner(_ => FakeCapturedRun.Done(1, "", "boom\n"));
-        var (_, screen) = Drive(Text("/generate"), enter: true, runner: runner);
+        var (_, screen) = Drive(Text("/generate --seed 1"), enter: true, runner: runner);
 
         Assert.Contains("exit 1 failed", screen, StringComparison.Ordinal);
         Assert.Contains("boom", screen, StringComparison.Ordinal);

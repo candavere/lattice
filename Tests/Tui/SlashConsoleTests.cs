@@ -459,6 +459,104 @@ public class SlashConsoleTests
         AssertCentredGroup(100, 20, shortFrame, FirstBrailleRow(shortFrame), PlaceholderRow(shortFrame));
     }
 
+    private static SlashConsoleFormField FormField(
+        string label, string text, bool required, bool focused, string help, bool typed = true) =>
+        new(label, text, required, focused, text.Length, help, [], typed);
+
+    private static SlashConsoleFormView GenerateForm(bool focusedSeed = true, string? error = null) =>
+        new("generate", "Generate a valid map as JSON.",
+            [
+                FormField("--seed", "", true, focusedSeed, "The seed the map is generated from.", false),
+                FormField("--min-fairness", "", false, false, "Retry generation until the spawn-bias index is at or below this.", false),
+                FormField("--out", "", false, false, "Write the map here instead of stdout.", false),
+                FormField("extra arguments", "", false, false, "Anything else, passed through as typed.", false),
+            ],
+            focusedSeed ? "The seed the map is generated from." : null,
+            error);
+
+    private static SlashConsoleFormView EvaluateForm(int focused) =>
+        new("evaluate", "Run the paired MCTS-versus-Scout evaluation.",
+            [
+                FormField("--seed-set", "heldout", false, focused == 0, "The suite(s): dev, heldout, or both.", false),
+                FormField("--rollouts", "32", false, focused == 1, "MCTS rollouts per action.", false),
+                FormField("--seeds", "50", false, focused == 2, "Seeds per suite.", false),
+                FormField("--out", "", false, focused == 3, "Write the machine-readable artifact here.", false),
+                FormField("--commit", "", false, focused == 4, "The commit the artifact claims.", false),
+                FormField("--scenario", "standard", false, focused == 5, "The map family, or a path to a descriptor.", false),
+                FormField("--agent-cmd", "", false, focused == 6, "An external agent command line to score.", false),
+                FormField("--agent-step-timeout-ms", "", false, focused == 7, "The external agent's per-step budget.", false),
+                FormField("extra arguments", "", false, focused == 8, "Anything else, passed through as typed.", false),
+            ],
+            "Focused field help.",
+            null);
+
+    private static SlashConsoleRequest WithForm(SlashConsoleRequest req, SlashConsoleFormView form) =>
+        req with { Menu = [], MenuOpen = false, Form = form };
+
+    [Fact]
+    public void FormReplacesMenuAndStaysCentred()
+    {
+        var size = new PaneSize(100, 32);
+        var cells = SlashConsoleLayout.Render(WithForm(Home(size), GenerateForm()));
+        var lines = cells.ToLines();
+        var text = string.Concat(lines);
+        Assert.Contains("/generate", text);
+        Assert.Contains("--seed", text);
+        Assert.Contains("*", text);
+        Assert.Contains("The seed the map is generated from.", text);
+        Assert.Contains("esc back", text);
+        Assert.DoesNotContain("/simulate", text);
+        var input = PlaceholderRow(lines);
+        AssertCentredGroup(size.Width, size.Height, lines, FirstBrailleRow(lines), input);
+
+        var seedRow = Array.FindIndex(lines, l => l.Contains("--seed", StringComparison.Ordinal));
+        Assert.True(
+            Enumerable.Range(0, size.Width).Any(x => (cells[x, seedRow].Attributes & CellAttributes.Reverse) != 0),
+            "the focused caret cell must be reversed.");
+    }
+
+    [Theory]
+    [InlineData(237, 66)]
+    [InlineData(120, 40)]
+    [InlineData(100, 32)]
+    public void LargestFormFitsWholeAtOrdinarySizes(int width, int height)
+    {
+        var size = new PaneSize(width, height);
+        var lines = SlashConsoleLayout.Render(WithForm(Home(size), EvaluateForm(0))).ToLines();
+        var text = string.Concat(lines);
+        foreach (var label in new[] { "--seed-set", "--rollouts", "--seeds", "--out", "--commit", "--scenario", "--agent-cmd", "--agent-step-timeout-ms", "extra arguments" })
+        {
+            Assert.Contains(label, text);
+        }
+
+        AssertCentredGroup(width, height, lines, FirstBrailleRow(lines), PlaceholderRow(lines));
+    }
+
+    [Fact]
+    public void CompactFormScrollsToFocused()
+    {
+        var size = new PaneSize(40, 12);
+        var cells = SlashConsoleLayout.Render(WithForm(Home(size), EvaluateForm(8)));
+        var lines = cells.ToLines();
+        Assert.Contains("extra arguments", string.Concat(lines));
+        var input = PlaceholderRow(lines);
+        Assert.True(input >= 0 && input <= size.Height - 3, "input must stay above the footer.");
+        Assert.StartsWith("  /Users/test/lattice", lines[size.Height - 2], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FormAndResultCoexistAboveTheFooter()
+    {
+        var size = new PaneSize(100, 32);
+        var req = WithForm(Home(size), GenerateForm());
+        req = req with { ResultTitle = "exit 0 ok 0.1s", ResultLines = ["{\"zones\": 12}"] };
+        var lines = SlashConsoleLayout.Render(req).ToLines();
+        Assert.Contains("exit 0 ok", string.Concat(lines));
+        var input = PlaceholderRow(lines);
+        Assert.True(input >= 0 && input <= size.Height - 3, "input must stay above the footer.");
+        Assert.StartsWith("  /Users/test/lattice", lines[size.Height - 2], StringComparison.Ordinal);
+    }
+
     [Fact]
     public void ConsoleDrawsOnlyFromSharedThemeRoles()
     {

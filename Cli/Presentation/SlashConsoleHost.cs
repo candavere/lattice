@@ -86,11 +86,12 @@ public static class SlashConsoleHost
             var state = new SlashConsoleState();
             var run = new ActiveRun();
             var result = new ResultPanel();
+            var form = new ActiveForm();
             var host = Enter(request);
 
             try
             {
-                Loop(state, run, result, request, controlC, keys, host);
+                Loop(state, run, result, form, request, controlC, keys, host);
             }
             finally
             {
@@ -146,10 +147,26 @@ public static class SlashConsoleHost
         internal bool Truncated { get; set; }
     }
 
+    /// <summary>
+    /// The guided input form on show, or none. The form owns its keys while open:
+    /// the input line is frozen and the menu is replaced by the form, so nothing
+    /// typed reaches the line behind it. Closing the form (Esc) drops it and leaves
+    /// the opening line intact; running from it closes it first.
+    /// </summary>
+    private sealed class ActiveForm
+    {
+        internal LaunchpadForm? Form { get; set; }
+
+        internal string OpeningLine { get; set; } = string.Empty;
+
+        internal int LastFocus { get; set; }
+    }
+
     private static void Loop(
         SlashConsoleState state,
         ActiveRun run,
         ResultPanel result,
+        ActiveForm form,
         SlashConsoleHostRequest request,
         ControlCAsInputScope controlC,
         IKeySource keys,
@@ -160,7 +177,7 @@ public static class SlashConsoleHost
 
         while (true)
         {
-            current.Present(Frame(state, run, result, request, current));
+            current.Present(Frame(state, run, result, form, request, current));
 
             if (state.HasQuit && run.Active is null)
             {
@@ -219,6 +236,27 @@ public static class SlashConsoleHost
                 continue;
             }
 
+            if (form.Form is not null)
+            {
+                RouteFormKey(form, state, key);
+
+                if (form.Form is not null && form.Form.WantsToRun)
+                {
+                    var plan = PlanFormRun(form);
+                    form.Form.Acknowledge();
+                    form.Form = null;
+
+                    if (DispatchCommit(plan, state, run, result, request, controlC, ref keys, ref current))
+                    {
+                        return;
+                    }
+                }
+
+                continue;
+            }
+
+            var isEnter = key.Kind == TuiKeyKind.Enter;
+            var menuOpenAtEnter = isEnter && state.MenuOpen;
             state.Apply(key);
             state.SetMenu(SlashConsoleMenu.Filter(state.Input));
 
@@ -228,52 +266,323 @@ public static class SlashConsoleHost
             }
 
             state.AcknowledgeCommit();
-            var plan = SlashConsoleCommit.ParseCommit(state.Input);
 
-            if (plan.Kind == CommitKind.Exit)
+            if (isEnter && TryOpenForm(state, form, menuOpenAtEnter))
+            {
+                continue;
+            }
+
+            if (DispatchCommit(SlashConsoleCommit.ParseCommit(state.Input), state, run, result, request, controlC, ref keys, ref current))
             {
                 return;
             }
+        }
+    }
 
-            if (plan.Kind == CommitKind.Error)
+    /// <summary>
+    /// Runs one parsed commit the way the loop always has: leave, refuse, watch
+    /// outside the screen, or capture. Returns true when the loop should return.
+    /// </summary>
+    private static bool DispatchCommit(
+        CommitPlan plan,
+        SlashConsoleState state,
+        ActiveRun run,
+        ResultPanel result,
+        SlashConsoleHostRequest request,
+        ControlCAsInputScope controlC,
+        ref IKeySource keys,
+        ref ScreenHost current)
+    {
+        if (plan.Kind == CommitKind.Exit)
+        {
+            return true;
+        }
+
+        if (plan.Kind == CommitKind.Error)
+        {
+            result.Title = "exit 2";
+            result.Lines = [plan.ErrorMessage ?? "refused"];
+            result.Truncated = false;
+            return false;
+        }
+
+        if (plan.Kind == CommitKind.Screen)
+        {
+            var watch = RunWatchOutsideTheScreen(request, controlC, keys, run, plan);
+            result.Title = $"exit {watch.ExitCode} {CommandLifecycle.Elapsed(watch.Elapsed)}";
+            result.Lines = null;
+            result.Truncated = false;
+
+            if (Reenter(request) is not { } next)
             {
-                result.Title = "exit 2";
-                result.Lines = [plan.ErrorMessage ?? "refused"];
-                result.Truncated = false;
-                continue;
+                return true;
             }
 
-            if (plan.Kind == CommitKind.Screen)
-            {
-                var watch = RunWatchOutsideTheScreen(request, controlC, keys, run, plan);
-                result.Title = $"exit {watch.ExitCode} {CommandLifecycle.Elapsed(watch.Elapsed)}";
-                result.Lines = null;
-                result.Truncated = false;
+            current = next;
+            keys = run.Keys ?? keys;
+            return false;
+        }
 
-                if (Reenter(request) is not { } next)
+        try
+        {
+            run.Active = request.Runner.StartCaptured(new CapturedRunRequest(plan.Arguments, plan.DisplayLine, request.WorkingDirectory));
+            run.StartedAt = request.Clock.Now;
+            run.Display = plan.DisplayLine;
+            run.Spinner = 0;
+        }
+        catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException)
+        {
+            result.Title = "exit 1";
+            result.Lines = [exception.Message];
+            result.Truncated = false;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Routes one key to the open form. The input line is frozen while the form is
+    /// open, so the state machine never sees these keys: arrows move field focus
+    /// directly (routing them into the form would steer its single command's
+    /// selection and reload defaults), characters focus before they type so a
+    /// <c>q</c> can never quit, and Esc leaves the form with the line intact.
+    /// </summary>
+    private static void RouteFormKey(ActiveForm form, SlashConsoleState state, TuiKey key)
+    {
+        var current = form.Form;
+        if (current is null)
+        {
+            return;
+        }
+
+        switch (key.Kind)
+        {
+            case TuiKeyKind.Escape:
+                form.Form = null;
+                return;
+
+            case TuiKeyKind.Interrupt:
+                form.Form = null;
+                state.Apply(key);
+                return;
+
+            case TuiKeyKind.Up:
+                current.FocusField(current.FocusedIndex - 1);
+                break;
+
+            case TuiKeyKind.Down:
+                current.FocusField(current.FocusedIndex + 1);
+                break;
+
+            case TuiKeyKind.PageUp:
+                current.FocusField(current.FocusedIndex - 4);
+                break;
+
+            case TuiKeyKind.PageDown:
+                current.FocusField(current.FocusedIndex + 4);
+                break;
+
+            case TuiKeyKind.Character:
+                if (current.Mode == LaunchpadMode.Editing)
                 {
-                    return;
+                    current.Apply(key);
+                }
+                else
+                {
+                    current.FocusField(form.LastFocus);
+                    current.Apply(key);
                 }
 
-                current = next;
-                keys = run.Keys ?? keys;
+                break;
+
+            default:
+                current.Apply(key);
+                break;
+        }
+
+        if (current.FocusedIndex >= 0)
+        {
+            form.LastFocus = current.FocusedIndex;
+        }
+    }
+
+    /// <summary>
+    /// Opens the guided form for a committed catalog line instead of spawning a
+    /// child that can only answer with a usage error. Picking a bare command from
+    /// the menu always opens its form; a typed line with arguments runs unchanged
+    /// when it carries every modelled required input, and otherwise opens the form
+    /// prefilled from the exact typed pairs. Unknown commands, the exit words and
+    /// unparseable lines never reach the form.
+    /// </summary>
+    /// <returns>True when the form was opened and nothing should run.</returns>
+    private static bool TryOpenForm(SlashConsoleState state, ActiveForm form, bool menuOpenAtEnter)
+    {
+        if (form.Form is not null)
+        {
+            return false;
+        }
+
+        var input = state.Input;
+        if (SlashConsoleMenu.IsExit(input))
+        {
+            return false;
+        }
+
+        var stripped = input.StartsWith("/", StringComparison.Ordinal) ? input[1..].Trim() : input.Trim();
+        if (!AgentCommandLine.TrySplit(stripped, out var tokens, out _))
+        {
+            return false;
+        }
+
+        if (tokens.Length == 0)
+        {
+            return false;
+        }
+
+        var command = LaunchpadCatalog.Commands.FirstOrDefault(entry =>
+            entry.Name.Equals(tokens[0], StringComparison.OrdinalIgnoreCase));
+        if (command is null)
+        {
+            return false;
+        }
+
+        if (tokens.Length == 1 && menuOpenAtEnter)
+        {
+            OpenForm(form, EmptyForm(command), input);
+            return true;
+        }
+
+        var tail = tokens[1..];
+        string? modeChoice = null;
+        if (tail.Length > 0 && IsFormModeWord(tail[0]))
+        {
+            // A mode word the command cannot honour stays the parser's refusal;
+            // a redundant one is consumed so the remaining tokens pair cleanly.
+            var askedScreen = !tail[0].Equals("run", StringComparison.OrdinalIgnoreCase);
+            if (command.Ways.Count == 1)
+            {
+                return false;
+            }
+
+            modeChoice = askedScreen ? "screen" : "run";
+            tail = tail[1..];
+        }
+
+        var filled = FillFormFields(command, tail, modeChoice, out var complete);
+        if (complete)
+        {
+            return false;
+        }
+
+        OpenForm(form, filled, input);
+        return true;
+    }
+
+    private static void OpenForm(ActiveForm form, LaunchpadForm filled, string openingLine)
+    {
+        form.Form = filled;
+        form.OpeningLine = openingLine;
+        form.LastFocus = 0;
+    }
+
+    private static LaunchpadForm EmptyForm(LaunchpadCommand command)
+    {
+        var empty = LaunchpadForm.For([command]);
+        empty.FocusField(0);
+        return empty;
+    }
+
+    private static bool IsFormModeWord(string token) =>
+        token.Equals("screen", StringComparison.OrdinalIgnoreCase)
+        || token.Equals("watch", StringComparison.OrdinalIgnoreCase)
+        || token.Equals("run", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Builds the form for <paramref name="command"/>, prefilling what the typed
+    /// tokens state exactly: <c>--flag value</c> pairs the form can represent, a
+    /// bare path where the command takes one, and the run-mode word. Anything else
+    /// leaves its field empty. Reports whether every modelled required input ended
+    /// up filled; the typed line itself is never rewritten.
+    /// </summary>
+    private static LaunchpadForm FillFormFields(LaunchpadCommand command, string[] tail, string? modeChoice, out bool complete)
+    {
+        var filled = LaunchpadForm.For([command]);
+
+        if (modeChoice is not null)
+        {
+            filled.TrySetValue(LaunchpadCatalog.RunModeLabel, modeChoice);
+        }
+
+        var paths = filled.Fields
+            .Where(field => field.Kind == LaunchpadFieldKind.PositionalPath)
+            .ToList();
+        var pathIndex = 0;
+        var index = 0;
+        while (index < tail.Length)
+        {
+            var token = tail[index];
+            if (token.StartsWith("-", StringComparison.Ordinal) && token.Length > 1)
+            {
+                var field = filled.Fields.FirstOrDefault(entry =>
+                    entry.Kind == LaunchpadFieldKind.Flag &&
+                    entry.Label.Equals(token, StringComparison.Ordinal));
+                if (field is null || index + 1 >= tail.Length || !filled.TrySetValue(field.Label, tail[index + 1]))
+                {
+                    break;
+                }
+
+                index += 2;
                 continue;
             }
 
-            try
+            if (pathIndex >= paths.Count)
             {
-                run.Active = request.Runner.StartCaptured(new CapturedRunRequest(plan.Arguments, plan.DisplayLine, request.WorkingDirectory));
-                run.StartedAt = request.Clock.Now;
-                run.Display = plan.DisplayLine;
-                run.Spinner = 0;
+                break;
             }
-            catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException)
+
+            if (!filled.TrySetValue(paths[pathIndex].Label, token))
             {
-                result.Title = "exit 1";
-                result.Lines = [exception.Message];
-                result.Truncated = false;
+                break;
             }
+
+            pathIndex++;
+            index++;
         }
+
+        var exact = index >= tail.Length;
+        complete = exact && command.RequiredFlags.All(required =>
+            filled.Fields.Any(field =>
+                field.Label.Equals(required, StringComparison.Ordinal) &&
+                filled.WasTyped(field)));
+
+        if (!exact)
+        {
+            return EmptyForm(command);
+        }
+
+        var firstEmpty = filled.Fields.ToList().FindIndex(field =>
+            field.Required && !filled.WasTyped(field));
+        filled.FocusField(firstEmpty < 0 ? 0 : firstEmpty);
+        return filled;
+    }
+
+    /// <summary>
+    /// Turns a confirmed form into the run the loop already knows: the reader's
+    /// chosen mode decides the path, exactly as the mode word does for a typed
+    /// line. A screen run carries the <c>tui</c> prefix the Launchpad runner adds,
+    /// reused here rather than re-decided.
+    /// </summary>
+    private static CommitPlan PlanFormRun(ActiveForm form)
+    {
+        var current = form.Form;
+        if (current is null)
+        {
+            return new CommitPlan(CommitKind.Error, [], "lattice", "refused");
+        }
+
+        return current.ChosenMode == RunMode.Screen
+            ? new CommitPlan(CommitKind.Screen, CliAppLaunchpadRunner.CockpitArguments(current.Arguments), current.CommandLine, null)
+            : new CommitPlan(CommitKind.Run, current.Arguments, current.CommandLine, null);
     }
 
     /// <summary>
@@ -367,6 +676,7 @@ public static class SlashConsoleHost
         SlashConsoleState state,
         ActiveRun run,
         ResultPanel result,
+        ActiveForm form,
         SlashConsoleHostRequest request,
         ScreenHost host)
     {
@@ -404,7 +714,42 @@ public static class SlashConsoleHost
             host.Size,
             host.Glyphs,
             request.Capabilities.Depth,
-            request.Capabilities.Utf8));
+            request.Capabilities.Utf8,
+            FormView(form)));
+    }
+
+    /// <summary>
+    /// Maps the open form to the plain data the layout draws, or null when no form
+    /// is open. The mapping is rebuilt every frame so the screen can never show a
+    /// value the form no longer holds.
+    /// </summary>
+    private static SlashConsoleFormView? FormView(ActiveForm form)
+    {
+        var current = form.Form;
+        if (current is null)
+        {
+            return null;
+        }
+
+        var focused = current.FocusedField;
+        return new SlashConsoleFormView(
+            current.Current.Name,
+            current.Current.Summary,
+            current.Fields
+                .Select(field => new SlashConsoleFormField(
+                    field.Label,
+                    current.Value(field),
+                    field.Required,
+                    field.Label == focused,
+                    field.Label == focused ? current.Caret : 0,
+                    field.Help ?? string.Empty,
+                    field.ValueFormat == LaunchpadValueFormat.Choice ? field.Choices ?? [] : [],
+                    current.WasTyped(field)))
+                .ToList(),
+            focused is null
+                ? null
+                : current.Fields.FirstOrDefault(field => field.Label == focused)?.Help,
+            current.ValidationError);
     }
 
     /// <summary>The resize notice, or null when the terminal carries the console.</summary>

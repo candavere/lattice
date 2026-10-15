@@ -221,4 +221,21 @@ public class LaunchpadCatalogTests
             Assert.Equal(LaunchpadValueFormat.UnsignedInteger, seed.ValueFormat);
         }
     }
+
+    /// <summary>
+    /// The trajectory flag is required wherever the command refuses without it,
+    /// exactly like the seed: render and analyze report a usage error for a bare
+    /// invocation, so the catalog marks it and the form asks for it.
+    /// </summary>
+    [Fact]
+    public void TheTrajectoryFlagIsRequiredWhereverTheCommandRefusesWithoutIt()
+    {
+        foreach (var name in new[] { "render", "analyze" })
+        {
+            var entry = LaunchpadCatalog.Commands.Single(command => command.Name == name);
+            Assert.Contains("--trajectory", entry.RequiredFlags);
+            var field = Assert.Single(entry.Fields, field => field.Label == "--trajectory");
+            Assert.True(field.Required);
+        }
+    }
 }

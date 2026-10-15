@@ -4,6 +4,44 @@ namespace Lattice.Tui;
 public sealed record SlashMenuItem(string Name, string Description);
 
 /// <summary>
+/// One guided-form field as the console draws it: plain data mapped from a
+/// <c>LaunchpadForm</c> by the host, so this assembly never references the CLI.
+/// </summary>
+/// <param name="Label">The flag's own name, or the field's own name where there is no flag.</param>
+/// <param name="Text">What the field shows: the typed value, or the catalog default as a placeholder.</param>
+/// <param name="Required">Whether the command refuses to run without it.</param>
+/// <param name="Focused">Whether this field has focus.</param>
+/// <param name="Caret">The caret column when focused.</param>
+/// <param name="Help">The catalog help line for the field.</param>
+/// <param name="Choices">The accepted values, when the field names a format with choices.</param>
+/// <param name="Typed">Whether the reader chose the text, as opposed to a shown default.</param>
+public sealed record SlashConsoleFormField(
+    string Label,
+    string Text,
+    bool Required,
+    bool Focused,
+    int Caret,
+    string Help,
+    string[] Choices,
+    bool Typed);
+
+/// <summary>
+/// The guided input form on show: one catalog command with its fields in catalog
+/// order, replacing the slash menu area while open. Null when no form is open.
+/// </summary>
+/// <param name="Command">The command name without its leading slash.</param>
+/// <param name="Summary">The catalog one-line summary.</param>
+/// <param name="Fields">The command's fields in catalog order.</param>
+/// <param name="Help">The focused field's help line, or null when nothing is focused.</param>
+/// <param name="ValidationError">Why the form cannot run, or null when it can.</param>
+public sealed record SlashConsoleFormView(
+    string Command,
+    string Summary,
+    IReadOnlyList<SlashConsoleFormField> Fields,
+    string? Help,
+    string? ValidationError);
+
+/// <summary>
 /// Everything the slash console needs for one pure frame: the input as typed, the menu
 /// rows to show, the selection, the working directory, an optional notice and result,
 /// and the terminal state. No keys, no processes, no clock.
@@ -21,7 +59,8 @@ public sealed record SlashConsoleRequest(
     PaneSize Size,
     GlyphMode Glyphs,
     ColorDepth Depth,
-    bool Utf8);
+    bool Utf8,
+    SlashConsoleFormView? Form = null);
 
 /// <summary>
 /// The slash-command console as a pure layout: a request in, a grid the size of the
@@ -88,6 +127,10 @@ public static class SlashConsoleLayout
     /// <param name="MenuStart">The first visible menu index (selection scrolling).</param>
     /// <param name="InputY">The input row.</param>
     /// <param name="ResultTop">The first result row.</param>
+    /// <param name="HasForm">Whether the guided form replaces the menu area.</param>
+    /// <param name="FormTop">The first form row (title).</param>
+    /// <param name="FormRows">How many field rows draw.</param>
+    /// <param name="FormStart">The first visible field index (focus scrolling).</param>
     public readonly record struct ConsoleGeometry(
         bool Centered,
         int NoticeY,
@@ -98,7 +141,11 @@ public static class SlashConsoleLayout
         int MenuRows,
         int MenuStart,
         int InputY,
-        int ResultTop);
+        int ResultTop,
+        bool HasForm,
+        int FormTop,
+        int FormRows,
+        int FormStart);
 
     /// <summary>Rows the footer owns: the working-directory row and the hints row.</summary>
     public const int FooterRows = 2;
@@ -129,27 +176,35 @@ public static class SlashConsoleLayout
         var showed = ShowsWordmark(request);
         var headH = showed ? Wordmark.Height : 1;
         var hasResult = request.ResultTitle is { Length: > 0 } || request.ResultLines is { Count: > 0 };
+        var hasForm = request.Form is not null;
+        var fieldTotal = request.Form?.Fields.Count ?? 0;
+        var errorRows = request.Form?.ValidationError is { Length: > 0 } ? 1 : 0;
+        var noticeRows = wantNotice ? 1 : 0;
 
         if (!hasResult)
         {
-            var full = (wantNotice ? 1 : 0) + headH + HeadGap + menuCount + (menuCount > 0 ? MenuGap : 0) + 1;
+            // The guided form replaces the menu area while open; the wordmark, the
+            // form (or menu) and the input stay one centred composition.
+            var blockFull = hasForm
+                ? 3 + errorRows + fieldTotal
+                : menuCount + (menuCount > 0 ? MenuGap : 0);
+            var full = noticeRows + headH + HeadGap + blockFull + 1;
             int top;
-            int menuRows;
+            int showRows;
             if (full <= usable)
             {
                 top = (usable - full) / 2;
-                menuRows = menuCount;
+                showRows = hasForm ? fieldTotal : menuCount;
             }
             else
             {
                 top = 0;
-                var room = usable - ((wantNotice ? 1 : 0) + headH + HeadGap + 1);
-                if (menuCount > 0)
-                {
-                    room -= MenuGap;
-                }
-
-                menuRows = Math.Max(0, Math.Min(menuCount, room));
+                var blockFixed = hasForm
+                    ? 3 + errorRows
+                    : (menuCount > 0 ? MenuGap : 0);
+                showRows = Math.Max(0, Math.Min(
+                    hasForm ? fieldTotal : menuCount,
+                    usable - (noticeRows + headH + HeadGap + blockFixed + 1)));
             }
 
             top = Math.Max(0, top);
@@ -158,17 +213,32 @@ public static class SlashConsoleLayout
             var headY = y;
             y += headH;
             y += HeadGap;
-            var menuTop = y;
-            y += menuRows;
-            if (menuRows > 0)
+
+            int menuTop = 0, menuRows = 0, menuStart = 0;
+            int formTop = 0, formRows = 0, formStart = 0;
+            if (hasForm)
             {
-                y += MenuGap;
+                formTop = y;
+                formRows = showRows;
+                formStart = FormStartIndex(request, showRows);
+                y += 1 + showRows + 1 + errorRows + 1;
+            }
+            else
+            {
+                menuTop = y;
+                menuRows = showRows;
+                menuStart = MenuStartIndex(request, showRows);
+                y += showRows;
+                if (showRows > 0)
+                {
+                    y += MenuGap;
+                }
             }
 
             var inputY = y;
             return new ConsoleGeometry(
-                true, noticeY, headY, showed, true, menuTop, menuRows,
-                MenuStartIndex(request, menuRows), inputY, inputY + MenuGap + 1);
+                true, noticeY, headY, showed, true, menuTop, menuRows, menuStart,
+                inputY, inputY + MenuGap + 1, hasForm, formTop, formRows, formStart);
         }
 
         // Results keep the top-anchored flow so the whole output body stays
@@ -180,24 +250,71 @@ public static class SlashConsoleLayout
             : Math.Min(height - 4, 4);
         contentTop = Math.Max(0, Math.Min(contentTop, Math.Max(0, height - 3)));
 
-        var roomLegacy = height - FooterRows - contentTop - 1 - 1;
-        var menuRowsLegacy = Math.Max(0, Math.Min(menuCount, roomLegacy));
+        int menuTopLegacy = 0, menuRowsLegacy = 0, menuStartLegacy = 0;
+        int formTopLegacy = 0, formRowsLegacy = 0, formStartLegacy = 0;
+        if (hasForm)
+        {
+            formTopLegacy = contentTop;
+            formRowsLegacy = Math.Max(0, Math.Min(
+                fieldTotal,
+                height - FooterRows - contentTop - (3 + errorRows) - MenuGap - 1));
+            formStartLegacy = FormStartIndex(request, formRowsLegacy);
+        }
+        else
+        {
+            var roomLegacy = height - FooterRows - contentTop - 1 - 1;
+            menuTopLegacy = contentTop;
+            menuRowsLegacy = Math.Max(0, Math.Min(menuCount, roomLegacy));
+            menuStartLegacy = MenuStartIndex(request, menuRowsLegacy);
+        }
+
         var noticeYLegacy = wantNotice && contentTop > 0 ? contentTop - 1 : -1;
-        var inputYLegacy = contentTop + menuRowsLegacy + (menuRowsLegacy > 0 ? MenuGap : 0);
+        var blockLegacy = hasForm
+            ? 1 + formRowsLegacy + 1 + errorRows + 1
+            : menuRowsLegacy + (menuRowsLegacy > 0 ? MenuGap : 0);
+        var inputYLegacy = contentTop + blockLegacy;
         return new ConsoleGeometry(
-            false, noticeYLegacy, headYLegacy, showed, headDrawn, contentTop, menuRowsLegacy,
-            MenuStartIndex(request, menuRowsLegacy), inputYLegacy, inputYLegacy + MenuGap + 1);
+            false, noticeYLegacy, headYLegacy, showed, headDrawn,
+            menuTopLegacy, menuRowsLegacy, menuStartLegacy,
+            inputYLegacy, inputYLegacy + MenuGap + 1,
+            hasForm, formTopLegacy, formRowsLegacy, formStartLegacy);
     }
 
-    private static int MenuStartIndex(SlashConsoleRequest request, int rowsToShow)
+    private static int FormStartIndex(SlashConsoleRequest request, int rowsToShow)
     {
-        if (rowsToShow >= request.Menu.Count)
+        if (request.Form is null)
         {
             return 0;
         }
 
-        return Math.Clamp(request.SelectedIndex - rowsToShow + 1, 0, request.Menu.Count - rowsToShow);
+        var total = request.Form.Fields.Count;
+        if (rowsToShow >= total)
+        {
+            return 0;
+        }
+
+        var focused = request.Form.Fields.ToList().FindIndex(field => field.Focused);
+        if (focused < 0)
+        {
+            return 0;
+        }
+
+        return ClampStart(total, focused, rowsToShow);
     }
+
+    /// <summary>Keeps an anchored row visible in a bounded viewport.</summary>
+    private static int ClampStart(int total, int anchor, int rowsToShow)
+    {
+        if (rowsToShow >= total)
+        {
+            return 0;
+        }
+
+        return Math.Clamp(anchor - rowsToShow + 1, 0, total - rowsToShow);
+    }
+
+    private static int MenuStartIndex(SlashConsoleRequest request, int rowsToShow) =>
+        ClampStart(request.Menu.Count, request.SelectedIndex, rowsToShow);
 
     /// <summary>
     /// The input text position from the same geometry the renderer draws: the input
@@ -340,9 +457,14 @@ public static class SlashConsoleLayout
             DrawClippedInColumn(cells, colX, geometry.NoticeY, colW, request.Notice, noticeStyle);
         }
 
-        if (geometry.MenuRows > 0)
+        if (geometry.MenuRows > 0 && !geometry.HasForm)
         {
             DrawMenu(cells, size, request, geometry, colX, colW, edge, panelFill);
+        }
+
+        if (geometry.HasForm && request.Form is not null)
+        {
+            DrawForm(cells, size, request, geometry, colX, colW, edge, panelFill);
         }
 
         DrawInputBar(cells, size, request, geometry.InputY, colX, colW, edge, panelFill);
@@ -355,6 +477,148 @@ public static class SlashConsoleLayout
         DrawBottom(cells, size, request, panelFill);
 
         return cells;
+    }
+
+    /// <summary>
+    /// The guided input form, in the menu area: the command and its summary, one row
+    /// per visible field with its required marker and value, the focused field's help,
+    /// the validation message when the form cannot run, and the form's keys. Focus
+    /// scrolls the field window; the focused row is always drawn.
+    /// </summary>
+    private static void DrawForm(CellBuffer cells, PaneSize size, SlashConsoleRequest request, ConsoleGeometry geometry, int colX, int colW, char edge, Rgb? panelFill)
+    {
+        var view = request.Form;
+        if (view is null)
+        {
+            return;
+        }
+
+        var y = geometry.FormTop;
+        var labelWidth = 0;
+        foreach (var field in view.Fields)
+        {
+            labelWidth = Math.Min(24, Math.Max(labelWidth, field.Label.Length));
+        }
+
+        labelWidth = Math.Max(8, Math.Min(labelWidth, Math.Max(8, colW - 12)));
+        var valueX = colX + 2 + 2 + labelWidth + 1;
+
+        DrawClippedInColumn(cells, colX + 2, y++, Math.Max(0, colW - 2), "/" + view.Command + "  " + view.Summary,
+            new Cell(' ', Palette.TextPrimary, panelFill, CellAttributes.Bold));
+
+        for (var r = 0; r < geometry.FormRows; r++)
+        {
+            var index = geometry.FormStart + r;
+            if (index < 0 || index >= view.Fields.Count || y >= size.Height - FooterRows)
+            {
+                break;
+            }
+
+            var field = view.Fields[index];
+            var rowBg = field.Focused && request.Depth == ColorDepth.TrueColor ? Theme.SelectionBackground : panelFill;
+            if (request.Depth == ColorDepth.TrueColor)
+            {
+                FillColumn(cells, size, colX, colW, y, rowBg);
+            }
+
+            if (field.Focused && colX >= 0 && colX < size.Width && y >= 0 && y < size.Height)
+            {
+                cells[colX, y] = new Cell(edge, Palette.AccentSecondary, rowBg, CellAttributes.Bold);
+            }
+
+            var markerStyle = new Cell(' ', field.Required ? Palette.Accent : Theme.Muted, rowBg, CellAttributes.Bold);
+            DrawClipped(cells, colX + 2, y, 1, field.Required ? "*" : " ", markerStyle);
+
+            var labelStyle = new Cell(' ', field.Focused ? Palette.TextPrimary : Theme.SecondaryText, rowBg,
+                field.Focused ? CellAttributes.Bold : CellAttributes.None);
+            DrawClipped(cells, colX + 4, y, labelWidth, field.Label, labelStyle);
+
+            var shown = field.Text.Length > 0 ? field.Text : string.Empty;
+            var textStyle = !field.Typed
+                ? new Cell(' ', Theme.Muted, rowBg)
+                : new Cell(' ', Palette.TextPrimary, rowBg);
+            var room = Math.Max(0, Math.Min(colX + colW - 1, size.Width - 1) - valueX);
+            var clipped = CellText.Clip(shown, room, request.Glyphs);
+            var suffix = field.Choices.Length > 0 && field.Focused
+                ? " [" + string.Join("/", field.Choices) + "]"
+                : string.Empty;
+            var suffixRoom = Math.Max(0, room - clipped.Length);
+            var clippedSuffix = CellText.Clip(suffix, suffixRoom, request.Glyphs);
+            var x = valueX;
+            foreach (var c in clipped)
+            {
+                if (x >= colX + colW || x >= size.Width)
+                {
+                    break;
+                }
+
+                if (x >= 0 && y >= 0 && y < size.Height)
+                {
+                    var caret = field.Focused && x - valueX == field.Caret;
+                    cells[x, y] = caret
+                        ? textStyle with { Glyph = c, Attributes = textStyle.Attributes | CellAttributes.Reverse }
+                        : textStyle with { Glyph = c };
+                }
+
+                x++;
+            }
+
+            var suffixStyle = new Cell(' ', Theme.Muted, rowBg);
+            foreach (var c in clippedSuffix)
+            {
+                if (x >= colX + colW || x >= size.Width)
+                {
+                    break;
+                }
+
+                if (x >= 0 && y >= 0 && y < size.Height)
+                {
+                    cells[x, y] = suffixStyle with { Glyph = c };
+                }
+
+                x++;
+            }
+
+            if (field.Focused && field.Caret >= clipped.Length && x < colX + colW && x < size.Width && x >= 0 && y >= 0 && y < size.Height)
+            {
+                cells[x, y] = textStyle with { Glyph = ' ', Attributes = textStyle.Attributes | CellAttributes.Reverse };
+            }
+
+            if (!field.Typed && field.Text.Length == 0)
+            {
+                var hint = field.Label == "extra arguments" ? "optional" : "empty";
+                DrawClipped(cells, x + 1, y, Math.Max(0, Math.Min(colX + colW, size.Width) - (x + 1)), hint, suffixStyle);
+            }
+
+            y++;
+        }
+
+        var helpStyle = new Cell(' ', Theme.SecondaryText, panelFill);
+        DrawClippedInColumn(cells, colX + 2, y++, Math.Max(0, colW - 2), view.Help ?? string.Empty, helpStyle);
+
+        if (view.ValidationError is { Length: > 0 } error)
+        {
+            DrawClippedInColumn(cells, colX + 2, y++, Math.Max(0, colW - 2), error,
+                new Cell(' ', Palette.Error, panelFill, CellAttributes.Bold));
+        }
+
+        DrawClippedInColumn(cells, colX + 2, y, Math.Max(0, colW - 2),
+            "up/down field  tab next  enter run  esc back", new Cell(' ', Theme.KeyHint, panelFill));
+    }
+
+    private static void FillColumn(CellBuffer cells, PaneSize size, int colX, int colW, int y, Rgb? background)
+    {
+        if (y < 0 || y >= size.Height || colW <= 0)
+        {
+            return;
+        }
+
+        var fx = Math.Max(0, colX);
+        var fw = Math.Min(colW, size.Width - fx);
+        for (var col = fx; col < fx + fw; col++)
+        {
+            cells[col, y] = new Cell(' ', null, background);
+        }
     }
 
     private static void DrawInputBar(CellBuffer cells, PaneSize size, SlashConsoleRequest request, int y, int colX, int colW, char edge, Rgb? panelFill)

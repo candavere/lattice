@@ -447,7 +447,9 @@ public class LaunchpadFormTests
     public void AChoiceFieldRefusesAValueThatIsNotOneOfItsChoices()
     {
         var form = Select(Form(), "render");
-        Drive(form, new TuiKey(TuiKeyKind.Tab), new TuiKey(TuiKeyKind.Tab));
+        Drive(form, new TuiKey(TuiKeyKind.Tab));
+        Type(form, "t.jsonl");
+        Drive(form, new TuiKey(TuiKeyKind.Tab));
         Type(form, "yaml");
 
         Assert.Equal("invalid --format 'yaml' (expected 'ascii' or 'svg').", form.ValidationError);
@@ -462,11 +464,13 @@ public class LaunchpadFormTests
     public void AChoiceFieldIsAsForgivingAsTheCommandIs()
     {
         var form = Select(Form(), "render");
-        Drive(form, new TuiKey(TuiKeyKind.Tab), new TuiKey(TuiKeyKind.Tab));
+        Drive(form, new TuiKey(TuiKeyKind.Tab));
+        Type(form, "t.jsonl");
+        Drive(form, new TuiKey(TuiKeyKind.Tab));
         Type(form, "SVG");
 
         Assert.Null(form.ValidationError);
-        Assert.Equal("lattice render --format SVG", form.CommandLine);
+        Assert.Equal("lattice render --trajectory t.jsonl --format SVG", form.CommandLine);
     }
 
     /// <summary>
@@ -866,5 +870,65 @@ public class LaunchpadFormTests
         {
             return error.Message;
         }
+    }
+
+    /// <summary>
+    /// Arrows steer the command selection, which reloads defaults: on a form over a
+    /// single command they are a no-op that silently discards what was typed. A host
+    /// that routes arrows into such a form would eat the reader's input, so this pins
+    /// the hazard the console's own focus movement must avoid.
+    /// </summary>
+    [Fact]
+    public void ArrowsOnASingleCommandFormDiscardTypedValues()
+    {
+        var generate = LaunchpadCatalog.Commands.Single(entry => entry.Name == "generate");
+        var form = Type(Drive(LaunchpadForm.For([generate]), new TuiKey(TuiKeyKind.Tab)), "42");
+        Drive(form, new TuiKey(TuiKeyKind.Escape), new TuiKey(TuiKeyKind.Down));
+
+        Assert.Equal(string.Empty, form.Values["--seed"]);
+    }
+
+    /// <summary>
+    /// A host over a single command moves field focus directly, without touching the
+    /// command selection or the values. Out-of-range asks clamp to the ends.
+    /// </summary>
+    [Fact]
+    public void FocusFieldMovesFocusWithoutTouchingValues()
+    {
+        var generate = LaunchpadCatalog.Commands.Single(entry => entry.Name == "generate");
+        var form = Type(Drive(LaunchpadForm.For([generate]), new TuiKey(TuiKeyKind.Tab)), "42");
+
+        form.FocusField(2);
+
+        Assert.Equal("--out", form.FocusedField);
+        Assert.Equal("42", form.Values["--seed"]);
+        Assert.True(form.WasTyped(form.Fields[0]));
+
+        form.FocusField(99);
+        Assert.Equal(LaunchpadCatalog.ExtraArgumentsLabel, form.FocusedField);
+        Assert.Equal("42", form.Values["--seed"]);
+    }
+
+    /// <summary>
+    /// An exact prefill sets the value, marks it chosen and validates it, so the
+    /// command line carries it. Unknown labels and values the parser refuses set
+    /// nothing and report false, so an inexact typed line opens an empty form.
+    /// </summary>
+    [Fact]
+    public void TrySetValueSetsAnExactValueMarkedTyped()
+    {
+        var generate = LaunchpadCatalog.Commands.Single(entry => entry.Name == "generate");
+        var form = LaunchpadForm.For([generate]);
+
+        Assert.True(form.TrySetValue("--seed", "42"));
+        Assert.Equal("42", form.Values["--seed"]);
+        Assert.True(form.WasTyped(form.Fields[0]));
+        Assert.Equal(["generate", "--seed", "42"], form.Arguments);
+        Assert.Null(form.ValidationError);
+
+        Assert.False(form.TrySetValue("--seed", "not-a-number"));
+        Assert.Equal("42", form.Values["--seed"]);
+
+        Assert.False(form.TrySetValue("--bogus", "1"));
     }
 }

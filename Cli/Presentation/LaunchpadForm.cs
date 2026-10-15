@@ -477,6 +477,41 @@ public sealed class LaunchpadForm
         Validate();
     }
 
+    /// <summary>
+    /// Moves field focus to the given row, for hosts that navigate fields with
+    /// their own keys. Command steering is untouched, so values never reload.
+    /// Out-of-range asks clamp to the ends.
+    /// </summary>
+    public void FocusField(int index) => Focus(index);
+
+    /// <summary>
+    /// Sets a field to a value the command's own parser accepts, marking it chosen
+    /// and validating the form. Returns false and changes nothing for an unknown
+    /// label or a refused value.
+    /// </summary>
+    public bool TrySetValue(string label, string value)
+    {
+        ArgumentNullException.ThrowIfNull(label);
+        ArgumentNullException.ThrowIfNull(value);
+
+        var field = Fields.FirstOrDefault(entry => entry.Label.Equals(label, StringComparison.Ordinal));
+        if (field is null || field.Kind == LaunchpadFieldKind.ExtraArguments)
+        {
+            return false;
+        }
+
+        if (field.Kind == LaunchpadFieldKind.Flag && Refusal(field, value) is not null)
+        {
+            return false;
+        }
+
+        _typed.Add(field.Label);
+        _values[field.Label] = value;
+        _carets[field.Label] = value.Length;
+        Validate();
+        return true;
+    }
+
     private void LeaveField()
     {
         _field = -1;

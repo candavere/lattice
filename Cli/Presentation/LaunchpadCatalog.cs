@@ -187,21 +187,21 @@ public static class LaunchpadCatalog
             "render",
             "Render a recorded trajectory as ASCII or SVG.",
             Form(
-                Flag("--trajectory", Help: "The trajectory to read."),
+                Flag("--trajectory", Required: true, Help: "The trajectory to read."),
                 Flag("--format", Format: LaunchpadValueFormat.Choice, Default: "ascii",
                     Choices: ["ascii", "svg"],
                     Help: "The output form."),
                 Flag("--out", Help: "Write here instead of stdout.")),
             ["--trajectory", "--format", "--out"],
-            []),
+            ["--trajectory"]),
         new(
             "analyze",
             "Report contention and turning points for a trajectory.",
             Form(
-                Flag("--trajectory", Help: "The trajectory to analyze."),
+                Flag("--trajectory", Required: true, Help: "The trajectory to analyze."),
                 Flag("--out", Help: "Write a Markdown report here instead of the terminal view.")),
             ["--trajectory", "--out"],
-            []),
+            ["--trajectory"]),
         new(
             "replay",
             "Play a recorded trajectory in the cockpit, or re-run it.",

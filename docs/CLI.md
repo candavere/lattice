@@ -559,6 +559,25 @@ text. A command run from the Launchpad leaves the alternate screen, restores
 the terminal, and runs through the same `CliApp.Run` path with the process's
 own stdout and stderr.
 
+### The slash console asks for required inputs
+
+Bare `lattice` on a terminal opens the slash console. Picking a command from
+the `/` menu with Enter opens an input form for that command instead of
+running it: one row per field in catalog order, required fields marked,
+defaults shown as placeholders, choices named, and values validated by the CLI
+parser itself as they are typed. The command runs only when the form is
+complete. Typing an incomplete raw line (a catalog command missing a required
+input) opens the same form, prefilled from the typed flags where exact; a
+complete raw line, an unknown command and `/exit` behave as before.
+
+```
+up/down field  tab next  enter run  esc back
+```
+
+`enter` confirms, `esc` leaves the form with the typed line intact, `ctrl-c`
+quits. Shell `lattice <command> <args>` behaviour — output, exit codes and
+error text — is unchanged.
+
 ### Refusals and exit codes
 
 A viewer whose input or output is redirected is not a viewer: entering the

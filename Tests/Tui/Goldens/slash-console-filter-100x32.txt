@@ -1,5 +1,11 @@
                                                                                                     
                                                                                                     
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
                              ⣀⡴⠿⢟⣁⣀                        ⣀                                        
                             ⣼⡿⣠⡴⠛⠛⠁                       ⠺⡿⣣⣄                                      
                            ⢰⣿⢳⣿⠃           ⢠⣶⠇⢀    ⣴⡾ ⡀    ⠈⠻⠋                                      
@@ -13,12 +19,6 @@
       │ /simulate             Run an episode: watched live, or recorded as trajectory JSONL.        
                                                                                                     
       │ /sim                                                                                        
-                                                                                                    
-                                                                                                    
-                                                                                                    
-                                                                                                    
-                                                                                                    
-                                                                                                    
                                                                                                     
                                                                                                     
                                                                                                     

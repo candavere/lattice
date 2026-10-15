@@ -1,7 +1,12 @@
                                                               
                                                               
-                           lattice                            
+                                                              
+                                                              
+                                                              
     terminal is 62x29; console needs 62x16 (62x30 with ...    
+                           lattice                            
+                                                              
+                                                              
     │ /generate             Generate a valid map as JSON.     
       /simulate             Run an episode: watched live…     
       /render               Render a recorded trajectory…     
@@ -14,11 +19,6 @@
       /exit                 Leave the console. (alias /q…     
                                                               
     │ /                                                       
-                                                              
-                                                              
-                                                              
-                                                              
-                                                              
                                                               
                                                               
                                                               

@@ -26,10 +26,11 @@ public sealed record SlashConsoleRequest(
 /// <summary>
 /// The slash-command console as a pure layout: a request in, a grid the size of the
 /// terminal out, no terminal touched. Home shows the centred dotted wordmark (or the
-/// centred plain-title fallback), a centred bounded input/menu column, and the working
-/// directory pinned bottom-left; the slash menu sits above the input in the same column
-/// with aligned names and descriptions; a result panel shows a clipped run with a
-/// truncation marker; the bottom row carries key hints right-aligned.
+/// centred plain-title fallback) as one vertically centred composition with the input
+/// in a centred bounded column, and the working directory pinned bottom-left; the slash
+/// menu sits above the input in the same column with aligned names and descriptions;
+/// a result panel keeps the top-anchored flow with a truncation marker so long output
+/// stays readable; the bottom row carries key hints right-aligned.
 /// </summary>
 /// <remarks>
 /// Colours come only from <see cref="Theme"/>, <see cref="Palette"/> and
@@ -67,6 +68,158 @@ public static class SlashConsoleLayout
     /// <summary>Whether this frame draws the wordmark rather than the centred fallback.</summary>
     public static bool ShowsWordmark(SlashConsoleRequest request) =>
         Wordmark.ShouldShowWordmark(request.Size.Width, request.Size.Height, request.Utf8, request.Glyphs, request.MenuOpen);
+
+    /// <summary>
+    /// One frame's vertical geometry: every row the renderer draws, derived from the
+    /// terminal size alone. The renderer and <see cref="InputCursor"/> share this
+    /// calculation, so the input the screen draws and the input position it reports
+    /// can never disagree.
+    /// </summary>
+    /// <param name="Centered">Whether the wordmark/menu/input group is centred as one
+    /// composition in the usable canvas. False when a result is on show: the result
+    /// body keeps the legacy top-anchored flow so a long output stays fully readable
+    /// instead of being squeezed into a centred decorative block.</param>
+    /// <param name="NoticeY">The notice row, or -1 when there is no notice.</param>
+    /// <param name="HeadY">The wordmark top row, or the fallback title row.</param>
+    /// <param name="HeadIsWordmark">Whether the head block is the wordmark.</param>
+    /// <param name="HeadDrawn">Whether the head block is drawn at all.</param>
+    /// <param name="MenuTop">The first menu row.</param>
+    /// <param name="MenuRows">How many menu rows draw.</param>
+    /// <param name="MenuStart">The first visible menu index (selection scrolling).</param>
+    /// <param name="InputY">The input row.</param>
+    /// <param name="ResultTop">The first result row.</param>
+    public readonly record struct ConsoleGeometry(
+        bool Centered,
+        int NoticeY,
+        int HeadY,
+        bool HeadIsWordmark,
+        bool HeadDrawn,
+        int MenuTop,
+        int MenuRows,
+        int MenuStart,
+        int InputY,
+        int ResultTop);
+
+    /// <summary>Rows the footer owns: the working-directory row and the hints row.</summary>
+    public const int FooterRows = 2;
+
+    /// <summary>Gap rows between the head block and the menu/input below it.</summary>
+    public const int HeadGap = 2;
+
+    /// <summary>Gap rows between the menu and the input below it.</summary>
+    public const int MenuGap = 1;
+
+    /// <summary>
+    /// Computes one frame's vertical geometry from the terminal size alone: no terminal
+    /// touched, no exceptions for any size. The usable canvas is the terminal minus the
+    /// pinned footer; the wordmark/menu/input group is centred in it as one composition
+    /// whenever it fits, with the free space above and below differing by at most one
+    /// row. When it cannot fit, the group clamps to the top with a bounded menu viewport
+    /// that always leaves the input row above the footer.
+    /// </summary>
+    public static ConsoleGeometry ComputeGeometry(SlashConsoleRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var width = request.Size.Width;
+        var height = request.Size.Height;
+        var usable = Math.Max(0, height - FooterRows);
+        var menuCount = request.MenuOpen && request.Menu.Count > 0 ? request.Menu.Count : 0;
+        var wantNotice = !string.IsNullOrEmpty(request.Notice);
+        var showed = ShowsWordmark(request);
+        var headH = showed ? Wordmark.Height : 1;
+        var hasResult = request.ResultTitle is { Length: > 0 } || request.ResultLines is { Count: > 0 };
+
+        if (!hasResult)
+        {
+            var full = (wantNotice ? 1 : 0) + headH + HeadGap + menuCount + (menuCount > 0 ? MenuGap : 0) + 1;
+            int top;
+            int menuRows;
+            if (full <= usable)
+            {
+                top = (usable - full) / 2;
+                menuRows = menuCount;
+            }
+            else
+            {
+                top = 0;
+                var room = usable - ((wantNotice ? 1 : 0) + headH + HeadGap + 1);
+                if (menuCount > 0)
+                {
+                    room -= MenuGap;
+                }
+
+                menuRows = Math.Max(0, Math.Min(menuCount, room));
+            }
+
+            top = Math.Max(0, top);
+            var y = top;
+            var noticeY = wantNotice ? y++ : -1;
+            var headY = y;
+            y += headH;
+            y += HeadGap;
+            var menuTop = y;
+            y += menuRows;
+            if (menuRows > 0)
+            {
+                y += MenuGap;
+            }
+
+            var inputY = y;
+            return new ConsoleGeometry(
+                true, noticeY, headY, showed, true, menuTop, menuRows,
+                MenuStartIndex(request, menuRows), inputY, inputY + MenuGap + 1);
+        }
+
+        // Results keep the legacy top-anchored flow so the whole output body stays
+        // readable; clearing the result restores the centred home composition.
+        var headYLegacy = 2;
+        var headDrawn = showed && headYLegacy + Wordmark.Height < height - 4;
+        int contentTop = headDrawn
+            ? headYLegacy + Wordmark.Height + HeadGap
+            : Math.Min(height - 4, 4);
+        contentTop = Math.Max(0, Math.Min(contentTop, Math.Max(0, height - 3)));
+
+        var roomLegacy = height - FooterRows - contentTop - 1 - 1;
+        var menuRowsLegacy = Math.Max(0, Math.Min(menuCount, roomLegacy));
+        var noticeYLegacy = wantNotice && contentTop > 0 ? contentTop - 1 : -1;
+        var inputYLegacy = contentTop + menuRowsLegacy + (menuRowsLegacy > 0 ? MenuGap : 0);
+        return new ConsoleGeometry(
+            false, noticeYLegacy, headYLegacy, showed, headDrawn, contentTop, menuRowsLegacy,
+            MenuStartIndex(request, menuRowsLegacy), inputYLegacy, inputYLegacy + MenuGap + 1);
+    }
+
+    private static int MenuStartIndex(SlashConsoleRequest request, int rowsToShow)
+    {
+        if (rowsToShow >= request.Menu.Count)
+        {
+            return 0;
+        }
+
+        return Math.Clamp(request.SelectedIndex - rowsToShow + 1, 0, request.Menu.Count - rowsToShow);
+    }
+
+    /// <summary>
+    /// The input text position from the same geometry the renderer draws: the input
+    /// row and the column just past the last visible input character (the text origin
+    /// when the line is empty). The console session hides the terminal cursor while
+    /// the screen owns it; this is the shared calculation any cursor placement must use.
+    /// </summary>
+    public static (int Row, int Col) InputCursor(SlashConsoleRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var geometry = ComputeGeometry(request);
+        var (colX, colW) = ContentColumn(request.Size.Width);
+        var textX = colX + 2;
+        var room = Math.Max(0, colX + colW - 1 - textX);
+        var visible = request.Input.Length > 0
+            ? CellText.Clip(request.Input, room, request.Glyphs).Length
+            : 0;
+        var col = Math.Max(textX, Math.Min(textX + visible, colX + colW - 1));
+        var row = Math.Max(0, Math.Min(geometry.InputY, Math.Max(0, request.Size.Height - 1)));
+        return (row, col);
+    }
 
     /// <summary>The centred bounded column: left origin and width.</summary>
     public static (int X, int Width) ContentColumn(int terminalWidth)
@@ -155,28 +308,18 @@ public static class SlashConsoleLayout
 
         var edge = request.Glyphs == GlyphMode.Ascii ? '|' : '│';
         var (colX, colW) = ContentColumn(size.Width);
+        var geometry = ComputeGeometry(request);
 
-        var showed = ShowsWordmark(request);
-        int contentTop;
-        if (showed)
+        if (geometry.HeadDrawn)
         {
-            var x = Math.Max(0, (size.Width - Wordmark.Width) / 2);
-            var y = 2;
-            if (y + Wordmark.Height < size.Height - 4)
+            if (geometry.HeadIsWordmark)
             {
-                Wordmark.DrawRows(cells, x, y, request.Depth);
-                contentTop = y + Wordmark.Height + 2;
+                var x = Math.Max(0, (size.Width - Wordmark.Width) / 2);
+                Wordmark.DrawRows(cells, x, geometry.HeadY, request.Depth);
             }
-            else
+            else if (size.Height > 4 && size.Width >= Wordmark.PlainTitle.Length + 2)
             {
-                contentTop = Math.Min(size.Height - 4, 4);
-            }
-        }
-        else
-        {
-            // Centred fallback title only; no competing top-left header.
-            if (size.Height > 4 && size.Width >= Wordmark.PlainTitle.Length + 2)
-            {
+                // Centred fallback title only; no competing top-left header.
                 var title = Wordmark.PlainTitle;
                 var start = Math.Max(0, (size.Width - title.Length) / 2);
                 var style = new Cell(' ', Palette.TextPrimary, panelFill, CellAttributes.Bold);
@@ -185,45 +328,28 @@ public static class SlashConsoleLayout
                     var bx = start + i;
                     if (bx >= 0 && bx < size.Width)
                     {
-                        cells[bx, 2] = style with { Glyph = title[i] };
+                        cells[bx, geometry.HeadY] = style with { Glyph = title[i] };
                     }
                 }
             }
-
-            contentTop = 4;
         }
 
-        contentTop = Math.Max(0, Math.Min(contentTop, Math.Max(0, size.Height - 3)));
-
-        int menuTop = contentTop;
-        int menuHeight = 0;
-        if (request.MenuOpen && request.Menu.Count > 0)
-        {
-            // Room for the input row plus the two bottom rows.
-            var room = size.Height - 2 - menuTop - 1 - 1;
-            menuHeight = Math.Max(0, Math.Min(request.Menu.Count, room));
-        }
-
-        if (!string.IsNullOrEmpty(request.Notice) && menuTop > 0)
+        if (geometry.NoticeY >= 0 && !string.IsNullOrEmpty(request.Notice))
         {
             var noticeStyle = new Cell(' ', Theme.SecondaryText, panelFill);
-            DrawClippedInColumn(cells, colX, menuTop - 1, colW, request.Notice, noticeStyle);
+            DrawClippedInColumn(cells, colX, geometry.NoticeY, colW, request.Notice, noticeStyle);
         }
 
-        var nextY = menuTop;
-        if (menuHeight > 0)
+        if (geometry.MenuRows > 0)
         {
-            nextY = DrawMenu(cells, size, request, menuTop, menuHeight, colX, colW, edge, panelFill);
-            nextY += 1; // deliberate gap between menu and input.
+            DrawMenu(cells, size, request, geometry, colX, colW, edge, panelFill);
         }
 
-        var inputY = nextY;
-        DrawInputBar(cells, size, request, inputY, colX, colW, edge, panelFill);
+        DrawInputBar(cells, size, request, geometry.InputY, colX, colW, edge, panelFill);
 
-        nextY = inputY + 2; // one input row plus one gap row.
         if (request.ResultLines is { Count: > 0 } || request.ResultTitle is { Length: > 0 })
         {
-            DrawResult(cells, size, request, nextY, colX, colW, panelFill);
+            DrawResult(cells, size, request, geometry.ResultTop, colX, colW, panelFill);
         }
 
         DrawBottom(cells, size, request, panelFill);
@@ -275,19 +401,17 @@ public static class SlashConsoleLayout
         }
     }
 
-    private static int DrawMenu(CellBuffer cells, PaneSize size, SlashConsoleRequest request, int firstY, int rowsToShow, int colX, int colW, char edge, Rgb? panelFill)
+    private static void DrawMenu(CellBuffer cells, PaneSize size, SlashConsoleRequest request, ConsoleGeometry geometry, int colX, int colW, char edge, Rgb? panelFill)
     {
+        var firstY = geometry.MenuTop;
+        var rowsToShow = geometry.MenuRows;
         var y = firstY;
         var nameCol = Math.Min(NameColumnWidth, Math.Max(8, colW - 10));
         var nameX = colX + 2;
         var descX = nameX + nameCol + 2;
 
-        // Ensure the selected row stays visible when the list is clipped by height.
-        var start = 0;
-        if (rowsToShow < request.Menu.Count)
-        {
-            start = Math.Clamp(request.SelectedIndex - rowsToShow + 1, 0, request.Menu.Count - rowsToShow);
-        }
+        // The visible window follows the selection, from the shared geometry.
+        var start = geometry.MenuStart;
 
         for (var r = 0; r < rowsToShow; r++)
         {
@@ -371,8 +495,6 @@ public static class SlashConsoleLayout
 
             y++;
         }
-
-        return y;
     }
 
     private static void DrawResult(CellBuffer cells, PaneSize size, SlashConsoleRequest request, int firstY, int colX, int colW, Rgb? panelFill)

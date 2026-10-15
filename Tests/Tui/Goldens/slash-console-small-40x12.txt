@@ -1,10 +1,10 @@
                                         
                                         
-                lattice                 
     terminal is 40x12; console ne...    
+                lattice                 
+                                        
+                                        
     │ Type / to see commands            
-                                        
-                                        
                                         
                                         
                                         

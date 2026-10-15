@@ -62,7 +62,8 @@ public class SlashConsoleTests
     [Fact]
     public void HomeShowsWordmarkPlaceholderCwdAndPlainTitle()
     {
-        var cells = SlashConsoleLayout.Render(Home(new PaneSize(100, 32)));
+        var req = Home(new PaneSize(100, 32));
+        var cells = SlashConsoleLayout.Render(req);
         var text = string.Concat(cells.ToLines());
         Assert.Contains(SlashConsoleLayout.Placeholder, text);
         Assert.Contains("/Users/test/lattice", text);
@@ -70,12 +71,13 @@ public class SlashConsoleTests
         // No competing top-left header: row 0 stays blank.
         Assert.Equal(' ', cells[0, 0].Glyph);
         Assert.Equal(' ', cells[2, 0].Glyph);
-        // Blue left edge on the centred bounded input bar.
+        // Blue left edge on the centred bounded input bar, at the shared input row.
         var (colX, colW) = SlashConsoleLayout.ContentColumn(100);
         Assert.True(colX > 0, "input column must leave breathing room.");
-        Assert.Equal(Palette.AccentSecondary, cells[colX, 12].Foreground);
+        var cursor = SlashConsoleLayout.InputCursor(req);
+        Assert.Equal(Palette.AccentSecondary, cells[colX, cursor.Row].Foreground);
         // Input does not fill the full terminal width.
-        Assert.Equal(' ', cells[0, 12].Glyph);
+        Assert.Equal(' ', cells[0, cursor.Row].Glyph);
     }
 
     [Fact]
@@ -151,15 +153,40 @@ public class SlashConsoleTests
     public void SelectedRowIsOrangeOnTheElementBand()
     {
         var size = new PaneSize(100, 32);
-        var cells = SlashConsoleLayout.Render(Menu("/", 0, size));
+        var req = Menu("/", 0, size);
+        var cells = SlashConsoleLayout.Render(req);
         var (colX, _) = SlashConsoleLayout.ContentColumn(size.Width);
-        // Menu sits above the input in the same centred column; selected row 0 carries the orange edge.
-        var edge = cells[colX, 12];
+        var inputRow = SlashConsoleLayout.InputCursor(req).Row;
+        // Menu sits above the input in the same centred column; selected row carries the orange edge.
+        var menuRow = inputRow - SlashConsoleMenu.Filter("/").Count - 1;
+        var edge = cells[colX, menuRow];
         Assert.Equal(Palette.Accent, edge.Foreground);
-        Assert.Equal(Theme.SelectionBackground, cells[colX + 5, 12].Background);
-        Assert.Equal(Palette.Accent, cells[colX + 2, 12].Foreground);
+        Assert.Equal(Theme.SelectionBackground, cells[colX + 5, menuRow].Background);
+        Assert.Equal(Palette.Accent, cells[colX + 2, menuRow].Foreground);
         // Unselected row: text and muted, no selection band.
-        Assert.Equal(Palette.TextPrimary, cells[colX + 2, 13].Foreground);
+        Assert.Equal(Palette.TextPrimary, cells[colX + 2, menuRow + 1].Foreground);
+    }
+
+    [Fact]
+    public void InputCursorAlignsWithRenderedInput()
+    {
+        // Empty line: cursor at the text origin over the placeholder.
+        var home = Home(new PaneSize(100, 32));
+        var (colX, _) = SlashConsoleLayout.ContentColumn(100);
+        Assert.Equal((PlaceholderRow(SlashConsoleLayout.Render(home).ToLines()), colX + 2), SlashConsoleLayout.InputCursor(home));
+
+        // Typed input: cursor just past the last visible character.
+        var typed = home with { Input = "/sim", Menu = SlashConsoleMenu.Filter("/sim"), MenuOpen = true };
+        var typedCursor = SlashConsoleLayout.InputCursor(typed);
+        Assert.Equal(colX + 2 + "/sim".Length, typedCursor.Col);
+        var typedLines = SlashConsoleLayout.Render(typed).ToLines();
+        Assert.Equal('/', typedLines[typedCursor.Row][typedCursor.Col - "/sim".Length]);
+
+        // Clipped input: cursor stays on the last visible column.
+        var longReq = home with { Input = "/" + new string('x', 200) };
+        var longCursor = SlashConsoleLayout.InputCursor(longReq);
+        var (longColX, longColW) = SlashConsoleLayout.ContentColumn(100);
+        Assert.Equal(longColX + longColW - 1, longCursor.Col);
     }
 
     [Fact]
@@ -275,6 +302,161 @@ public class SlashConsoleTests
 
         var ascii = SlashConsoleLayout.Render(Home(new PaneSize(100, 32), GlyphMode.Ascii, utf8: false));
         Assert.Contains(Wordmark.PlainTitle, string.Concat(ascii.ToLines()));
+    }
+
+    private static int FirstBrailleRow(string[] lines)
+    {
+        for (var y = 0; y < lines.Length; y++)
+        {
+            foreach (var c in lines[y])
+            {
+                if (c >= 0x2800 && c <= 0x28FF)
+                {
+                    return y;
+                }
+            }
+        }
+
+        return -1;
+    }
+
+    private static int PlaceholderRow(string[] lines)
+    {
+        for (var y = 0; y < lines.Length; y++)
+        {
+            if (lines[y].Contains(SlashConsoleLayout.Placeholder, StringComparison.Ordinal))
+            {
+                return y;
+            }
+        }
+
+        return -1;
+    }
+
+    private static void AssertCentredGroup(int width, int height, string[] lines, int groupTop, int groupBottom)
+    {
+        var usable = height - 2;
+        Assert.True(groupTop >= 0, "group must not start above the canvas.");
+        Assert.True(groupBottom <= usable - 1, "group must not collide with the footer.");
+        var above = groupTop;
+        var below = usable - (groupBottom + 1);
+        Assert.True(Math.Abs(above - below) <= 1, $"free space above ({above}) and below ({below}) must differ by at most one row.");
+    }
+
+    [Theory]
+    [InlineData(237, 66)]
+    [InlineData(120, 40)]
+    [InlineData(100, 32)]
+    [InlineData(80, 24)]
+    [InlineData(62, 16)]
+    public void HomeGroupIsCentredInUsableCanvas(int width, int height)
+    {
+        var lines = SlashConsoleLayout.Render(Home(new PaneSize(width, height))).ToLines();
+        var top = FirstBrailleRow(lines);
+        var input = PlaceholderRow(lines);
+        Assert.True(top >= 0 && input > top, "wordmark and input must both render.");
+        AssertCentredGroup(width, height, lines, top, input);
+    }
+
+    [Theory]
+    [InlineData(100, 31)]
+    [InlineData(100, 32)]
+    [InlineData(100, 33)]
+    public void OddAndEvenHeightsCentreWithinOneRow(int width, int height)
+    {
+        var lines = SlashConsoleLayout.Render(Home(new PaneSize(width, height))).ToLines();
+        AssertCentredGroup(width, height, lines, FirstBrailleRow(lines), PlaceholderRow(lines));
+    }
+
+    [Theory]
+    [InlineData(120, 40)]
+    [InlineData(100, 32)]
+    public void MenuStackIsCentredAsOneGroup(int width, int height)
+    {
+        var size = new PaneSize(width, height);
+        var lines = SlashConsoleLayout.Render(Menu("/", 0, size)).ToLines();
+        var top = FirstBrailleRow(lines);
+        var input = Array.FindLastIndex(lines, l => l.TrimEnd().EndsWith("│ /", StringComparison.Ordinal) || l.TrimEnd().EndsWith("| /", StringComparison.Ordinal));
+        Assert.True(top >= 0 && input > top, "wordmark, menu and input must render.");
+        AssertCentredGroup(width, height, lines, top, input);
+    }
+
+    [Fact]
+    public void HomeAt237x66PinsScreenshotComposition()
+    {
+        var lines = SlashConsoleLayout.Render(Home(new PaneSize(237, 66))).ToLines();
+        Assert.Equal(26, FirstBrailleRow(lines));
+        Assert.Equal(33, FirstBrailleRow(lines) + Wordmark.Height - 1);
+        Assert.Equal(36, PlaceholderRow(lines));
+        Assert.StartsWith("  /Users/test/lattice", lines[64], StringComparison.Ordinal);
+        Assert.Contains(SlashConsoleLayout.HomeHints.Split(' ')[0], lines[65]);
+    }
+
+    [Fact]
+    public void ConstrainedMenuKeepsViewportAndFooter()
+    {
+        var size = new PaneSize(40, 12);
+        var cells = SlashConsoleLayout.Render(Menu("/", 9, size));
+        var lines = cells.ToLines();
+        var input = Array.FindLastIndex(lines, l => l.TrimEnd().EndsWith("│ /", StringComparison.Ordinal) || l.TrimEnd().EndsWith("| /", StringComparison.Ordinal));
+        Assert.True(input >= 0 && input <= size.Height - 3, "input must stay above the footer.");
+        Assert.Contains("/exit", string.Concat(lines), StringComparison.Ordinal);
+        Assert.StartsWith("  /Users/test/lattice", lines[size.Height - 2], StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(1, 1)]
+    [InlineData(3, 2)]
+    [InlineData(10, 5)]
+    [InlineData(2, 8)]
+    public void DegenerateSizesNeverThrow(int width, int height)
+    {
+        var size = new PaneSize(width, height);
+        SlashConsoleLayout.Render(Home(size));
+        SlashConsoleLayout.Render(Menu("/", 0, size));
+    }
+
+    [Fact]
+    public void ResultsStayTopAnchoredAndReadable()
+    {
+        var size = new PaneSize(100, 32);
+        var req = new SlashConsoleRequest(
+            "/generate --seed 42", [], 0, false, "/Users/test/lattice", null,
+            "exit 0 ok 0.4s",
+            ["{\"zones\": 12}"],
+            false, size, GlyphMode.Unicode, ColorDepth.TrueColor, true);
+        var lines = SlashConsoleLayout.Render(req).ToLines();
+        var input = Array.FindLastIndex(lines, l => l.Contains("/generate --seed 42", StringComparison.Ordinal));
+        Assert.Equal(12, input);
+        Assert.Contains("exit 0 ok", lines[14]);
+    }
+
+    [Fact]
+    public void HomeRestoredWhenResultCleared()
+    {
+        var size = new PaneSize(100, 32);
+        var withResult = new SlashConsoleRequest(
+            "/generate --seed 42", [], 0, false, "/Users/test/lattice", null,
+            "exit 0 ok 0.4s", ["{\"zones\": 12}"], false,
+            size, GlyphMode.Unicode, ColorDepth.TrueColor, true);
+        var cleared = withResult with { Input = "", ResultTitle = null, ResultLines = null };
+        var inputWithResult = Array.FindLastIndex(
+            SlashConsoleLayout.Render(withResult).ToLines(),
+            l => l.Contains("/generate --seed 42", StringComparison.Ordinal));
+        var homeInput = PlaceholderRow(SlashConsoleLayout.Render(cleared).ToLines());
+        Assert.Equal(12, inputWithResult);
+        Assert.Equal(19, homeInput);
+    }
+
+    [Fact]
+    public void ResizeTallShortTallIsStateless()
+    {
+        var tall = SlashConsoleLayout.Render(Home(new PaneSize(100, 40))).ToLines();
+        var shortFrame = SlashConsoleLayout.Render(Home(new PaneSize(100, 20))).ToLines();
+        var tallAgain = SlashConsoleLayout.Render(Home(new PaneSize(100, 40))).ToLines();
+        Assert.Equal(tall, tallAgain);
+        AssertCentredGroup(100, 40, tall, FirstBrailleRow(tall), PlaceholderRow(tall));
+        AssertCentredGroup(100, 20, shortFrame, FirstBrailleRow(shortFrame), PlaceholderRow(shortFrame));
     }
 
     [Fact]

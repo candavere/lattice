@@ -64,25 +64,32 @@ public class SlashConsoleTests
     {
         var cells = SlashConsoleLayout.Render(Home(new PaneSize(100, 32)));
         var text = string.Concat(cells.ToLines());
-        Assert.Contains(Wordmark.PlainTitle, text);
         Assert.Contains(SlashConsoleLayout.Placeholder, text);
         Assert.Contains("/Users/test/lattice", text);
         Assert.Contains("⣀", text);
-        // Blue left edge on the input bar.
-        Assert.Equal(Palette.AccentSecondary, cells[0, 12].Foreground);
+        // No competing top-left header: row 0 stays blank.
+        Assert.Equal(' ', cells[0, 0].Glyph);
+        Assert.Equal(' ', cells[2, 0].Glyph);
+        // Blue left edge on the centred bounded input bar.
+        var (colX, colW) = SlashConsoleLayout.ContentColumn(100);
+        Assert.True(colX > 0, "input column must leave breathing room.");
+        Assert.Equal(Palette.AccentSecondary, cells[colX, 12].Foreground);
+        // Input does not fill the full terminal width.
+        Assert.Equal(' ', cells[0, 12].Glyph);
     }
 
     [Fact]
-    public void PlainTitleIsAlwaysVisible()
+    public void PlainTitleFallbackShowsWhenWordmarkCannot()
     {
-        foreach (var size in new[] { new PaneSize(100, 32), new PaneSize(80, 24), new PaneSize(62, 16), new PaneSize(60, 20), new PaneSize(40, 12) })
+        // Small, ASCII and non-UTF-8 terminals fall back to the centred plain title.
+        foreach (var size in new[] { new PaneSize(60, 20), new PaneSize(40, 12) })
         {
             var cells = SlashConsoleLayout.Render(Home(size));
             Assert.Contains(Wordmark.PlainTitle, string.Concat(cells.ToLines()));
         }
 
-        var menu = SlashConsoleLayout.Render(Menu("/", 0, new PaneSize(100, 32)));
-        Assert.Contains(Wordmark.PlainTitle, string.Concat(menu.ToLines()));
+        var ascii = SlashConsoleLayout.Render(Home(new PaneSize(100, 32), GlyphMode.Ascii, utf8: false));
+        Assert.Contains(Wordmark.PlainTitle, string.Concat(ascii.ToLines()));
     }
 
     [Fact]
@@ -143,15 +150,16 @@ public class SlashConsoleTests
     [Fact]
     public void SelectedRowIsOrangeOnTheElementBand()
     {
-        var cells = SlashConsoleLayout.Render(Menu("/", 0, new PaneSize(100, 32)));
-        // Selected row 0: orange edge, orange name on the element band.
-        var edge = cells[0, 13];
+        var size = new PaneSize(100, 32);
+        var cells = SlashConsoleLayout.Render(Menu("/", 0, size));
+        var (colX, _) = SlashConsoleLayout.ContentColumn(size.Width);
+        // Menu sits above the input in the same centred column; selected row 0 carries the orange edge.
+        var edge = cells[colX, 12];
         Assert.Equal(Palette.Accent, edge.Foreground);
-        Assert.Equal(Theme.SelectionBackground, cells[5, 13].Background);
-        Assert.Equal(Palette.Accent, cells[2, 13].Foreground);
-        // Unselected row: text and muted, no band.
-        Assert.Equal(Palette.TextPrimary, cells[2, 14].Foreground);
-        Assert.True(cells[2, 14].Background is null || cells[2, 14].Background == Theme.PanelFill(ColorDepth.TrueColor));
+        Assert.Equal(Theme.SelectionBackground, cells[colX + 5, 12].Background);
+        Assert.Equal(Palette.Accent, cells[colX + 2, 12].Foreground);
+        // Unselected row: text and muted, no selection band.
+        Assert.Equal(Palette.TextPrimary, cells[colX + 2, 13].Foreground);
     }
 
     [Fact]
@@ -167,6 +175,106 @@ public class SlashConsoleTests
         Assert.Contains("exit 0", text);
         Assert.Contains(SlashConsoleLayout.TruncationMarker, text);
         Assert.True(text.Contains("…", StringComparison.Ordinal) || text.Contains("...", StringComparison.Ordinal), "result must be clipped with an ellipsis mark.");
+    }
+
+    [Fact]
+    public void MenuSitsAboveInputInTheSameCentredColumn()
+    {
+        var size = new PaneSize(100, 32);
+        var cells = SlashConsoleLayout.Render(Menu("/", 0, size));
+        var lines = cells.ToLines();
+        var menuRow = Array.FindIndex(lines, l => l.Contains("/generate"));
+        var inputRow = Array.FindLastIndex(lines, l => l.Contains("│ /") || l.Contains("| /"));
+        Assert.True(menuRow >= 0 && inputRow >= 0, "menu and input must both render.");
+        Assert.True(menuRow < inputRow, "the slash menu must sit above the input.");
+        var (colX, colW) = SlashConsoleLayout.ContentColumn(size.Width);
+        Assert.Contains("/generate", lines[menuRow].Substring(colX, Math.Min(colW, lines[menuRow].Length - colX)));
+    }
+
+    [Fact]
+    public void WordmarkIsUniformNearWhiteWithNoSplitOrDepth()
+    {
+        var cells = SlashConsoleLayout.Render(Home(new PaneSize(100, 32)));
+        var seen = 0;
+        for (var y = 0; y < cells.Height; y++)
+        {
+            for (var x = 0; x < cells.Width; x++)
+            {
+                var cell = cells[x, y];
+                if (cell.Glyph >= 0x2800 && cell.Glyph <= 0x28FF)
+                {
+                    seen++;
+                    Assert.Equal(Wordmark.Foreground, cell.Foreground);
+                }
+            }
+        }
+
+        Assert.True(seen > 0, "expected wordmark Braille cells.");
+    }
+
+    [Fact]
+    public void NoDesignReviewLabelsAreRendered()
+    {
+        var frames = new[]
+        {
+            SlashConsoleLayout.Render(Home(new PaneSize(100, 32))).ToLines(),
+            SlashConsoleLayout.Render(Menu("/", 0, new PaneSize(100, 32))).ToLines(),
+            SlashConsoleLayout.Render(Home(new PaneSize(60, 20))).ToLines(),
+        };
+
+        foreach (var lines in frames)
+        {
+            var text = string.Concat(lines).ToLowerInvariant();
+            Assert.DoesNotContain("sidepiece", text);
+            Assert.DoesNotContain("mockup", text);
+            Assert.DoesNotContain("iteration", text);
+            Assert.DoesNotContain("caption", text);
+            Assert.DoesNotContain("s2", text);
+            Assert.DoesNotContain("h2", text);
+        }
+    }
+
+    [Fact]
+    public void WorkingDirectoryIsPinnedBottomLeftOnHomeMenuAndResult()
+    {
+        var home = SlashConsoleLayout.Render(Home(new PaneSize(100, 32)));
+        var menu = SlashConsoleLayout.Render(Menu("/", 0, new PaneSize(100, 32)));
+        var resultReq = new SlashConsoleRequest(
+            "/generate --seed 1", [], 0, false, "/tmp/outside-repo", null,
+            "exit 0 ok 0.1s", ["ok"], false, new PaneSize(100, 32), GlyphMode.Unicode, ColorDepth.TrueColor, true);
+        var result = SlashConsoleLayout.Render(resultReq);
+
+        var homeCwd = home.ToLines()[home.Height - 2];
+        var menuCwd = menu.ToLines()[menu.Height - 2];
+        var resultCwd = result.ToLines()[result.Height - 2];
+        Assert.StartsWith("  /Users/test/lattice", homeCwd, StringComparison.Ordinal);
+        Assert.StartsWith("  /Users/test/lattice", menuCwd, StringComparison.Ordinal);
+        Assert.StartsWith("  /tmp/outside-repo", resultCwd, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LongWorkingDirectoryClipsWithoutHidingTheLocation()
+    {
+        var longPath = "/Users/test/" + new string('a', 120) + "/lattice-project";
+        var req = Home(new PaneSize(100, 32)) with { WorkingDirectory = longPath };
+        var cells = SlashConsoleLayout.Render(req);
+        var cwdRow = cells.ToLines()[cells.Height - 2];
+        Assert.Contains("lattice-project", cwdRow);
+        Assert.True(cwdRow.Trim().Length <= 52, "cwd must clip to roughly half the terminal width.");
+    }
+
+    [Fact]
+    public void NarrowAndAsciiLayoutsStayFunctionalWithoutOverlap()
+    {
+        foreach (var size in new[] { new PaneSize(62, 16), new PaneSize(60, 20), new PaneSize(40, 12) })
+        {
+            var cells = SlashConsoleLayout.Render(Home(size));
+            var text = string.Concat(cells.ToLines());
+            Assert.Contains(Wordmark.PlainTitle, text);
+        }
+
+        var ascii = SlashConsoleLayout.Render(Home(new PaneSize(100, 32), GlyphMode.Ascii, utf8: false));
+        Assert.Contains(Wordmark.PlainTitle, string.Concat(ascii.ToLines()));
     }
 
     [Fact]

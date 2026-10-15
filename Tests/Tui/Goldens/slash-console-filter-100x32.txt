@@ -1,4 +1,4 @@
-  lattice                                                                                           
+                                                                                                    
                                                                                                     
                              ⣀⡴⠿⢟⣁⣀                        ⣀                                        
                             ⣼⡿⣠⡴⠛⠛⠁                       ⠺⡿⣣⣄                                      
@@ -10,8 +10,9 @@
                          ⠸⣿⣿⣿⣀⡤⢿⣿⣿⣏⣠⣿⢿⣿⣇⡤⠾⣿⣿⣿⣁⣠⠴⠂⢿⣿⣿⣏⣀⡤⠖⣿⣿⣿⣇⣠⢿⣿⣿⡷⠚⠁⣠⠴⠻⣿⣿⡷⠞⠁⣠⠔                       
                                                                                                     
                                                                                                     
-│ /sim                                                                                              
-│ /simulate Run an episode: watched live, or recorded as trajectory JSONL.                          
+      │ /simulate             Run an episode: watched live, or recorded as trajectory JSONL.        
+                                                                                                    
+      │ /sim                                                                                        
                                                                                                     
                                                                                                     
                                                                                                     
@@ -27,6 +28,5 @@
                                                                                                     
                                                                                                     
                                                                                                     
-                                                                                                    
-/Users/test/lattice                                                                                 
-up/down select  tab complete  enter run  esc close                                                  
+  /Users/test/lattice                                                                               
+                                                up/down select  tab complete  enter run  esc close  

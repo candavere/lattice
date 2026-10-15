@@ -1,4 +1,4 @@
-  lattice                                                                                           
+                                                                                                    
                                                                                                     
                              ⣀⡴⠿⢟⣁⣀                        ⣀                                        
                             ⣼⡿⣠⡴⠛⠛⠁                       ⠺⡿⣣⣄                                      
@@ -10,10 +10,11 @@
                          ⠸⣿⣿⣿⣀⡤⢿⣿⣿⣏⣠⣿⢿⣿⣇⡤⠾⣿⣿⣿⣁⣠⠴⠂⢿⣿⣿⣏⣀⡤⠖⣿⣿⣿⣇⣠⢿⣿⣿⡷⠚⠁⣠⠴⠻⣿⣿⡷⠞⠁⣠⠔                       
                                                                                                     
                                                                                                     
-│ /generate --seed 42                                                                               
-  exit 0 ok 0.4s                                                                                    
-  {"zones": 12, "resources": 8, "seed": 42} with a very long trailing tail that must be clipped...  
-  [truncated]                                                                                       
+      │ /generate --seed 42                                                                         
+                                                                                                    
+        exit 0 ok 0.4s                                                                              
+        {"zones": 12, "resources": 8, "seed": 42} with a very long trailing tail that must...       
+        [truncated]                                                                                 
                                                                                                     
                                                                                                     
                                                                                                     
@@ -27,6 +28,5 @@
                                                                                                     
                                                                                                     
                                                                                                     
-                                                                                                    
-/Users/test/lattice                                                                                 
-/ commands  /exit leave  ctrl-c quit                                                                
+  /Users/test/lattice                                                                               
+                                                              / commands  /exit leave  ctrl-c quit  

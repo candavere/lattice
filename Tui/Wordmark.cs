@@ -7,18 +7,18 @@ namespace Lattice.Tui;
 /// <para>
 /// Provenance: nearest real-glyph implementation of the owner's selected dotted-cursive
 /// direction, generated from the URW Z003 Medium Italic script face (a Zapf Chancery clone)
-/// at 2x4 dots per cell, size 46, depth offset 3 dots right and down, no stroke thickening;
-/// a heavier variant was too blobby. The selected picture itself was a hand-drawn dot mockup,
-/// so these rows are NOT the owner-approved exact shape. Stored here as committed data
-/// (constants, not a font dependency at run time). A Pillow render of these rows reads as
-/// "lattice"; that is NOT terminal evidence.
+/// at 2x4 dots per cell, size 46, no stroke thickening. The selected picture itself was a
+/// hand-drawn dot mockup, so these rows are NOT the owner-approved exact shape: terminal
+/// Braille rendering varies by font (dot size, spacing and weight differ between fonts,
+/// and a terminal owns its font), so identical hand-drawn dots cannot be promised. Stored
+/// here as committed data (constants, not a font dependency at run time).
 /// </para>
 /// <para>
-/// Colours: foreground cells are near-white #eeeeee; cells marked S in the mask are
-/// depth-only cells, #3c3c3c. A terminal cell has one foreground colour, so a cell that
-/// holds both letter dots and depth dots is drawn in the letter colour: depth shows only
-/// as a dim speckle to the right and below the letters. Two colours are never faked in
-/// one cell.
+/// Colours (flat-word rule, October 2025 correction): every visible letter cell is the
+/// uniform solid near-white #eeeeee. No gradient, grey-to-white split, per-letter shading,
+/// colour interpolation or depth/shadow treatment is drawn; the earlier depth step is
+/// omitted for this implementation rather than risk violating the flat-colour requirement.
+/// A terminal cell has one foreground colour.
 /// </para>
 /// <para>
 /// Narrow Braille exception: showing this dotted wordmark needs Braille Patterns
@@ -32,10 +32,11 @@ namespace Lattice.Tui;
 /// Fallbacks: below 62x16 (or below 62x30 while the menu is open) the plain bold
 /// <c>lattice</c> title is shown instead of the wordmark. In ASCII glyph mode, or when
 /// the locale is not UTF-8 (see <see cref="CapabilityDetector"/>), Braille is never
-/// emitted and the plain title is shown. At 16 colours or no colour the depth cells
-/// are dropped. A terminal with no Braille font renders a blank area the program cannot
-/// detect, so callers must keep a plain <c>lattice</c> title visible somewhere on screen
-/// (input bar header or bottom line) and never replace it with the wordmark.
+/// emitted and the plain title is shown. A terminal with no Braille font renders a blank
+/// area the program cannot detect; the console keeps a discreet plain-title fallback for
+/// the small/ASCII/non-UTF-8 cases and documents the font limitation, and never prints
+/// design-review labels. Callers must never replace the wordmark with a competing header
+/// as the normal design.
 /// </para>
 /// </remarks>
 public static class Wordmark
@@ -67,7 +68,7 @@ public static class Wordmark
     /// <summary>Wordmark letter colour: near-white #eeeeee (OpenCode text).</summary>
     public static readonly Rgb Foreground = Rgb.FromHex("#eeeeee");
 
-    /// <summary>Wordmark depth-only colour: #3c3c3c (OpenCode depth step).</summary>
+    /// <summary>Wordmark depth step, retained for palette compatibility; not drawn in the flat implementation.</summary>
     public static readonly Rgb Depth = Rgb.FromHex("#3c3c3c");
 
     /// <summary>
@@ -86,19 +87,20 @@ public static class Wordmark
     ];
 
     /// <summary>
-    /// Mask for <see cref="Rows"/>: F = foreground cell, S = depth-only cell, . = empty.
+    /// Mask for <see cref="Rows"/>: F = foreground cell, . = empty.
+    /// Flat-word rule: every letter cell is F (uniform near-white); no S/depth cells.
     /// The source of truth for colours; same 8x58 shape as <see cref="Rows"/>.
     /// </summary>
     public static readonly string[] Mask =
     [
-        "........FFFFFS........................F...................",
-        ".......FFSSSSS.......................FFFS.................",
-        "......FFFSS...........FFFS....FF.S....SSS.................",
-        "......FFSS..FFFFFFFS..FFSS...FFFSS.FFFFS..FFFFFS..FFFFFS..",
-        ".....FFFSS.FFSSSFFSSFFFFFFSFFFFFFFFFFFSS.FFSSFSS.FFSFFFS..",
-        ".....FFSS.FFFSSFFFSS.FFSS...FFFSS..FFFSSFFSS....FFFFFSSS..",
-        "....FFFFFFFFSFFFFFFFFFFSFF..FFSFFF.FFSFFFFSS.FF.FFSSSFF...",
-        "....FFFFSSFFFFFFFFSSFFFFFSSSFFFFSSSFFFFSFFFFFFSSFFFFFFSS..",
+        "........FFFFFF........................F...................",
+        ".......FFFFFFF.......................FFFF.................",
+        "......FFFFF...........FFFF....FF.F....FFF.................",
+        "......FFFF..FFFFFFFF..FFFF...FFFFF.FFFFF..FFFFFF..FFFFFF..",
+        ".....FFFFF.FFFFFFFFFFFFFFFFFFFFFFFFFFFFF.FFFFFFF.FFFFFFF..",
+        ".....FFFF.FFFFFFFFFF.FFFF...FFFFF..FFFFFFFFF....FFFFFFFF..",
+        "....FFFFFFFFFFFFFFFFFFFFFF..FFFFFF.FFFFFFFFF.FF.FFFFFFF...",
+        "....FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF..",
     ];
 
     /// <summary>Whether <paramref name="c"/> is a Braille Patterns character U+2800-U+28FF.</summary>
@@ -111,8 +113,7 @@ public static class Wordmark
     /// Whether the wordmark (rather than the plain title) should be drawn for this
     /// terminal state. ASCII mode and non-UTF-8 never show Braille; below 62x16
     /// (or below 62x30 while the menu is open) the plain title is shown.
-    /// Colour depth does NOT gate the wordmark itself: at 16 colours or no colour
-    /// the depth cells are dropped but the letters still draw.
+    /// Colour depth does NOT gate the wordmark itself.
     /// </summary>
     public static bool ShouldShowWordmark(int width, int height, bool utf8, GlyphMode glyphs, bool menuOpen)
     {
@@ -165,8 +166,8 @@ public static class Wordmark
     }
 
     /// <summary>
-    /// Draws the 8x58 rows at (<paramref name="x"/>, <paramref name="y"/>), honouring
-    /// the depth-drop rule: at 16 colours or no colour only foreground cells draw.
+    /// Draws the 8x58 rows at (<paramref name="x"/>, <paramref name="y"/>) in the uniform
+    /// near-white foreground. Flat-word rule: no depth cells are drawn at any colour depth.
     /// Callers must have checked <see cref="ShouldShowWordmark"/> first when they need
     /// the fallback; this method draws rows unconditionally.
     /// </summary>
@@ -174,9 +175,7 @@ public static class Wordmark
     {
         ArgumentNullException.ThrowIfNull(buffer);
 
-        var showDepth = depth is ColorDepth.TrueColor or ColorDepth.Ansi256;
         var foregroundCell = new Cell(' ', Foreground);
-        var depthCell = new Cell(' ', Depth);
 
         for (var row = 0; row < Height; row++)
         {
@@ -184,18 +183,12 @@ public static class Wordmark
             var mask = Mask[row];
             for (var column = 0; column < Width; column++)
             {
-                var kind = mask[column];
-                if (kind == '.')
+                if (mask[column] == '.')
                 {
                     continue;
                 }
 
-                if (kind == 'S' && !showDepth)
-                {
-                    continue;
-                }
-
-                var cell = (kind == 'F' ? foregroundCell : depthCell) with { Glyph = glyphs[column] };
+                var cell = foregroundCell with { Glyph = glyphs[column] };
                 var bx = x + column;
                 var by = y + row;
                 if (bx >= 0 && bx < buffer.Width && by >= 0 && by < buffer.Height)
@@ -208,8 +201,7 @@ public static class Wordmark
 
     /// <summary>
     /// Draws the plain <c>lattice</c> title in Bold, centred on row <paramref name="y"/>.
-    /// Used as the fallback wherever the wordmark cannot draw, and kept visible elsewhere
-    /// on the console so a terminal with no Braille font never shows a blank area alone.
+    /// Used as the fallback wherever the wordmark cannot draw.
     /// </summary>
     public static void DrawPlainTitleCentred(CellBuffer buffer, int y, int terminalWidth, ColorDepth depth)
     {

@@ -25,17 +25,18 @@ public sealed record SlashConsoleRequest(
 
 /// <summary>
 /// The slash-command console as a pure layout: a request in, a grid the size of the
-/// terminal out, no terminal touched. Home shows the dotted wordmark (or the plain-title
-/// fallback), one input bar with a blue left edge, and the working directory; the slash
-/// menu lists the research commands with the catalog's own descriptions; a result panel
-/// shows a clipped run with a truncation marker; the bottom row carries key hints.
+/// terminal out, no terminal touched. Home shows the centred dotted wordmark (or the
+/// centred plain-title fallback), a centred bounded input/menu column, and the working
+/// directory pinned bottom-left; the slash menu sits above the input in the same column
+/// with aligned names and descriptions; a result panel shows a clipped run with a
+/// truncation marker; the bottom row carries key hints right-aligned.
 /// </summary>
 /// <remarks>
 /// Colours come only from <see cref="Theme"/>, <see cref="Palette"/> and
-/// <see cref="Wordmark"/> (whose near-white and depth values match the official text
-/// and depth step). No hex literal lives here. Panels and the screen fill paint only
-/// at truecolor; below that the user's own background stays. Border and edge glyphs
-/// are decoration, never the sole carrier of meaning.
+/// <see cref="Wordmark"/> (uniform near-white, flat, no depth shading). No hex literal
+/// lives here. Panels and the screen fill paint only at truecolor; below that the user's
+/// own background stays. Border and edge glyphs are decoration, never the sole carrier
+/// of meaning. Never prints design-review labels.
 /// </remarks>
 public static class SlashConsoleLayout
 {
@@ -54,9 +55,89 @@ public static class SlashConsoleLayout
     /// <summary>How many result lines the frame will show at most; the host bounds the buffer itself.</summary>
     public const int MaxResultLinesShown = 12;
 
+    /// <summary>Maximum width of the centred input/menu column.</summary>
+    public const int ContentMaxWidth = 88;
+
+    /// <summary>Minimum breathing room left and right of the centred column.</summary>
+    public const int ContentMargin = 4;
+
+    /// <summary>Fixed width of the menu name column, keeping descriptions aligned.</summary>
+    public const int NameColumnWidth = 20;
+
     /// <summary>Whether this frame draws the wordmark rather than the centred fallback.</summary>
     public static bool ShowsWordmark(SlashConsoleRequest request) =>
         Wordmark.ShouldShowWordmark(request.Size.Width, request.Size.Height, request.Utf8, request.Glyphs, request.MenuOpen);
+
+    /// <summary>The centred bounded column: left origin and width.</summary>
+    public static (int X, int Width) ContentColumn(int terminalWidth)
+    {
+        var width = Math.Min(ContentMaxWidth, Math.Max(10, terminalWidth - ContentMargin * 2));
+        width = Math.Min(width, Math.Max(10, terminalWidth));
+        var x = Math.Max(0, (terminalWidth - width) / 2);
+        return (x, width);
+    }
+
+    /// <summary>
+    /// The working-directory label: truthful home-relative "~" shortening when the path
+    /// sits under the user's home; otherwise the path unchanged. Never hard-codes a sample.
+    /// </summary>
+    public static string DisplayWorkingDirectory(string workingDirectory)
+    {
+        if (string.IsNullOrEmpty(workingDirectory))
+        {
+            return workingDirectory;
+        }
+
+        string? home = null;
+        try
+        {
+            home = System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile);
+        }
+        catch
+        {
+            home = null;
+        }
+
+        if (string.IsNullOrEmpty(home))
+        {
+            home = System.Environment.GetEnvironmentVariable("HOME");
+        }
+
+        if (!string.IsNullOrEmpty(home))
+        {
+            if (workingDirectory.Equals(home, StringComparison.Ordinal))
+            {
+                return "~";
+            }
+
+            var prefix = home.TrimEnd('/', '\\') + System.IO.Path.DirectorySeparatorChar;
+            var altPrefix = home.TrimEnd('/', '\\') + (System.IO.Path.DirectorySeparatorChar == '/' ? '\\' : '/');
+            if (workingDirectory.StartsWith(prefix, StringComparison.Ordinal))
+            {
+                return "~" + workingDirectory.Substring(home.Length);
+            }
+
+            if (workingDirectory.StartsWith(altPrefix, StringComparison.Ordinal))
+            {
+                return "~" + workingDirectory.Substring(home.Length);
+            }
+
+            // POSIX home with forward slashes even on Windows-style separators.
+            var slashHome = home.Replace('\\', '/').TrimEnd('/');
+            var slashPath = workingDirectory.Replace('\\', '/');
+            if (slashPath.Equals(slashHome, StringComparison.Ordinal))
+            {
+                return "~";
+            }
+
+            if (slashPath.StartsWith(slashHome + "/", StringComparison.Ordinal))
+            {
+                return "~" + slashPath.Substring(slashHome.Length);
+            }
+        }
+
+        return workingDirectory;
+    }
 
     /// <summary>Renders one console frame exactly the size of the terminal.</summary>
     public static CellBuffer Render(SlashConsoleRequest request)
@@ -73,12 +154,10 @@ public static class SlashConsoleLayout
         }
 
         var edge = request.Glyphs == GlyphMode.Ascii ? '|' : '│';
-
-        // Always-visible plain title: top-left, bold, never replaced by the wordmark.
-        DrawPlainHeader(cells, size);
+        var (colX, colW) = ContentColumn(size.Width);
 
         var showed = ShowsWordmark(request);
-        int inputY;
+        int contentTop;
         if (showed)
         {
             var x = Math.Max(0, (size.Width - Wordmark.Width) / 2);
@@ -86,16 +165,16 @@ public static class SlashConsoleLayout
             if (y + Wordmark.Height < size.Height - 4)
             {
                 Wordmark.DrawRows(cells, x, y, request.Depth);
-                inputY = y + Wordmark.Height + 2;
+                contentTop = y + Wordmark.Height + 2;
             }
             else
             {
-                inputY = Math.Min(size.Height - 4, 4);
+                contentTop = Math.Min(size.Height - 4, 4);
             }
         }
         else
         {
-            // Centred fallback title in addition to the always-visible header.
+            // Centred fallback title only; no competing top-left header.
             if (size.Height > 4 && size.Width >= Wordmark.PlainTitle.Length + 2)
             {
                 var title = Wordmark.PlainTitle;
@@ -111,25 +190,40 @@ public static class SlashConsoleLayout
                 }
             }
 
-            inputY = 4;
+            contentTop = 4;
         }
 
-        if (request.Notice is { Length: > 0 } notice && inputY > 1)
+        contentTop = Math.Max(0, Math.Min(contentTop, Math.Max(0, size.Height - 3)));
+
+        int menuTop = contentTop;
+        int menuHeight = 0;
+        if (request.MenuOpen && request.Menu.Count > 0)
         {
-            DrawClipped(cells, 2, inputY - 1, size.Width - 4, notice, new Cell(' ', Theme.SecondaryText, panelFill));
+            // Room for the input row plus the two bottom rows.
+            var room = size.Height - 2 - menuTop - 1 - 1;
+            menuHeight = Math.Max(0, Math.Min(request.Menu.Count, room));
         }
 
-        DrawInputBar(cells, size, request, inputY, edge, panelFill);
-
-        var nextY = inputY + 1;
-        if (request.MenuOpen)
+        if (!string.IsNullOrEmpty(request.Notice) && menuTop > 0)
         {
-            nextY = DrawMenu(cells, size, request, nextY, edge, panelFill);
+            var noticeStyle = new Cell(' ', Theme.SecondaryText, panelFill);
+            DrawClippedInColumn(cells, colX, menuTop - 1, colW, request.Notice, noticeStyle);
         }
 
+        var nextY = menuTop;
+        if (menuHeight > 0)
+        {
+            nextY = DrawMenu(cells, size, request, menuTop, menuHeight, colX, colW, edge, panelFill);
+            nextY += 1; // deliberate gap between menu and input.
+        }
+
+        var inputY = nextY;
+        DrawInputBar(cells, size, request, inputY, colX, colW, edge, panelFill);
+
+        nextY = inputY + 2; // one input row plus one gap row.
         if (request.ResultLines is { Count: > 0 } || request.ResultTitle is { Length: > 0 })
         {
-            DrawResult(cells, size, request, nextY, panelFill);
+            DrawResult(cells, size, request, nextY, colX, colW, panelFill);
         }
 
         DrawBottom(cells, size, request, panelFill);
@@ -137,40 +231,42 @@ public static class SlashConsoleLayout
         return cells;
     }
 
-    private static void DrawPlainHeader(CellBuffer cells, PaneSize size)
-    {
-        if (size.Height < 1)
-        {
-            return;
-        }
-
-        var title = Wordmark.PlainTitle;
-        var style = new Cell(' ', Palette.TextPrimary, null, CellAttributes.Bold);
-        for (var i = 0; i < title.Length && 2 + i < size.Width; i++)
-        {
-            cells[2 + i, 0] = style with { Glyph = title[i] };
-        }
-    }
-
-    private static void DrawInputBar(CellBuffer cells, PaneSize size, SlashConsoleRequest request, int y, char edge, Rgb? panelFill)
+    private static void DrawInputBar(CellBuffer cells, PaneSize size, SlashConsoleRequest request, int y, int colX, int colW, char edge, Rgb? panelFill)
     {
         if (y < 0 || y >= size.Height)
         {
             return;
         }
 
-        cells[0, y] = new Cell(edge, Palette.AccentSecondary, panelFill, CellAttributes.Bold);
+        // Bounded darker panel across the centred column.
+        if (panelFill is not null && colW > 0)
+        {
+            var fill = new Cell(' ', null, panelFill);
+            var fx = Math.Max(0, colX);
+            var fw = Math.Min(colW, size.Width - fx);
+            if (fw > 0)
+            {
+                cells.Fill(fx, y, fw, 1, fill);
+            }
+        }
+
+        if (colX >= 0 && colX < size.Width)
+        {
+            cells[colX, y] = new Cell(edge, Palette.AccentSecondary, panelFill, CellAttributes.Bold);
+        }
 
         var text = request.Input.Length > 0 ? request.Input : Placeholder;
         var style = request.Input.Length > 0
             ? new Cell(' ', Palette.TextPrimary, panelFill)
             : new Cell(' ', Theme.Muted, panelFill);
 
-        var clipped = CellText.Clip(text, Math.Max(0, size.Width - 3), request.Glyphs);
+        var textX = colX + 2;
+        var textRoom = Math.Max(0, colX + colW - 1 - textX);
+        var clipped = CellText.Clip(text, textRoom, request.Glyphs);
         for (var i = 0; i < clipped.Length; i++)
         {
-            var bx = 2 + i;
-            if (bx >= size.Width)
+            var bx = textX + i;
+            if (bx < 0 || bx >= size.Width)
             {
                 break;
             }
@@ -179,12 +275,28 @@ public static class SlashConsoleLayout
         }
     }
 
-    private static int DrawMenu(CellBuffer cells, PaneSize size, SlashConsoleRequest request, int firstY, char edge, Rgb? panelFill)
+    private static int DrawMenu(CellBuffer cells, PaneSize size, SlashConsoleRequest request, int firstY, int rowsToShow, int colX, int colW, char edge, Rgb? panelFill)
     {
         var y = firstY;
-        var count = request.Menu.Count;
-        for (var i = 0; i < count; i++)
+        var nameCol = Math.Min(NameColumnWidth, Math.Max(8, colW - 10));
+        var nameX = colX + 2;
+        var descX = nameX + nameCol + 2;
+
+        // Ensure the selected row stays visible when the list is clipped by height.
+        var start = 0;
+        if (rowsToShow < request.Menu.Count)
         {
+            start = Math.Clamp(request.SelectedIndex - rowsToShow + 1, 0, request.Menu.Count - rowsToShow);
+        }
+
+        for (var r = 0; r < rowsToShow; r++)
+        {
+            var i = start + r;
+            if (i < 0 || i >= request.Menu.Count)
+            {
+                break;
+            }
+
             if (y >= size.Height - 2)
             {
                 break;
@@ -194,19 +306,22 @@ public static class SlashConsoleLayout
             var selected = i == request.SelectedIndex;
             var rowBg = selected && request.Depth == ColorDepth.TrueColor ? Theme.SelectionBackground : panelFill;
 
-            if (selected)
+            if (request.Depth == ColorDepth.TrueColor)
             {
-                // Element band at truecolor; below truecolor the user's background stays
-                // and the orange text, edge and Bold carry the selection alone.
-                if (request.Depth == ColorDepth.TrueColor)
+                var fx = Math.Max(0, colX);
+                var fw = Math.Min(colW, size.Width - fx);
+                if (fw > 0)
                 {
-                    for (var col = 0; col < size.Width; col++)
+                    for (var col = fx; col < fx + fw; col++)
                     {
                         cells[col, y] = new Cell(' ', null, rowBg);
                     }
                 }
+            }
 
-                cells[0, y] = new Cell(edge, Palette.Accent, rowBg, CellAttributes.Bold);
+            if (selected && colX >= 0 && colX < size.Width)
+            {
+                cells[colX, y] = new Cell(edge, Palette.Accent, rowBg, CellAttributes.Bold);
             }
 
             var nameStyle = selected
@@ -216,29 +331,42 @@ public static class SlashConsoleLayout
                 ? new Cell(' ', Palette.Accent, rowBg)
                 : new Cell(' ', Theme.Muted, rowBg);
 
-            var name = CellText.Clip(item.Name, Math.Max(0, Math.Min(20, size.Width - 4)), request.Glyphs);
-            var x = 2;
+            var name = CellText.Clip(item.Name, nameCol, request.Glyphs);
+            var x = nameX;
             foreach (var c in name)
             {
-                if (x >= size.Width - 1)
+                if (x >= colX + colW - 1 || x >= size.Width - 1)
                 {
                     break;
                 }
 
-                cells[x++, y] = nameStyle with { Glyph = c };
+                if (x >= 0)
+                {
+                    cells[x, y] = nameStyle with { Glyph = c };
+                }
+
+                x++;
             }
 
-            x++;
-            var room = Math.Max(0, size.Width - x - 1);
-            var desc = CellText.Clip(item.Description, room, request.Glyphs);
-            foreach (var c in desc)
+            var room = Math.Max(0, Math.Min(colX + colW - 1, size.Width - 1) - descX);
+            if (room > 0)
             {
-                if (x >= size.Width)
+                var desc = CellText.Clip(item.Description, room, request.Glyphs);
+                x = descX;
+                foreach (var c in desc)
                 {
-                    break;
-                }
+                    if (x >= colX + colW || x >= size.Width)
+                    {
+                        break;
+                    }
 
-                cells[x++, y] = descStyle with { Glyph = c };
+                    if (x >= 0)
+                    {
+                        cells[x, y] = descStyle with { Glyph = c };
+                    }
+
+                    x++;
+                }
             }
 
             y++;
@@ -247,13 +375,16 @@ public static class SlashConsoleLayout
         return y;
     }
 
-    private static void DrawResult(CellBuffer cells, PaneSize size, SlashConsoleRequest request, int firstY, Rgb? panelFill)
+    private static void DrawResult(CellBuffer cells, PaneSize size, SlashConsoleRequest request, int firstY, int colX, int colW, Rgb? panelFill)
     {
         var y = firstY;
         if (y >= size.Height - 2)
         {
             return;
         }
+
+        var textX = colX + 2;
+        var textW = Math.Max(0, colX + colW - 1 - textX);
 
         if (request.ResultTitle is { Length: > 0 } title)
         {
@@ -262,7 +393,7 @@ public static class SlashConsoleLayout
                 : title.Contains("ok", StringComparison.Ordinal) || title.StartsWith("exit 0", StringComparison.Ordinal)
                     ? new Cell(' ', Palette.Success, panelFill, CellAttributes.Bold)
                     : new Cell(' ', Palette.TextPrimary, panelFill, CellAttributes.Bold);
-            DrawClipped(cells, 2, y, size.Width - 4, title, titleStyle);
+            DrawClippedInColumn(cells, textX, y, textW, title, titleStyle);
             y++;
         }
 
@@ -279,14 +410,14 @@ public static class SlashConsoleLayout
                 break;
             }
 
-            DrawClipped(cells, 2, y, size.Width - 4, line, new Cell(' ', Palette.TextPrimary, panelFill));
+            DrawClippedInColumn(cells, textX, y, textW, line, new Cell(' ', Palette.TextPrimary, panelFill));
             shown++;
             y++;
         }
 
         if (request.ResultTruncated && y < size.Height - 2)
         {
-            DrawClipped(cells, 2, y, size.Width - 4, TruncationMarker, new Cell(' ', Palette.Warning, panelFill, CellAttributes.Bold));
+            DrawClippedInColumn(cells, textX, y, textW, TruncationMarker, new Cell(' ', Palette.Warning, panelFill, CellAttributes.Bold));
         }
     }
 
@@ -302,11 +433,57 @@ public static class SlashConsoleLayout
 
         if (!string.IsNullOrEmpty(request.WorkingDirectory))
         {
-            DrawClipped(cells, 0, cwdY, Math.Max(0, size.Width / 2), request.WorkingDirectory, new Cell(' ', Theme.Muted, panelFill));
+            var display = DisplayWorkingDirectory(request.WorkingDirectory);
+            var maxCwd = Math.Max(10, size.Width / 2);
+            display = ClipLeft(display, maxCwd, request.Glyphs);
+            DrawClipped(cells, 2, cwdY, Math.Max(0, Math.Min(maxCwd, size.Width - 2)), display, new Cell(' ', Theme.Muted, panelFill));
         }
 
         var hints = request.MenuOpen ? MenuOpenHints : HomeHints;
-        DrawClipped(cells, 0, hintY, size.Width, hints, new Cell(' ', Theme.KeyHint, panelFill));
+        var hintRoom = Math.Max(0, size.Width - 4);
+        var clippedHints = CellText.Clip(hints, hintRoom, request.Glyphs);
+        var hintX = Math.Max(2, size.Width - 2 - clippedHints.Length);
+        if (clippedHints.Length >= size.Width - 2)
+        {
+            hintX = 0;
+        }
+
+        DrawClipped(cells, hintX, hintY, size.Width - hintX, clippedHints, new Cell(' ', Theme.KeyHint, panelFill));
+    }
+
+    private static string ClipLeft(string text, int maxWidth, GlyphMode glyphs)
+    {
+        if (maxWidth <= 0)
+        {
+            return string.Empty;
+        }
+
+        var clipped = CellText.Clip(text, maxWidth, glyphs);
+        if (clipped.Length <= maxWidth)
+        {
+            // CellText.Clip clips the right side; if it fits, keep it whole.
+            // When the original is longer, keep the tail so the leaf directory stays visible.
+            if (text.Length <= maxWidth)
+            {
+                return clipped;
+            }
+        }
+
+        if (text.Length <= maxWidth)
+        {
+            return CellText.Clip(text, maxWidth, glyphs);
+        }
+
+        var ascii = glyphs == GlyphMode.Ascii;
+        var ellipsis = ascii ? "..." : "…";
+        var keep = Math.Max(0, maxWidth - ellipsis.Length);
+        var tail = text.Length > keep ? text[^keep..] : text;
+        return ellipsis + tail;
+    }
+
+    private static void DrawClippedInColumn(CellBuffer cells, int x, int y, int width, string text, Cell style)
+    {
+        DrawClipped(cells, x, y, width, text, style);
     }
 
     private static void DrawClipped(CellBuffer cells, int x, int y, int width, string text, Cell style)
@@ -317,7 +494,7 @@ public static class SlashConsoleLayout
         }
 
         var mode = style.Glyph < 128 && text.All(c => c < 128) ? GlyphMode.Ascii : GlyphMode.Unicode;
-        var clipped = CellText.Clip(text, Math.Min(width, cells.Width - x), mode);
+        var clipped = CellText.Clip(text, Math.Min(width, Math.Max(0, cells.Width - x)), mode);
         for (var i = 0; i < clipped.Length; i++)
         {
             var bx = x + i;

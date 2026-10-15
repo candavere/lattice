@@ -1,4 +1,4 @@
-  lattice                                                                       
+                                                                                
                                                                                 
                    ⣀⡴⠿⢟⣁⣀                        ⣀                              
                   ⣼⡿⣠⡴⠛⠛⠁                       ⠺⡿⣣⣄                            
@@ -10,7 +10,7 @@
                ⠸⣿⣿⣿⣀⡤⢿⣿⣿⣏⣠⣿⢿⣿⣇⡤⠾⣿⣿⣿⣁⣠⠴⠂⢿⣿⣿⣏⣀⡤⠖⣿⣿⣿⣇⣠⢿⣿⣿⡷⠚⠁⣠⠴⠻⣿⣿⡷⠞⠁⣠⠔             
                                                                                 
                                                                                 
-│ Type / to see commands                                                        
+    │ Type / to see commands                                                    
                                                                                 
                                                                                 
                                                                                 
@@ -20,5 +20,5 @@
                                                                                 
                                                                                 
                                                                                 
-/Users/test/lattice                                                             
-/ commands  /exit leave  ctrl-c quit                                            
+  /Users/test/lattice                                                           
+                                          / commands  /exit leave  ctrl-c quit  

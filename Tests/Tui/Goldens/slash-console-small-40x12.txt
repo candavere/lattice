@@ -1,12 +1,12 @@
-  lattice                               
+                                        
                                         
                 lattice                 
-  terminal is 40x12; console needs ...  
-│ Type / to see commands                
+    terminal is 40x12; console ne...    
+    │ Type / to see commands            
                                         
                                         
                                         
                                         
                                         
-/Users/test/lattice                     
-/ commands  /exit leave  ctrl-c quit    
+  /Users/test/lattice                   
+  / commands  /exit leave  ctrl-c quit  

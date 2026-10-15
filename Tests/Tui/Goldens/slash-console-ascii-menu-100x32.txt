@@ -1,18 +1,19 @@
-  lattice                                                                                           
+                                                                                                    
                                                                                                     
                                               lattice                                               
                                                                                                     
-| /                                                                                                 
-| /generate Generate a valid map as JSON.                                                           
-  /simulate Run an episode: watched live, or recorded as trajectory JSONL.                          
-  /render Render a recorded trajectory as ASCII or SVG.                                             
-  /analyze Report contention and turning points for a trajectory.                                   
-  /replay Play a recorded trajectory in the cockpit, or re-run it.                                  
-  /benchmark Measure the five-case workload matrix.                                                 
-  /evaluate Run the paired MCTS-versus-Scout evaluation.                                            
-  /validate-scenario Check a scenario descriptor without running it.                                
-  /ledger Show evaluation artifacts side by side, read-only.                                        
-  /exit Leave the console. (alias /quit)                                                            
+      | /generate             Generate a valid map as JSON.                                         
+        /simulate             Run an episode: watched live, or recorded as trajectory JSONL.        
+        /render               Render a recorded trajectory as ASCII or SVG.                         
+        /analyze              Report contention and turning points for a trajectory.                
+        /replay               Play a recorded trajectory in the cockpit, or re-run it.              
+        /benchmark            Measure the five-case workload matrix.                                
+        /evaluate             Run the paired MCTS-versus-Scout evaluation.                          
+        /validate-scenario    Check a scenario descriptor without running it.                       
+        /ledger               Show evaluation artifacts side by side, read-only.                    
+        /exit                 Leave the console. (alias /quit)                                      
+                                                                                                    
+      | /                                                                                           
                                                                                                     
                                                                                                     
                                                                                                     
@@ -27,6 +28,5 @@
                                                                                                     
                                                                                                     
                                                                                                     
-                                                                                                    
-/Users/test/lattice                                                                                 
-up/down select  tab complete  enter run  esc close                                                  
+  /Users/test/lattice                                                                               
+                                                up/down select  tab complete  enter run  esc close  

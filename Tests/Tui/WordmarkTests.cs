@@ -21,7 +21,7 @@ public class WordmarkTests
     }
 
     [Fact]
-    public void MaskIsSameShapeUsingOnlyFSAndDot()
+    public void MaskIsSameShapeUsingOnlyFAndDot()
     {
         Assert.Equal(8, Wordmark.Mask.Length);
         foreach (var row in Wordmark.Mask)
@@ -29,9 +29,12 @@ public class WordmarkTests
             Assert.Equal(58, row.Length);
             foreach (var c in row)
             {
-                Assert.True(c == 'F' || c == 'S' || c == '.', $"mask char '{c}' is not F, S or dot.");
+                Assert.True(c == 'F' || c == '.', $"mask char '{c}' is not F or dot.");
             }
         }
+
+        // Flat-word rule: no depth/shading cells.
+        Assert.DoesNotContain('S', string.Concat(Wordmark.Mask));
     }
 
     [Fact]
@@ -276,38 +279,9 @@ public class WordmarkTests
     }
 
     [Fact]
-    public void DrawRowsSetsRightColoursInCells()
+    public void DrawRowsSetsUniformNearWhiteForeground()
     {
-        var buffer = new CellBuffer(Wordmark.Width, Wordmark.Height);
-        Wordmark.DrawRows(buffer, 0, 0, ColorDepth.TrueColor);
-        for (var r = 0; r < Wordmark.Height; r++)
-        {
-            for (var c = 0; c < Wordmark.Width; c++)
-            {
-                var mask = Wordmark.Mask[r][c];
-                var cell = buffer[c, r];
-                if (mask == '.')
-                {
-                    Assert.Equal(' ', cell.Glyph);
-                }
-                else if (mask == 'F')
-                {
-                    Assert.Equal(Wordmark.Rows[r][c], cell.Glyph);
-                    Assert.Equal(Wordmark.Foreground, cell.Foreground);
-                }
-                else
-                {
-                    Assert.Equal(Wordmark.Rows[r][c], cell.Glyph);
-                    Assert.Equal(Wordmark.Depth, cell.Foreground);
-                }
-            }
-        }
-    }
-
-    [Fact]
-    public void DrawRowsDropsDepthAtSixteenColoursAndNoColour()
-    {
-        foreach (var depth in new[] { ColorDepth.Ansi16, ColorDepth.None })
+        foreach (var depth in new[] { ColorDepth.TrueColor, ColorDepth.Ansi256, ColorDepth.Ansi16, ColorDepth.None })
         {
             var buffer = new CellBuffer(Wordmark.Width, Wordmark.Height);
             Wordmark.DrawRows(buffer, 0, 0, depth);
@@ -317,17 +291,43 @@ public class WordmarkTests
                 {
                     var mask = Wordmark.Mask[r][c];
                     var cell = buffer[c, r];
-                    if (mask == 'S')
+                    if (mask == '.')
                     {
                         Assert.Equal(' ', cell.Glyph);
                     }
-                    else if (mask == 'F')
+                    else
                     {
+                        Assert.Equal('F', mask);
                         Assert.Equal(Wordmark.Rows[r][c], cell.Glyph);
+                        if (depth != ColorDepth.None)
+                        {
+                            Assert.Equal(Wordmark.Foreground, cell.Foreground);
+                        }
                     }
                 }
             }
         }
+    }
+
+    [Fact]
+    public void DrawRowsHasNoDepthCellsAtAnyDepth()
+    {
+        foreach (var depth in new[] { ColorDepth.TrueColor, ColorDepth.Ansi256, ColorDepth.Ansi16, ColorDepth.None })
+        {
+            var buffer = new CellBuffer(Wordmark.Width, Wordmark.Height);
+            Wordmark.DrawRows(buffer, 0, 0, depth);
+            for (var r = 0; r < Wordmark.Height; r++)
+            {
+                for (var c = 0; c < Wordmark.Width; c++)
+                {
+                    var cell = buffer[c, r];
+                    Assert.NotEqual(Wordmark.Depth, cell.Foreground);
+                }
+            }
+        }
+
+        Assert.Equal(0, CountMask('S'));
+        Assert.True(CountMask('F') > 0, "expected foreground cells in the mask.");
     }
 
     [Theory]
@@ -359,9 +359,7 @@ public class WordmarkTests
             {
                 var mask = Wordmark.Mask[r][c];
                 var glyph = Wordmark.Rows[r][c];
-                var showDepth = depth is ColorDepth.TrueColor or ColorDepth.Ansi256;
-                var drawn = mask == 'F' || (mask == 'S' && showDepth);
-                if (drawn)
+                if (mask == 'F')
                 {
                     Assert.Contains(glyph.ToString(), bytes);
                 }
@@ -370,17 +368,12 @@ public class WordmarkTests
 
         if (depth == ColorDepth.TrueColor)
         {
-            // #eeeeee -> 238;238;238 ; #3c3c3c -> 60;60;60.
+            // Flat word: uniform near-white #eeeeee -> 238;238;238, no depth step.
             Assert.Contains("38;2;238;238;238", bytes);
-            Assert.Contains("38;2;60;60;60", bytes);
+            Assert.DoesNotContain("38;2;60;60;60", bytes);
         }
 
-        if (depth is ColorDepth.TrueColor or ColorDepth.Ansi256)
-        {
-            // Depth cells are drawn only where the mapping keeps them.
-            var depthCells = CountMask('S');
-            Assert.True(depthCells > 0, "expected depth cells in the mask.");
-        }
+        Assert.Equal(0, CountMask('S'));
     }
 
     private static int CountMask(char kind)

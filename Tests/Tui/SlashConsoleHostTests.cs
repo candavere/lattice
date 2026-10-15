@@ -836,6 +836,19 @@ public class SlashConsoleHostTests
 
         public CapturedRunResult Finish() => _result with { Cancelled = _cancelled };
 
+        // The fake's collection is instant, so the poll and Finish agree.
+        public bool TryTakeFinished(out CapturedRunResult result)
+        {
+            if (!IsDone)
+            {
+                result = default!;
+                return false;
+            }
+
+            result = Finish();
+            return true;
+        }
+
         private readonly CapturedRunResult _result = result;
     }
 }

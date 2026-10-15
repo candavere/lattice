@@ -49,6 +49,17 @@ namespace Lattice.Agents.External;
 /// read anywhere in this type, so a clock adjustment mid-match cannot
 /// manufacture or suppress a timeout (§7).
 /// </para>
+/// <para>
+/// <b>The budget is end-to-end, both directions.</b> The read side always had a
+/// deadline; the write side originally did not, so a child that stopped reading
+/// stdin blocked the host in a full pipe before any budget applied. Writes and
+/// flushes now run under the same binding budget the read would get, measured
+/// from the same clock, and a write that expires kills the child — which is
+/// what unblocks the pipe — before reporting the timeout. The best-effort error
+/// notification is bounded the same way and never restarts the clock. A
+/// disposed agent is cancellation, not a fault: it raises
+/// <see cref="OperationCanceledException"/> rather than inventing a §8 code.
+/// </para>
 /// </remarks>
 public sealed class ExternalAgent : IAgent, IDisposable
 {
@@ -105,9 +116,31 @@ public sealed class ExternalAgent : IAgent, IDisposable
     private readonly List<Task> _pumps = [];
     private readonly Stopwatch _clock = new();
 
+    /// <summary>
+    /// Cancelled by <see cref="Dispose"/> so a wait that is bounded by a budget
+    /// rather than a pipe can be woken early instead of served its whole budget.
+    /// </summary>
+    private readonly CancellationTokenSource _cancelled = new();
+
     private ExternalAgentFault? _pendingFault;
     private int _step;
-    private bool _disposed;
+
+    /// <summary>0 = live, 1 = disposed. Interlocked, because a mid-exchange
+    /// cancellation runs the full <see cref="Dispose"/> from the writer's wait
+    /// thread while the caller may be disposing concurrently: exactly one of
+    /// them may run the teardown.</summary>
+    private int _disposeState;
+
+    /// <summary>
+    /// How many writes are in flight. Closing stdin while a write is blocked
+    /// inside it blocks the closer — the close waits for the in-flight write,
+    /// and a blocked pipe write never ends on its own — so a close that would
+    /// sit on top of one is skipped and the tree kill is what ends the write.
+    /// </summary>
+    private int _writesInFlight;
+
+    /// <summary>The write in flight, so teardown can join it bounded after the kill.</summary>
+    private volatile Task? _writeInFlight;
 
     /// <summary>
     /// Starts the agent process, sends <c>hello</c> exactly once, and requires a
@@ -242,7 +275,7 @@ public sealed class ExternalAgent : IAgent, IDisposable
     public AgentAction Decide(Observation observation)
     {
         ArgumentNullException.ThrowIfNull(observation);
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ObjectDisposedException.ThrowIf(_disposeState != 0, this);
 
         if (_pendingFault is not null)
         {
@@ -319,36 +352,55 @@ public sealed class ExternalAgent : IAgent, IDisposable
     /// </summary>
     public void Dispose()
     {
-        if (_disposed)
+        if (Interlocked.Exchange(ref _disposeState, 1) != 0)
         {
             return;
         }
 
-        _disposed = true;
+        // Wake any bounded wait first, so a write or read that is waiting out
+        // its budget is released by the cancellation rather than served it.
+        _cancelled.Cancel();
 
-        TryCloseStdin();
-
-        if (!_process.WaitForExit((int)GracefulExitTimeout.TotalMilliseconds))
+        if (Volatile.Read(ref _writesInFlight) > 0)
         {
-            try
-            {
-                _process.Kill(entireProcessTree: true);
-            }
-            catch (InvalidOperationException)
-            {
-                // Already gone between the wait and the kill; nothing to do.
-            }
-
-            _process.WaitForExit((int)KillConfirmTimeout.TotalMilliseconds);
+            // A write is blocked in the pipe: stdin cannot be closed gracefully
+            // until it ends, and the kill is what ends it. Kill first, then the
+            // close is safe.
+            KillAndJoinWrite(_writeInFlight);
         }
+        else
+        {
+            TryCloseStdin();
+
+            if (!_process.WaitForExit((int)GracefulExitTimeout.TotalMilliseconds))
+            {
+                KillEntireTree();
+                _process.WaitForExit((int)KillConfirmTimeout.TotalMilliseconds);
+            }
+        }
+
+        // Always attempt the whole-tree kill, even when the child exited on its
+        // own within the grace: a descendant the child spawned — a worker that
+        // inherited stdout or stderr — outlives its parent's exit, and only the
+        // tree kill reaches for it. On an exited parent the request is accepted
+        // and reaps what the platform can; where a descendant was already
+        // reparented and cannot be enumerated, what remains is held honestly
+        // rather than silently: the pumps' join below is bounded, and a pump
+        // still parked on such a pipe is a background thread that dies with the
+        // process, not a hang.
+        KillEntireTree();
 
         LatchExit();
 
         // Releasing the pump lets a reader blocked handing over a line finish.
+        // Bounded, and short: the join exists to let a mid-line handover
+        // complete (sub-millisecond normally), not to wait out a pipe a
+        // descendant is holding — waiting that out here was a per-match stall
+        // paid by every match whose agent spawned a worker.
         _inbound.CompleteAdding();
         try
         {
-            Task.WaitAll(_pumps.ToArray(), TimeSpan.FromSeconds(5));
+            Task.WaitAll(_pumps.ToArray(), PumpJoinTimeout);
         }
         catch (AggregateException)
         {
@@ -359,6 +411,62 @@ public sealed class ExternalAgent : IAgent, IDisposable
 
         _inbound.Dispose();
         _process.Dispose();
+        _cancelled.Dispose();
+    }
+
+    /// <summary>How long the pump join waits before abandoning a pump to its pipe.</summary>
+    private static readonly TimeSpan PumpJoinTimeout = TimeSpan.FromMilliseconds(500);
+
+    /// <summary>
+    /// Kills the whole process tree, confirms exit, and joins the write in
+    /// flight, bounded — the one sequence every "the write must be ended now"
+    /// path shares. The kill comes first because it is what unblocks the
+    /// writer: closing stdin on top of a blocked write blocks the closer
+    /// instead, and a blocked pipe write never ends on its own.
+    /// </summary>
+    private void KillAndJoinWrite(Task? write)
+    {
+        KillEntireTree();
+        _process.WaitForExit((int)KillConfirmTimeout.TotalMilliseconds);
+
+        if (write is null)
+        {
+            return;
+        }
+
+        try
+        {
+            write.Wait(KillConfirmTimeout);
+        }
+        catch (Exception exception) when (exception is AggregateException or ObjectDisposedException)
+        {
+            // The write died with the pipe, as intended; the match is already
+            // decided and whatever fault raised this path is its record.
+        }
+    }
+
+    /// <summary>Kills the whole process tree, tolerating every already-gone race.</summary>
+    private void KillEntireTree()
+    {
+        try
+        {
+            _process.Kill(entireProcessTree: true);
+        }
+        catch (InvalidOperationException)
+        {
+            // Already exited between the wait and the kill; the request below
+            // on an exited handle is still what reaches surviving descendants.
+        }
+        catch (NotSupportedException)
+        {
+            try
+            {
+                _process.Kill();
+            }
+            catch (InvalidOperationException)
+            {
+            }
+        }
     }
 
     /// <summary>
@@ -456,7 +564,12 @@ public sealed class ExternalAgent : IAgent, IDisposable
         }
 
         _clock.Restart();
-        WriteLine(payload);
+        WriteLineBounded(
+            payload,
+            Budget(_limits.StepTimeout).Budget,
+            ProtocolReason.TimeoutHandshake,
+            step: -1,
+            subject: "the hello was not accepted");
 
         // The handshake waits step_timeout_ms, on the same knob as a step (§3.1).
         var outcome = ReadWithin(_limits.StepTimeout, ProtocolReason.TimeoutHandshake, out var timeout);
@@ -496,11 +609,169 @@ public sealed class ExternalAgent : IAgent, IDisposable
         _stdin.Flush();
     }
 
+    /// <summary>
+    /// Writes one LF-terminated line, bounded by <paramref name="budget"/> on the
+    /// monotonic clock and cancellable by <see cref="Dispose"/>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Why the write is bounded at all.</b> A child that stops reading stdin
+    /// fills the pipe, and a synchronous write into a full pipe blocks for as
+    /// long as the child stays silent — indefinitely. The read side has always
+    /// had a deadline; the write side bypassed it, so the deadlock moved one
+    /// stage earlier and no budget ever applied. The write is therefore given
+    /// the same budget the read would have had, measured from the same
+    /// monotonic clock, so the deadline is end-to-end rather than per-direction.
+    /// </para>
+    /// <para>
+    /// <b>Why the write runs on another thread.</b> A blocked pipe write cannot
+    /// be interrupted in place on any of the three supported operating systems;
+    /// waiting for it from a side thread with a budget is the only portable way
+    /// to keep the deciding thread in control. The waiter never abandons the
+    /// task: on expiry the child is killed, which is what actually unblocks the
+    /// pipe, and the write is then joined bounded so its failure is observed
+    /// rather than left to surface as an unobserved task exception. Killing on
+    /// expiry is also the contract, not collateral: a match whose agent will
+    /// not accept its observation is over, and the kill-on-dispose guarantee
+    /// would end the same process moments later anyway.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="OperationCanceledException">
+    /// <see cref="Dispose"/> was called while the write was in flight. A
+    /// cancelled exchange is not a protocol fault: no §8 code describes it, and
+    /// recording one would score the agent a loss for a match Lattice itself
+    /// abandoned.
+    /// </exception>
+    private void WriteLineBounded(byte[] payload, TimeSpan budget, ProtocolReason expiryReason, int step, string subject)
+    {
+        if (_cancelled.IsCancellationRequested)
+        {
+            throw new OperationCanceledException("the external agent was disposed during the exchange.");
+        }
+
+        if (budget <= TimeSpan.Zero)
+        {
+            // The whole-match budget was already gone before a byte was written.
+            throw Fail(expiryReason, DescribeTimeout(expiryReason, subject), step, sendError: false);
+        }
+
+        Task write;
+        // The in-flight count is incremented synchronously, before the task is
+        // queued: between Task.Run and the pool running the body, Dispose could
+        // otherwise read zero and close stdin under an about-to-start write —
+        // the exact hazard the count exists to prevent.
+        Interlocked.Increment(ref _writesInFlight);
+        try
+        {
+            write = Task.Run(() =>
+            {
+                try
+                {
+                    _stdin.Write(payload, 0, payload.Length);
+                    _stdin.WriteByte(LineFeed);
+                    _stdin.Flush();
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref _writesInFlight);
+                }
+            });
+        }
+        catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException)
+        {
+            Interlocked.Decrement(ref _writesInFlight);
+            throw Fail(expiryReason, $"the write could not be started: {exception.Message}", step);
+        }
+
+        _writeInFlight = write;
+
+        try
+        {
+            write.Wait(budget, _cancelled.Token);
+        }
+        catch (OperationCanceledException) when (_cancelled.IsCancellationRequested)
+        {
+            DisposeNow();
+            throw new OperationCanceledException("the external agent was disposed during the exchange.");
+        }
+        catch (AggregateException)
+        {
+            // The write itself faulted — the pipe is already broken. The first
+            // fault is the one to record, not a wrapper around it: GetResult
+            // rethrows the original IOException.
+            write.GetAwaiter().GetResult();
+        }
+
+        if (!write.IsCompleted)
+        {
+            // The budget expired with bytes still in the pipe. Kill FIRST — the
+            // kill is what unblocks the writer, and closing stdin on top of a
+            // blocked write would block the closer instead — then observe the
+            // write's failure, so nothing is left blocked or unobserved behind
+            // this throw.
+            KillAndJoinWrite(write);
+            LatchExit();
+            TryCloseStdin();
+            throw Fail(expiryReason, DescribeTimeout(expiryReason, subject), step, sendError: false);
+        }
+
+        // Completed within budget: surface an in-flight pipe failure as the
+        // fault it is, exactly as a synchronous write would have.
+        write.GetAwaiter().GetResult();
+    }
+
+    /// <summary>
+    /// The budget one exchange direction gets, and whether the whole-match
+    /// budget is the one that binds. Shared by the write and the read so both
+    /// sides of one exchange decide from the same clock and the same rule.
+    /// </summary>
+    private (TimeSpan Budget, bool MatchBinds) Budget(TimeSpan stepBudget)
+    {
+        var matchRemaining = _limits.MatchTimeout - _clock.Elapsed;
+        if (matchRemaining <= TimeSpan.Zero)
+        {
+            return (TimeSpan.Zero, true);
+        }
+
+        // When the match budget is the smaller of the two it is the one that
+        // binds, so its expiry is a timeout_match; otherwise the exchange budget
+        // binds and its expiry is the caller's code. §8.4 puts timeout_step
+        // first when both hold, and this ordering is what decides which of them
+        // actually held.
+        var matchBinds = matchRemaining < stepBudget;
+        return (matchBinds ? matchRemaining : stepBudget, matchBinds);
+    }
+
+    /// <summary>
+    /// The teardown path a mid-exchange cancellation uses: the full
+    /// <see cref="Dispose"/> sequence, from an arbitrary thread, idempotently.
+    /// </summary>
+    private void DisposeNow()
+    {
+        try
+        {
+            Dispose();
+        }
+        catch (ObjectDisposedException)
+        {
+            // The source was disposed between the check and this call.
+        }
+    }
+
     private byte[]? Exchange(byte[] payload, int step)
     {
-        WriteLine(payload);
+        // The write and the read share one monotonic budget: the write consumes
+        // from the step budget first and the read gets whatever remains, so a
+        // blocked write cannot buy a second full budget on the read side. Which
+        // budget binds — step or whole-match — is decided from the same clock
+        // and the same rule in both directions.
+        var writeStart = _clock.Elapsed;
+        var (writeBudget, matchBinds) = Budget(_limits.StepTimeout);
+        var writeTimeout = matchBinds ? ProtocolReason.TimeoutMatch : ProtocolReason.TimeoutStep;
+        WriteLineBounded(payload, writeBudget, writeTimeout, step, subject: $"the observation for step {step} was not accepted");
 
-        var outcome = ReadWithin(_limits.StepTimeout, ProtocolReason.TimeoutStep, out var timeout);
+        var stepRemaining = _limits.StepTimeout - (_clock.Elapsed - writeStart);
+        var outcome = ReadWithin(stepRemaining < TimeSpan.Zero ? TimeSpan.Zero : stepRemaining, ProtocolReason.TimeoutStep, out var timeout);
         if (outcome is null)
         {
             throw Fail(
@@ -535,19 +806,15 @@ public sealed class ExternalAgent : IAgent, IDisposable
     {
         timeout = null;
 
-        var matchRemaining = _limits.MatchTimeout - _clock.Elapsed;
-        if (matchRemaining <= TimeSpan.Zero)
+        // One rule decides which budget binds, shared with the write side of the
+        // exchange so both directions agree on it.
+        var (budget, matchBinds) = Budget(stepBudget);
+        if (budget <= TimeSpan.Zero)
         {
             timeout = ProtocolReason.TimeoutMatch;
             return null;
         }
 
-        // When the match budget is the smaller of the two it is the one that binds,
-        // so its expiry is a timeout_match; otherwise the exchange budget binds and
-        // its expiry is the caller's code. §8.4 puts timeout_step first when both
-        // hold, and this ordering is what decides which of them actually held.
-        var matchBinds = matchRemaining < stepBudget;
-        var budget = matchBinds ? matchRemaining : stepBudget;
         var deadline = _clock.Elapsed + budget;
 
         while (true)
@@ -562,6 +829,35 @@ public sealed class ExternalAgent : IAgent, IDisposable
             if (_inbound.TryTake(out var outcome, remaining < PollInterval ? remaining : PollInterval))
             {
                 return outcome;
+            }
+
+            // The child can exit without its stdout ever reaching EOF: a
+            // descendant it spawned holds the pipe open. Exit is observable
+            // directly, so the exchange ends here rather than at the budget,
+            // and the caller classifies from the exit code — the difference
+            // between agent_exited and a timeout_step that blames a live
+            // process for a match that was already over.
+            bool exited;
+            try
+            {
+                exited = _process.HasExited;
+            }
+            catch (InvalidOperationException)
+            {
+                exited = false;
+            }
+
+            if (exited)
+            {
+                // One poll interval of settle, so a line the child flushed on
+                // its way out is still taken — the same granularity the loop
+                // already waits at.
+                if (_inbound.TryTake(out var final, PollInterval))
+                {
+                    return final;
+                }
+
+                return ReadOutcome.OfClosed();
             }
         }
     }
@@ -718,22 +1014,37 @@ public sealed class ExternalAgent : IAgent, IDisposable
     {
         // §3/§8.1: an error line before terminating whenever a failure was
         // detected, and never on a normal termination. Best-effort, because a
-        // process-level failure may already have taken the stream with it.
-        if (sendError && !_disposed)
+        // process-level failure may already have taken the stream with it — and
+        // bounded, because the same non-reading child that caused the fault can
+        // hold the error line in a full pipe exactly as it held the observation.
+        // The notification may consume what is left of the match budget, never
+        // more: it does not restart the clock, and when nothing is left it is
+        // skipped, which §8.1 permits wherever the stream has already failed.
+        if (sendError && Volatile.Read(ref _disposeState) == 0)
         {
-            try
+            var remaining = _limits.MatchTimeout - _clock.Elapsed;
+            if (remaining > TimeSpan.Zero)
             {
-                var error = ProtocolWriter.WriteLine(new ErrorMessage
+                try
                 {
-                    Reason = reason,
-                    Detail = detail,
-                });
-                WriteLine(error);
-            }
-            catch (Exception e) when (e is IOException or ObjectDisposedException or InvalidOperationException)
-            {
-                // The peer is gone; §8.1 makes sending `error` permitted, not
-                // required, where the stream has already failed.
+                    var error = ProtocolWriter.WriteLine(new ErrorMessage
+                    {
+                        Reason = reason,
+                        Detail = detail,
+                    });
+                    WriteLineBounded(
+                        error,
+                        remaining,
+                        reason,
+                        step,
+                        subject: "the error notification was not accepted");
+                }
+                catch (Exception e) when (e is ExternalAgentFaultException or IOException or ObjectDisposedException or InvalidOperationException)
+                {
+                    // The peer is gone, or would not read the notification either;
+                    // §8.1 makes sending `error` permitted, not required, where the
+                    // stream has already failed. The original fault stands.
+                }
             }
         }
 
@@ -742,8 +1053,20 @@ public sealed class ExternalAgent : IAgent, IDisposable
         return new ExternalAgentFaultException(fault);
     }
 
+    /// <summary>
+    /// Closes stdin when no write is in flight. A close issued while a write is
+    /// blocked inside the stream blocks the closer until that write ends — and
+    /// a blocked pipe write never ends on its own — so a close that would sit
+    /// on top of one is skipped: the tree kill ends the write, and the stream
+    /// is disposed with the process afterwards.
+    /// </summary>
     private void TryCloseStdin()
     {
+        if (Volatile.Read(ref _writesInFlight) > 0)
+        {
+            return;
+        }
+
         try
         {
             _stdin.Close();

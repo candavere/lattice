@@ -97,8 +97,17 @@ public static class SlashConsoleHost
             {
                 if (run.Active is not null)
                 {
+                    // Cancel the tree, then collect to the end — here, and only
+                    // here, waiting is right, and the wait is bounded by the
+                    // collection's own policy (CollectionEofTimeout + a short
+                    // grace; the kill has already closed the pipes for any
+                    // ordinary run, so this is normally milliseconds). The loop
+                    // is exiting, so there is no input to process after this;
+                    // this join is what leaves no collection task and no child
+                    // behind.
                     run.Active.Cancel();
-                    PollRun(run, result);
+                    _ = run.Active.Finish();
+                    run.Active = null;
                 }
 
                 host.Dispose();
@@ -651,16 +660,19 @@ public static class SlashConsoleHost
     }
 
     /// <summary>
-    /// Collects a finished captured run into the result panel. Returns true when a run ended.
+    /// Collects a finished captured run into the result panel, without ever
+    /// blocking the input/render thread: a run whose pipes are held open by a
+    /// descendant is shown as still working until its bounded collection
+    /// completes, so Esc and Ctrl-C stay live throughout collection and
+    /// teardown (the audit's frozen-loop case).
     /// </summary>
     private static bool PollRun(ActiveRun run, ResultPanel result)
     {
-        if (run.Active is null || !run.Active.IsDone)
+        if (run.Active is null || !run.Active.TryTakeFinished(out var finished))
         {
             return false;
         }
 
-        var finished = run.Active.Finish();
         run.Active = null;
 
         var elapsed = CommandLifecycle.Elapsed(finished.Elapsed);

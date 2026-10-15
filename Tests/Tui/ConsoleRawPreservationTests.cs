@@ -158,5 +158,18 @@ public class ConsoleRawPreservationTests
             new(true, false, new CapturedRunResult(exit, stdout, stderr, false, TimeSpan.FromSeconds(1), false));
         public CapturedRunResult Finish() => result;
         public void Cancel() { }
+
+        // The fake's collection is instant, so the poll and Finish agree.
+        public bool TryTakeFinished(out CapturedRunResult result)
+        {
+            if (!IsDone)
+            {
+                result = default!;
+                return false;
+            }
+
+            result = Finish();
+            return true;
+        }
     }
 }

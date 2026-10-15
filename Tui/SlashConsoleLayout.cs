@@ -77,7 +77,7 @@ public static class SlashConsoleLayout
     /// </summary>
     /// <param name="Centered">Whether the wordmark/menu/input group is centred as one
     /// composition in the usable canvas. False when a result is on show: the result
-    /// body keeps the legacy top-anchored flow so a long output stays fully readable
+    /// body keeps the top-anchored flow so a long output stays fully readable
     /// instead of being squeezed into a centred decorative block.</param>
     /// <param name="NoticeY">The notice row, or -1 when there is no notice.</param>
     /// <param name="HeadY">The wordmark top row, or the fallback title row.</param>
@@ -171,7 +171,7 @@ public static class SlashConsoleLayout
                 MenuStartIndex(request, menuRows), inputY, inputY + MenuGap + 1);
         }
 
-        // Results keep the legacy top-anchored flow so the whole output body stays
+        // Results keep the top-anchored flow so the whole output body stays
         // readable; clearing the result restores the centred home composition.
         var headYLegacy = 2;
         var headDrawn = showed && headYLegacy + Wordmark.Height < height - 4;

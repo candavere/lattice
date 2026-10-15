@@ -51,18 +51,46 @@ public sealed record CapturedRunRequest(string[] Arguments, string DisplayLine, 
 
 /// <summary>What a captured run produced.</summary>
 /// <param name="ExitCode">The child's exit status (whatever the platform reports after a kill).</param>
-/// <param name="Stdout">The child's stdout, bounded.</param>
-/// <param name="Stderr">The child's stderr, bounded.</param>
+/// <param name="Stdout">The child's stdout head, up to the memory cap.</param>
+/// <param name="Stderr">The child's stderr head, up to the memory cap.</param>
 /// <param name="Cancelled">Whether the run was cancelled through <see cref="ICapturedRun.Cancel"/>.</param>
 /// <param name="Elapsed">How long the run took.</param>
-/// <param name="Truncated">Whether either stream exceeded the bound.</param>
+/// <param name="Truncated">Whether either stream exceeded its memory cap, hit the disk cap, or lost its spool write.</param>
+/// <param name="EffectiveCommand">
+/// The command actually passed to the child — executable, invocation prefix and
+/// argv — quoted for display. Quoted from the captured argv, never a UI label.
+/// </param>
+/// <param name="WorkingDirectory">The directory the child ran in.</param>
+/// <param name="StdoutDroppedChars">Stdout characters read but kept nowhere.</param>
+/// <param name="StderrDroppedChars">Stderr characters read but kept nowhere.</param>
+/// <param name="StdoutSpoolPath">The file holding stdout past its memory head, or null.</param>
+/// <param name="StderrSpoolPath">The file holding stderr past its memory head, or null.</param>
+/// <param name="StdoutMemoryWhole">Whether the stdout head alone is the whole stream (not the projection gate).</param>
+/// <param name="StderrMemoryWhole">Whether the stderr head alone is the whole stream (not the projection gate).</param>
+/// <param name="StdoutSpoolFailed">Whether the stdout spool write failed (its output is partial).</param>
+/// <param name="StderrSpoolFailed">Whether the stderr spool write failed (its output is partial).</param>
+/// <remarks>
+/// Full raw output is available exactly when a stream is complete or when its
+/// spool path is set with no dropped characters and no spool failure; anything
+/// else is partial and must never feed a domain projection as if it were whole.
+/// </remarks>
 public sealed record CapturedRunResult(
     int ExitCode,
     string Stdout,
     string Stderr,
     bool Cancelled,
     TimeSpan Elapsed,
-    bool Truncated);
+    bool Truncated,
+    string EffectiveCommand = "",
+    string WorkingDirectory = "",
+    long StdoutDroppedChars = 0,
+    long StderrDroppedChars = 0,
+    string? StdoutSpoolPath = null,
+    string? StderrSpoolPath = null,
+    bool StdoutMemoryWhole = true,
+    bool StderrMemoryWhole = true,
+    bool StdoutSpoolFailed = false,
+    bool StderrSpoolFailed = false);
 
 /// <summary>One watch-screen run: the <c>tui</c> argv, the line it is shown as, and where it runs.</summary>
 /// <param name="Invocation">How to start the child; null resolves the current process.</param>
@@ -110,17 +138,26 @@ public interface ISlashConsoleRunner
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Result buffer bound.</b> Each captured stream is kept up to
-/// <see cref="CapturedMaxCharsPerStream"/> characters (32,768); anything past that is
-/// dropped and reported through <see cref="CapturedRunResult.Truncated"/>, which the
-/// frame shows with its visible truncation marker. <c>--out</c> artifacts are written
+/// <b>Result buffer bound.</b> Each captured stream is drained incrementally and
+/// kept up to <see cref="CapturedMaxCharsPerStream"/> characters in memory
+/// (32,768); overflow is spooled to a per-run file under
+/// <see cref="CapturedDiskCapCharsPerStream"/> characters, and anything past
+/// that is counted as dropped. Both pipes are always drained to EOF — even
+/// after both caps — so the child can never block on a full pipe. A truncated
+/// capture reports exactly what was dropped per stream and must never feed a
+/// domain projection as if it were complete. <c>--out</c> artifacts are written
 /// by the child exactly as on the command line and are never bounded here.
+/// Spool files live under the OS temp directory for the session (only runs
+/// that overflow memory create them) and are left to OS temp reclamation.
 /// </para>
 /// </remarks>
 public sealed class SlashConsoleProcessRunner : ISlashConsoleRunner
 {
-    /// <summary>How much of each captured stream is kept, in characters.</summary>
+    /// <summary>How much of each captured stream is kept in memory, in characters.</summary>
     public const int CapturedMaxCharsPerStream = 32768;
+
+    /// <summary>How much overflow per captured stream is spooled to disk, in characters.</summary>
+    public const long CapturedDiskCapCharsPerStream = 1048576;
 
     /// <inheritdoc />
     public ICapturedRun StartCaptured(CapturedRunRequest request)
@@ -149,13 +186,27 @@ public sealed class SlashConsoleProcessRunner : ISlashConsoleRunner
             start.ArgumentList.Add(argument);
         }
 
+        var effectiveCommand = ArgvDisplay.QuoteCommand(
+            [start.FileName, .. invocation.PrefixArguments, .. request.Arguments]);
+        var spoolDirectory = Path.Combine(Path.GetTempPath(), "lattice-console-" + Guid.NewGuid().ToString("N"));
+
         var process = Process.Start(start) ?? throw new InvalidOperationException(
             $"Could not start '{start.FileName}' for '{request.DisplayLine}'.");
         process.StandardInput.Close();
 
-        var stdout = process.StandardOutput.ReadToEndAsync();
-        var stderr = process.StandardError.ReadToEndAsync();
-        return new CapturedRun(process, stdout, stderr, Stopwatch.StartNew());
+        // Both streams drain concurrently from here: each task reads its pipe
+        // to EOF under the caps, so a chatty child can never block.
+        var stdout = BoundedStreamCapture.CaptureAsync(
+            process.StandardOutput,
+            CapturedMaxCharsPerStream,
+            Path.Combine(spoolDirectory, "stdout.log"),
+            CapturedDiskCapCharsPerStream);
+        var stderr = BoundedStreamCapture.CaptureAsync(
+            process.StandardError,
+            CapturedMaxCharsPerStream,
+            Path.Combine(spoolDirectory, "stderr.log"),
+            CapturedDiskCapCharsPerStream);
+        return new CapturedRun(process, stdout, stderr, Stopwatch.StartNew(), effectiveCommand, request.WorkingDirectory);
     }
 
     /// <inheritdoc />
@@ -204,19 +255,29 @@ public sealed class SlashConsoleProcessRunner : ISlashConsoleRunner
     private sealed class CapturedRun : ICapturedRun
     {
         private readonly Process _process;
-        private readonly Task<string> _stdout;
-        private readonly Task<string> _stderr;
+        private readonly Task<CapturedStream> _stdout;
+        private readonly Task<CapturedStream> _stderr;
         private readonly Stopwatch _stopwatch;
+        private readonly string _effectiveCommand;
+        private readonly string _workingDirectory;
         private bool _cancelled;
         private bool _finished;
         private CapturedRunResult? _result;
 
-        internal CapturedRun(Process process, Task<string> stdout, Task<string> stderr, Stopwatch stopwatch)
+        internal CapturedRun(
+            Process process,
+            Task<CapturedStream> stdout,
+            Task<CapturedStream> stderr,
+            Stopwatch stopwatch,
+            string effectiveCommand,
+            string workingDirectory)
         {
             _process = process;
             _stdout = stdout;
             _stderr = stderr;
             _stopwatch = stopwatch;
+            _effectiveCommand = effectiveCommand;
+            _workingDirectory = workingDirectory;
         }
 
         /// <inheritdoc />
@@ -282,9 +343,6 @@ public sealed class SlashConsoleProcessRunner : ISlashConsoleRunner
             var stderr = _stderr.GetAwaiter().GetResult();
             var elapsed = _stopwatch.Elapsed;
 
-            var (boundedOut, outTruncated) = BoundOutput(stdout);
-            var (boundedErr, errTruncated) = BoundOutput(stderr);
-
             int exit;
             try
             {
@@ -297,7 +355,23 @@ public sealed class SlashConsoleProcessRunner : ISlashConsoleRunner
 
             _process.Dispose();
             _finished = true;
-            _result = new CapturedRunResult(exit, boundedOut, boundedErr, _cancelled, elapsed, outTruncated || errTruncated);
+            _result = new CapturedRunResult(
+                exit,
+                stdout.MemoryText,
+                stderr.MemoryText,
+                _cancelled,
+                elapsed,
+                !stdout.MemoryWhole || !stderr.MemoryWhole,
+                _effectiveCommand,
+                _workingDirectory,
+                stdout.DroppedChars,
+                stderr.DroppedChars,
+                stdout.SpoolPath,
+                stderr.SpoolPath,
+                stdout.MemoryWhole,
+                stderr.MemoryWhole,
+                stdout.SpoolFailed,
+                stderr.SpoolFailed);
             return _result;
         }
     }

@@ -242,6 +242,12 @@ public static class SlashConsoleHost
 
                 if (form.Form is not null && form.Form.WantsToRun)
                 {
+                    if (!form.Form.CanRun)
+                    {
+                        form.Form.Acknowledge();
+                        continue;
+                    }
+
                     var plan = PlanFormRun(form);
                     form.Form.Acknowledge();
                     form.Form = null;
@@ -500,9 +506,10 @@ public static class SlashConsoleHost
     /// <summary>
     /// Builds the form for <paramref name="command"/>, prefilling what the typed
     /// tokens state exactly: <c>--flag value</c> pairs the form can represent, a
-    /// bare path where the command takes one, and the run-mode word. Anything else
-    /// leaves its field empty. Reports whether every modelled required input ended
-    /// up filled; the typed line itself is never rewritten.
+    /// bare path where the command takes one, and the run-mode word. Unrepresentable
+    /// remainder is kept verbatim in the raw tail so confirming preserves every
+    /// token. Reports whether every modelled required input ended up filled; the
+    /// typed line itself is never rewritten.
     /// </summary>
     private static LaunchpadForm FillFormFields(LaunchpadCommand command, string[] tail, string? modeChoice, out bool complete)
     {
@@ -550,20 +557,78 @@ public static class SlashConsoleHost
         }
 
         var exact = index >= tail.Length;
-        complete = exact && command.RequiredFlags.All(required =>
-            filled.Fields.Any(field =>
-                field.Label.Equals(required, StringComparison.Ordinal) &&
-                filled.WasTyped(field)));
+        complete = RequiredPresent(command, filled);
 
-        if (!exact)
+        if (!exact && !complete)
         {
-            return EmptyForm(command);
+            filled.TrySetValue(LaunchpadCatalog.ExtraArgumentsLabel, QuoteRemainder(tail[index..]));
+            filled.FocusField(FirstMissing(command, filled));
+            return filled;
         }
 
-        var firstEmpty = filled.Fields.ToList().FindIndex(field =>
-            field.Required && !filled.WasTyped(field));
-        filled.FocusField(firstEmpty < 0 ? 0 : firstEmpty);
+        if (!complete)
+        {
+            filled.FocusField(FirstMissing(command, filled));
+            return filled;
+        }
+
         return filled;
+    }
+
+    private static string QuoteRemainder(string[] remainder)
+    {
+        return string.Join(' ', remainder.Select(token =>
+            token.Contains(' ') || token.Contains('"') ? $"\"{token.Replace("\"", "\\\"", StringComparison.Ordinal)}\"" : token));
+    }
+
+    private static bool RequiredPresent(LaunchpadCommand command, LaunchpadForm filled)
+    {
+        var flagsPresent = command.RequiredFlags.All(required =>
+            filled.Fields.Any(field =>
+                field.Label.Equals(required, StringComparison.Ordinal) &&
+                filled.WasTyped(field) &&
+                filled.Value(field).Trim().Length > 0));
+
+        if (!flagsPresent)
+        {
+            return false;
+        }
+
+        if (command.RequiredAnyInputs.Count == 0)
+        {
+            return true;
+        }
+
+        return command.RequiredAnyInputs.Any(label =>
+            filled.Fields.FirstOrDefault(field => field.Label.Equals(label, StringComparison.Ordinal)) is { } field
+            && filled.WasTyped(field)
+            && filled.Value(field).Trim().Length > 0);
+    }
+
+    private static int FirstMissing(LaunchpadCommand command, LaunchpadForm filled)
+    {
+        var firstEmpty = filled.Fields.ToList().FindIndex(field =>
+            field.Required && (!filled.WasTyped(field) || filled.Value(field).Trim().Length == 0));
+        if (firstEmpty >= 0)
+        {
+            return firstEmpty;
+        }
+
+        if (command.RequiredAnyInputs.Count > 0)
+        {
+            var anyPresent = command.RequiredAnyInputs.Any(label =>
+                filled.Fields.FirstOrDefault(field => field.Label.Equals(label, StringComparison.Ordinal)) is { } field
+                && filled.WasTyped(field)
+                && filled.Value(field).Trim().Length > 0);
+            if (!anyPresent)
+            {
+                var firstGroup = filled.Fields.ToList().FindIndex(field =>
+                    command.RequiredAnyInputs.Contains(field.Label, StringComparer.Ordinal));
+                return firstGroup < 0 ? 0 : firstGroup;
+            }
+        }
+
+        return 0;
     }
 
     /// <summary>

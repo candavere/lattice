@@ -1505,19 +1505,7 @@ public static class CliApp
             }
 
             var (flags, positionals) = ParseFlags(args, "--trajectory", "--out");
-            var trajectoryPath = flags.TryGetValue("--trajectory", out var flaggedPath)
-                ? flaggedPath
-                : positionals.Count == 1 ? positionals[0] : null;
-            if (trajectoryPath is null)
-            {
-                throw new UsageError(
-                    "missing trajectory path (pass a positional path or --trajectory <file>).");
-            }
-
-            if (positionals.Count > (flags.ContainsKey("--trajectory") ? 0 : 1))
-            {
-                throw new UsageError($"unexpected argument '{positionals[^1]}'.");
-            }
+            var trajectoryPath = CliInputResolution.ResolveReplayTrajectory(flags, positionals);
 
             TrajectoryRecording recording;
             using (var reader = new StreamReader(trajectoryPath))
@@ -1584,21 +1572,7 @@ public static class CliApp
             // paths" and "you passed none" are two different messages rather
             // than both collapsing into "missing path" — a caller who passed an
             // extra argument needs to be told which argument was extra.
-            var allowedPositionals = flags.ContainsKey("--out") ? 0 : 1;
-            if (positionals.Count > allowedPositionals)
-            {
-                throw new UsageError(
-                    $"unexpected argument '{positionals[allowedPositionals]}'.");
-            }
-
-            var path = flags.TryGetValue("--out", out var flagged)
-                ? flagged
-                : positionals.Count == 1 ? positionals[0] : null;
-            if (path is null)
-            {
-                throw new UsageError(
-                    "missing scenario path (pass a positional path or --out <file>).");
-            }
+            var path = CliInputResolution.ResolveValidateScenarioPath(flags, positionals);
 
             (ScenarioDescriptor descriptor, string digest) scenario;
             try

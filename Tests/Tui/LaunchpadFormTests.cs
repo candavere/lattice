@@ -539,7 +539,9 @@ public class LaunchpadFormTests
     public void TheRawTailIsAppendedUnexamined()
     {
         var form = Select(Form(), "replay");
-        for (var i = 0; i < 5; i++)
+        Drive(form, new TuiKey(TuiKeyKind.Tab));
+        Type(form, "site/demo.jsonl");
+        for (var i = 0; i < 4; i++)
         {
             Drive(form, new TuiKey(TuiKeyKind.Tab));
         }
@@ -547,7 +549,7 @@ public class LaunchpadFormTests
         Assert.Equal(LaunchpadCatalog.ExtraArgumentsLabel, form.FocusedField);
         Type(form, "--verify");
 
-        Assert.Equal("lattice replay --verify", form.CommandLine);
+        Assert.Equal("lattice replay site/demo.jsonl --verify", form.CommandLine);
         Assert.True(form.CanRun);
     }
 
@@ -912,7 +914,8 @@ public class LaunchpadFormTests
     /// <summary>
     /// An exact prefill sets the value, marks it chosen and validates it, so the
     /// command line carries it. Unknown labels and values the parser refuses set
-    /// nothing and report false, so an inexact typed line opens an empty form.
+    /// nothing and report false; the raw tail accepts anything verbatim so
+    /// unrepresentable remainder survives a form round-trip.
     /// </summary>
     [Fact]
     public void TrySetValueSetsAnExactValueMarkedTyped()

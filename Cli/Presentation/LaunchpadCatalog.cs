@@ -44,6 +44,11 @@ public sealed record LaunchpadField(
 /// </param>
 /// <param name="RequiredFlags">The flags whose absence is a usage error.</param>
 /// <param name="TakesPositionalPath">Whether the command takes a bare path token.</param>
+/// <param name="RequiredAny">
+/// Field labels where at least one must be supplied. For the two commands that
+/// take a path two ways, this names the positional label and the flag that
+/// names the same path — one is required, not both.
+/// </param>
 /// <param name="RunModes">
 /// The ways this command can be started, in the order the form offers them. A
 /// command with one is not a choice the reader has to make.
@@ -63,8 +68,14 @@ public sealed record LaunchpadCommand(
     string[] RequiredFlags,
     bool TakesPositionalPath = false,
     string[]? RunModes = null,
-    string[]? InvocationPrefix = null)
+    string[]? InvocationPrefix = null,
+    string[]? RequiredAny = null)
 {
+    /// <summary>
+    /// Field labels where at least one must hold a non-blank value. Empty for
+    /// every command except the two that take a path two ways.
+    /// </summary>
+    public IReadOnlyList<string> RequiredAnyInputs => RequiredAny ?? [];
     /// <summary>
     /// The leading tokens in front of the command's own name, empty for a command the
     /// CLI dispatches directly.
@@ -206,14 +217,15 @@ public static class LaunchpadCatalog
             "replay",
             "Play a recorded trajectory in the cockpit, or re-run it.",
             Watched(
-                Path("The trajectory to re-run."),
-                Flag("--trajectory", Help: "The same path, named explicitly."),
+                Path("The trajectory to re-run (one of this or --trajectory is required)."),
+                Flag("--trajectory", Help: "The same path, named explicitly (one of this or the path is required)."),
                 Flag("--verify", Help: "Assert tick-by-tick equivalence instead of re-serializing."),
                 Flag("--out", Help: "Write the re-serialized trajectory here.")),
             ["--trajectory", "--verify", "--out"],
             [],
             TakesPositionalPath: true,
-            RunModes: ScreenOnly),
+            RunModes: ScreenOnly,
+            RequiredAny: [PositionalPathLabel, "--trajectory"]),
         new(
             "benchmark",
             "Measure the five-case workload matrix.",
@@ -252,11 +264,12 @@ public static class LaunchpadCatalog
             "validate-scenario",
             "Check a scenario descriptor without running it.",
             Form(
-                Path("The descriptor to check."),
-                Flag("--out", Help: "The same path, named explicitly.")),
+                Path("The descriptor to check (one of this or --out is required)."),
+                Flag("--out", Help: "The same path, named explicitly (one of this or the path is required).")),
             ["--out"],
             [],
-            TakesPositionalPath: true),
+            TakesPositionalPath: true,
+            RequiredAny: [PositionalPathLabel, "--out"]),
         new(
             "ledger",
             "Show evaluation artifacts side by side, read-only.",

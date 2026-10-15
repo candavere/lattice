@@ -565,9 +565,12 @@ Bare `lattice` on a terminal opens the slash console. Picking a command from
 the `/` menu with Enter opens an input form for that command instead of
 running it: one row per field in catalog order, required fields marked,
 defaults shown as placeholders, choices named, and values validated by the CLI
-parser itself as they are typed. The command runs only when the form is
-complete. Typing an incomplete raw line (a catalog command missing a required
-input) opens the same form, prefilled from the typed flags where exact; a
+parser itself as they are typed. The command runs only on explicit `enter`
+when the form is complete. `replay` needs one of its path or `--trajectory`,
+and `validate-scenario` needs one of its path or `--out` — one, not both,
+with the CLI's own missing/arity text. Typing an incomplete raw line (a
+catalog command missing a required input) opens the same form, prefilled from
+the typed flags where exact with the rest kept verbatim in the raw tail; a
 complete raw line, an unknown command and `/exit` behave as before.
 
 ```

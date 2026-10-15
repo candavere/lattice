@@ -223,11 +223,19 @@ public sealed class LaunchpadForm
             into.Add(text);
         }
 
-        // Any run of whitespace in the tail is collapsed, so a reader who typed a
-        // stray space has not produced a command line with a doubled space in it.
+        // The tail is the reader's own words, split the way the console splits
+        // them so a quoted path stays one argv entry. Falls back to whitespace
+        // split for an unterminated quote, which the child then refuses.
         if (_values.GetValueOrDefault(LaunchpadCatalog.ExtraArgumentsLabel) is { Length: > 0 } tail)
         {
-            into.AddRange(Collapse(tail).Split(' ', StringSplitOptions.RemoveEmptyEntries));
+            if (AgentCommandLine.TrySplit(tail, out var tokens, out _))
+            {
+                into.AddRange(tokens);
+            }
+            else
+            {
+                into.AddRange(Collapse(tail).Split(' ', StringSplitOptions.RemoveEmptyEntries));
+            }
         }
     }
 
@@ -487,7 +495,8 @@ public sealed class LaunchpadForm
     /// <summary>
     /// Sets a field to a value the command's own parser accepts, marking it chosen
     /// and validating the form. Returns false and changes nothing for an unknown
-    /// label or a refused value.
+    /// label or a refused value. The raw tail accepts anything verbatim so a
+    /// partially typed line's unknown tokens survive a form round-trip.
     /// </summary>
     public bool TrySetValue(string label, string value)
     {
@@ -495,9 +504,18 @@ public sealed class LaunchpadForm
         ArgumentNullException.ThrowIfNull(value);
 
         var field = Fields.FirstOrDefault(entry => entry.Label.Equals(label, StringComparison.Ordinal));
-        if (field is null || field.Kind == LaunchpadFieldKind.ExtraArguments)
+        if (field is null)
         {
             return false;
+        }
+
+        if (field.Kind == LaunchpadFieldKind.ExtraArguments)
+        {
+            _typed.Add(field.Label);
+            _values[field.Label] = value;
+            _carets[field.Label] = value.Length;
+            Validate();
+            return true;
         }
 
         if (field.Kind == LaunchpadFieldKind.Flag && Refusal(field, value) is not null)
@@ -575,6 +593,16 @@ public sealed class LaunchpadForm
             }
         }
 
+        if (command.RequiredAnyInputs.Count > 0)
+        {
+            var refusal = PresenceRefusal(command);
+            if (refusal is not null)
+            {
+                _validationError = refusal;
+                return;
+            }
+        }
+
         foreach (var field in Fields.Where(field => field.Kind == LaunchpadFieldKind.Flag))
         {
             var text = Chosen(field);
@@ -592,6 +620,73 @@ public sealed class LaunchpadForm
         }
 
         _validationError = null;
+    }
+
+    /// <summary>
+    /// The at-least-one presence check, answered by the CLI's own pure
+    /// input-resolution: blank counts as absent, both supplied and neither
+    /// report the command's own wording. Pure: no file is read.
+    /// </summary>
+    private string? PresenceRefusal(LaunchpadCommand command)
+    {
+        try
+        {
+            if (command.Name.Equals("replay", StringComparison.Ordinal))
+            {
+                CliInputResolution.ResolveReplayTrajectory(FlagsFor(command, "--trajectory"), PositionalsFor(command));
+                return null;
+            }
+
+            if (command.Name.Equals("validate-scenario", StringComparison.Ordinal))
+            {
+                CliInputResolution.ResolveValidateScenarioPath(FlagsFor(command, "--out"), PositionalsFor(command));
+                return null;
+            }
+
+            var anyPresent = command.RequiredAnyInputs.Any(label =>
+                Fields.FirstOrDefault(field => field.Label.Equals(label, StringComparison.Ordinal)) is { } field
+                && Chosen(field).Trim().Length > 0);
+            return anyPresent ? null : $"missing required input (pass one of {string.Join(", ", command.RequiredAnyInputs)}).";
+        }
+        catch (UsageError error)
+        {
+            return error.Message;
+        }
+    }
+
+    private Dictionary<string, string> FlagsFor(LaunchpadCommand command, params string[] names)
+    {
+        var flags = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var name in names)
+        {
+            var field = Fields.FirstOrDefault(candidate => candidate.Label.Equals(name, StringComparison.Ordinal));
+            if (field is not null && Chosen(field).Trim() is { Length: > 0 } trimmed)
+            {
+                flags[name] = trimmed;
+            }
+        }
+
+        return flags;
+    }
+
+    private List<string> PositionalsFor(LaunchpadCommand command)
+    {
+        var positionals = new List<string>();
+        foreach (var field in Fields.Where(field => field.Kind == LaunchpadFieldKind.PositionalPath))
+        {
+            if (command.RequiredAnyInputs.Contains(field.Label, StringComparer.Ordinal)
+                && Chosen(field).Trim() is { Length: > 0 } trimmed)
+            {
+                positionals.Add(trimmed);
+            }
+            else if (!command.RequiredAnyInputs.Contains(field.Label, StringComparer.Ordinal)
+                && Chosen(field) is { Length: > 0 } raw)
+            {
+                positionals.Add(raw);
+            }
+        }
+
+        return positionals;
     }
 
     /// <summary>

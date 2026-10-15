@@ -274,6 +274,124 @@ public class SlashConsoleHostTests
     }
 
     [Fact]
+    public void EmptyReplayFormRunsNothingWithTheCliMissingText()
+    {
+        var runner = new FakeRunner(_ => FakeCapturedRun.Done(0, "", ""));
+        var keys = Text("/replay");
+        keys.Add(new TuiKey(TuiKeyKind.Enter));
+        keys.Add(new TuiKey(TuiKeyKind.Enter));
+        keys.Add(new TuiKey(TuiKeyKind.Enter));
+        var (exit, screen) = Drive(keys, runner: runner);
+
+        Assert.Equal(0, exit);
+        Assert.Empty(runner.Captured);
+        Assert.Empty(runner.Watched);
+        Assert.Contains("missing trajectory path (pass a positional path or --trajectory <file>).", screen, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EmptyValidateScenarioFormRunsNothingWithTheCliMissingText()
+    {
+        var runner = new FakeRunner(_ => FakeCapturedRun.Done(0, "", ""));
+        var keys = Text("/validate-scenario");
+        keys.Add(new TuiKey(TuiKeyKind.Enter));
+        keys.Add(new TuiKey(TuiKeyKind.Enter));
+        keys.Add(new TuiKey(TuiKeyKind.Enter));
+        var (exit, screen) = Drive(keys, runner: runner);
+
+        Assert.Equal(0, exit);
+        Assert.Empty(runner.Captured);
+        Assert.Empty(runner.Watched);
+        Assert.Contains("missing scenario path (pass a positional path or --out <file>).", screen, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ReplayPositionalRunsThroughTheScreenPath()
+    {
+        var runner = new FakeRunner();
+        var keys = Text("/replay");
+        keys.Add(new TuiKey(TuiKeyKind.Enter));
+        keys.AddRange(Text("site/demo.jsonl"));
+        keys.Add(new TuiKey(TuiKeyKind.Enter));
+        keys.Add(new TuiKey(TuiKeyKind.Enter));
+        var (exit, _) = Drive(keys, runner: runner, extraKeys: 1);
+
+        Assert.Equal(0, exit);
+        Assert.Empty(runner.Captured);
+        var watch = Assert.Single(runner.Watched);
+        Assert.Equal(["tui", "replay", "site/demo.jsonl"], watch.Arguments);
+    }
+
+    [Fact]
+    public void ValidatePositionalAndOutFlagEachRunCaptured()
+    {
+        var runner = new FakeRunner(_ => FakeCapturedRun.Done(0, "", ""));
+        var positional = Text("/validate-scenario");
+        positional.Add(new TuiKey(TuiKeyKind.Enter));
+        positional.AddRange(Text("scenarios/collection-skirmish.json"));
+        positional.Add(new TuiKey(TuiKeyKind.Enter));
+        positional.Add(new TuiKey(TuiKeyKind.Enter));
+        var (exit, _) = Drive(positional, runner: runner);
+
+        Assert.Equal(0, exit);
+        var run = Assert.Single(runner.Captured);
+        Assert.Equal(["validate-scenario", "scenarios/collection-skirmish.json"], run.Arguments);
+        Assert.Empty(runner.Watched);
+
+        var flaggedRunner = new FakeRunner(_ => FakeCapturedRun.Done(0, "", ""));
+        var flagged = Text("/validate-scenario");
+        flagged.Add(new TuiKey(TuiKeyKind.Enter));
+        flagged.Add(new TuiKey(TuiKeyKind.Tab));
+        flagged.AddRange(Text("scenarios/collection-skirmish.json"));
+        flagged.Add(new TuiKey(TuiKeyKind.Enter));
+        flagged.Add(new TuiKey(TuiKeyKind.Enter));
+        var (flaggedExit, _) = Drive(flagged, runner: flaggedRunner);
+
+        Assert.Equal(0, flaggedExit);
+        var flaggedRun = Assert.Single(flaggedRunner.Captured);
+        Assert.Equal(["validate-scenario", "--out", "scenarios/collection-skirmish.json"], flaggedRun.Arguments);
+        Assert.Empty(flaggedRunner.Watched);
+    }
+
+    [Fact]
+    public void ReplayEscapeKeepsTheOriginalLine()
+    {
+        var runner = new FakeRunner();
+        var keys = Text("/replay --bogus x");
+        keys.Add(new TuiKey(TuiKeyKind.Enter));
+        keys.Add(new TuiKey(TuiKeyKind.Escape));
+        var (exit, screen) = Drive(keys, runner: runner);
+
+        Assert.Equal(0, exit);
+        Assert.Empty(runner.Captured);
+        Assert.Empty(runner.Watched);
+        Assert.Contains("/replay --bogus x", screen, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ReplayInterruptQuitsWithoutRunning()
+    {
+        var runner = new FakeRunner();
+        var keys = Text("/replay");
+        keys.Add(new TuiKey(TuiKeyKind.Enter));
+        keys.Add(new TuiKey(TuiKeyKind.Interrupt));
+        var (exit, _) = Drive(keys, runner: runner);
+
+        Assert.Equal(0, exit);
+        Assert.Empty(runner.Captured);
+        Assert.Empty(runner.Watched);
+    }
+
+    [Fact]
+    public void ReplayFlagRoutesThroughTheScreenArgv()
+    {
+        var plan = SlashConsoleCommit.ParseCommit("/replay --trajectory site/demo.jsonl");
+
+        Assert.Equal(CommitKind.Screen, plan.Kind);
+        Assert.Equal(["tui", "replay", "--trajectory", "site/demo.jsonl"], plan.Arguments);
+    }
+
+    [Fact]
     public void FormDefaultModeWatchesASimulatableCommand()
     {
         var runner = new FakeRunner();

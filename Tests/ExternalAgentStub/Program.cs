@@ -105,7 +105,7 @@ public static class Program
         // less than one step budget and so stays inside it: a delay that exceeds
         // the entire match budget cannot be waited out at any child startup speed,
         // which is what makes timeout_match reachable without a race.
-        var stallMs = mode == "stall-match" && parsed > 0 ? parsed : 0;
+        var stallMs = (mode == "stall-match" || mode == "spawn-stall-match") && parsed > 0 ? parsed : 0;
 
         // The handshake is answered immediately. The delay is spent inside the
         // step loop instead, where the host is actually counting: with
@@ -140,7 +140,7 @@ public static class Program
         // kill — or outlives it where the platform cannot reap an orphan, which
         // is exactly the case the tests document.
 
-        if (mode == "spawn-hold" || mode == "spawn-exit")
+        if (mode == "spawn-hold" || mode == "spawn-exit" || mode == "spawn-hang-at-step" || mode == "spawn-stall-match")
         {
             SpawnHoldingWorker();
             Console.Error.WriteLine($"stub: spawned worker; mode={mode}");
@@ -192,6 +192,7 @@ public static class Program
             switch (mode)
             {
                 case "hang-at-step" when step == at:
+                case "spawn-hang-at-step" when step == at:
                     Console.Error.WriteLine($"stub: hanging at step {step} as asked");
                     Thread.Sleep(Timeout.Infinite);
                     return 0;

@@ -117,6 +117,18 @@ public sealed class ExternalAgent : IAgent, IDisposable
     private readonly Stopwatch _clock = new();
 
     /// <summary>
+    /// PIDs of descendants ever observed while the parent was alive. A worker
+    /// that outlives its parent is reparented (PPID 1 on macOS) and can no
+    /// longer be enumerated from the exited parent, so the only product-owned
+    /// handle to it is a PID captured before the exit. Accumulated on every
+    /// exchange while the parent is known alive, then killed explicitly by PID
+    /// at teardown. Test-only pidfiles are never read here; this is the
+    /// product mechanism.
+    /// </summary>
+    private readonly HashSet<int> _knownDescendants = [];
+    private readonly object _descendantsLock = new();
+
+    /// <summary>
     /// Cancelled by <see cref="Dispose"/> so a wait that is bounded by a budget
     /// rather than a pipe can be woken early instead of served its whole budget.
     /// </summary>
@@ -205,6 +217,7 @@ public sealed class ExternalAgent : IAgent, IDisposable
         _pumps.Add(StartPump(DrainStderr));
 
         Handshake(runSeed, maxTicks, agentCount);
+        NoteDescendants();
     }
 
     /// <inheritdoc />
@@ -287,6 +300,8 @@ public sealed class ExternalAgent : IAgent, IDisposable
         // throw, so every failure below it has the number.
         LastKnownScores = (observation.AgentStates[0].Score, observation.AgentStates[1].Score);
 
+        NoteDescendants();
+
         var step = _step;
         var message = ExternalWire.ToWire(step, observation);
 
@@ -361,6 +376,8 @@ public sealed class ExternalAgent : IAgent, IDisposable
         // its budget is released by the cancellation rather than served it.
         _cancelled.Cancel();
 
+        NoteDescendants();
+
         if (Volatile.Read(ref _writesInFlight) > 0)
         {
             // A write is blocked in the pipe: stdin cannot be closed gracefully
@@ -381,14 +398,13 @@ public sealed class ExternalAgent : IAgent, IDisposable
 
         // Always attempt the whole-tree kill, even when the child exited on its
         // own within the grace: a descendant the child spawned — a worker that
-        // inherited stdout or stderr — outlives its parent's exit, and only the
-        // tree kill reaches for it. On an exited parent the request is accepted
-        // and reaps what the platform can; where a descendant was already
-        // reparented and cannot be enumerated, what remains is held honestly
-        // rather than silently: the pumps' join below is bounded, and a pump
-        // still parked on such a pipe is a background thread that dies with the
-        // process, not a hang.
+        // inherited stdout or stderr — outlives its parent's exit. The tree kill
+        // reaps what the platform can; a descendant already reparented past the
+        // parent (PPID 1 on macOS) escapes it, so the PIDs accumulated while the
+        // parent was alive are killed explicitly by PID below. The pumps' join
+        // stays bounded regardless.
         KillEntireTree();
+        KillKnownDescendants();
 
         LatchExit();
 
@@ -466,6 +482,67 @@ public sealed class ExternalAgent : IAgent, IDisposable
             catch (InvalidOperationException)
             {
             }
+        }
+
+        KillKnownDescendants();
+    }
+
+    /// <summary>
+    /// Records live descendants of the child while it is alive. Called after
+    /// the handshake and before every exchange, so a worker spawned at any
+    /// point is captured before a later exit reparents it.
+    /// </summary>
+    private void NoteDescendants()
+    {
+        if (Volatile.Read(ref _disposeState) != 0) return;
+        int pid = ProcessId;
+        if (pid <= 0) return;
+        try
+        {
+            if (_process.HasExited) return;
+        }
+        catch (InvalidOperationException) { return; }
+        IReadOnlyList<int> found;
+        try { found = ProcessTree.CollectDescendants(pid); }
+        catch { return; }
+        if (found.Count == 0) return;
+        lock (_descendantsLock)
+        {
+            foreach (var id in found) _knownDescendants.Add(id);
+        }
+    }
+
+    /// <summary>
+    /// Kills PIDs captured by <see cref="NoteDescendants"/> explicitly by PID,
+    /// so a worker already reparented past its parent is still ended. Bounded:
+    /// each kill is fire-and-forget with a short settle, never an unbounded wait.
+    /// </summary>
+    private void KillKnownDescendants()
+    {
+        int[] targets;
+        lock (_descendantsLock) { targets = [.. _knownDescendants]; }
+        foreach (var pid in targets)
+        {
+            if (pid == ProcessId) continue;
+            ProcessTree.KillById(pid);
+        }
+        var deadline = Stopwatch.StartNew();
+        while (deadline.Elapsed < TimeSpan.FromSeconds(2))
+        {
+            bool anyAlive = false;
+            foreach (var pid in targets)
+            {
+                if (pid == ProcessId) continue;
+                try
+                {
+                    using var p = Process.GetProcessById(pid);
+                    if (!p.HasExited) { anyAlive = true; break; }
+                }
+                catch (ArgumentException) { }
+                catch (InvalidOperationException) { }
+            }
+            if (!anyAlive) break;
+            Thread.Sleep(50);
         }
     }
 

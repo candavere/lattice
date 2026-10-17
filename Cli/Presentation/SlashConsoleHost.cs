@@ -146,14 +146,10 @@ public static class SlashConsoleHost
         internal IKeySource? Keys { get; set; }
     }
 
-    /// <summary>The result panel on show.</summary>
+    /// <summary>The result workspace on show, or none.</summary>
     private sealed class ResultPanel
     {
-        internal string? Title { get; set; }
-
-        internal IReadOnlyList<string>? Lines { get; set; }
-
-        internal bool Truncated { get; set; }
+        internal SlashConsoleWorkspace? Workspace { get; set; }
     }
 
     /// <summary>
@@ -220,6 +216,7 @@ public static class SlashConsoleHost
                 continue;
             }
 
+            var workspace = result.Workspace;
             if (outcome != KeyWait.Key)
             {
                 if (PollRun(run, result))
@@ -236,12 +233,37 @@ public static class SlashConsoleHost
             {
                 // While a captured command runs, Esc or Ctrl-C cancels its whole
                 // process tree; any other key is discarded, not queued behind it.
-                if (key.Kind is TuiKeyKind.Escape or TuiKeyKind.Interrupt)
+                var cancelledThisKey = false;
+                if (key.Kind is TuiKeyKind.Escape or TuiKeyKind.Interrupt
+                    && run.Active is not null
+                    && !run.Active.IsDone)
                 {
                     run.Active.Cancel();
+                    cancelledThisKey = true;
                 }
 
-                PollRun(run, result);
+                if (!PollRun(run, result))
+                {
+                    // Still in flight: this key is discarded, not queued behind it.
+                    continue;
+                }
+
+                // A key that cancelled the run must not then be routed into the
+                // result view (e.g. Esc clearing it); the cancelled result stays.
+                if (cancelledThisKey)
+                {
+                    continue;
+                }
+
+                // The run ended on this key press; its workspace is now on show,
+                // so fall through and let this same key act on it.
+                workspace = result.Workspace;
+                current.RepaintEverything();
+            }
+
+            if (workspace is not null && RouteResultKey(workspace, key, result, request))
+            {
+                current.RepaintEverything();
                 continue;
             }
 
@@ -315,18 +337,16 @@ public static class SlashConsoleHost
 
         if (plan.Kind == CommitKind.Error)
         {
-            result.Title = "exit 2";
-            result.Lines = [plan.ErrorMessage ?? "refused"];
-            result.Truncated = false;
+            result.Workspace = SlashConsoleWorkspace.FromMessage("exit 2", [plan.ErrorMessage ?? "refused"]);
             return false;
         }
 
         if (plan.Kind == CommitKind.Screen)
         {
             var watch = RunWatchOutsideTheScreen(request, controlC, keys, run, plan);
-            result.Title = $"exit {watch.ExitCode} {CommandLifecycle.Elapsed(watch.Elapsed)}";
-            result.Lines = null;
-            result.Truncated = false;
+            result.Workspace = SlashConsoleWorkspace.FromMessage(
+                $"exit {watch.ExitCode} {CommandLifecycle.Elapsed(watch.Elapsed)}",
+                ["records nothing"]);
 
             if (Reenter(request) is not { } next)
             {
@@ -347,9 +367,7 @@ public static class SlashConsoleHost
         }
         catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException)
         {
-            result.Title = "exit 1";
-            result.Lines = [exception.Message];
-            result.Truncated = false;
+            result.Workspace = SlashConsoleWorkspace.FromMessage("exit 1", [exception.Message]);
         }
 
         return false;
@@ -675,23 +693,7 @@ public static class SlashConsoleHost
 
         run.Active = null;
 
-        var elapsed = CommandLifecycle.Elapsed(finished.Elapsed);
-        if (finished.Cancelled)
-        {
-            result.Title = $"cancelled {elapsed}";
-        }
-        else if (finished.ExitCode == 0)
-        {
-            result.Title = $"exit 0 ok {elapsed}";
-        }
-        else
-        {
-            result.Title = $"exit {finished.ExitCode} failed {elapsed}";
-        }
-
-        var lines = SplitLines(finished.Stdout).Concat(SplitLines(finished.Stderr)).ToList();
-        result.Truncated = finished.Truncated || lines.Count > SlashConsoleLayout.MaxResultLinesShown;
-        result.Lines = lines.Take(SlashConsoleLayout.MaxResultLinesShown).ToList();
+        result.Workspace = SlashConsoleWorkspace.FromRun(finished, run.Display, run.Display);
         return true;
     }
 
@@ -711,6 +713,112 @@ public static class SlashConsoleHost
 
         return lines;
     }
+
+    /// <summary>
+    /// Routes one key while a result workspace is on show. Returns true when the key
+    /// was consumed by the workspace (navigation, raw toggling, save, or clearing the
+    /// result) and must not reach the input line; false lets ordinary typing through
+    /// so the console stays usable without first dismissing the result.
+    /// </summary>
+    private static bool RouteResultKey(
+        SlashConsoleWorkspace workspace,
+        TuiKey key,
+        ResultPanel result,
+        SlashConsoleHostRequest request)
+    {
+        var showingRaw = workspace.BuildView().ShowingRaw;
+
+        if (showingRaw)
+        {
+            switch (key.Kind)
+            {
+                case TuiKeyKind.Character when key.Glyph is 'q' or 'Q':
+                    workspace.BackToSummary();
+                    return true;
+
+                case TuiKeyKind.Character when key.Glyph is 's' or 'S':
+                    var saved = workspace.SaveRaw(request.WorkingDirectory);
+                    result.Workspace = SlashConsoleWorkspace.FromMessage(
+                        saved.Success ? $"saved {saved.Path}" : $"save failed: {saved.Reason}",
+                        saved.Success ? [$"saved {saved.Path}"] : [saved.Reason ?? "save failed"]);
+                    return true;
+
+                case TuiKeyKind.PageDown:
+                    workspace.ScrollBy(ResultScrollRows);
+                    return true;
+
+                case TuiKeyKind.PageUp:
+                    workspace.ScrollBy(-ResultScrollRows);
+                    return true;
+
+                case TuiKeyKind.Down:
+                    workspace.ScrollBy(1);
+                    return true;
+
+                case TuiKeyKind.Up:
+                    workspace.ScrollBy(-1);
+                    return true;
+
+                case TuiKeyKind.Home:
+                    workspace.ScrollToTop();
+                    return true;
+
+                case TuiKeyKind.End:
+                    workspace.ScrollToEnd();
+                    return true;
+
+                case TuiKeyKind.Escape:
+                case TuiKeyKind.Tab:
+                    workspace.BackToSummary();
+                    return true;
+
+                default:
+                    // The raw viewer owns the screen; stray keys edit nothing.
+                    return true;
+            }
+        }
+
+        switch (key.Kind)
+        {
+            case TuiKeyKind.Tab:
+                workspace.ToggleRaw();
+                return true;
+
+            case TuiKeyKind.PageDown:
+                workspace.ScrollBy(ResultScrollRows);
+                return true;
+
+            case TuiKeyKind.PageUp:
+                workspace.ScrollBy(-ResultScrollRows);
+                return true;
+
+            case TuiKeyKind.Down:
+                workspace.ScrollBy(1);
+                return true;
+
+            case TuiKeyKind.Up:
+                workspace.ScrollBy(-1);
+                return true;
+
+            case TuiKeyKind.Home:
+                workspace.ScrollToTop();
+                return true;
+
+            case TuiKeyKind.End:
+                workspace.ScrollToEnd();
+                return true;
+
+            case TuiKeyKind.Escape:
+                result.Workspace = null;
+                return true;
+
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>How many body rows a PageUp/PageDown moves in the result workspace.</summary>
+    private const int ResultScrollRows = 10;
 
     /// <summary>
     /// Runs a watch screen with the terminal fully restored, mirroring the Launchpad host:
@@ -758,10 +866,6 @@ public static class SlashConsoleHost
         ScreenHost host)
     {
         string? notice;
-        string? title = result.Title;
-        IReadOnlyList<string>? lines = result.Lines;
-        var truncated = result.Truncated;
-
         if (run.Active is not null)
         {
             var elapsed = request.Clock.Now - run.StartedAt;
@@ -778,6 +882,12 @@ public static class SlashConsoleHost
             notice = ResizeNotice(host.Size, state.MenuOpen);
         }
 
+        SlashConsoleResultView? view = null;
+        if (result.Workspace is not null)
+        {
+            view = result.Workspace.BuildView();
+        }
+
         return SlashConsoleLayout.Render(new SlashConsoleRequest(
             state.Input,
             state.Menu,
@@ -785,9 +895,7 @@ public static class SlashConsoleHost
             state.MenuOpen,
             request.WorkingDirectory,
             notice,
-            title,
-            lines,
-            truncated,
+            view,
             host.Size,
             host.Glyphs,
             request.Capabilities.Depth,

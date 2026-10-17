@@ -11,10 +11,21 @@ namespace Lattice.Tests.Tui;
 public class SlashConsoleTests
 {
     private static SlashConsoleRequest Home(PaneSize size, GlyphMode glyphs = GlyphMode.Unicode, bool utf8 = true) =>
-        new("", [], 0, false, "/Users/test/lattice", null, null, null, false, size, glyphs, ColorDepth.TrueColor, utf8);
+        new("", [], 0, false, "/Users/test/lattice", null, null, size, glyphs, ColorDepth.TrueColor, utf8);
 
     private static SlashConsoleRequest Menu(string input, int selected, PaneSize size, GlyphMode glyphs = GlyphMode.Unicode, bool utf8 = true) =>
-        new(input, SlashConsoleMenu.Filter(input), selected, true, "/Users/test/lattice", null, null, null, false, size, glyphs, ColorDepth.TrueColor, utf8);
+        new(input, SlashConsoleMenu.Filter(input), selected, true, "/Users/test/lattice", null, null, size, glyphs, ColorDepth.TrueColor, utf8);
+
+    private static SlashConsoleResultView SummaryView(
+        string title,
+        string command,
+        IReadOnlyList<string> body,
+        IReadOnlyList<string>? limits = null,
+        int scroll = 0,
+        bool raw = false) =>
+        new(title, command, "/Users/test/lattice",
+            [new SlashConsoleResultSection("stdout", body)],
+            body, limits ?? [], null, scroll, raw);
 
     [Fact]
     public void MenuListsNineCatalogCommandsInOrderWithTheirOwnDescriptionsPlusExit()
@@ -190,18 +201,20 @@ public class SlashConsoleTests
     }
 
     [Fact]
-    public void ResultIsClippedWithEllipsisAndTruncationMarker()
+    public void ResultWrapsLongLinesInsteadOfClipping()
     {
         var req = new SlashConsoleRequest(
             "/generate --seed 42", [], 0, false, "/Users/test/lattice", null,
-            "exit 0 ok 0.4s",
-            ["{\"zones\": 12} with a very long trailing tail that must be clipped with an ellipsis mark and more words to overflow the pane width surely"],
-            true, new PaneSize(100, 32), GlyphMode.Unicode, ColorDepth.TrueColor, true);
+            SummaryView("exit 0 ok 0.4s", "lattice generate --seed 42",
+                ["{\"zones\": 12} with a very long trailing tail that must be wrapped across rows and more words to overflow the pane width surely"]),
+            new PaneSize(100, 32), GlyphMode.Unicode, ColorDepth.TrueColor, true);
         var cells = SlashConsoleLayout.Render(req);
         var text = string.Join('\n', cells.ToLines());
         Assert.Contains("exit 0", text);
-        Assert.Contains(SlashConsoleLayout.TruncationMarker, text);
-        Assert.True(text.Contains("…", StringComparison.Ordinal) || text.Contains("...", StringComparison.Ordinal), "result must be clipped with an ellipsis mark.");
+        Assert.Contains("trailing", text);
+        Assert.Contains("surely", text);
+        Assert.DoesNotContain("[truncated]", text);
+        Assert.DoesNotContain("…", text);
     }
 
     [Fact]
@@ -268,7 +281,8 @@ public class SlashConsoleTests
         var menu = SlashConsoleLayout.Render(Menu("/", 0, new PaneSize(100, 32)));
         var resultReq = new SlashConsoleRequest(
             "/generate --seed 1", [], 0, false, "/tmp/outside-repo", null,
-            "exit 0 ok 0.1s", ["ok"], false, new PaneSize(100, 32), GlyphMode.Unicode, ColorDepth.TrueColor, true);
+            SummaryView("exit 0 ok 0.1s", "lattice generate --seed 1", ["ok"]),
+            new PaneSize(100, 32), GlyphMode.Unicode, ColorDepth.TrueColor, true);
         var result = SlashConsoleLayout.Render(resultReq);
 
         var homeCwd = home.ToLines()[home.Height - 2];
@@ -417,18 +431,26 @@ public class SlashConsoleTests
     }
 
     [Fact]
-    public void ResultsStayTopAnchoredAndReadable()
+    public void ResultsUseFunctionalSpaceWithoutBranding()
     {
         var size = new PaneSize(100, 32);
         var req = new SlashConsoleRequest(
             "/generate --seed 42", [], 0, false, "/Users/test/lattice", null,
-            "exit 0 ok 0.4s",
-            ["{\"zones\": 12}"],
-            false, size, GlyphMode.Unicode, ColorDepth.TrueColor, true);
+            SummaryView("exit 0 ok 0.4s", "lattice generate --seed 42", ["{\"zones\": 12}"]),
+            size, GlyphMode.Unicode, ColorDepth.TrueColor, true);
         var lines = SlashConsoleLayout.Render(req).ToLines();
+        foreach (var line in lines)
+        {
+            foreach (var c in line)
+            {
+                Assert.False(c >= 0x2800 && c <= 0x28FF, "no wordmark over results.");
+            }
+        }
+
+        Assert.Contains("exit 0 ok", lines[0]);
+        Assert.Contains("lattice generate --seed 42", string.Concat(lines));
         var input = Array.FindLastIndex(lines, l => l.Contains("/generate --seed 42", StringComparison.Ordinal));
-        Assert.Equal(12, input);
-        Assert.Contains("exit 0 ok", lines[14]);
+        Assert.Equal(size.Height - 3, input);
     }
 
     [Fact]
@@ -437,14 +459,14 @@ public class SlashConsoleTests
         var size = new PaneSize(100, 32);
         var withResult = new SlashConsoleRequest(
             "/generate --seed 42", [], 0, false, "/Users/test/lattice", null,
-            "exit 0 ok 0.4s", ["{\"zones\": 12}"], false,
+            SummaryView("exit 0 ok 0.4s", "lattice generate --seed 42", ["{\"zones\": 12}"]),
             size, GlyphMode.Unicode, ColorDepth.TrueColor, true);
-        var cleared = withResult with { Input = "", ResultTitle = null, ResultLines = null };
+        var cleared = withResult with { Input = "", ResultView = null };
         var inputWithResult = Array.FindLastIndex(
             SlashConsoleLayout.Render(withResult).ToLines(),
             l => l.Contains("/generate --seed 42", StringComparison.Ordinal));
         var homeInput = PlaceholderRow(SlashConsoleLayout.Render(cleared).ToLines());
-        Assert.Equal(12, inputWithResult);
+        Assert.Equal(size.Height - 3, inputWithResult);
         Assert.Equal(19, homeInput);
     }
 
@@ -549,7 +571,7 @@ public class SlashConsoleTests
     {
         var size = new PaneSize(100, 32);
         var req = WithForm(Home(size), GenerateForm());
-        req = req with { ResultTitle = "exit 0 ok 0.1s", ResultLines = ["{\"zones\": 12}"] };
+        req = req with { ResultView = SummaryView("exit 0 ok 0.1s", "lattice generate --seed 1", ["{\"zones\": 12}"]) };
         var lines = SlashConsoleLayout.Render(req).ToLines();
         Assert.Contains("exit 0 ok", string.Concat(lines));
         var input = PlaceholderRow(lines);
@@ -620,7 +642,7 @@ public class SlashConsoleTests
         var size = new PaneSize(width, height);
         var glyphs = ascii ? GlyphMode.Ascii : GlyphMode.Unicode;
         var menu = menuOpen ? SlashConsoleMenu.Filter(input) : Array.Empty<SlashMenuItem>();
-        var req = new SlashConsoleRequest(input, menu, selected, menuOpen, "/Users/test/lattice", null, null, null, false, size, glyphs, ColorDepth.TrueColor, !ascii);
+        var req = new SlashConsoleRequest(input, menu, selected, menuOpen, "/Users/test/lattice", null, null, size, glyphs, ColorDepth.TrueColor, !ascii);
         var frame = SlashConsoleLayout.Render(req).ToLines();
         var frozen = Frozen(name);
         Assert.Equal(frozen.Length, frame.Length);
@@ -644,7 +666,7 @@ public class SlashConsoleTests
             var notice = $"terminal is {width}x{height}; console needs 62x16 (62x30 with menu); resize for it";
             var menuOpen = name.Contains("menu", StringComparison.Ordinal);
             var menu = menuOpen ? SlashConsoleMenu.Filter("/") : Array.Empty<SlashMenuItem>();
-            var req = new SlashConsoleRequest(menuOpen ? "/" : "", menu, 0, menuOpen, "/Users/test/lattice", notice, null, null, false, size, GlyphMode.Unicode, ColorDepth.TrueColor, true);
+            var req = new SlashConsoleRequest(menuOpen ? "/" : "", menu, 0, menuOpen, "/Users/test/lattice", notice, null, size, GlyphMode.Unicode, ColorDepth.TrueColor, true);
             var frame = SlashConsoleLayout.Render(req).ToLines();
             var frozen = Frozen(name);
             Assert.Equal(frozen.Length, frame.Length);
@@ -666,9 +688,9 @@ public class SlashConsoleTests
 
         var result = new SlashConsoleRequest(
             "/generate --seed 42", [], 0, false, "/Users/test/lattice", null,
-            "exit 0 ok 0.4s",
-            ["{\"zones\": 12, \"resources\": 8, \"seed\": 42} with a very long trailing tail that must be clipped with an ellipsis mark"],
-            true, new PaneSize(100, 32), GlyphMode.Unicode, ColorDepth.TrueColor, true);
+            SummaryView("exit 0 ok 0.4s", "lattice generate --seed 42",
+                ["{\"zones\": 12, \"resources\": 8, \"seed\": 42} with a very long trailing tail that must be wrapped across rows instead of clipped"]),
+            new PaneSize(100, 32), GlyphMode.Unicode, ColorDepth.TrueColor, true);
         AssertFramesEqual("slash-console-result-100x32", SlashConsoleLayout.Render(result).ToLines());
     }
 

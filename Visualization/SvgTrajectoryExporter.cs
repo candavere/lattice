@@ -68,7 +68,7 @@ public static class SvgTrajectoryExporter
     private static List<Frame> BuildFrames(TrajectoryRecording recording)
     {
         var frames = new List<Frame>();
-        var initial = Simulation.CreateInitial(recording.Header.Map, recording.Header.SimulationConfig);
+        var initial = Simulation.CreateInitial(recording.Header.Map, recording.Header.SimulationConfig, recording.Header.DynamicRules ?? DynamicMapRuleSet.None);
         frames.Add(new Frame("initial", initial.Agents, initial.Claims));
         foreach (var step in recording.Steps)
         {

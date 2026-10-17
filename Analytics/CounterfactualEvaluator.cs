@@ -61,7 +61,8 @@ public static class CounterfactualEvaluator
         }
 
         var config = recording.Header.SimulationConfig;
-        var fork = SimulationFork.Create(Simulation.CreateInitial(recording.Header.Map, config), config);
+        var rules = recording.Header.DynamicRules ?? DynamicMapRuleSet.None;
+        var fork = SimulationFork.Create(Simulation.CreateInitial(recording.Header.Map, config, rules), config);
         var forkedSteps = 0;
         StepResult lastResult = default!;
 

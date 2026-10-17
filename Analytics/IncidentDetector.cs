@@ -68,7 +68,7 @@ public static class IncidentDetector
         var map = recording.Header.Map;
         var steps = recording.Steps;
         var agentCount = recording.Header.SimulationConfig.AgentCount;
-        var initial = Simulation.CreateInitial(map, recording.Header.SimulationConfig);
+        var initial = Simulation.CreateInitial(map, recording.Header.SimulationConfig, recording.Header.DynamicRules ?? DynamicMapRuleSet.None);
         var previousZones = initial.Agents.ToDictionary(agent => agent.AgentId, agent => agent.ZoneId);
 
         var idle = new int[agentCount];

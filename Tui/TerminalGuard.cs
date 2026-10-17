@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace Lattice.Tui;
@@ -232,6 +233,8 @@ public sealed class ConsoleCancelSubscription : ICancelSubscription
     {
         private readonly TextWriter _output;
         private ICancelSubscription? _subscription;
+        private PosixSignalRegistration? _termRegistration;
+        private PosixSignalRegistration? _hupRegistration;
         private bool _restored;
 
         internal Session(TextWriter output) => _output = output;
@@ -242,6 +245,29 @@ public sealed class ConsoleCancelSubscription : ICancelSubscription
             _output.Write(HideCursor);
             _output.Flush();
             TrySetCursorVisible(false);
+
+            // Console.CancelKeyPress covers Ctrl-C from a real terminal. SIGTERM and
+            // SIGHUP do not raise that event, so register them here so the terminal
+            // is still restored when the process is terminated by either signal.
+            try
+            {
+                _termRegistration = PosixSignalRegistration.Create(PosixSignal.SIGTERM, _ => Restore());
+            }
+            catch (Exception exception) when (exception is PlatformNotSupportedException
+                or InvalidOperationException)
+            {
+                _termRegistration = null;
+            }
+
+            try
+            {
+                _hupRegistration = PosixSignalRegistration.Create(PosixSignal.SIGHUP, _ => Restore());
+            }
+            catch (Exception exception) when (exception is PlatformNotSupportedException
+                or InvalidOperationException)
+            {
+                _hupRegistration = null;
+            }
         }
 
         internal void Attach(ICancelSubscription subscription)
@@ -265,6 +291,30 @@ public sealed class ConsoleCancelSubscription : ICancelSubscription
             var subscription = _subscription;
             _subscription = null;
             subscription?.Unregister();
+
+            try
+            {
+                _termRegistration?.Dispose();
+            }
+            catch (Exception exception) when (exception is PlatformNotSupportedException
+                or InvalidOperationException
+                or ObjectDisposedException)
+            {
+            }
+
+            _termRegistration = null;
+
+            try
+            {
+                _hupRegistration?.Dispose();
+            }
+            catch (Exception exception) when (exception is PlatformNotSupportedException
+                or InvalidOperationException
+                or ObjectDisposedException)
+            {
+            }
+
+            _hupRegistration = null;
         }
 
         private void Restore()

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 using Lattice.Protocol;
 
@@ -62,6 +63,20 @@ public static class Program
     {
         Console.Error.WriteLine($"stub: mode={mode} LATTICE_PROTOCOL={advertised ?? "<unset>"}");
 
+        // The worker must never touch the protocol: it shares its parent's
+        // inherited stdin and stdout, so a read here would steal a line the
+        // host wrote to the parent and a hello_ack here would be a duplicate
+        // reply on the shared pipe. Its whole job is to hold the inherited
+        // stdout and stderr handles open — which is what keeps the host's
+        // EOF wait blocked — and nothing else.
+        if (mode == "worker-hold")
+        {
+            Console.Error.WriteLine("stub: worker holding pipes");
+            Console.Error.Flush();
+            Thread.Sleep(Timeout.Infinite);
+            return 0;
+        }
+
         // Every mode begins with the handshake, so the failure under test is the
         // only thing that differs. silent-handshake is the one exception: it reads
         // hello and then says nothing, which is what a timeout_handshake is.
@@ -90,7 +105,7 @@ public static class Program
         // less than one step budget and so stays inside it: a delay that exceeds
         // the entire match budget cannot be waited out at any child startup speed,
         // which is what makes timeout_match reachable without a race.
-        var stallMs = mode == "stall-match" && parsed > 0 ? parsed : 0;
+        var stallMs = (mode == "stall-match" || mode == "spawn-stall-match") && parsed > 0 ? parsed : 0;
 
         // The handshake is answered immediately. The delay is spent inside the
         // step loop instead, where the host is actually counting: with
@@ -101,6 +116,36 @@ public static class Program
         // work too, but only just -- the delay starts after process startup, so it
         // would be racing the host's own handshake budget from behind.
         Write(stdout, new HelloAckMessage { Protocol = ProtocolLimits.Version });
+
+        // `ack-then-stop-reading` answers the handshake and then never reads
+        // stdin again: the host's constructor returns (the handshake barrier),
+        // and the next observation write blocks on a full pipe while this
+        // process sleeps. That is stdin backpressure, not a silent agent: a
+        // silent agent answers the write and never the read, while this one
+        // never lets the write complete. The stderr line is the evidence the
+        // handshake really succeeded before the block, so the test asserts a
+        // blocked write rather than a failed handshake.
+        if (mode == "ack-then-stop-reading")
+        {
+            Console.Error.WriteLine("stub: handshake ok; no longer reading stdin");
+            Console.Error.Flush();
+            Thread.Sleep(Timeout.Infinite);
+            return 0;
+        }
+
+        // Worker modes, for the descendant-holds-pipes scenarios. The worker is
+        // this same stub in `worker-hold` mode, handled at the top of Play: it
+        // inherits the parent's stdout/stderr (the host's capture pipes), holds
+        // them open past any test budget, and is reaped by the host's tree
+        // kill — or outlives it where the platform cannot reap an orphan, which
+        // is exactly the case the tests document.
+
+        if (mode == "spawn-hold" || mode == "spawn-exit" || mode == "spawn-hang-at-step" || mode == "spawn-stall-match")
+        {
+            SpawnHoldingWorker();
+            Console.Error.WriteLine($"stub: spawned worker; mode={mode}");
+            Console.Error.Flush();
+        }
 
         // The wire step this exchange is for, counted from 0 and advanced once per
         // completed exchange. Kept separate from `at` above so a mode like
@@ -147,6 +192,7 @@ public static class Program
             switch (mode)
             {
                 case "hang-at-step" when step == at:
+                case "spawn-hang-at-step" when step == at:
                     Console.Error.WriteLine($"stub: hanging at step {step} as asked");
                     Thread.Sleep(Timeout.Infinite);
                     return 0;
@@ -154,6 +200,15 @@ public static class Program
                 case "exit-at-step" when step == at:
                     // A clean exit before the exchange completed is agent_exited.
                     Console.Error.WriteLine($"stub: exiting cleanly at step {step} as asked");
+                    return 0;
+
+                case "spawn-exit" when step == at:
+                    // The audit's misclassification case: clean exit after
+                    // answering, while the spawned worker holds both capture
+                    // pipes open. The host must classify from the observed
+                    // exit — agent_exited — not wait for an EOF that will
+                    // never come and mislabel it timeout_step.
+                    Console.Error.WriteLine($"stub: exiting cleanly at step {step} with a worker holding the pipes");
                     return 0;
 
                 case "crash" when step == at:
@@ -201,6 +256,54 @@ public static class Program
             step++;
         }
     }
+
+    /// <summary>
+    /// Spawns this same stub as a worker that inherits the parent's stdout and
+    /// stderr — the host's capture pipes — and holds them. The worker is a
+    /// separate OS process, which is the only honest way to hold a pipe: a
+    /// thread would not survive the parent's exit. When the test provides a
+    /// <c>LATTICE_TEST_WORKER_PIDFILE</c> (inherited environment), the worker's
+    /// PID is recorded there so the test that started this fixture can reap the
+    /// worker by an owned PID where the platform's tree kill cannot.
+    /// </summary>
+    private static void SpawnHoldingWorker()
+    {
+        try
+        {
+            var stub = Path.Combine(AppContext.BaseDirectory, "Lattice.ExternalAgentStub.dll");
+            using var worker = Process.Start(new ProcessStartInfo
+            {
+                FileName = "dotnet",
+                Arguments = $"{QuoteIfNeeded(stub)} worker-hold",
+                UseShellExecute = false,
+
+                // No redirect: the worker inherits this process's stdout and
+                // stderr, which are the host's capture pipes. That inheritance
+                // is the premise under test.
+                CreateNoWindow = true,
+            });
+
+            if (worker is not null &&
+                System.Environment.GetEnvironmentVariable(WorkerPidFileVariable) is { } pidFile &&
+                pidFile.Length > 0)
+            {
+                // Test-only ownership channel: the PID goes to the file the
+                // test owns, never anywhere a real run would look.
+                File.AppendAllText(pidFile, $"{worker.Id}\n");
+            }
+        }
+        catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException)
+        {
+            Console.Error.WriteLine($"stub: could not spawn worker: {exception.Message}");
+            Console.Error.Flush();
+        }
+    }
+
+    /// <summary>The test-only environment variable naming the worker PID file.</summary>
+    private const string WorkerPidFileVariable = "LATTICE_TEST_WORKER_PIDFILE";
+
+    private static string QuoteIfNeeded(string path) =>
+        path.Contains(' ') ? $"\"{path}\"" : path;
 
     /// <summary>Writes more than 1 MiB to stderr while continuing to play correctly.</summary>
     private static void FloodStderr()

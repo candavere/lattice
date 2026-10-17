@@ -58,14 +58,17 @@ public static class BoundedStreamCapture
     /// memory cap is exceeded) up to <paramref name="diskCapChars"/> characters.
     /// A null <paramref name="spoolPath"/> means the overflow is counted and
     /// dropped. A spool failure is recorded, never thrown: the pipe keeps
-    /// draining and the loss is counted exactly.
+    /// draining and the loss is counted exactly. Each chunk is also reported
+    /// through <paramref name="progress"/> as a snapshot, so a caller that
+    /// cannot wait for EOF still sees what was read so far.
     /// </summary>
     public static async Task<CapturedStream> CaptureAsync(
         TextReader reader,
         int memoryCapChars,
         string? spoolPath,
         long diskCapChars,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Action<CapturedStream>? progress = null)
     {
         ArgumentNullException.ThrowIfNull(reader);
         ArgumentOutOfRangeException.ThrowIfNegative(memoryCapChars);
@@ -96,51 +99,62 @@ public static class BoundedStreamCapture
                     slice = slice[take..];
                 }
 
-                if (slice.Length == 0)
+                if (slice.Length > 0)
                 {
-                    continue;
-                }
-
-                if (spoolPath is null || spoolFailed)
-                {
-                    dropped += slice.Length;
-                    continue;
-                }
-
-                var writer = spool;
-                if (writer is null)
-                {
-                    writer = OpenSpool(spoolPath, ref spoolCreated);
-                    spool = writer;
-                    if (writer is null)
+                    if (spoolPath is null || spoolFailed)
                     {
-                        spoolFailed = true;
                         dropped += slice.Length;
-                        continue;
+                    }
+                    else
+                    {
+                        var writer = spool;
+                        if (writer is null)
+                        {
+                            writer = OpenSpool(spoolPath, ref spoolCreated);
+                            spool = writer;
+                        }
+
+                        if (writer is null)
+                        {
+                            spoolFailed = true;
+                            dropped += slice.Length;
+                        }
+                        else
+                        {
+                            var diskRoom = diskCapChars - spooled;
+                            if (diskRoom > 0)
+                            {
+                                var take = (int)Math.Min(diskRoom, slice.Length);
+                                var writeFailed = false;
+                                try
+                                {
+                                    await writer.WriteAsync(slice[..take], cancellationToken).ConfigureAwait(false);
+                                }
+                                catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException)
+                                {
+                                    FailSpool(ref spool, spoolPath, spoolCreated);
+                                    spoolFailed = true;
+                                    writeFailed = true;
+                                }
+
+                                if (writeFailed)
+                                {
+                                    dropped += slice.Length;
+                                    slice = Memory<char>.Empty;
+                                }
+                                else
+                                {
+                                    spooled += take;
+                                    slice = slice[take..];
+                                }
+                            }
+
+                            dropped += slice.Length;
+                        }
                     }
                 }
 
-                var diskRoom = diskCapChars - spooled;
-                if (diskRoom > 0)
-                {
-                    var take = (int)Math.Min(diskRoom, slice.Length);
-                    try
-                    {
-                        await writer.WriteAsync(slice[..take], cancellationToken).ConfigureAwait(false);
-                    }
-                    catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException)
-                    {
-                        FailSpool(ref spool, spoolPath, spoolCreated);
-                        spoolFailed = true;
-                        dropped += slice.Length;
-                        continue;
-                    }
-
-                    spooled += take;
-                    slice = slice[take..];
-                }
-
-                dropped += slice.Length;
+                progress?.Invoke(Snapshot());
             }
         }
         finally
@@ -167,14 +181,16 @@ public static class BoundedStreamCapture
         }
 
         var memoryText = memory.ToString();
-        return new CapturedStream(
-            memoryText,
+        CapturedStream Snapshot() => new(
+            memory.ToString(),
             total,
             dropped,
             spoolFailed ? null : (spooled > 0 ? spoolPath : null),
             spoolFailed ? 0 : spooled,
             spoolFailed,
-            total > memoryText.Length);
+            total > memory.Length);
+        progress?.Invoke(Snapshot());
+        return Snapshot();
     }
 
     private static StreamWriter? OpenSpool(string spoolPath, ref bool created)

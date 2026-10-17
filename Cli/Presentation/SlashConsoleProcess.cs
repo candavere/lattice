@@ -69,10 +69,16 @@ public sealed record CapturedRunRequest(string[] Arguments, string DisplayLine, 
 /// <param name="StderrMemoryWhole">Whether the stderr head alone is the whole stream (not the projection gate).</param>
 /// <param name="StdoutSpoolFailed">Whether the stdout spool write failed (its output is partial).</param>
 /// <param name="StderrSpoolFailed">Whether the stderr spool write failed (its output is partial).</param>
+/// <param name="CollectionIncomplete">
+/// Whether collection ended before both pipes reached EOF, so an unknown tail
+/// of output was never read at all — distinct from truncation, where everything
+/// read was retained or counted.
+/// </param>
 /// <remarks>
-/// Full raw output is available exactly when a stream is complete or when its
-/// spool path is set with no dropped characters and no spool failure; anything
-/// else is partial and must never feed a domain projection as if it were whole.
+/// Full raw output is available exactly when a stream is complete, or when its
+/// spool path is set with no dropped characters and no spool failure, and the
+/// collection itself reached EOF on both pipes; anything else is partial and
+/// must never feed a domain projection as if it were whole.
 /// </remarks>
 public sealed record CapturedRunResult(
     int ExitCode,
@@ -90,7 +96,8 @@ public sealed record CapturedRunResult(
     bool StdoutMemoryWhole = true,
     bool StderrMemoryWhole = true,
     bool StdoutSpoolFailed = false,
-    bool StderrSpoolFailed = false);
+    bool StderrSpoolFailed = false,
+    bool CollectionIncomplete = false);
 
 /// <summary>One watch-screen run: the <c>tui</c> argv, the line it is shown as, and where it runs.</summary>
 /// <param name="Invocation">How to start the child; null resolves the current process.</param>
@@ -110,6 +117,17 @@ public interface ICapturedRun
 
     /// <summary>Waits for the exit and collects the bounded output. Idempotent.</summary>
     CapturedRunResult Finish();
+
+    /// <summary>
+    /// Takes the collected result if collection has completed, without blocking.
+    /// False while the child runs or collection is still in flight — the state a
+    /// poll loop shows as still working. Implementations that wrap another
+    /// <see cref="ICapturedRun"/> forward this member; it is deliberately not a
+    /// default method falling back to <see cref="Finish"/>, because a wrapper
+    /// inheriting that default would turn this non-blocking poll back into a
+    /// blocking collection — the exact freeze this seam exists to prevent.
+    /// </summary>
+    bool TryTakeFinished(out CapturedRunResult result);
 }
 
 /// <summary>
@@ -150,6 +168,19 @@ public interface ISlashConsoleRunner
 /// Spool files live under the OS temp directory for the session (only runs
 /// that overflow memory create them) and are left to OS temp reclamation.
 /// </para>
+/// <para>
+/// <b>Collection is bounded, and exit is not capture.</b> The child's exit, the
+/// pipes reaching EOF, and the terminal result are three distinct facts. A
+/// worker process the child spawned can inherit a capture pipe and hold it open
+/// past the child's own exit, so waiting for EOF after <see cref="ICapturedRun.IsDone"/>
+/// can wait forever. Collection therefore runs on its own task under an
+/// explicit budget: when a pipe has not reached EOF in time, the whole process
+/// tree is killed (which is what actually closes the pipe), a short grace
+/// follows, and whatever remains uncollected is reported through
+/// <see cref="CapturedRunResult.CollectionIncomplete"/> rather than passed off
+/// as complete. The budgets are teardown policy, paid only by runs whose
+/// descendants misbehave; an ordinary run collects the moment its pipes close.
+/// </para>
 /// </remarks>
 public sealed class SlashConsoleProcessRunner : ISlashConsoleRunner
 {
@@ -158,6 +189,14 @@ public sealed class SlashConsoleProcessRunner : ISlashConsoleRunner
 
     /// <summary>How much overflow per captured stream is spooled to disk, in characters.</summary>
     public const long CapturedDiskCapCharsPerStream = 1048576;
+
+    /// <summary>
+    /// How long collection waits for both pipes to reach EOF before the tree is
+    /// killed and the capture is marked incomplete. Long enough that no ordinary
+    /// command — including a slow but honest one — ever pays it; short enough
+    /// that a pipe held open by a descendant cannot hold the console.
+    /// </summary>
+    public static readonly TimeSpan CollectionEofTimeout = TimeSpan.FromSeconds(15);
 
     /// <inheritdoc />
     public ICapturedRun StartCaptured(CapturedRunRequest request)
@@ -196,17 +235,40 @@ public sealed class SlashConsoleProcessRunner : ISlashConsoleRunner
 
         // Both streams drain concurrently from here: each task reads its pipe
         // to EOF under the caps, so a chatty child can never block.
+        var stdoutSnapshot = new CaptureSnapshot();
+        var stderrSnapshot = new CaptureSnapshot();
         var stdout = BoundedStreamCapture.CaptureAsync(
             process.StandardOutput,
             CapturedMaxCharsPerStream,
             Path.Combine(spoolDirectory, "stdout.log"),
-            CapturedDiskCapCharsPerStream);
+            CapturedDiskCapCharsPerStream,
+            progress: stdoutSnapshot.Update);
         var stderr = BoundedStreamCapture.CaptureAsync(
             process.StandardError,
             CapturedMaxCharsPerStream,
             Path.Combine(spoolDirectory, "stderr.log"),
-            CapturedDiskCapCharsPerStream);
-        return new CapturedRun(process, stdout, stderr, Stopwatch.StartNew(), effectiveCommand, request.WorkingDirectory);
+            CapturedDiskCapCharsPerStream,
+            progress: stderrSnapshot.Update);
+        return new CapturedRun(
+            process,
+            stdout,
+            stderr,
+            stdoutSnapshot,
+            stderrSnapshot,
+            Stopwatch.StartNew(),
+            effectiveCommand,
+            request.WorkingDirectory);
+
+    }
+
+    /// <summary>The latest snapshot of one in-flight capture, safe to read from any thread.</summary>
+    private sealed class CaptureSnapshot
+    {
+        private volatile CapturedStream? _current;
+
+        internal CapturedStream? Current => _current;
+
+        internal void Update(CapturedStream snapshot) => _current = snapshot;
     }
 
     /// <inheritdoc />
@@ -257,9 +319,12 @@ public sealed class SlashConsoleProcessRunner : ISlashConsoleRunner
         private readonly Process _process;
         private readonly Task<CapturedStream> _stdout;
         private readonly Task<CapturedStream> _stderr;
+        private readonly CaptureSnapshot _stdoutSnapshot;
+        private readonly CaptureSnapshot _stderrSnapshot;
         private readonly Stopwatch _stopwatch;
         private readonly string _effectiveCommand;
         private readonly string _workingDirectory;
+        private readonly Task<CapturedRunResult> _collection;
         private bool _cancelled;
         private bool _finished;
         private CapturedRunResult? _result;
@@ -268,6 +333,8 @@ public sealed class SlashConsoleProcessRunner : ISlashConsoleRunner
             Process process,
             Task<CapturedStream> stdout,
             Task<CapturedStream> stderr,
+            CaptureSnapshot stdoutSnapshot,
+            CaptureSnapshot stderrSnapshot,
             Stopwatch stopwatch,
             string effectiveCommand,
             string workingDirectory)
@@ -275,9 +342,16 @@ public sealed class SlashConsoleProcessRunner : ISlashConsoleRunner
             _process = process;
             _stdout = stdout;
             _stderr = stderr;
+            _stdoutSnapshot = stdoutSnapshot;
+            _stderrSnapshot = stderrSnapshot;
             _stopwatch = stopwatch;
             _effectiveCommand = effectiveCommand;
             _workingDirectory = workingDirectory;
+
+            // Collection starts now, off the caller's thread, and is bounded by
+            // its own policy: nothing in Finish ever waits unboundedly for a
+            // pipe a descendant may be holding open.
+            _collection = Task.Run(CollectAsync);
         }
 
         /// <inheritdoc />
@@ -324,6 +398,19 @@ public sealed class SlashConsoleProcessRunner : ISlashConsoleRunner
         }
 
         /// <inheritdoc />
+        public bool TryTakeFinished(out CapturedRunResult result)
+        {
+            if (!_collection.IsCompleted)
+            {
+                result = default!;
+                return false;
+            }
+
+            result = _collection.GetAwaiter().GetResult();
+            return true;
+        }
+
+        /// <inheritdoc />
         public CapturedRunResult Finish()
         {
             if (_result is not null)
@@ -331,6 +418,25 @@ public sealed class SlashConsoleProcessRunner : ISlashConsoleRunner
                 return _result;
             }
 
+            // Bounded by the collection's own policy, never by an unbounded
+            // EOF wait: the collection task kills the tree when a descendant
+            // holds a pipe, so this cannot wait forever.
+            var collected = _collection.GetAwaiter().GetResult();
+            _finished = true;
+            _result = collected;
+            return _result;
+        }
+
+        /// <summary>
+        /// The one bounded collection every caller reads from: wait for the
+        /// direct child, wait for both pipes to reach EOF under
+        /// <see cref="SlashConsoleProcessRunner.CollectionEofTimeout"/>, kill
+        /// the tree when a descendant holds a pipe past that, allow a short
+        /// grace for the kill to take effect, and report honestly what remains
+        /// uncollected.
+        /// </summary>
+        private async Task<CapturedRunResult> CollectAsync()
+        {
             try
             {
                 _process.WaitForExit();
@@ -339,8 +445,43 @@ public sealed class SlashConsoleProcessRunner : ISlashConsoleRunner
             {
             }
 
-            var stdout = _stdout.GetAwaiter().GetResult();
-            var stderr = _stderr.GetAwaiter().GetResult();
+            bool bothClosed;
+            try
+            {
+                bothClosed = await WaitForBothClosed().WaitAsync(CollectionEofTimeout).ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+                bothClosed = false;
+            }
+
+            var incomplete = !bothClosed;
+            if (incomplete)
+            {
+                // A descendant of the child is holding a pipe open. Killing the
+                // tree is what closes it: without the kill there is no EOF, only
+                // an unbounded wait. This is the path where the direct child's
+                // exit and safe capture are distinct facts. The kill is a
+                // collection policy, not a user cancellation, so it must not
+                // set the run's Cancelled flag — that flag is the user's Esc
+                // and Ctrl-C, and reporting a policy kill as one would misname
+                // what happened. The incompleteness itself is what the result
+                // reports.
+                KillTree();
+                try
+                {
+                    bothClosed = await WaitForBothClosed().WaitAsync(GraceForKill).ConfigureAwait(false);
+                }
+                catch (TimeoutException)
+                {
+                    bothClosed = false;
+                }
+
+                incomplete = !bothClosed;
+            }
+
+            var stdout = await ValueOf(_stdout, _stdoutSnapshot).ConfigureAwait(false);
+            var stderr = await ValueOf(_stderr, _stderrSnapshot).ConfigureAwait(false);
             var elapsed = _stopwatch.Elapsed;
 
             int exit;
@@ -353,15 +494,22 @@ public sealed class SlashConsoleProcessRunner : ISlashConsoleRunner
                 exit = 1;
             }
 
-            _process.Dispose();
-            _finished = true;
-            _result = new CapturedRunResult(
+            try
+            {
+                _process.Dispose();
+            }
+            catch (InvalidOperationException)
+            {
+            }
+
+            var truncated = incomplete || !stdout.MemoryWhole || !stderr.MemoryWhole;
+            return new CapturedRunResult(
                 exit,
                 stdout.MemoryText,
                 stderr.MemoryText,
                 _cancelled,
                 elapsed,
-                !stdout.MemoryWhole || !stderr.MemoryWhole,
+                truncated,
                 _effectiveCommand,
                 _workingDirectory,
                 stdout.DroppedChars,
@@ -371,8 +519,84 @@ public sealed class SlashConsoleProcessRunner : ISlashConsoleRunner
                 stdout.MemoryWhole,
                 stderr.MemoryWhole,
                 stdout.SpoolFailed,
-                stderr.SpoolFailed);
-            return _result;
+                stderr.SpoolFailed,
+                incomplete);
         }
+
+        /// <summary>
+        /// Kills the whole tree from the collector, without touching the user
+        /// cancellation flag — <see cref="Cancel"/> is the user's Esc and
+        /// Ctrl-C, and a collection-policy kill is a different fact. The
+        /// direct child is usually already gone here, and the primitive probe
+        /// behind these tests shows <c>Kill(entireProcessTree: true)</c> on an
+        /// exited parent is accepted but does not reliably reap an orphaned
+        /// descendant on every OS — so the honest guarantee is bounded
+        /// collection with the gap reported, not a promise that every
+        /// descendant is reaped.
+        /// </summary>
+        private void KillTree()
+        {
+            try
+            {
+                _process.Kill(entireProcessTree: true);
+            }
+            catch (InvalidOperationException)
+            {
+                // Already exited: the descendants are the collector's only
+                // remaining concern, and the platform gap above applies.
+            }
+            catch (NotSupportedException)
+            {
+                try
+                {
+                    _process.Kill();
+                }
+                catch (InvalidOperationException)
+                {
+                }
+            }
+        }
+        /// <summary>
+        /// True when both capture tasks reached EOF. Where the kill does not
+        /// close the pipes, the honest outcome is the incomplete flag, not a
+        /// promise that every descendant was reaped.
+        /// </summary>
+        private async Task<bool> WaitForBothClosed()
+        {
+            try
+            {
+                await _stdout.ConfigureAwait(false);
+                await _stderr.ConfigureAwait(false);
+                return true;
+            }
+            catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException)
+            {
+                // A capture that faulted will never produce more output; treat
+                // it as closed so collection settles. The fault's own stream
+                // falls back to its snapshot below.
+                return true;
+            }
+        }
+
+        /// <summary>Resolves a capture task, falling back to its latest snapshot when EOF never came.</summary>
+        private static async Task<CapturedStream> ValueOf(Task<CapturedStream> capture, CaptureSnapshot snapshot)
+        {
+            if (capture.IsCompleted)
+            {
+                try
+                {
+                    return await capture.ConfigureAwait(false);
+                }
+                catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException)
+                {
+                }
+            }
+
+            return snapshot.Current
+                ?? new CapturedStream(string.Empty, 0, 0, null, 0, SpoolFailed: false, Truncated: false);
+        }
+
+        /// <summary>How long the kill gets to close the pipes before the capture is reported incomplete.</summary>
+        private static readonly TimeSpan GraceForKill = TimeSpan.FromSeconds(3);
     }
 }

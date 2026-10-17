@@ -25,20 +25,62 @@ public static class ProcessTree
         return CollectViaPs(rootPid);
     }
 
-    /// <summary>Kills one PID's tree, tolerating already-gone and platform refusal.</summary>
-    public static void KillById(int pid)
+    /// <summary>
+    /// Kills one PID's tree, tolerating already-gone and platform refusal.
+    /// When <paramref name="expectedStartTime"/> is supplied, the kill is
+    /// skipped unless the live process's start time matches it, mitigating PID
+    /// reuse. The check and the kill are not atomic, so residual TOCTOU remains;
+    /// on any uncertainty the kill is skipped (fail closed).
+    /// </summary>
+    public static void KillById(int pid, DateTime? expectedStartTime = null)
     {
         if (pid <= 0) return;
         try
         {
             using var p = Process.GetProcessById(pid);
             if (p.HasExited) return;
+            if (expectedStartTime.HasValue)
+            {
+                try
+                {
+                    if (p.StartTime != expectedStartTime.Value) return;
+                }
+                catch (Exception exception) when (exception is NotSupportedException
+                    or InvalidOperationException
+                    or PlatformNotSupportedException)
+                {
+                    // Cannot verify identity; fail closed.
+                    return;
+                }
+            }
             try { p.Kill(entireProcessTree: true); }
             catch (NotSupportedException) { p.Kill(); }
             catch (InvalidOperationException) { }
         }
         catch (ArgumentException) { }
         catch (InvalidOperationException) { }
+    }
+
+    /// <summary>
+    /// Returns the start time of a live process, or null if it cannot be
+    /// determined. Used to record identity alongside a captured PID.
+    /// </summary>
+    public static DateTime? TryGetStartTime(int pid)
+    {
+        if (pid <= 0) return null;
+        try
+        {
+            using var p = Process.GetProcessById(pid);
+            if (p.HasExited) return null;
+            return p.StartTime;
+        }
+        catch (Exception exception) when (exception is ArgumentException
+            or InvalidOperationException
+            or NotSupportedException
+            or PlatformNotSupportedException)
+        {
+            return null;
+        }
     }
 
     private static IReadOnlyList<int> CollectViaPs(int rootPid)

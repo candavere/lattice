@@ -53,9 +53,7 @@ public sealed record SlashConsoleRequest(
     bool MenuOpen,
     string WorkingDirectory,
     string? Notice,
-    string? ResultTitle,
-    IReadOnlyList<string>? ResultLines,
-    bool ResultTruncated,
+    SlashConsoleResultView? ResultView,
     PaneSize Size,
     GlyphMode Glyphs,
     ColorDepth Depth,
@@ -89,12 +87,6 @@ public static class SlashConsoleLayout
     /// <summary>Key hints on home. Implemented by the host in the next stage.</summary>
     public const string HomeHints = "/ commands  /exit leave  ctrl-c quit";
 
-    /// <summary>Visible marker that the result buffer was truncated to its bound.</summary>
-    public const string TruncationMarker = "[truncated]";
-
-    /// <summary>How many result lines the frame will show at most; the host bounds the buffer itself.</summary>
-    public const int MaxResultLinesShown = 12;
-
     /// <summary>Maximum width of the centred input/menu column.</summary>
     public const int ContentMaxWidth = 88;
 
@@ -106,7 +98,8 @@ public static class SlashConsoleLayout
 
     /// <summary>Whether this frame draws the wordmark rather than the centred fallback.</summary>
     public static bool ShowsWordmark(SlashConsoleRequest request) =>
-        Wordmark.ShouldShowWordmark(request.Size.Width, request.Size.Height, request.Utf8, request.Glyphs, request.MenuOpen);
+        Wordmark.ShouldShowWordmark(request.Size.Width, request.Size.Height, request.Utf8, request.Glyphs, request.MenuOpen)
+        && request.ResultView is null;
 
     /// <summary>
     /// One frame's vertical geometry: every row the renderer draws, derived from the
@@ -175,7 +168,7 @@ public static class SlashConsoleLayout
         var wantNotice = !string.IsNullOrEmpty(request.Notice);
         var showed = ShowsWordmark(request);
         var headH = showed ? Wordmark.Height : 1;
-        var hasResult = request.ResultTitle is { Length: > 0 } || request.ResultLines is { Count: > 0 };
+        var hasResult = request.ResultView is not null;
         var hasForm = request.Form is not null;
         var fieldTotal = request.Form?.Fields.Count ?? 0;
         var errorRows = request.Form?.ValidationError is { Length: > 0 } ? 1 : 0;
@@ -241,43 +234,51 @@ public static class SlashConsoleLayout
                 inputY, inputY + MenuGap + 1, hasForm, formTop, formRows, formStart);
         }
 
-        // Results keep the top-anchored flow so the whole output body stays
-        // readable; clearing the result restores the centred home composition.
-        var headYLegacy = 2;
-        var headDrawn = showed && headYLegacy + Wordmark.Height < height - 4;
-        int contentTop = headDrawn
-            ? headYLegacy + Wordmark.Height + HeadGap
-            : Math.Min(height - 4, 4);
-        contentTop = Math.Max(0, Math.Min(contentTop, Math.Max(0, height - 3)));
+        // Results use the full functional space: the workspace body flows from the
+        // top of the canvas, the input is pinned just above the footer, and the
+        // working directory and hints keep the last two rows. No wordmark competes
+        // with the output. Clearing the result restores the centred home composition.
+        var resultCanvasTop = 0;
+        var noticeYResult = -1;
+        if (wantNotice)
+        {
+            noticeYResult = 0;
+            resultCanvasTop = 1;
+        }
 
-        int menuTopLegacy = 0, menuRowsLegacy = 0, menuStartLegacy = 0;
-        int formTopLegacy = 0, formRowsLegacy = 0, formStartLegacy = 0;
+        var inputYResult = Math.Max(resultCanvasTop, height - 3);
+
+        int menuTopResult = 0, menuRowsResult = 0, menuStartResult = 0;
+        int formTopResult = 0, formRowsResult = 0, formStartResult = 0;
+        var bodyTop = resultCanvasTop;
         if (hasForm)
         {
-            formTopLegacy = contentTop;
-            formRowsLegacy = Math.Max(0, Math.Min(
-                fieldTotal,
-                height - FooterRows - contentTop - (3 + errorRows) - MenuGap - 1));
-            formStartLegacy = FormStartIndex(request, formRowsLegacy);
+            formTopResult = bodyTop;
+            var room = Math.Max(0, inputYResult - bodyTop - (1 + 1 + errorRows + 1) - 1);
+            formRowsResult = Math.Max(0, Math.Min(fieldTotal, room));
+            formStartResult = FormStartIndex(request, formRowsResult);
+            bodyTop = formTopResult + 1 + formRowsResult + 1 + errorRows + 1;
         }
-        else
+        else if (menuCount > 0)
         {
-            var roomLegacy = height - FooterRows - contentTop - 1 - 1;
-            menuTopLegacy = contentTop;
-            menuRowsLegacy = Math.Max(0, Math.Min(menuCount, roomLegacy));
-            menuStartLegacy = MenuStartIndex(request, menuRowsLegacy);
+            menuTopResult = bodyTop;
+            var room = Math.Max(0, inputYResult - bodyTop - 1);
+            menuRowsResult = Math.Max(0, Math.Min(menuCount, room));
+            menuStartResult = MenuStartIndex(request, menuRowsResult);
+            bodyTop = menuTopResult + menuRowsResult + (menuRowsResult > 0 ? MenuGap : 0);
         }
 
-        var noticeYLegacy = wantNotice && contentTop > 0 ? contentTop - 1 : -1;
-        var blockLegacy = hasForm
-            ? 1 + formRowsLegacy + 1 + errorRows + 1
-            : menuRowsLegacy + (menuRowsLegacy > 0 ? MenuGap : 0);
-        var inputYLegacy = contentTop + blockLegacy;
+        var resultTop = bodyTop;
+        if (resultTop >= inputYResult)
+        {
+            resultTop = Math.Max(0, inputYResult - 1);
+        }
+
         return new ConsoleGeometry(
-            false, noticeYLegacy, headYLegacy, showed, headDrawn,
-            menuTopLegacy, menuRowsLegacy, menuStartLegacy,
-            inputYLegacy, inputYLegacy + MenuGap + 1,
-            hasForm, formTopLegacy, formRowsLegacy, formStartLegacy);
+            false, noticeYResult, resultCanvasTop, false, false,
+            menuTopResult, menuRowsResult, menuStartResult,
+            inputYResult, resultTop,
+            hasForm, formTopResult, formRowsResult, formStartResult);
     }
 
     private static int FormStartIndex(SlashConsoleRequest request, int rowsToShow)
@@ -469,7 +470,7 @@ public static class SlashConsoleLayout
 
         DrawInputBar(cells, size, request, geometry.InputY, colX, colW, edge, panelFill);
 
-        if (request.ResultLines is { Count: > 0 } || request.ResultTitle is { Length: > 0 })
+        if (request.ResultView is not null)
         {
             DrawResult(cells, size, request, geometry.ResultTop, colX, colW, panelFill);
         }
@@ -772,38 +773,102 @@ public static class SlashConsoleLayout
         var textX = colX + 2;
         var textW = Math.Max(0, colX + colW - 1 - textX);
 
-        if (request.ResultTitle is { Length: > 0 } title)
-        {
-            var titleStyle = title.Contains("failed", StringComparison.Ordinal) || title.Contains("cancelled", StringComparison.Ordinal)
-                ? new Cell(' ', Palette.Error, panelFill, CellAttributes.Bold)
-                : title.Contains("ok", StringComparison.Ordinal) || title.StartsWith("exit 0", StringComparison.Ordinal)
-                    ? new Cell(' ', Palette.Success, panelFill, CellAttributes.Bold)
-                    : new Cell(' ', Palette.TextPrimary, panelFill, CellAttributes.Bold);
-            DrawClippedInColumn(cells, textX, y, textW, title, titleStyle);
-            y++;
-        }
-
-        if (request.ResultLines is null)
+        var view = request.ResultView;
+        if (view is null)
         {
             return;
         }
 
-        var shown = 0;
-        foreach (var line in request.ResultLines)
+        var bodyList = new System.Collections.Generic.List<(string text, Cell style)>();
+        if (!view.ShowingRaw)
         {
-            if (shown >= MaxResultLinesShown || y >= size.Height - 2)
+            var titleStyle = view.Title.Contains("failed", StringComparison.Ordinal) || view.Title.Contains("cancelled", StringComparison.Ordinal)
+                ? new Cell(' ', Palette.Error, panelFill, CellAttributes.Bold)
+                : view.Title.Contains("ok", StringComparison.Ordinal) || view.Title.StartsWith("exit 0", StringComparison.Ordinal)
+                    ? new Cell(' ', Palette.Success, panelFill, CellAttributes.Bold)
+                    : new Cell(' ', Palette.TextPrimary, panelFill, CellAttributes.Bold);
+            bodyList.Add((view.Title, titleStyle));
+            if (!string.IsNullOrEmpty(view.CommandLine))
+            {
+                bodyList.Add((view.CommandLine, new Cell(' ', Palette.TextPrimary, panelFill)));
+            }
+
+            bodyList.Add((string.Empty, new Cell(' ', Palette.TextPrimary, panelFill)));
+            foreach (var section in view.Sections)
+            {
+                bodyList.Add((section.Heading, new Cell(' ', Palette.TextPrimary, panelFill, CellAttributes.Bold)));
+                foreach (var line in section.Lines)
+                {
+                    foreach (var wrapped in SlashConsoleWrap.Wrap(line, textW))
+                    {
+                        bodyList.Add((wrapped, new Cell(' ', Palette.TextPrimary, panelFill)));
+                    }
+                }
+            }
+
+            foreach (var notice in view.LimitNotices)
+            {
+                bodyList.Add((notice, new Cell(' ', Palette.Warning, panelFill)));
+            }
+        }
+        else
+        {
+            if (view.RawLines is { Count: > 0 })
+            {
+                foreach (var line in view.RawLines)
+                {
+                    foreach (var wrapped in SlashConsoleWrap.Wrap(line, textW))
+                    {
+                        bodyList.Add((wrapped, new Cell(' ', Palette.TextPrimary, panelFill)));
+                    }
+                }
+            }
+            else
+            {
+                bodyList.Add((view.Title, new Cell(' ', Palette.TextPrimary, panelFill)));
+                bodyList.Add(("(raw view unavailable)", new Cell(' ', Palette.Warning, panelFill)));
+            }
+        }
+
+        var scroll = view.Scroll;
+        var bodyHeight = Math.Max(0, size.Height - 3 - y);
+        if (bodyHeight < 0)
+        {
+            bodyHeight = 0;
+        }
+
+        var maxScroll = bodyList.Count - bodyHeight;
+        if (maxScroll < 0)
+        {
+            maxScroll = 0;
+        }
+
+        if (scroll > maxScroll)
+        {
+            scroll = maxScroll;
+        }
+
+        if (scroll < 0)
+        {
+            scroll = 0;
+        }
+
+        var rowCount = 0;
+        for (var i = scroll; i < bodyList.Count; i++)
+        {
+            if (y >= size.Height - 2)
             {
                 break;
             }
 
-            DrawClippedInColumn(cells, textX, y, textW, line, new Cell(' ', Palette.TextPrimary, panelFill));
-            shown++;
+            var item = bodyList[i];
+            DrawClippedInColumn(cells, textX, y, textW, item.text, item.style);
             y++;
-        }
-
-        if (request.ResultTruncated && y < size.Height - 2)
-        {
-            DrawClippedInColumn(cells, textX, y, textW, TruncationMarker, new Cell(' ', Palette.Warning, panelFill, CellAttributes.Bold));
+            rowCount++;
+            if (bodyHeight > 0 && rowCount >= bodyHeight)
+            {
+                break;
+            }
         }
     }
 
@@ -826,6 +891,11 @@ public static class SlashConsoleLayout
         }
 
         var hints = request.MenuOpen ? MenuOpenHints : HomeHints;
+        if (request.ResultView is not null)
+        {
+            hints = request.ResultView.ShowingRaw ? "↑/↓ scroll  s save  q back" : "↑/↓ scroll  tab raw  esc clear";
+        }
+
         var hintRoom = Math.Max(0, size.Width - 4);
         var clippedHints = CellText.Clip(hints, hintRoom, request.Glyphs);
         var hintX = Math.Max(2, size.Width - 2 - clippedHints.Length);

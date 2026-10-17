@@ -125,7 +125,7 @@ public sealed class ExternalAgent : IAgent, IDisposable
     /// at teardown. Test-only pidfiles are never read here; this is the
     /// product mechanism.
     /// </summary>
-    private readonly HashSet<int> _knownDescendants = [];
+    private readonly Dictionary<int, DateTime?> _knownDescendants = [];
     private readonly object _descendantsLock = new();
 
     /// <summary>
@@ -508,7 +508,7 @@ public sealed class ExternalAgent : IAgent, IDisposable
         if (found.Count == 0) return;
         lock (_descendantsLock)
         {
-            foreach (var id in found) _knownDescendants.Add(id);
+            foreach (var id in found) _knownDescendants[id] = ProcessTree.TryGetStartTime(id);
         }
     }
 
@@ -519,18 +519,18 @@ public sealed class ExternalAgent : IAgent, IDisposable
     /// </summary>
     private void KillKnownDescendants()
     {
-        int[] targets;
-        lock (_descendantsLock) { targets = [.. _knownDescendants]; }
-        foreach (var pid in targets)
+        (int pid, DateTime? start)[] targets;
+        lock (_descendantsLock) { targets = _knownDescendants.Select(kv => (kv.Key, kv.Value)).ToArray(); }
+        foreach (var (pid, start) in targets)
         {
             if (pid == ProcessId) continue;
-            ProcessTree.KillById(pid);
+            ProcessTree.KillById(pid, start);
         }
         var deadline = Stopwatch.StartNew();
         while (deadline.Elapsed < TimeSpan.FromSeconds(2))
         {
             bool anyAlive = false;
-            foreach (var pid in targets)
+            foreach (var (pid, _) in targets)
             {
                 if (pid == ProcessId) continue;
                 try

@@ -71,7 +71,7 @@ public static class TrajectoryAnalyzer
         var map = recording.Header.Map;
         var steps = recording.Steps;
         var agentCount = recording.Header.SimulationConfig.AgentCount;
-        var initial = Simulation.CreateInitial(map, recording.Header.SimulationConfig);
+        var initial = Simulation.CreateInitial(map, recording.Header.SimulationConfig, recording.Header.DynamicRules ?? DynamicMapRuleSet.None);
         var initialZones = initial.Agents.ToDictionary(agent => agent.AgentId, agent => agent.ZoneId);
 
         var previousZones = new Dictionary<int, int>(initialZones);

@@ -25,7 +25,7 @@ public static class TrajectoryPlayback
 public static void Playback(TextReader trajectorySource, TextWriter sink)
 {
     var header = TrajectoryReader.ReadHeader(trajectorySource);
-    var initial = Simulation.CreateInitial(header.Map, header.SimulationConfig);
+    var initial = Simulation.CreateInitial(header.Map, header.SimulationConfig, header.DynamicRules ?? DynamicMapRuleSet.None);
 
     sink.Write("== initial state ==\n");
     WriteFrame(sink, header.Map, initial.Agents, initial.Claims, header.Scenario, header.AgentRoles);

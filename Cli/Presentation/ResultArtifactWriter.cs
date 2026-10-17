@@ -44,32 +44,56 @@ public static class ResultArtifactWriter
                 sb.AppendLine();
             }
 
-            // stdout: head + spool
+            // stdout: head + spool (complete-raw contract)
             sb.Append(stdoutHead ?? string.Empty);
-            if (!string.IsNullOrEmpty(stdoutSpoolPath) && File.Exists(stdoutSpoolPath))
+            if (!string.IsNullOrEmpty(stdoutSpoolPath))
             {
+                if (!File.Exists(stdoutSpoolPath) && !Directory.Exists(stdoutSpoolPath))
+                {
+                    return new ResultArtifactOutcome(false, null, $"stdout spool not found: {stdoutSpoolPath}");
+                }
+
+                string stdoutSpool;
                 try
                 {
-                    sb.Append(File.ReadAllText(stdoutSpoolPath));
+                    stdoutSpool = File.ReadAllText(stdoutSpoolPath);
                 }
-                catch (IOException)
+                catch (IOException ex)
                 {
-                    // If spool cannot be read, save head only and record via outcome? But not stated.
-                    // Tests expect honest read; missing spool is handled separately.
+                    return new ResultArtifactOutcome(false, null, $"stdout spool unreadable: {ex.Message}");
                 }
+                catch (UnauthorizedAccessException ex)
+                {
+                    return new ResultArtifactOutcome(false, null, $"stdout spool unreadable: {ex.Message}");
+                }
+
+                sb.Append(stdoutSpool);
             }
 
-            // stderr: head + spool
+            // stderr: head + spool (complete-raw contract)
             sb.Append(stderrHead ?? string.Empty);
-            if (!string.IsNullOrEmpty(stderrSpoolPath) && File.Exists(stderrSpoolPath))
+            if (!string.IsNullOrEmpty(stderrSpoolPath))
             {
+                if (!File.Exists(stderrSpoolPath) && !Directory.Exists(stderrSpoolPath))
+                {
+                    return new ResultArtifactOutcome(false, null, $"stderr spool not found: {stderrSpoolPath}");
+                }
+
+                string stderrSpool;
                 try
                 {
-                    sb.Append(File.ReadAllText(stderrSpoolPath));
+                    stderrSpool = File.ReadAllText(stderrSpoolPath);
                 }
-                catch (IOException)
+                catch (IOException ex)
                 {
+                    return new ResultArtifactOutcome(false, null, $"stderr spool unreadable: {ex.Message}");
                 }
+                catch (UnauthorizedAccessException ex)
+                {
+                    return new ResultArtifactOutcome(false, null, $"stderr spool unreadable: {ex.Message}");
+                }
+
+                sb.Append(stderrSpool);
             }
 
             // Atomic write to target path

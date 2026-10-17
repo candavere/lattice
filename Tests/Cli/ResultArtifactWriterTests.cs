@@ -73,6 +73,96 @@ public class ResultArtifactWriterTests
         Assert.Null(outcome.Path);
     }
 
+    [Fact]
+    public void SaveFailsWhenRecordedSpoolIsMissing()
+    {
+        using var temp = new TempDir();
+        var missingSpool = Path.Combine(temp.Path, "missing-stdout.log");
+
+        var outcome = ResultArtifactWriter.SaveRaw(
+            temp.Path,
+            "r.log",
+            "HEAD\n",
+            missingSpool,
+            "ERR\n",
+            null,
+            []);
+
+        Assert.False(outcome.Success, outcome.Reason);
+        Assert.NotNull(outcome.Reason);
+        Assert.Null(outcome.Path);
+        Assert.False(File.Exists(Path.Combine(temp.Path, "r.log")));
+    }
+
+    [Fact]
+    public void SaveFailsWhenRecordedSpoolCannotBeRead()
+    {
+        using var temp = new TempDir();
+        // A directory is reported by File.Exists as existing but cannot be read
+        // as a file: deterministic on this platform, no permission dependence.
+        var unreadableSpool = temp.Path;
+        var subDir = Path.Combine(temp.Path, "spool-dir");
+        Directory.CreateDirectory(subDir);
+
+        var outcome = ResultArtifactWriter.SaveRaw(
+            temp.Path,
+            "r.log",
+            "HEAD\n",
+            subDir,
+            "ERR\n",
+            null,
+            []);
+
+        Assert.False(outcome.Success, outcome.Reason);
+        Assert.NotNull(outcome.Reason);
+        Assert.Contains("unreadable", outcome.Reason, StringComparison.Ordinal);
+        Assert.Null(outcome.Path);
+        Assert.False(File.Exists(Path.Combine(temp.Path, "r.log")));
+    }
+
+    [Fact]
+    public void SaveFailsWhenRecordedStderrSpoolIsMissing()
+    {
+        using var temp = new TempDir();
+
+        var outcome = ResultArtifactWriter.SaveRaw(
+            temp.Path,
+            "r.log",
+            "OUT\n",
+            null,
+            "ERR\n",
+            Path.Combine(temp.Path, "missing-stderr.log"),
+            []);
+
+        Assert.False(outcome.Success, outcome.Reason);
+        Assert.NotNull(outcome.Reason);
+        Assert.Null(outcome.Path);
+        Assert.False(File.Exists(Path.Combine(temp.Path, "r.log")));
+    }
+
+    [Fact]
+    public void SaveFailsWhenRecordedStderrSpoolCannotBeRead()
+    {
+        using var temp = new TempDir();
+        var subDir = Path.Combine(temp.Path, "stderr-spool-dir");
+        Directory.CreateDirectory(subDir);
+
+        var outcome = ResultArtifactWriter.SaveRaw(
+            temp.Path,
+            "r.log",
+            "OUT\n",
+            null,
+            "ERR\n",
+            subDir,
+            []);
+
+        Assert.False(outcome.Success, outcome.Reason);
+        Assert.NotNull(outcome.Reason);
+        Assert.Contains("unreadable", outcome.Reason, StringComparison.Ordinal);
+        Assert.Null(outcome.Path);
+        Assert.False(File.Exists(Path.Combine(temp.Path, "r.log")));
+    }
+
     private sealed class TempDir : IDisposable
     {
         internal string Path { get; } = System.IO.Path.Combine(

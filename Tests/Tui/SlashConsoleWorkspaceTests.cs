@@ -341,6 +341,16 @@ public class SlashConsoleWorkspaceTests
         public static FakeCapturedRun Done(int exit, string stdout, string stderr) =>
             new(true, new CapturedRunResult(exit, stdout, stderr, false, TimeSpan.FromSeconds(1), false));
         public CapturedRunResult Finish() => _result;
+        public bool TryTakeFinished(out CapturedRunResult result)
+        {
+            if (!_done)
+            {
+                result = default!;
+                return false;
+            }
+            result = _result;
+            return true;
+        }
         public void Cancel() { }
     }
 

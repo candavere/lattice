@@ -73,8 +73,8 @@ public class SlashConsoleWorkspaceTests
         var view = workspace.BuildView();
 
         Assert.True(view.ShowingRaw);
-        Assert.Contains("HEAD", view.RawLines);
-        Assert.Contains("SPILLED", view.RawLines);
+        Assert.Contains(view.RawLines, line => string.Equals(line, "HEAD", StringComparison.Ordinal));
+        Assert.Contains(view.RawLines, line => string.Equals(line, "SPILLED", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -87,7 +87,7 @@ public class SlashConsoleWorkspaceTests
         var workspace = SlashConsoleWorkspace.FromRun(result, "run", "lattice");
         workspace.ToggleRaw();
 
-        Assert.Contains("HEAD", workspace.BuildView().RawLines);
+        Assert.Contains(workspace.BuildView().RawLines, line => string.Equals(line, "HEAD", StringComparison.Ordinal));
     }
 
     [Fact]

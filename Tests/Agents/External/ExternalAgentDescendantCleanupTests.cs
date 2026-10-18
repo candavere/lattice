@@ -291,6 +291,30 @@ public class ExternalAgentDescendantCleanupTests
         _output.WriteLine($"OS: {System.Runtime.InteropServices.RuntimeInformation.OSDescription}");
     }
 
+    [Fact]
+    public void ProcessTree_KillById_DoesNotKillWhenIdentityMismatched()
+    {
+        using var p = Process.Start(new ProcessStartInfo
+        {
+            FileName = "sleep",
+            ArgumentList = { "30" },
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        })!;
+        var actual = ProcessTree.TryGetStartTime(p.Id);
+        Assert.NotNull(actual);
+        Assert.False(ProcessTree.KillById(p.Id, actual.Value.AddSeconds(1)));
+        Assert.True(IsAlive(p.Id));
+        try { p.Kill(entireProcessTree: true); } catch { }
+        try { p.WaitForExit(5000); } catch { }
+    }
+
+    [Fact]
+    public void ProcessTree_KillById_AbsentPidIsComplete()
+    {
+        Assert.True(ProcessTree.KillById(int.MaxValue));
+    }
+
     private bool ReapOwned(string pidFile)
     {
         var pids = ReadPids(pidFile);

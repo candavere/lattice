@@ -32,33 +32,47 @@ public static class ProcessTree
     /// reuse. The check and the kill are not atomic, so residual TOCTOU remains;
     /// on any uncertainty the kill is skipped (fail closed).
     /// </summary>
-    public static void KillById(int pid, DateTime? expectedStartTime = null)
+    public static bool KillById(int pid, DateTime? expectedStartTime = null)
     {
-        if (pid <= 0) return;
+        if (pid <= 0) return true;
         try
         {
             using var p = Process.GetProcessById(pid);
-            if (p.HasExited) return;
+            if (p.HasExited) return true;
             if (expectedStartTime.HasValue)
             {
+                DateTime actual;
                 try
                 {
-                    if (p.StartTime != expectedStartTime.Value) return;
+                    actual = p.StartTime;
                 }
                 catch (Exception exception) when (exception is NotSupportedException
                     or InvalidOperationException
-                    or PlatformNotSupportedException)
+                    or PlatformNotSupportedException
+                    or System.ComponentModel.Win32Exception)
                 {
-                    // Cannot verify identity; fail closed.
-                    return;
+                    // Cannot verify identity; fail closed. If it has exited, done.
+                    try { if (p.HasExited) return true; } catch { }
+                    return false;
+                }
+                if (actual != expectedStartTime.Value)
+                {
+                    return false;
                 }
             }
             try { p.Kill(entireProcessTree: true); }
             catch (NotSupportedException) { p.Kill(); }
             catch (InvalidOperationException) { }
+            return true;
         }
-        catch (ArgumentException) { }
-        catch (InvalidOperationException) { }
+        catch (ArgumentException) { return true; }
+        catch (InvalidOperationException) { return true; }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            // Lookup failed; cannot confirm. Treat as unverifiable rather than
+            // claiming success, but do not throw.
+            return false;
+        }
     }
 
     /// <summary>
@@ -77,7 +91,8 @@ public static class ProcessTree
         catch (Exception exception) when (exception is ArgumentException
             or InvalidOperationException
             or NotSupportedException
-            or PlatformNotSupportedException)
+            or PlatformNotSupportedException
+            or System.ComponentModel.Win32Exception)
         {
             return null;
         }

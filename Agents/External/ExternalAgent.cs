@@ -126,6 +126,7 @@ public sealed class ExternalAgent : IAgent, IDisposable
     /// product mechanism.
     /// </summary>
     private readonly Dictionary<int, DateTime?> _knownDescendants = [];
+    private readonly HashSet<int> _unreapedDescendants = [];
     private readonly object _descendantsLock = new();
 
     /// <summary>
@@ -228,6 +229,15 @@ public sealed class ExternalAgent : IAgent, IDisposable
 
     /// <summary>The OS process id of the child, for asserting that it is really gone.</summary>
     public int ProcessId { get; }
+
+    /// <summary>
+    /// PIDs whose cleanup could not be verified (identity unverifiable or
+    /// lookup failure). Never killed by bare PID. Exposed for diagnostics/tests.
+    /// </summary>
+    public IReadOnlyCollection<int> UnreapedDescendants
+    {
+        get { lock (_descendantsLock) { return _unreapedDescendants.ToArray(); } }
+    }
 
     /// <summary>
     /// True once the child has been observed to have exited. Latched before the
@@ -524,7 +534,24 @@ public sealed class ExternalAgent : IAgent, IDisposable
         foreach (var (pid, start) in targets)
         {
             if (pid == ProcessId) continue;
-            ProcessTree.KillById(pid, start);
+            if (!start.HasValue)
+            {
+                // Identity was never captured: do not kill by bare PID.
+                lock (_descendantsLock) { _unreapedDescendants.Add(pid); }
+                continue;
+            }
+            try
+            {
+                if (!ProcessTree.KillById(pid, start))
+                {
+                    lock (_descendantsLock) { _unreapedDescendants.Add(pid); }
+                }
+            }
+            catch (Exception)
+            {
+                // One unreadable/uncooperative descendant must not abort the rest.
+                lock (_descendantsLock) { _unreapedDescendants.Add(pid); }
+            }
         }
         var deadline = Stopwatch.StartNew();
         while (deadline.Elapsed < TimeSpan.FromSeconds(2))

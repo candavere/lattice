@@ -83,6 +83,7 @@ public sealed class LauncherSetupTests
 
     private static (int ExitCode, string Stdout, string Stderr) Run(string fileName, IEnumerable<string> args, string cwd, IDictionary<string, string> env, int timeoutMs = DefaultTimeoutMs)
     {
+        var started = Stopwatch.StartNew();
         using var process = Process.Start(BaseStart(fileName, args, cwd, env))!;
         var outTask = process.StandardOutput.ReadToEndAsync();
         var errTask = process.StandardError.ReadToEndAsync();
@@ -97,6 +98,30 @@ public sealed class LauncherSetupTests
             {
             }
             process.WaitForExit();
+        }
+        // Bound the stdout/stderr reads by whatever is left of this helper's
+        // existing time budget. A child that exited but left a descendant holding
+        // the pipe write ends would otherwise keep ReadToEndAsync from ever
+        // observing EOF, so the test would hang past WaitForExit.
+        var remainingMs = (int)(timeoutMs - started.ElapsedMilliseconds);
+        if (remainingMs < 0)
+        {
+            remainingMs = 0;
+        }
+        var readBudget = TimeSpan.FromMilliseconds(remainingMs);
+        bool outDone = outTask.Wait(readBudget);
+        bool errDone = errTask.Wait(readBudget);
+        if (!outDone || !errDone)
+        {
+            try
+            {
+                process.Kill(entireProcessTree: true);
+            }
+            catch
+            {
+            }
+            throw new TimeoutException(
+                "process exited but its output pipes are still open (a spawned process likely inherited them)");
         }
         var stdout = outTask.GetAwaiter().GetResult();
         var stderr = errTask.GetAwaiter().GetResult();
@@ -203,7 +228,7 @@ public sealed class LauncherSetupTests
         var dotnetOut = Path.Combine(scope.Work, "dotnet.json");
         var (gdCode, gdOut, gdErr) = Run("dotnet", new[]
         {
-            "run", "-c", "Release", "--project", Path.Combine(root, "Cli"),
+            "run", "--disable-build-servers", "-c", "Release", "--project", Path.Combine(root, "Cli"),
             "--", "generate", "--seed", "42", "--out", dotnetOut
         }, scope.Work, env);
         Assert.True(gdCode == 0, $"dotnet generate failed: {gdErr}\n{gdOut}");
@@ -252,6 +277,15 @@ public sealed class LauncherSetupTests
         // In this temp HOME the profile did not exist before install, so the
         // uninstaller must remove the file it created rather than leave it.
         Assert.False(File.Exists(Path.Combine(scope.Home, ".profile")), "installed profile should be removed on uninstall");
+    }
+
+    [Fact]
+    public void Run_BoundedRead_FailsFastWhenPipeHeldOpen()
+    {
+        var env = new Dictionary<string, string>();
+        var ex = Assert.ThrowsAny<Exception>(() =>
+            Run("bash", new[] { "-c", "exec 3>&1; (sleep 3 >&3 &) ; exit 0" }, Path.GetTempPath(), env, 1000));
+        Assert.Contains("output pipes are still open", ex.Message);
     }
 
     [Fact]

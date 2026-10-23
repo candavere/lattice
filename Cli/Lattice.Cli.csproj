@@ -48,4 +48,20 @@
                       LogicalName="Lattice.Cli.scenarios.bottleneck-contention.json" />
   </ItemGroup>
 
+  <Target Name="GenerateBuildIdentity" BeforeTargets="CoreCompile">
+    <PropertyGroup>
+      <_SourceCommit>unknown</_SourceCommit>
+    </PropertyGroup>
+    <Exec Command="git rev-parse HEAD" ConsoleToMSBuild="true" StandardOutputImportance="low" WorkingDirectory="$(MSBuildProjectDirectory)/.." Condition="Exists('$(MSBuildProjectDirectory)/../.git')" IgnoreExitCode="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_SourceCommit" />
+    </Exec>
+    <PropertyGroup>
+      <_SourceCommit Condition="'$(_SourceCommit)' == ''">unknown</_SourceCommit>
+    </PropertyGroup>
+    <Exec Command="printf '%s\n' 'namespace Lattice.Cli { internal static class BuildIdentity { public const string Commit = &quot;$(_SourceCommit)&quot;; } }' &gt; &quot;$(IntermediateOutputPath)BuildIdentity.g.cs&quot;" />
+    <ItemGroup>
+      <Compile Include="$(IntermediateOutputPath)BuildIdentity.g.cs" />
+    </ItemGroup>
+  </Target>
+
 </Project>

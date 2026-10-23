@@ -60,6 +60,16 @@ public static class CliApp
     /// </summary>
     public const string Version = "3.1.0";
 
+    /// <summary>
+    /// The full source commit this build was produced from, stamped at build
+    /// time by MSBuild (see Lattice.Cli.csproj). Falls back to "unknown" when
+    /// the build ran outside a git checkout.
+    /// </summary>
+    public static string SourceCommit => BuildIdentity.Commit;
+
+    /// <summary>The version string plus the stamped source commit.</summary>
+    public static string InformationalVersion => $"{Version}+{SourceCommit}";
+
     private static readonly GeneratorConfig DefaultGeneratorConfig = new(3, 5, 1, 1, 3, GeneratorConfig.DefaultRetryCap);
     private const int DefaultSimulationSteps = 100;
     private const int DefaultEvaluationRollouts = 32;
@@ -368,7 +378,7 @@ public static class CliApp
 
         if (args is ["--version"] or ["-v"])
         {
-            stdout.WriteLine(Version);
+            stdout.WriteLine(InformationalVersion);
             return Success;
         }
 
@@ -1643,7 +1653,7 @@ public static class CliApp
             var steps = flags.TryGetValue("--steps", out var stepsText)
                 ? ParsePositiveInt(stepsText, "--steps")
                 : (int?)null;
-            var commit = flags.TryGetValue("--commit", out var commitText) ? commitText : null;
+            var commit = flags.TryGetValue("--commit", out var commitText) ? commitText : SourceCommit;
             var cpu = flags.TryGetValue("--cpu", out var cpuText) ? cpuText : null;
 
             var workloads = WorkloadCatalog.BuildAll(steps);
@@ -1707,7 +1717,7 @@ public static class CliApp
             var seedCap = flags.TryGetValue("--seeds", out var capText)
                 ? ParsePositiveInt(capText, "--seeds")
                 : 50;
-            var commit = flags.TryGetValue("--commit", out var commitText) ? commitText : null;
+            var commit = flags.TryGetValue("--commit", out var commitText) ? commitText : SourceCommit;
 
             var scenarioText2 = flags.GetValueOrDefault("--scenario") ?? "standard";
 

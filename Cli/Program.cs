@@ -4,7 +4,7 @@ using Lattice.Tui;
 
 if (args is ["--version"] or ["-v"])
 {
-    Console.Out.WriteLine(CliApp.Version);
+    Console.Out.WriteLine(CliApp.InformationalVersion);
     return 0;
 }
 

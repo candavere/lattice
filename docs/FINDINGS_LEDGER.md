@@ -307,6 +307,22 @@ schema is defined in [`reproduction_packet.md`](reproduction_packet.md)
 
 ---
 
+## FINDING-017 — ExternalAgent handshake timeout, one historical occurrence
+
+| Field | Value |
+| --- | --- |
+| **ID** | `FINDING-017` |
+| **Date** | 2026-11-01 |
+| **Source / Provenance** | `INTERNAL_AUDIT` |
+| **Target Surface** | `Tests/Agents/External/ExternalAgentBackpressureTests.cs` — `ErrorNotificationDoesNotRestartTheBudget`; `Agents/External/ExternalAgent.cs` handshake (`Handshake`, lines ~638–685) |
+| **Observation** | One full-suite run failed once with `ExternalAgentFaultException` at step -1, reason `timeout_handshake`: the hello was not accepted within `step_timeout_ms` 500 (the handshake waits on the same knob as a step, per spec §3.1). The test class passed 8/8 in three isolated runs. A bounded measurement (throwaway harness under `.evidence/startup-timing/`, 20 samples: 10 unloaded, 10 under approximated contention from `ExternalAgentBackpressureTests` and `LauncherSetupTests` running concurrently) recorded a worst hello-write-to-hello_ack interval of 113.6 ms against the 500 ms budget, with no reproduction. The first stderr line in every sample was the stub's boot marker (`stub: mode=conform LATTICE_PROTOCOL=1`), which arrives before the protocol reply. |
+| **Severity & Confidence** | Medium / Bounded |
+| **Disposition** | `OPEN` |
+| **Resolution & Evidence Link** | No code change. Harness and raw timings are under `.evidence/startup-timing/` (untracked, not committed). The contention load was approximated by two concurrent test classes rather than the full suite, and the harness runs outside the test process so it cannot observe host-side in-process scheduling. Cause unestablished; the startup-contention hypothesis is neither confirmed nor excluded. |
+| **Resolution Release Status** | `MAIN_ONLY` |
+
+---
+
 ## Ledger index
 
 | ID | Date | Target | Severity | Disposition | Closure commit |
@@ -327,6 +343,7 @@ schema is defined in [`reproduction_packet.md`](reproduction_packet.md)
 | `FINDING-014` | 2026-09-29 | 20-session runner-class re-collection: four workloads armed, `policy_lookahead_mcts_32` recorded as a negative result (2.050× between-run spread, 0.1085 below the arm floor) | Medium | `FIXED` / `ACCEPTED_LIMITATION` | Re-collection commit (re-derived record + 20 verified raw sessions + manifest verdicts + workflow thresholds + docs; no engine changes) |
 | `FINDING-015` | 2026-09-30 | Same commit `ca438d0`, same runner image, same fingerprint: `stress_topology_4agent` read 0.802 → 0.785 → 1.006 across two attempts of one run; a re-dispatch turned red into green with the cause unestablished | Medium | `OPEN` (cause) / `ACCEPTED_LIMITATION` (re-dispatch is not a diagnosis) | No code change; entry plus run [`36692501509`](https://github.com/candavere/lattice/actions/runs/36692501509) attempts 1 and 2 |
 | `FINDING-016` | 2026-10-01 | `FINDING-015` understated its later non-documentation diff: `ca438d0..2c02b7d` changed **three** non-doc paths (`.github/workflows/ci.yml` +66, `Cli/Lattice.Cli.csproj` +2 packaging metadata, `site/index.html` favicon), not one. Corrected by reference; the narrower measured-code claim and all same-SHA evidence stand | Low | `FIXED` (scope statement, by reference) | Docs-only ledger addition; no source, workflow, benchmark record or baseline changed |
+| `FINDING-017` | 2026-11-01 | ExternalAgent handshake timeout, one historical occurrence | Medium | `OPEN` | No code change; `.evidence/startup-timing/` measurement (20 samples, worst 113.6 ms, no reproduction) |
 
 The ledger is maintained under the governing evidentiary standards of
 [`adr/0001-governing-product-thesis.md`](adr/0001-governing-product-thesis.md);

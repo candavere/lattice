@@ -12,7 +12,6 @@ using Lattice.Environment;
 using Lattice.Generator;
 using Lattice.Protocol;
 using Lattice.Trajectories;
-using Lattice.Tui;
 using Lattice.Visualization;
 
 namespace Lattice.Cli;
@@ -236,133 +235,7 @@ public static class CliApp
     /// <param name="stdout">Where the command's own output goes, byte for byte as before.</param>
     /// <param name="stderr">Where diagnostics and the lifecycle lines go.</param>
     /// <param name="terminal">What the CLI believes about the attached terminal.</param>
-    public static int Run(string[] args, TextWriter stdout, TextWriter stderr, CliTerminal terminal) =>
-        Run(args, stdout, stderr, terminal, TuiConsole.Default);
-
-    /// <summary>
-    /// The overload that also names the viewer's console, so the interactive
-    /// subcommands can be driven with a setting and a key source a test owns. The
-    /// seam exists for the same reason as the one above: the process-wide console
-    /// input mode cannot be exercised from a test host that has no console, and
-    /// "the run never reached it" is a claim that needs a stand-in to assert.
-    /// </summary>
-    /// <param name="args">The command line.</param>
-    /// <param name="stdout">Where the command's own output goes, byte for byte as before.</param>
-    /// <param name="stderr">Where diagnostics and the lifecycle lines go.</param>
-    /// <param name="terminal">What the CLI believes about the attached terminal.</param>
-    /// <param name="console">The console <c>lattice tui</c> is composed from.</param>
-    /// <summary>
-    /// The overload that also names the terminal's capabilities, so the bare
-    /// invocation can be decided from them.
-    /// <para>
-    /// <b>This is the only path that opens the console.</b> A zero-argument run
-    /// reaches a screen only when the caller has said the streams are a terminal's.
-    /// Deciding that from <see cref="Console"/> inside the three-argument overload
-    /// would mean a test — which hands it a <see cref="StringWriter"/> and is itself
-    /// usually run from a developer's terminal — opened a full-screen view and
-    /// blocked. The capabilities are a parameter for that reason: the answer is the
-    /// caller's, not the ambient one's.
-    /// </para>
-    /// </summary>
-    /// <param name="args">The command line.</param>
-    /// <param name="stdout">Where the command's own output goes, byte for byte as before.</param>
-    /// <param name="stderr">Where diagnostics and the lifecycle lines go.</param>
-    /// <param name="terminal">What the CLI believes about the attached terminal.</param>
-    /// <param name="console">The console the screens are composed from.</param>
-    /// <param name="capabilities">What the attached terminal can carry.</param>
-    /// <param name="session">The terminal seam; the guard's by default.</param>
-    /// <param name="clock">How elapsed time is measured on a screen.</param>
-    /// <param name="runner">How a command is started from the console.</param>
-    /// <param name="onConsole">
-    /// Called once, after the console has opened, for a caller that wants to know
-    /// it did. Not a hook into the screen itself: the screen's behaviour is asserted
-    /// through <see cref="SlashConsoleHost"/>, and this exists so a test can tell an
-    /// opened screen from a usage line without a terminal to draw one on.
-    /// </param>
-    internal static int Run(
-        string[] args,
-        TextWriter stdout,
-        TextWriter stderr,
-        CliTerminal terminal,
-        TuiConsole console,
-        TerminalCapabilities capabilities,
-        ITerminalSessionFactory? session = null,
-        IUiClock? clock = null,
-        ISlashConsoleRunner? runner = null,
-        Action? onConsole = null)
-    {
-        if (args.Length == 0)
-        {
-            // The one place a bare invocation can become something other than usage,
-            // and only for a terminal that can carry a screen. Everywhere else the
-            // behaviour is exactly what it was before this screen existed.
-            return CanOpenLaunchpad(capabilities)
-                ? RunSlashConsole(stdout, stderr, capabilities, console, session, clock, runner, onConsole)
-                : NoCommand(stdout, stderr);
-        }
-
-        return Run(args, stdout, stderr, terminal, console);
-    }
-
-    /// <summary>
-    /// What a bare invocation does when no terminal can carry a screen: the usage
-    /// text on the stderr it was handed and the usage status. Nothing else, and
-    /// nothing read from the ambient console — the writers are the caller's, because
-    /// this path is exactly the one a test and a script both arrive at.
-    /// </summary>
-    private static int NoCommand(TextWriter stdout, TextWriter stderr)
-    {
-        WriteUsage(stderr);
-        return UsageError.ExitCode;
-    }
-
-    /// <summary>
-    /// Whether these capabilities can carry the console: standard input and
-    /// standard output both have to be the terminal, because the screen reads keys
-    /// from one and draws on the other, and a screen that drew into a redirect would
-    /// put escape sequences into whatever the redirect was for. Kept under its
-    /// Launchpad-era name so the predicate's callers and tests keep reading.
-    /// </summary>
-    public static bool CanOpenLaunchpad(TerminalCapabilities capabilities) =>
-        !capabilities.InputRedirected && !capabilities.OutputRedirected;
-
-    /// <summary>
-    /// Opens the slash console and runs it to the reader's quit. The screen takes the
-    /// process's own writers: a screen that drew anywhere but the real stdout would
-    /// not be the screen a reader sees. The Launchpad code stays for its own seams;
-    /// the bare route opens this console.
-    /// </summary>
-    private static int RunSlashConsole(
-        TextWriter stdout,
-        TextWriter stderr,
-        TerminalCapabilities capabilities,
-        TuiConsole console,
-        ITerminalSessionFactory? session,
-        IUiClock? clock,
-        ISlashConsoleRunner? runner,
-        Action? onConsole)
-    {
-        onConsole?.Invoke();
-
-        var result = SlashConsoleHost.Run(new SlashConsoleHostRequest(
-            stdout,
-            stderr,
-            capabilities,
-            console,
-            session ?? new TerminalGuardSessionFactory(),
-            clock ?? new MonotonicClock(),
-            runner ?? new SlashConsoleProcessRunner(),
-            System.Environment.CurrentDirectory));
-
-        if (result.Refusal is not null)
-        {
-            stderr.WriteLine(result.Refusal);
-        }
-
-        return result.ExitCode;
-    }
-
-    internal static int Run(string[] args, TextWriter stdout, TextWriter stderr, CliTerminal terminal, TuiConsole console)
+        public static int Run(string[] args, TextWriter stdout, TextWriter stderr, CliTerminal terminal)
     {
         if (args.Length == 0)
         {
@@ -420,430 +293,16 @@ public static class CliApp
             "analyze" => lifecycle.Run(() => Analyze(args[1..], stdout, commandErrors)),
             "replay" => lifecycle.Run(() => Replay(args[1..], stdout, commandErrors)),
             "benchmark" => lifecycle.Run(() => RunBenchmark(args[1..], stdout, commandErrors)),
-            "evaluate" => lifecycle.Run(() => Evaluate(args[1..], stdout, commandErrors, lifecycle)),
+            "evaluate" => lifecycle.Run(() => Evaluate(args[1..], stdout, commandErrors)),
             "validate-scenario" => lifecycle.Run(() => ValidateScenario(args[1..], stdout, commandErrors)),
-            "tui" => lifecycle.Run(() => Tui(args[1..], stdout, commandErrors, console)),
             _ => UnknownCommand(args[0], stderr),
         };
     }
 
-    /// <summary>
-    /// The interactive terminal viewer: <c>replay</c>, which plays a recorded
-    /// trajectory in a read-only cockpit and runs no simulation, and
-    /// <c>simulate</c>, which runs a real episode in the same cockpit and lets the
-    /// reader control it.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// Everything the command line can be wrong about is decided before anything is
-    /// read: the subcommand, the arity, an unknown flag. Each of those is a
-    /// <see cref="UsageError"/> and reports the usage status. A path that is missing
-    /// or unreadable is a fact discovered while doing the work, so it keeps the
-    /// runtime-failure status — the same split every other command here makes.
-    /// </para>
-    /// <para>
-    /// The terminal itself is the host's business, not the parser's: whether the
-    /// streams can carry a full-screen view is decided inside
-    /// <see cref="TuiHost"/>, which refuses a redirected run with one line of
-    /// reason and the usage status.
-    /// </para>
-    /// </remarks>
-    private static int Tui(string[] args, TextWriter stdout, TextWriter stderr, TuiConsole console)
-    {
-        try
-        {
-            // --ascii is a boolean switch shared by both subcommands: stripped before
-            // parsing so it can never be mistaken for a value or a path, and so the
-            // parser below sees only the flags it should refuse or use.
-            var ascii = args.Skip(1).Contains("--ascii", StringComparer.Ordinal);
-            var rest = args.Skip(1).Where(argument => argument != "--ascii").ToArray();
-
-            if (args.Length > 0 && args[0] == "simulate")
-            {
-                // --hide-panels is stripped per cockpit subcommand rather than here:
-                // the Ledger has no hide mode, so it must refuse the flag as unknown
-                // rather than silently ignore it.
-                var simulateArgs = WithoutFlag(rest, "--hide-panels", out var simulateHidden);
-                return TuiSimulate(simulateArgs, ascii, simulateHidden, stdout, stderr, console);
-            }
-
-            if (args.Length > 0 && args[0] == "ledger")
-            {
-                return TuiLedger(rest, ascii, stdout, stderr, console);
-            }
-
-            if (args.Length == 0 || args[0] != "replay")
-            {
-                WriteTuiUsage(stderr);
-                return UsageError.ExitCode;
-            }
-
-            var replayArgs = WithoutFlag(rest, "--hide-panels", out var replayHidden);
-            var (_, positionals) = ParseFlags(replayArgs);
-
-            if (positionals.Count == 0)
-            {
-                WriteTuiUsage(stderr);
-                return UsageError.ExitCode;
-            }
-
-            GuardNoPositionals(positionals.Skip(1).ToList());
-
-            // Read-only, and through the same reader every other command uses, so a
-            // malformed file is rejected here rather than by the viewer.
-            var document = ReplaySource.ReadFile(positionals[0]);
-
-            return StartViewer(
-                document,
-                stdout,
-                stderr,
-                CapabilityDetector.Detect(),
-                ascii,
-                console,
-                cursor: null,
-                hidePanels: replayHidden).ExitCode;
-        }
-        catch (Exception ex)
-        {
-            return Report(ex, stderr);
-        }
-    }
-
-    /// <summary>
-    /// The one place an interactive viewer run is started, for both subcommands, in
-    /// the one order that is safe.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// The refusal is asked of the host's own predicate before anything is built.
-    /// It cannot be left to <see cref="TuiHost.Run"/>, because the host is handed a
-    /// key source that does not exist yet — and building one is what asks the
-    /// process's console for its input mode. On Windows that ask throws when
-    /// standard input is redirected, which turned a run that should have been
-    /// refused with the usage status into a runtime failure instead.
-    /// </para>
-    /// <para>
-    /// So: refuse, or there is no key source, no reading thread and no console
-    /// property touched at all. After that the key source is built, then the
-    /// Ctrl-C-as-input setting is taken for the run — it is a process-wide setting,
-    /// so the scope that takes it gives the prior value back on every ending, and
-    /// gives it back after the terminal is restored and before the reading thread is
-    /// disposed.
-    /// </para>
-    /// </remarks>
-    /// <param name="document">The replay to show.</param>
-    /// <param name="stdout">Where frames go.</param>
-    /// <param name="stderr">Where a refusal goes.</param>
-    /// <param name="capabilities">What the terminal can do, resolved once.</param>
-    /// <param name="ascii">Whether the caller asked for ASCII glyphs.</param>
-    /// <param name="console">The console the run is composed from.</param>
-    /// <param name="cursor">The live cursor, or null to play the recording.</param>
-    /// <param name="hidePanels">Whether the run opens with the side panes hidden.</param>
-    /// <param name="session">The terminal seam; the guard's by default.</param>
-    /// <param name="clock">How elapsed time is measured.</param>
-    /// <remarks>
-    /// The parameters are spelled out rather than taken as a
-    /// <see cref="TuiHostRequest"/> because the key source is the one member that does
-    /// not exist yet: it is built here, after the refusal. Handing the host a record
-    /// with that member already filled would mean building it first.
-    /// </remarks>
-    internal static TuiRunResult StartViewer(
-        ReplayDocument document,
-        TextWriter stdout,
-        TextWriter stderr,
-        TerminalCapabilities capabilities,
-        bool ascii,
-        TuiConsole console,
-        ICockpitCursor? cursor,
-        ITerminalSessionFactory? session = null,
-        IUiClock? clock = null,
-        bool hidePanels = false)
-    {
-        var refusal = TuiHost.RefusalFor(capabilities);
-        if (refusal is not null)
-        {
-            stderr.WriteLine(refusal);
-            return new TuiRunResult(UsageError.ExitCode, refusal);
-        }
-
-        // The key source is declared first so it is disposed LAST, and the scope
-        // second so it is disposed FIRST: the setting goes back before the reading
-        // thread is left to the process, and both happen after the terminal is back.
-        using var keys = console.Keys();
-        using var controlC = ControlCAsInputScope.Enter(console.ControlCAsInput);
-
-        return TuiHost.Run(new TuiHostRequest(
-            document,
-            stdout,
-            stderr,
-            capabilities,
-            ascii,
-            session ?? new TerminalGuardSessionFactory(),
-            keys,
-            clock ?? new MonotonicClock(),
-            Cursor: cursor,
-            HidePanels: hidePanels));
-    }
-
-    /// <summary>
-    /// Runs a live episode in the cockpit: the same roster, map, rules, seed and
-    /// vision <c>lattice simulate</c> would use for the same arguments, stepped one
-    /// tick at a time on a thread of its own while the reader holds the controls.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// The statuses are the ones every other command here returns: 0 for a clean
-    /// quit or a finished episode, 1 for a runtime failure with one line on stderr,
-    /// 2 for an invocation that cannot be run. A refusal — a redirected stream, a
-    /// flag that does not apply to a live run — touches nothing and says why.
-    /// </para>
-    /// <para>
-    /// The order on the way out is fixed and is the whole point: the stepper is
-    /// stopped and the terminal is restored first, and only then is anything
-    /// printed. A reader whose terminal was left in the alternate screen, or a
-    /// caller whose agent was still deciding, is told after the fact rather than
-    /// before.
-    /// </para>
-    /// </remarks>
-    private static int TuiSimulate(string[] args, bool ascii, bool hidePanels, TextWriter stdout, TextWriter stderr, TuiConsole console)
-    {
-        var setup = BuildLiveSetup(args, stderr);
-
-        // The terminal is settled before the stepper is: a redirected run must leave
-        // nothing running and nothing on screen, and that is only true if the check
-        // comes first. StartViewer asks the same question again before it builds
-        // anything, and the answer is the same — this one exists because the episode
-        // is about to start a thread, and StartViewer's is because a key source is
-        // about to be built. Neither is reachable when the other has already run.
-        var capabilities = CapabilityDetector.Detect();
-        if (TuiHost.RefusalFor(capabilities) is { } refusal)
-        {
-            stderr.WriteLine(refusal);
-            return UsageError.ExitCode;
-        }
-
-        using var episode = new LiveEpisode(setup);
-        var cursor = new LivePlayback(episode);
-
-        var result = StartViewer(
-            cursor.Document,
-            stdout,
-            stderr,
-            capabilities,
-            ascii,
-            console,
-            cursor,
-            hidePanels: hidePanels);
-
-        if (result.Refusal is not null)
-        {
-            stderr.WriteLine(result.Refusal);
-        }
-
-        // Stop and join before anything is printed: the terminal is already back by
-        // the time TuiHost.Run returned, and the agent that may still be deciding is
-        // no longer one once the join has returned.
-        var joined = episode.Stop();
-        var failure = episode.Failure;
-
-        if (failure is not null)
-        {
-            stderr.WriteLine($"lattice tui simulate: {failure.Message}");
-        }
-        else if (!joined)
-        {
-            // Reported, not fatal: the viewer closed cleanly and the agent merely
-            // outlived it. A background thread ends with the process.
-            stderr.WriteLine(LiveEpisode.StillDecidingNotice);
-        }
-
-        return result.ExitCode == 0 ? LiveExitCode(failure) : result.ExitCode;
-    }
-
-    /// <summary>
-    /// The status a finished live run reports: a simulation that failed is a
-    /// runtime failure, and a clean quit or a finished episode is success.
-    /// </summary>
-    public static int LiveExitCode(Exception? failure) => failure is null ? Success : Failure;
-
-    /// <summary>
-    /// The episode a live run plays, built from the same flags and through the same
-    /// public constructors <c>lattice simulate</c> uses. The flags that decide an
-    /// artifact rather than an episode are refused by name: a live run writes
-    /// nothing, and silently ignoring a request to write a file would be worse than
-    /// saying so.
-    /// </summary>
-    private static LiveEpisodeSetup BuildLiveSetup(string[] args, TextWriter stderr)
-    {
-        // --quiet is a boolean switch, exactly as it is for the batch command: it is
-        // stripped before the key/value parser so it never demands a value. A live
-        // viewer has no dashboard and no progress line to suppress, so accepting it
-        // and doing nothing is the whole of its meaning here.
-        args = args.Where(argument => argument != "--quiet").ToArray();
-
-        var (flags, positionals) = ParseFlags(
-            args,
-            "--seed",
-            "--steps",
-            "--agent",
-            "--scenario",
-            "--rules",
-            "--out");
-        GuardNoPositionals(positionals);
-
-        if (flags.ContainsKey("--out"))
-        {
-            throw new UsageError(
-                "--out cannot be used with 'tui simulate': a live run records nothing to a file.");
-        }
-
-        var seed = ParseULong(Require(flags, "--seed"), "--seed");
-        var steps = flags.TryGetValue("--steps", out var stepsText)
-            ? ParsePositiveInt(stepsText, "--steps")
-            : DefaultSimulationSteps;
-
-        // A --scenario value is EITHER a path to a descriptor file or a built-in
-        // name — never both, and never guessed between. The same test the batch
-        // command uses: a path separator, not a case-insensitive name match.
-        if (flags.TryGetValue("--scenario", out var scenarioText) && LooksLikePath(scenarioText))
-        {
-            if (flags.ContainsKey("--agent"))
-            {
-                throw new UsageError(
-                    "--agent cannot be used with a scenario file: the roster is declared by the descriptor's 'Slots'.");
-            }
-
-            if (flags.ContainsKey("--steps"))
-            {
-                // The batch command refuses this too, for the same reason: the
-                // descriptor declares the budget, and overriding it would make the
-                // live episode's budget differ from the declared one.
-                throw new UsageError(
-                    "--steps cannot be combined with a scenario file: the descriptor declares 'Simulation.StepLimit'.");
-            }
-
-            if (flags.ContainsKey("--rules"))
-            {
-                // The batch command accepts this combination: the descriptor owns
-                // the map, so the rules file is not applied there either. Refusing it
-                // here would make the live command refuse something `simulate` runs,
-                // which is the opposite of parity — and it would be refused for doing
-                // exactly what the batch command does. Said out loud instead of
-                // refused, because a flag that is accepted and has no effect is
-                // something the reader is entitled to be told.
-                stderr.WriteLine(
-                    "lattice tui simulate: --rules has no effect with a scenario file; " +
-                    "the descriptor owns the topology, exactly as in 'lattice simulate'.");
-            }
-
-            return LiveEpisodeSetup.FromDescriptorFile(scenarioText, seed);
-        }
-
-        var scenario = flags.TryGetValue("--scenario", out var namedText)
-            ? namedText.ToLowerInvariant()
-            : "";
-
-        if (scenario.Length > 0)
-        {
-            if (scenario != InfiltrationScenario.ScenarioName)
-            {
-                throw new UsageError(
-                    $"invalid --scenario '{namedText}' (expected 'infiltration' or a path to a scenario file).");
-            }
-
-            if (flags.ContainsKey("--agent"))
-            {
-                throw new UsageError(
-                    "--agent cannot be used with --scenario infiltration (the roster is fixed: Sentry vs Infiltrator).");
-            }
-
-            if (flags.ContainsKey("--rules"))
-            {
-                throw new UsageError(
-                    "--rules cannot be used with --scenario infiltration (the scenario owns its topology).");
-            }
-
-            return LiveEpisodeSetup.Infiltration(seed, steps);
-        }
-
-        var agent = flags.TryGetValue("--agent", out var agentText)
-            ? agentText.ToLowerInvariant()
-            : "greedy";
-        var rules = flags.TryGetValue("--rules", out var rulesPath)
-            ? LoadRules(rulesPath)
-            : DynamicMapRuleSet.None;
-
-        return LiveEpisodeSetup.Skirmish(seed, steps, agent, rules);
-    }
-
-    /// <summary>
-    /// Runs the Ledger over one or more evaluation artifacts: a read-only screen showing
-    /// what each artifact recorded, and how two of them line up when more than one is
-    /// named.
-    /// <para>
-    /// <b>The refusal is asked before the artifacts are read.</b> A run whose streams
-    /// cannot carry a screen has no viewer to be given, so it is refused before a single
-    /// file is opened — the same refusal, from the same predicate and with the same
-    /// status as the cockpit's, and the same rule that nothing is built and no console
-    /// input property is read before it.
-    /// </para>
-    /// </summary>
-    private static int TuiLedger(string[] args, bool ascii, TextWriter stdout, TextWriter stderr, TuiConsole console)
-    {
-        // Everything decidable from the command line alone is decided first, exactly as
-        // every other command in this file does: no subcommand path, an unknown flag, or
-        // no artifact at all are usage errors and report the usage status with nothing
-        // run and nothing read.
-        var (_, positionals) = ParseFlags(args);
-
-        if (positionals.Count == 0)
-        {
-            WriteTuiUsage(stderr);
-            return UsageError.ExitCode;
-        }
-
-        try
-        {
-            // The host writes its own refusal line before it returns it, so nothing here
-            // prints it a second time: two copies of one line of reason is one line too
-            // many on a reader's terminal.
-            return LedgerHost.Run(new LedgerHostRequest(
-                positionals,
-                stdout,
-                stderr,
-                CapabilityDetector.Detect(),
-                console,
-                new TerminalGuardSessionFactory(),
-                new MonotonicClock(),
-                ascii)).ExitCode;
-        }
-        catch (Exception ex)
-        {
-            return Report(ex, stderr);
-        }
-    }
-
-    /// <summary>
-    /// Splits a boolean switch out of an argument list, reporting whether it was
-    /// there. The switch is recognised anywhere in the list, exactly as
-    /// <c>--ascii</c> is, so it can never be mistaken for a value or a path.
-    /// </summary>
-    private static string[] WithoutFlag(string[] args, string flag, out bool present)
-    {
-        present = args.Contains(flag, StringComparer.Ordinal);
-        return present ? args.Where(argument => argument != flag).ToArray() : args;
-    }
-
-    /// <summary>
-    /// The viewer's own usage line, on stderr only, and deliberately one line: a
-    /// usage line is a diagnosis, not a manual.
-    /// </summary>
-    private static void WriteTuiUsage(TextWriter sink) =>
-        sink.WriteLine("usage: lattice tui replay <trajectory.jsonl> [--ascii] [--hide-panels] | lattice tui ledger <artifact.json> [<artifact.json> ...] [--ascii] | lattice tui simulate --seed <n> [--steps <n>] [--agent <a>] [--scenario <infiltration|file>] [--rules <f>] [--ascii] [--hide-panels]");
 
     private static bool IsKnownCommand(string command) =>
         command is "generate" or "simulate" or "render" or "analyze"
-            or "replay" or "benchmark" or "evaluate" or "validate-scenario" or "tui";
+            or "replay" or "benchmark" or "evaluate" or "validate-scenario";
 
     /// <summary>
     /// Whether <paramref name="command"/> accepts <c>--quiet</c>. Only
@@ -1680,8 +1139,7 @@ public static class CliApp
     private static int Evaluate(
         string[] args,
         TextWriter stdout,
-        TextWriter stderr,
-        CommandLifecycleScope? lifecycle = null)
+        TextWriter stderr)
     {
         try
         {
@@ -1733,7 +1191,7 @@ public static class CliApp
             // protocol.
             if (LooksLikePath(scenarioText2))
             {
-                return EvaluateScenarioFile(flags, scenarioText2, stdout, stderr, lifecycle);
+                return EvaluateScenarioFile(flags, scenarioText2, stdout, stderr);
             }
 
             var scenario = scenarioText2.ToLowerInvariant();
@@ -1766,7 +1224,7 @@ public static class CliApp
                     : ExternalTimeLimits.DefaultStepTimeoutMs);
 
             return request.AgentCommand is null
-                ? EvaluateInProcess(request, flags, stdout, stderr, lifecycle)
+                ? EvaluateInProcess(request, flags, stdout, stderr)
                 : EvaluateExternal(request, flags, stdout, stderr);
         }
         catch (Exception ex)
@@ -1801,8 +1259,7 @@ public static class CliApp
         Dictionary<string, string> flags,
         string path,
         TextWriter stdout,
-        TextWriter stderr,
-        CommandLifecycleScope? lifecycle = null)
+        TextWriter stderr)
     {
         ScenarioDescriptor descriptor;
         string digest;
@@ -1873,7 +1330,7 @@ public static class CliApp
                 : ExternalTimeLimits.DefaultStepTimeoutMs);
 
         return request.AgentCommand is null
-            ? EvaluateInProcess(request, flags, stdout, stderr, lifecycle)
+            ? EvaluateInProcess(request, flags, stdout, stderr)
             : EvaluateExternal(request, flags, stdout, stderr);
     }
 
@@ -1892,8 +1349,7 @@ public static class CliApp
         EvaluateRequest request,
         Dictionary<string, string> flags,
         TextWriter stdout,
-        TextWriter stderr,
-        CommandLifecycleScope? lifecycle = null)
+        TextWriter stderr)
     {
         var pairings = new[] { (0, 1), (1, 0) };
 
@@ -1902,19 +1358,9 @@ public static class CliApp
         {
             var seeds = EvaluationSeeds(suite).Take(request.SeedCap).ToArray();
 
-            // The harness builds a map exactly once per match, from the factory
-            // the CLI supplies (EvaluationHarness.Evaluate), so counting the
-            // factory's own calls counts matches actually started. That is a real
-            // counter read from the real work, not an estimate of it, and it
-            // needs no change to the harness.
-            //
-            // Null when no lifecycle line is showing, in which case the factory
-            // is handed over unwrapped and the study is byte-for-byte the study
-            // that ran before this existed.
-            var matches = lifecycle?.Matches(seeds.Length * pairings.Length);
             var spec = new EvaluationSpec(
                 seeds,
-                matches?.Wrap(request.MapFactory) ?? request.MapFactory,
+                request.MapFactory,
                 EvaluationSimulationConfig,
                 request.Teams,
                 pairings,

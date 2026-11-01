@@ -337,7 +337,6 @@ Try one replay and one evidence view, then quit each screen with `q`:
 
 ```sh
 lattice replay site/demo.jsonl --verify                     # headless, exit 0
-dotnet run --project Cli -- tui ledger benchmarks/mcts_evaluation_results.json
 ```
 
 Opt-in launcher setup: `./setup.sh --install-launcher` (or `.\setup.ps1 -InstallLauncher`
@@ -750,31 +749,6 @@ everywhere else.
 
 The flag-by-flag reference, every flag, its semantics, and worked examples,
 lives in [`docs/CLI.md`](docs/CLI.md).
-
-## Interactive terminal screens
-
-Typing bare `lattice` in a terminal opens the Launchpad, where every command
-and every screen below is configured from its own flags and started; on a
-redirected stream, or with any argument, behaviour is exactly as `--help`
-says. `lattice tui` opens three full-screen viewers that read keys and draw on
-the terminal: `replay <trajectory.jsonl>` plays a recording and runs no
-simulation, `simulate --seed <n>` runs a live episode in the same cockpit, and
-`ledger <artifact.json> [...]` reads one or more `evaluate --out` artifacts
-side by side and derives nothing. The Launchpad shows the command it will run
-as `$ lattice ...`; titles and pane titles are Bold; instructions, headers,
-hints and required values use a readable secondary (at least 4.5:1 on the
-panel fill) while the sampled dim is reserved for decoration and disabled
-content; selection stays legible on its fill with a Bold/marker/caret cue; and
-verdicts, LIVE/paused/playing and contention are words and glyphs as well as
-colour. In the cockpit `h` hides the scoreboard,
-event log and timeline so the world pane gets the room, and `h` again brings
-them back without moving the replay or the episode; `--hide-panels` opens the
-viewer hidden, and `--ascii` forces ASCII glyphs on all three screens. A viewer
-whose input or output is redirected prints one line of reason and exits `2`
-without entering the alternate screen; quitting any screen exits `0`. The eight
-commands above still run directly, non-interactively, for scripts. Keys,
-refusals and exit codes are stated per screen in
-[`docs/CLI.md#tui`](docs/CLI.md#tui).
 
 ## Declarative scenario files
 

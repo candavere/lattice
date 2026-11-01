@@ -33,7 +33,6 @@ public class PackageReadinessTests
             "Environment/Lattice.Environment.csproj",
             "Agents/Lattice.Agents.csproj",
             "Protocol/Lattice.Protocol.csproj",
-            "Tui/Lattice.Tui.csproj",
             "Trajectories/Lattice.Trajectories.csproj",
             "Analytics/Lattice.Analytics.csproj",
             "Visualization/Lattice.Visualization.csproj",
@@ -50,8 +49,7 @@ public class PackageReadinessTests
     {
         var yml = File.ReadAllText(Path.Combine(Root(), ".github", "workflows", "release.yml"));
         Assert.Contains("Protocol/Lattice.Protocol.csproj", yml, StringComparison.Ordinal);
-        Assert.Contains("Tui/Lattice.Tui.csproj", yml, StringComparison.Ordinal);
-        Assert.Contains("The 10 production/test projects", yml, StringComparison.Ordinal);
+        Assert.Contains("The 9 production/test projects", yml, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -62,7 +60,6 @@ public class PackageReadinessTests
             "Environment/Lattice.Environment.csproj",
             "Agents/Lattice.Agents.csproj",
             "Protocol/Lattice.Protocol.csproj",
-            "Tui/Lattice.Tui.csproj",
             "Trajectories/Lattice.Trajectories.csproj",
             "Analytics/Lattice.Analytics.csproj",
             "Visualization/Lattice.Visualization.csproj",

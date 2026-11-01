@@ -13,11 +13,10 @@ remain the usage references.
   `Lattice.Protocol.dll` plus the other own assemblies. A `3.1.0` version does
   not mean untagged `main` changes were released.
 - Throwaway install (`--tool-path`, local-only NuGet source, `--version 3.1.0`)
-  reports `3.1.0` and matches `dotnet run` byte-for-byte on the golden replay
+  reports `3.1.0+<sha>` and matches `dotnet run` byte-for-byte on the golden replay
   (`stdout` empty, `stderr` identical, exit `0`) from outside the repo.
-- Bare installed `lattice` opens a readable Launchpad in a real PTY; running a
-  command, returning, and quitting restores the terminal (alternate screen
-  exit, cursor visible). Redirected runs exit `2` with one line and no
+- Bare installed `lattice` prints usage and exits `2` on a redirected stream or
+  with no command; the interactive screens are parked until after v4.
   alternate screen; `--help` exits `0`. No new exit codes.
 - Replay, live, and Ledger open and leave cleanly in a PTY (resize, ASCII,
   hide/show, nav/edit, Ctrl-C, invalid artifact). Existing lifecycle and

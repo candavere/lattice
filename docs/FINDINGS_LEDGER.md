@@ -349,3 +349,6 @@ The ledger is maintained under the governing evidentiary standards of
 [`adr/0001-governing-product-thesis.md`](adr/0001-governing-product-thesis.md);
 the corresponding public-claim mappings are calibrated in
 [`CLAIM_CALIBRATION_MATRIX.md`](CLAIM_CALIBRATION_MATRIX.md).
+## FINDING-018: Pump-completion await before exit classification
+
+Observed: single full-suite failure of `Line_Too_Long_When_The_Agent_Sends_An_Over_Length_Line` expected `LineTooLong` actual `AgentExited` (ExternalAgentCodeTests.cs:195). Mechanism consistent with ReadWithin exit branch classifying before PumpStdout enqueued terminal violation. Historical cause not established (never reproduced). Fix: await pump completion bounded by remaining budget before classifying. Regression: none added (no minimal seam); precedence property unchanged.

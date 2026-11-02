@@ -114,6 +114,7 @@ public sealed class ExternalAgent : IAgent, IDisposable
     private readonly StderrRing _stderr = new();
     private readonly BlockingCollection<ReadOutcome> _inbound = new(boundedCapacity: 1);
     private readonly List<Task> _pumps = [];
+    private readonly TaskCompletionSource _pumpCompleted = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly Stopwatch _clock = new();
 
     /// <summary>
@@ -953,10 +954,32 @@ public sealed class ExternalAgent : IAgent, IDisposable
 
             if (exited)
             {
+                // Consume any outcome already queued before awaiting pump
+                // completion, so a terminal enqueue that landed first is not
+                // discarded or overtaken (§8.4 precedence).
+                if (_inbound.TryTake(out var final, 0))
+                {
+                    return final;
+                }
+
+                // Await pump completion bounded by the remaining exchange/match
+                // budget, so a terminal enqueue that has not yet landed gets a
+                // chance to arrive before classification.
+                var settleBudget = deadline - _clock.Elapsed;
+                if (settleBudget > TimeSpan.Zero)
+                {
+                    _pumpCompleted.Task.Wait(settleBudget < PollInterval ? settleBudget : PollInterval);
+                }
+
+                if (_inbound.TryTake(out final, 0))
+                {
+                    return final;
+                }
+
                 // One poll interval of settle, so a line the child flushed on
                 // its way out is still taken — the same granularity the loop
                 // already waits at.
-                if (_inbound.TryTake(out var final, PollInterval))
+                if (_inbound.TryTake(out final, PollInterval))
                 {
                     return final;
                 }
@@ -1002,6 +1025,10 @@ public sealed class ExternalAgent : IAgent, IDisposable
         {
             // The pipe went away, or the collection was completed during teardown.
             // Either way there is no further line to read.
+        }
+        finally
+        {
+            _pumpCompleted.TrySetResult();
         }
     }
 

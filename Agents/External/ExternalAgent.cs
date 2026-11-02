@@ -115,6 +115,17 @@ public sealed class ExternalAgent : IAgent, IDisposable
     private readonly BlockingCollection<ReadOutcome> _inbound = new(boundedCapacity: 1);
     private readonly List<Task> _pumps = [];
     private readonly TaskCompletionSource _pumpCompleted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>
+    /// Inert regression seams, null in production. The pump invokes
+    /// <see cref="BeforeTerminalEnqueue"/> immediately before each terminal
+    /// enqueue (EOF or violation, never ordinary lines) and
+    /// <see cref="TerminalEnqueued"/> strictly after one lands;
+    /// <see cref="ExitBranchProbe"/> fires at the top of the exit branch.
+    /// </summary>
+    internal Action? BeforeTerminalEnqueue;
+    internal Action? TerminalEnqueued;
+    internal Action? ExitBranchProbe;
     private readonly Stopwatch _clock = new();
 
     /// <summary>
@@ -954,6 +965,8 @@ public sealed class ExternalAgent : IAgent, IDisposable
 
             if (exited)
             {
+                ExitBranchProbe?.Invoke();
+
                 // Consume any outcome already queued before awaiting pump
                 // completion, so a terminal enqueue that landed first is not
                 // discarded or overtaken (§8.4 precedence).
@@ -1007,7 +1020,9 @@ public sealed class ExternalAgent : IAgent, IDisposable
                 var line = ProtocolFraming.ReadLine(_stdout);
                 if (line is null)
                 {
+                    BeforeTerminalEnqueue?.Invoke();
                     _inbound.Add(ReadOutcome.OfClosed());
+                    TerminalEnqueued?.Invoke();
                     return;
                 }
 
@@ -1019,6 +1034,7 @@ public sealed class ExternalAgent : IAgent, IDisposable
         }
         catch (ProtocolViolation violation)
         {
+            BeforeTerminalEnqueue?.Invoke();
             TryAdd(ReadOutcome.OfViolation(violation));
         }
         catch (Exception e) when (e is IOException or ObjectDisposedException or InvalidOperationException)
@@ -1066,6 +1082,7 @@ public sealed class ExternalAgent : IAgent, IDisposable
         try
         {
             _inbound.Add(outcome);
+            TerminalEnqueued?.Invoke();
         }
         catch (Exception e) when (e is InvalidOperationException or ObjectDisposedException)
         {

@@ -121,6 +121,67 @@ public class CounterfactualEvaluatorTests
     }
 
     [Fact]
+    public void BranchingRecordingWithDynamicRules_HonorsTheRecordedTopology()
+    {
+        // A recording whose header carries a TimedPortcullisRule (choke 0 shut
+        // for ticks 1-5, open at tick 6, on the three-zone line). Branching at
+        // tick 2 with a Move across the choke must be refused in the fork —
+        // the portcullis is closed at fork tick 2 — so the follow-up collect
+        // fails and the fork runs to the 20-tick limit scoreless. If the fork
+        // ignored the header's rules (treated them as absent), the tick-2 Move
+        // would cross immediately and the tick-3 Collect would land, ending
+        // the fork at tick 3 with agent 0 the winner.
+        const ulong seed = 0xD3D3UL;
+        var config = new SimulationConfig(2, 20, TransitSpeed: 4);
+        var map = new MapGraph(
+            new[]
+            {
+                new Zone(0, new GridPoint(0, 0)),
+                new Zone(1, new GridPoint(0, 8)),
+                new Zone(2, new GridPoint(0, 16)),
+            },
+            new[] { new ResourceNode(0, 1, new GridPoint(0, 8)) },
+            new[]
+            {
+                new ChokePoint(0, 0, 1, MaxOccupancy: 1),
+                new ChokePoint(1, 1, 2),
+            });
+        var rules = new DynamicMapRuleSet(new IDynamicMapRule[]
+        {
+            new TimedPortcullisRule(ChokeId: 0, OpenTicks: 1, ClosedTicks: 5),
+        });
+
+        var recording = TrajectoryWriter.Record(
+            map, config, seed,
+            new[]
+            {
+                new[] { new AgentAction(ActionKind.Wait), new AgentAction(ActionKind.Wait) },
+                new[] { new AgentAction(ActionKind.Move, ZoneId: 1), new AgentAction(ActionKind.Wait) },
+                new[] { new AgentAction(ActionKind.Collect, ResourceId: 0), new AgentAction(ActionKind.Wait) },
+            },
+            new StringWriter(),
+            rules: rules);
+        Assert.NotNull(recording.Header.DynamicRules);
+        Assert.True(recording.Steps.Length >= 3, "fixture episode must have at least three recorded steps");
+
+        var result = CounterfactualEvaluator.Evaluate(
+            recording,
+            branchTick: 2,
+            alternativeTurns: new[]
+            {
+                new[] { new AgentAction(ActionKind.Move, ZoneId: 1), new AgentAction(ActionKind.Wait) },
+                new[] { new AgentAction(ActionKind.Collect, ResourceId: 0), new AgentAction(ActionKind.Wait) },
+            });
+
+        // The closed portcullis refused the tick-2 Move in the fork, so the
+        // collect never lands and the Wait filler runs the fork to MaxTicks.
+        Assert.Equal([0, 0], result.ForkedScores);
+        Assert.Equal([0, 0], result.ScoreDeltas);
+        Assert.Equal(20, result.ForkedSteps);
+        Assert.Equal(0, result.ForkedWinner);
+    }
+
+    [Fact]
     public void BranchTick_OutOfRange_Throws()
     {
         var recording = AnalyticsFixtures.Fixture1();

@@ -91,6 +91,17 @@ public class SimulateScenarioFileTests
     }
 
     [Fact]
+    public void RulesCannotBeCombinedWithAScenarioFile()
+    {
+        var (exit, _, stderr) = Run(
+            "simulate", "--seed", "42", "--rules", Committed("Tests", "fixtures", "golden_dynamic_rules.json"),
+            "--scenario", Committed("scenarios", "gated-vault-duel.json"));
+
+        Assert.NotEqual(0, exit);
+        Assert.Contains("--rules cannot be used with a scenario file", stderr, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void AnInvalidDescriptor_ExitsNonZeroAndNamesTheField()
     {
         var (exit, _, stderr) = Run(

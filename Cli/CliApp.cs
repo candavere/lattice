@@ -521,6 +521,12 @@ public static class CliApp
                 "--agent cannot be used with a scenario file: the roster is declared by the descriptor's 'Slots'.");
         }
 
+        if (flags.ContainsKey("--rules"))
+        {
+            throw new UsageError(
+                "--rules cannot be used with a scenario file: dynamic topology is not part of the descriptor schema in this release.");
+        }
+
         ScenarioDescriptor descriptor;
         string digest;
         try

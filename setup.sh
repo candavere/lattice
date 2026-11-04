@@ -371,7 +371,7 @@ launcher_install() {
   packdir="$(mktemp -d "${TMPDIR:-/tmp}/lattice-pack.XXXXXX")" || { launcher_unlock; trap - EXIT INT TERM; return 1; }
 
   echo "Packing the CLI (version $ver)..."
-  if ! dotnet pack Cli -c Release --output "$packdir"; then
+  if ! dotnet pack Cli -c Release --output "$packdir" --disable-build-servers; then
     echo "error: dotnet pack failed; removing only this run's temp pack folder." >&2
     rm -rf "$packdir"
     launcher_unlock; trap - EXIT INT TERM

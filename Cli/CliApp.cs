@@ -965,7 +965,8 @@ public static class CliApp
     /// recording. With <c>--verify</c> the exit code is 0 only when every
     /// recorded tick's serialized result matches; a divergence or structural
     /// defect returns a non-zero exit. Without <c>--verify</c> it re-serializes
-    /// the recording to stdout so a caller can inspect or re-host it.
+    /// the recording to stdout, or to the <c>--out</c> path when given, so a
+    /// caller can inspect or re-host it.
     /// </summary>
     private static int Replay(string[] args, TextWriter stdout, TextWriter stderr)
     {
@@ -981,6 +982,12 @@ public static class CliApp
 
             var (flags, positionals) = ParseFlags(args, "--trajectory", "--out");
             var trajectoryPath = CliInputResolution.ResolveReplayTrajectory(flags, positionals);
+
+            if (verify && flags.ContainsKey("--out"))
+            {
+                throw new UsageError(
+                    "--out cannot be combined with --verify: --verify emits no stdout artifact to redirect; its verdict goes to stderr.");
+            }
 
             TrajectoryRecording recording;
             using (var reader = new StreamReader(trajectoryPath))
@@ -1006,8 +1013,13 @@ public static class CliApp
 
             if (!verify)
             {
-                TrajectoryWriter.Write(recording, stdout);
-                return Success;
+                var reserialized = new StringBuilder();
+                using (var sink = new StringWriter(reserialized))
+                {
+                    TrajectoryWriter.Write(recording, sink);
+                }
+
+                return WriteOutput(flags, "--out", reserialized.ToString().TrimEnd(), stdout, stderr);
             }
 
             var hashed = recording.Steps.Count(step => step.StateHash is not null);

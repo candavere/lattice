@@ -748,6 +748,55 @@ public class CliIntegrationTests
     }
 
     [Fact]
+    public void Replay_Out_WritesReserializedRecordingToFile()
+    {
+        var trajectory = TempPath(".jsonl");
+        var output = TempPath(".jsonl");
+        try
+        {
+            Assert.Equal(0, Run("simulate", "--seed", "7", "--steps", "15", "--out", trajectory).ExitCode);
+
+            var (exit, stdout, stderr) = Run("replay", trajectory, "--out", output);
+
+            Assert.Equal(0, exit);
+            Assert.True(string.IsNullOrEmpty(stdout), $"expected empty stdout, got: {stdout}");
+            Assert.Contains($"wrote {output}", stderr);
+            Assert.True(File.Exists(output), "replay --out did not write the recording");
+            Assert.Equal(File.ReadAllText(trajectory), File.ReadAllText(output));
+        }
+        finally
+        {
+            File.Delete(trajectory);
+            if (File.Exists(output))
+            {
+                File.Delete(output);
+            }
+        }
+    }
+
+    [Fact]
+    public void Replay_VerifyWithOut_IsRefused()
+    {
+        var trajectory = TempPath(".jsonl");
+        var output = TempPath(".jsonl");
+        try
+        {
+            Assert.Equal(0, Run("simulate", "--seed", "7", "--steps", "15", "--out", trajectory).ExitCode);
+
+            var (exit, _, stderr) = Run("replay", trajectory, "--verify", "--out", output);
+
+            Assert.NotEqual(0, exit);
+            Assert.Contains("--verify", stderr);
+            Assert.Contains("emits no stdout artifact to redirect", stderr);
+            Assert.False(File.Exists(output));
+        }
+        finally
+        {
+            File.Delete(trajectory);
+        }
+    }
+
+    [Fact]
     public void Replay_Verify_CorruptedTrajectory_NonZeroExit()
     {
         var trajectory = TempPath(".jsonl");

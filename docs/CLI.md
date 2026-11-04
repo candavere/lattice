@@ -104,6 +104,9 @@ dotnet run -c Release --project Cli -- replay <path-to-trajectory.jsonl>
 
 # Replay with strict per-step serialized StepResult and state-digest verification
 dotnet run -c Release --project Cli -- replay <path-to-trajectory.jsonl> --verify
+
+# Write the re-serialized recording to a file instead of stdout (refused with --verify)
+dotnet run -c Release --project Cli -- replay <path-to-trajectory.jsonl> --out <path>
 ```
 
 `--verify` rebuilds the simulation state and dynamic topology rules from the

@@ -205,7 +205,8 @@ public static class CliApp
         Func<ulong, MapGraph> MapFactory,
         IReadOnlyList<IAgentFactory> Teams,
         string? AgentCommand,
-        int AgentStepTimeoutMs);
+        int AgentStepTimeoutMs,
+        string? ScenarioSha256 = null);
 
     /// <summary>
     /// The simulation parameters the <c>--min-fairness</c> gate runs its
@@ -1170,8 +1171,16 @@ public static class CliApp
             var (flags, positionals) = ParseFlags(
                 args,
                 "--seed-set", "--rollouts", "--seeds", "--out", "--commit", "--scenario",
-                "--agent-cmd", "--agent-step-timeout-ms");
+                "--agent-cmd", "--agent-step-timeout-ms", "--record-episodes");
             GuardNoPositionals(positionals);
+
+            // --record-episodes records the matches an external agent plays; an
+            // in-process evaluation produces no episodes to record, so the flag is
+            // refused rather than silently doing nothing.
+            if (flags.ContainsKey("--record-episodes") && !flags.ContainsKey("--agent-cmd"))
+            {
+                throw new UsageError("--record-episodes requires --agent-cmd: an in-process evaluation produces no episodes to record.");
+            }
             var seedSetText = flags.TryGetValue("--seed-set", out var setText)
                 ? setText.ToLowerInvariant()
                 : HeldOutSuite;
@@ -1239,7 +1248,9 @@ public static class CliApp
                 AgentCommand: flags.TryGetValue("--agent-cmd", out var commandText) ? commandText : null,
                 AgentStepTimeoutMs: flags.TryGetValue("--agent-step-timeout-ms", out var stepText)
                     ? ParseAgentStepTimeoutMs(stepText)
-                    : ExternalTimeLimits.DefaultStepTimeoutMs);
+                    : ExternalTimeLimits.DefaultStepTimeoutMs,
+                ScenarioSha256: BuiltInScenarioDigest(
+                    scenario == "standard" ? BuiltInScenarioCatalog.Standard : BuiltInScenarioCatalog.Bottleneck));
 
             return request.AgentCommand is null
                 ? EvaluateInProcess(request, flags, stdout, stderr)
@@ -1345,7 +1356,8 @@ public static class CliApp
             flags.TryGetValue("--agent-cmd", out var commandText) ? commandText : null,
             flags.TryGetValue("--agent-step-timeout-ms", out var stepText)
                 ? ParseAgentStepTimeoutMs(stepText)
-                : ExternalTimeLimits.DefaultStepTimeoutMs);
+                : ExternalTimeLimits.DefaultStepTimeoutMs,
+            ScenarioSha256: digest);
 
         return request.AgentCommand is null
             ? EvaluateInProcess(request, flags, stdout, stderr)
@@ -1432,6 +1444,16 @@ public static class CliApp
         TextWriter stdout,
         TextWriter stderr)
     {
+        // --record-episodes: the recordings are evidence, so the directory is
+        // validated and every path the run could write is checked before a
+        // single match is played -- a run that would overwrite an existing
+        // recording never starts, and no faulted match is left half-recorded.
+        var recordDir = flags.TryGetValue("--record-episodes", out var recordDirText) ? recordDirText : null;
+        if (recordDir is not null)
+        {
+            PrepareEpisodeRecording(recordDir, request);
+        }
+
         var argv = AgentCommandLine.Require(request.AgentCommand);
         if (!AgentProgramResolver.TryResolve(argv[0], out var program, out var resolutionFailure))
         {
@@ -1472,7 +1494,7 @@ public static class CliApp
                 var map = request.MapFactory(seed);
                 foreach (var externalSlot in new[] { 0, 1 })
                 {
-                    results.Add(PlayExternalMatch(
+                    var result = PlayExternalMatch(
                         request,
                         map,
                         launch,
@@ -1481,7 +1503,13 @@ public static class CliApp
                         seed,
                         maxSteps,
                         limits,
-                        baseline));
+                        baseline);
+                    if (recordDir is not null)
+                    {
+                        RecordExternalEpisode(recordDir, request, map, result, externalName, baseline.Name, seed, externalSlot, stderr);
+                    }
+
+                    results.Add(result);
                 }
             }
 
@@ -1539,6 +1567,88 @@ public static class CliApp
             AgentForfeits: forfeits.Count == 0 ? null : [.. forfeits]);
         var json = JsonArtifact.SerializeIndented(artifact);
         return WriteOutput(flags, "--out", json, stdout, stderr);
+    }
+
+    /// <summary>
+    /// Creates the <c>--record-episodes</c> directory if it is missing and
+    /// refuses to start the run when any path a completed match would write
+    /// already exists. Every (seed, seat) pair the run can produce is checked
+    /// up front, so the refusal never lands after a match has already been
+    /// played, and a recording that exists is never overwritten.
+    /// </summary>
+    private static void PrepareEpisodeRecording(string recordDir, EvaluateRequest request)
+    {
+        Directory.CreateDirectory(recordDir);
+        var existing = new List<string>();
+        foreach (var suite in request.Suites)
+        {
+            foreach (var seed in EvaluationSeeds(suite).Take(request.SeedCap))
+            {
+                foreach (var slot in new[] { 0, 1 })
+                {
+                    var target = EpisodeRecordingPath(recordDir, seed, slot);
+                    if (File.Exists(target))
+                    {
+                        existing.Add(target);
+                    }
+                }
+            }
+        }
+
+        if (existing.Count > 0)
+        {
+            throw new IOException(
+                $"--record-episodes: refusing to overwrite existing recording(s): {string.Join(", ", existing)}");
+        }
+    }
+
+    private static string EpisodeRecordingPath(string recordDir, ulong seed, int slot) =>
+        Path.Combine(recordDir, $"evaluate-seed{seed}-seat{slot}.jsonl");
+
+    /// <summary>
+    /// Writes one match's episode as a trajectory JSONL — the same
+    /// <see cref="TrajectoryWriter.Record"/> path <c>simulate</c> uses — or names
+    /// the match as skipped when it carries no episode, which is the faulted
+    /// match case: nothing is written and the skip is said out loud rather
+    /// than silently producing nothing. The write is CREATE_NEW, so a file
+    /// that appeared since the pre-flight is an error rather than an
+    /// overwrite.
+    /// </summary>
+    private static void RecordExternalEpisode(
+        string recordDir,
+        EvaluateRequest request,
+        MapGraph map,
+        ExternalMatchResult result,
+        string externalName,
+        string baselineName,
+        ulong seed,
+        int externalSlot,
+        TextWriter stderr)
+    {
+        var path = EpisodeRecordingPath(recordDir, seed, externalSlot);
+        if (result.Episode is null)
+        {
+            stderr.WriteLine($"skipped recording {path}: match produced no episode");
+            return;
+        }
+
+        var roles = new string[EvaluationSimulationConfig.AgentCount];
+        roles[result.ExternalSlot] = externalName;
+        roles[1 - result.ExternalSlot] = baselineName;
+
+        using (var sink = new StreamWriter(new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None)))
+        {
+            TrajectoryWriter.Record(
+                map,
+                EvaluationSimulationConfig,
+                seed,
+                result.Episode.Turns,
+                sink,
+                agentRoles: roles,
+                scenarioSha256: request.ScenarioSha256);
+        }
+
+        stderr.WriteLine($"wrote {path}");
     }
 
     /// <summary>
@@ -1958,13 +2068,18 @@ public static class CliApp
         sink.WriteLine("            family with capacity-1 choke bottlenecks, so transit denials and claim");
         sink.WriteLine("            races surface non-zero contention; '--out' writes the machine-readable");
         sink.WriteLine("            per-seed + statistics artifact");
-        sink.WriteLine("  evaluate  --agent-cmd \"<command line>\" [--agent-step-timeout-ms <n>] [--seed-set dev|heldout] [--seeds <n>] [--scenario standard|bottleneck] [--out <file>] [--commit <sha>]");
+        sink.WriteLine("  evaluate  --agent-cmd \"<command line>\" [--agent-step-timeout-ms <n>] [--seed-set dev|heldout] [--seeds <n>] [--scenario standard|bottleneck] [--out <file>] [--commit <sha>] [--record-episodes <dir>]");
         sink.WriteLine("            Score an external agent process as the candidate, in the seat MCTS would");
         sink.WriteLine("            take and against the same Scout baseline, with identical statistics;");
         sink.WriteLine("            the command line is split without a shell (double quotes group, so a path");
         sink.WriteLine("            with spaces must be quoted) and a program that cannot be run exits 2 with");
         sink.WriteLine("            nothing written. '--agent-step-timeout-ms' (default 5000) is the per-step");
-        sink.WriteLine("            budget; the match budget is computed from it");
+        sink.WriteLine("            budget; the match budget is computed from it. '--record-episodes <dir>'");
+        sink.WriteLine("            writes each completed match's episode as a trajectory JSONL at");
+        sink.WriteLine("            '<dir>/evaluate-seed<seed>-seat<slot>.jsonl' (the same path 'simulate'");
+        sink.WriteLine("            records); the directory is created if missing, an existing target file is");
+        sink.WriteLine("            an error before any match is played, and a faulted match writes nothing");
+        sink.WriteLine("            and is named as skipped on stderr");
         sink.WriteLine();
         sink.WriteLine("  validate-scenario <file>");
         sink.WriteLine("            Check a declarative scenario descriptor and report its id, SHA-256,");

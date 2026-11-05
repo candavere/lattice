@@ -425,6 +425,134 @@ public class EvaluateAgentCmdTests
         }
     }
 
+    [Fact(Timeout = TestTimeoutMs)]
+    public async Task RecordEpisodes_Writes_One_Jsonl_Per_Completed_Match_And_Replay_Verify_Passes()
+    {
+        var dir = EpisodeDir();
+        try
+        {
+            var (exit, _, stderr) = await Task.Run(() => Run(
+                "evaluate",
+                "--scenario", "standard",
+                "--seed-set", "dev",
+                "--seeds", "1",
+                "--rollouts", "2",
+                "--agent-cmd", AgentCommand("conform"),
+                "--agent-step-timeout-ms", "2000",
+                "--record-episodes", dir));
+
+            Assert.Equal(0, exit);
+
+            // One mirrored seating per seat on the one dev seed produced a
+            // recording each, under the documented name.
+            var expected = new[]
+            {
+                Path.Combine(dir, "evaluate-seed1001-seat0.jsonl"),
+                Path.Combine(dir, "evaluate-seed1001-seat1.jsonl"),
+            };
+            Assert.Equal(expected.Order(StringComparer.Ordinal), Directory.GetFiles(dir, "*.jsonl").Order(StringComparer.Ordinal));
+
+            foreach (var file in expected)
+            {
+                Assert.True(File.Exists(file), $"no recording at {file}.");
+                var (verifyExit, _, verifyStderr) = Run("replay", file, "--verify");
+                Assert.Equal(0, verifyExit);
+                Assert.Contains("replay verified", verifyStderr, StringComparison.Ordinal);
+            }
+
+            // One run never targets the same path twice: every advertised write
+            // names a distinct file.
+            var wroteLines = stderr
+                .Split('\n')
+                .Select(line => line.TrimEnd('\r'))
+                .Where(line => line.StartsWith("wrote ", StringComparison.Ordinal))
+                .Select(line => line.Substring("wrote ".Length).Trim())
+                .ToArray();
+            Assert.Equal(2, wroteLines.Length);
+            Assert.Equal(2, wroteLines.Distinct(StringComparer.Ordinal).Count());
+        }
+        finally
+        {
+            if (Directory.Exists(dir))
+            {
+                Directory.Delete(dir, recursive: true);
+            }
+        }
+    }
+
+    [Fact(Timeout = TestTimeoutMs)]
+    public async Task RecordEpisodes_Fails_Closed_Naming_The_Existing_File_On_A_Second_Run()
+    {
+        var dir = EpisodeDir();
+        Directory.CreateDirectory(dir);
+        var existing = Path.Combine(dir, "evaluate-seed1001-seat0.jsonl");
+        File.WriteAllText(existing, "sentinel\n");
+        try
+        {
+            var (exit, _, stderr) = await Task.Run(() => Run(
+                "evaluate",
+                "--scenario", "standard",
+                "--seed-set", "dev",
+                "--seeds", "1",
+                "--rollouts", "2",
+                "--agent-cmd", AgentCommand("conform"),
+                "--agent-step-timeout-ms", "2000",
+                "--record-episodes", dir));
+
+            Assert.NotEqual(0, exit);
+            Assert.Contains("evaluate-seed1001-seat0.jsonl", stderr, StringComparison.Ordinal);
+
+            // Recordings are evidence: the pre-existing file is never overwritten,
+            // and the run that would have overwritten it produced no other files.
+            Assert.Equal("sentinel\n", File.ReadAllText(existing));
+            Assert.Equal(new[] { existing }, Directory.GetFiles(dir, "*.jsonl"));
+        }
+        finally
+        {
+            if (Directory.Exists(dir))
+            {
+                Directory.Delete(dir, recursive: true);
+            }
+        }
+    }
+
+    [Fact(Timeout = TestTimeoutMs)]
+    public async Task RecordEpisodes_Skips_A_Faulted_Match_And_Names_It_On_Stderr()
+    {
+        var dir = EpisodeDir();
+        try
+        {
+            // A crashed agent is a result, not a CLI error, and its matches carry
+            // no episode: nothing is recorded, and the skip is said out loud.
+            var (exit, _, stderr) = await Task.Run(() => Run(
+                "evaluate",
+                "--scenario", "standard",
+                "--seed-set", "dev",
+                "--seeds", "1",
+                "--rollouts", "2",
+                "--agent-cmd", AgentCommand("crash"),
+                "--agent-step-timeout-ms", "2000",
+                "--record-episodes", dir));
+
+            Assert.Equal(0, exit);
+            Assert.Empty(Directory.GetFiles(dir, "*.jsonl"));
+            Assert.Contains("skipped", stderr, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(dir))
+            {
+                Directory.Delete(dir, recursive: true);
+            }
+        }
+    }
+
+    /// <summary>
+    /// A fresh, non-existent recordings directory per test; the flag creates it.
+    /// </summary>
+    private static string EpisodeDir() =>
+        Path.Combine(Path.GetTempPath(), $"lattice-record-episodes-{Guid.NewGuid():N}");
+
     /// <summary>
     /// The stub as one command line: the dotnet host, then the stub's own path as a
     /// quoted argument, then the mode. The quoting is not decoration — the test

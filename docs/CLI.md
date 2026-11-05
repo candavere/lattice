@@ -358,6 +358,7 @@ header. The contract is exact:
 | `--out <file>` | Write the JSON artifact to a file instead of stdout |
 | `--agent-cmd "<command line>"` | Score an external agent process as the candidate (see below) |
 | `--agent-step-timeout-ms <n>` | External agents only: the per-step budget; default 5000. Accepted but unused without `--agent-cmd` |
+| `--record-episodes <dir>` | External agents only: write each completed match's episode as trajectory JSONL under `<dir>` (see below). Requires `--agent-cmd` |
 
 ```sh
 dotnet run --project Cli -- evaluate --seed-set dev,heldout --rollouts 32 --out benchmarks/mcts_evaluation_results.json
@@ -385,6 +386,25 @@ could not be compared with a published study.
 ```sh
 dotnet run --project Cli -- evaluate --scenario standard --seed-set dev --seeds 30 --agent-cmd "python3 examples/python/lattice_agent.py"
 ```
+
+`--record-episodes <dir>` records what the external agent actually played. For
+every match whose episode exists, the CLI writes the match as a trajectory JSONL
+via the same `TrajectoryWriter.Record` path `simulate` uses — the map the match
+ran, `EvaluationSimulationConfig` (`AgentCount: 2, MaxTicks: 200, TransitSpeed:
+4`), the built-in digest of the scenario under evaluation as `ScenarioSha256`
+(`collection-skirmish` for `standard`, `bottleneck-contention` for `bottleneck`,
+or the descriptor's digest when the scenario came from a file), and
+`AgentRoles` naming the external seat (`external:<program>`) and the baseline.
+The file is named `<dir>/evaluate-seed<seed>-seat<slot>.jsonl` with `<slot>` the
+external agent's seat, one file per completed match, so a `--seeds 1` run on the
+dev suite produces two files. A faulted match carries no episode: nothing is
+written for it and the skip is named on stderr. The directory is created if
+missing; if any target file already exists the run refuses to start — no match
+is played, the existing file is named, and the exit status is non-zero — because
+a recording is evidence and is never silently overwritten. Each written file
+passes `replay --verify`, exactly as any `simulate` recording does. The flag
+requires `--agent-cmd`: an in-process evaluation produces no episodes to
+record.
 
 The value is a command line, split **without a shell**: unquoted whitespace
 separates, a double quote groups, and a backslash escapes only `"` and `\` inside

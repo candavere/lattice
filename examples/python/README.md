@@ -1,11 +1,47 @@
 # A Lattice external agent in Python
 
-`lattice_agent.py` is a complete, conformant
-[external agent](../../docs/EXTERNAL_AGENT_PROTOCOL.md) in about 150 lines of
-standard-library Python.
-It is here for two reasons: so the protocol has a worked example that is not
-written by the same people who wrote the parser, and so you have something to run
-before you write your own.
+This directory holds two external agents, both conformant to the
+[external agent protocol](../../docs/EXTERNAL_AGENT_PROTOCOL.md), standard library
+only, Python 3.8+.
+
+`lattice_agent.py` is a complete rule-based agent in about 150 lines. It is here
+so the protocol has a worked example that is not written by the same people who
+wrote the parser, and so you have something to run before you write your own.
+
+`lattice_model_agent.py` is a thin model adapter: per observation it asks an
+OpenAI-compatible chat-completions endpoint for one action, validates the reply
+against the adapter-internal model-reply shape, and translates it into the wire
+envelope. It never guesses — any failure (endpoint error, timeout, malformed
+reply, malformed protocol input) is one stderr line and a non-zero exit, and the
+match is scored a loss. It is for scoring a model as a player, not for shipping
+a policy.
+
+## Running the model adapter
+
+```sh
+dotnet run --project Cli -- evaluate --scenario standard --seed-set dev --seeds 1 \
+  --agent-cmd "python3 examples/python/lattice_model_agent.py \
+    --endpoint http://127.0.0.1:11434/v1/chat/completions \
+    --model my-model --prompt-version v1"
+```
+
+| Flag | Meaning |
+| :--- | :--- |
+| `--endpoint <url>` | Required. The full URL of the chat-completions path |
+| `--model <id>` | Required. The model id sent in the request |
+| `--api-key-env <var>` | The API key is read from this environment variable — never argv, the URL, logs or the sidecar. If the variable is unset the adapter exits non-zero before the handshake |
+| `--temperature` | Default 0 |
+| `--request-timeout-ms` | Default 1500. One retry is allowed on a timeout, and only if it fits the step budget Lattice offered in `hello.limits` |
+| `--prompt-version <id>` | Required. Bump when the prompt template changes |
+| `--sidecar <path>` | Optional. One JSON object at startup: endpoint host, model, temperature, prompt version, parser version. Never the key |
+
+The model-reply shape the adapter accepts, and the prompt template demands, is
+`{"action":"wait"}`, `{"action":"move","zone_id":N}` or
+`{"action":"collect","resource_id":N}` with exact key sets and integer ids inside
+the observation's ranges; anything else is a parse failure. A mid-crossing
+observation (`transit` set) is answered with `Wait` without calling the model.
+
+## The rule-based agent
 
 It needs **Python 3.8 or newer** and nothing else — no packages, no virtual
 environment, no build step. It is launched by Lattice as a child process and

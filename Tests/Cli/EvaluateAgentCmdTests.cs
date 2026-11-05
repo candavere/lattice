@@ -1,7 +1,11 @@
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
 using System.Text.Json;
 using Lattice.Cli;
 using Lattice.Tests.Agents.External;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Lattice.Tests.Cli;
 
@@ -35,6 +39,10 @@ public class EvaluateAgentCmdTests
     /// dotnet-hosted child processes on a cold machine.
     /// </summary>
     private const int TestTimeoutMs = 60_000;
+
+    private readonly ITestOutputHelper _output;
+
+    public EvaluateAgentCmdTests(ITestOutputHelper output) => _output = output;
 
     [Fact(Timeout = TestTimeoutMs)]
     public async Task A_Conforming_External_Agent_Produces_A_Study_And_An_Artifact()
@@ -547,11 +555,187 @@ public class EvaluateAgentCmdTests
         }
     }
 
+    [Fact(Timeout = TestTimeoutMs)]
+    public async Task RecordEpisodes_Mock_Model_Adapter_End_To_End_And_Replay_Verifies()
+    {
+        // The shipped model adapter, a real CLI, a stub chat-completions endpoint:
+        // the adapter's whole path (hello, per-observation model call, reply
+        // validation, wire envelope) runs for real, against an endpoint that always
+        // answers a legal Wait.
+        var python = ResolvePython();
+        if (python is null)
+        {
+            _output.WriteLine(
+                "SKIPPED: no Python interpreter on PATH on this machine, so the model adapter cannot be " +
+                "exercised here. The recording path itself is covered by the stub-agent tests above.");
+            return;
+        }
+
+        var adapter = Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory, "..", "..", "..", "..", "examples", "python", "lattice_model_agent.py"));
+        Assert.True(File.Exists(adapter), $"the model adapter was not found at '{adapter}'.");
+
+        var dir = EpisodeDir();
+        var outPath = Path.Combine(Path.GetTempPath(), $"lattice-mock-e2e-{Guid.NewGuid():N}.json");
+        using var stub = new StubChatCompletionsServer();
+        try
+        {
+            var (exit, _, stderr) = await Task.Run(() => Run(
+                "evaluate",
+                "--scenario", "standard",
+                "--seed-set", "dev",
+                "--seeds", "1",
+                "--rollouts", "2",
+                "--agent-step-timeout-ms", "5000",
+                "--agent-cmd",
+                $"\"{python}\" \"{adapter}\" --endpoint http://127.0.0.1:{stub.Port}/v1/chat/completions --model stub --prompt-version v1",
+                "--record-episodes", dir,
+                "--out", outPath));
+
+            Assert.Equal(0, exit);
+
+            var files = Directory.GetFiles(dir, "*.jsonl");
+            Assert.Equal(2, files.Length);
+            foreach (var file in files)
+            {
+                var (verifyExit, _, verifyStderr) = Run("replay", file, "--verify");
+                Assert.Equal(0, verifyExit);
+                Assert.Contains("replay verified", verifyStderr, StringComparison.Ordinal);
+            }
+
+            Assert.True(stub.Requests >= 2, "the adapter reached the stub endpoint at least once per match.");
+        }
+        finally
+        {
+            File.Delete(outPath);
+            if (Directory.Exists(dir))
+            {
+                Directory.Delete(dir, recursive: true);
+            }
+        }
+    }
+
     /// <summary>
     /// A fresh, non-existent recordings directory per test; the flag creates it.
     /// </summary>
     private static string EpisodeDir() =>
         Path.Combine(Path.GetTempPath(), $"lattice-record-episodes-{Guid.NewGuid():N}");
+
+    /// <summary>
+    /// The interpreter, resolved the same way the CLI resolves an agent program,
+    /// or <see langword="null"/> when this machine has none.
+    /// </summary>
+    private static string? ResolvePython()
+    {
+        foreach (var candidate in new[] { "python3", "python" })
+        {
+            if (AgentProgramResolver.TryResolve(candidate, out var resolved, out _))
+            {
+                return resolved;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// A stub OpenAI-compatible chat-completions endpoint on 127.0.0.1: every POST
+    /// is answered with a legal model reply (`{"action":"wait"}`), which the
+    /// adapter must translate into a wire Wait. Requests are counted so the test
+    /// can see the endpoint was actually reached.
+    /// </summary>
+    private sealed class StubChatCompletionsServer : IDisposable
+    {
+        private readonly HttpListener _listener;
+        private readonly Thread _thread;
+        private volatile bool _stop;
+        private int _requests;
+
+        public StubChatCompletionsServer()
+        {
+            using var probe = new TcpListener(IPAddress.Loopback, 0);
+            probe.Start();
+            Port = ((IPEndPoint)probe.LocalEndpoint).Port;
+            probe.Stop();
+
+            _listener = new HttpListener();
+            _listener.Prefixes.Add($"http://127.0.0.1:{Port}/");
+            _listener.Start();
+            _thread = new Thread(AcceptLoop) { IsBackground = true };
+            _thread.Start();
+        }
+
+        public int Port { get; }
+
+        public int Requests => _requests;
+
+        private void AcceptLoop()
+        {
+            while (!_stop)
+            {
+                HttpListenerContext context;
+                try
+                {
+                    context = _listener.GetContext();
+                }
+                catch (Exception) when (_stop)
+                {
+                    return;
+                }
+                catch (Exception)
+                {
+                    return;
+                }
+
+                try
+                {
+                    using (var reader = new StreamReader(context.Request.InputStream, Encoding.UTF8))
+                    {
+                        _ = reader.ReadToEnd();
+                    }
+
+                    Interlocked.Increment(ref _requests);
+
+                    var content = "{\"action\":\"wait\"}";
+                    var payload = "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":"
+                        + JsonSerializer.Serialize(content) + "}}]}";
+                    var bytes = Encoding.UTF8.GetBytes(payload);
+                    context.Response.StatusCode = 200;
+                    context.Response.ContentType = "application/json";
+                    context.Response.ContentLength64 = bytes.Length;
+                    context.Response.OutputStream.Write(bytes, 0, bytes.Length);
+                    context.Response.OutputStream.Close();
+                }
+                catch (Exception)
+                {
+                    try
+                    {
+                        context.Response.Abort();
+                    }
+                    catch (Exception)
+                    {
+                        // nothing left to tell the caller
+                    }
+                }
+            }
+        }
+
+        public void Dispose()
+        {
+            _stop = true;
+            try
+            {
+                _listener.Stop();
+            }
+            catch (Exception)
+            {
+                // already down
+            }
+
+            _listener.Close();
+            _thread.Join(TimeSpan.FromSeconds(5));
+        }
+    }
 
     /// <summary>
     /// The stub as one command line: the dotnet host, then the stub's own path as a

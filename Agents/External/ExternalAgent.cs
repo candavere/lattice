@@ -773,13 +773,13 @@ public sealed class ExternalAgent : IAgent, IDisposable
 
         Task write;
         // The in-flight count is incremented synchronously, before the task is
-        // queued: between Task.Run and the pool running the body, Dispose could
+        // started: between starting it and its body running, Dispose could
         // otherwise read zero and close stdin under an about-to-start write —
         // the exact hazard the count exists to prevent.
         Interlocked.Increment(ref _writesInFlight);
         try
         {
-            write = Task.Run(() =>
+            write = Task.Factory.StartNew(() =>
             {
                 try
                 {
@@ -791,7 +791,7 @@ public sealed class ExternalAgent : IAgent, IDisposable
                 {
                     Interlocked.Decrement(ref _writesInFlight);
                 }
-            });
+            }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
         }
         catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException)
         {

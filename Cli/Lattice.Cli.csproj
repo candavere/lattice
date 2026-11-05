@@ -54,7 +54,7 @@
     <PropertyGroup>
       <_SourceCommit Condition="'$(_SourceCommit)' == ''">unknown</_SourceCommit>
     </PropertyGroup>
-    <Exec Command="printf '%s\n' 'namespace Lattice.Cli { internal static class BuildIdentity { public const string Commit = &quot;$(_SourceCommit)&quot;; } }' &gt; &quot;$(IntermediateOutputPath)BuildIdentity.g.cs&quot;" />
+    <WriteLinesToFile File="$(IntermediateOutputPath)BuildIdentity.g.cs" Overwrite="true" Lines="namespace Lattice.Cli { internal static class BuildIdentity { public const string Commit = &quot;$(_SourceCommit)&quot;%3B } }" />
     <ItemGroup>
       <Compile Include="$(IntermediateOutputPath)BuildIdentity.g.cs" />
     </ItemGroup>

@@ -50,7 +50,7 @@ public class ExternalMatchFailureRecordTests
             baseline: new CollectOnceAgent(1),
             Seed,
             maxSteps: MaxTicks,
-            limits: ExternalAgentTestHost.Budget(stepTimeoutMs: 400, MaxTicks, slackMs: 1_000)));
+            limits: ExternalAgentTestHost.StandardBudget(MaxTicks)));
 
         Assert.Equal(ProtocolReason.TimeoutStep, result.Fault!.Reason);
 
@@ -194,7 +194,7 @@ public class ExternalMatchFailureRecordTests
             baseline: new AlwaysWaitAgent(0),
             Seed,
             maxSteps: MaxTicks,
-            limits: ExternalAgentTestHost.Budget(stepTimeoutMs: 400, MaxTicks, slackMs: 1_000)));
+            limits: ExternalAgentTestHost.StandardBudget(MaxTicks)));
 
         Assert.Equal(ProtocolReason.TimeoutStep, result.Fault!.Reason);
         Assert.Equal(MatchOutcome.TeamBWin, result.ExternalOutcome);

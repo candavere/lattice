@@ -72,7 +72,7 @@ TRANSIT_OBSERVATION = {
     "step_number": 3,
 }
 
-SECRET = "sk-test-SECRETVALUE-0123456789"
+SECRET = "TEST-ONLY-NOT-A-SECRET-PLACEHOLDER"
 
 
 def hello_line(step_timeout_ms=5000):

@@ -460,3 +460,21 @@ followed by a `decision` line carrying the same verdict string the in-process
 study records under `Decision` in its artifact — the same analyzer's words, not a
 second phrasing of them. If voids leave fewer than 30 valid seeds the run is "Not
 graded", and the summary says that the exclusion is why.
+
+## Acceptance report for the external-agent path
+
+`scripts/acceptance_v4.sh [OUT_DIR]` runs the checks that back the bring-your-own-model adapter (`examples/python/lattice_model_agent.py`) and writes `ACCEPTANCE.md` into a new evidence directory (default `.evidence/acceptance-v4-<UTC>`; an existing directory is refused, nothing is overwritten). Each slice is recorded as `works`, `broken` or `not-tested` with its command, exit code and evidence file. The script stops at the first `broken` slice and records the rest as `not-tested: not reached`. It does not restore packages (`--no-restore`), so it makes no network use.
+
+| Slice | What it checks |
+| :--- | :--- |
+| S1 | Tracked tree clean (or only this script and this docs section differ, before they are committed); author and committer of every commit after `eb13fad` are the project identity |
+| S2, S3 | `dotnet build --no-restore`; `dotnet test --no-build` (counts recorded, not asserted) |
+| S4 | Adapter unit tests (stub endpoint, no network beyond loopback) |
+| S5, S6 | Reference-agent match with `--record-episodes`; `replay --verify` on each recording |
+| S7, S8, S9 | Expected-negative checks: overwrite refusal (exit 1), `--record-episodes` without `--agent-cmd` (exit 2), unset `--api-key-env` variable fails closed (exit 1, empty stdout, one documented stderr line) |
+| S10 | Local model match on a loopback endpoint you started (2 completed matches, no void runs or agent failures, recordings replay-verified) (`LATTICE_ACCEPT_LOCAL_ENDPOINT`, `LATTICE_ACCEPT_LOCAL_MODEL`, optional `LATTICE_ACCEPT_STEP_MS`); `not-tested` otherwise. A non-loopback endpoint is refused |
+| S11 | Hosted model match: always `not-tested` here; it needs a provider and cost terms chosen by a person |
+| S12 | Token-shaped secret scan of tracked files and the net `eb13fad..HEAD` diff (per-commit history is not covered); paths and pattern names only |
+| S13 | Fixture-literal classification: always `not-tested`; it is a human decision |
+
+A passing report shows that the checked plumbing works. It does not show that a real model plays well, and the report never states that v4 is usable.

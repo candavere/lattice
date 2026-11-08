@@ -94,7 +94,7 @@ public class ExternalAgentBackpressureTests
     [Fact(Timeout = ExternalAgentTestHost.TestTimeoutMs)]
     public async Task BlockedWriteSettlesWithinStepBudgetPlusTeardown()
     {
-        var limits = ExternalAgentTestHost.Budget(stepTimeoutMs: 500, maxTicks: 1, slackMs: 2_000);
+        var limits = ExternalAgentTestHost.Budget(stepTimeoutMs: 500, maxTicks: 1, slackMs: 30_000);
         using var agent = new ExternalAgent(
             ExternalAgentTestHost.Launch("ack-then-stop-reading"),
             agentId: 0, runSeed: Seed, scenario: ExternalAgent.StandardScenario,

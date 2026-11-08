@@ -408,6 +408,9 @@ completed local-model S10 result, the closed S13 fixture classification
 fixture is the obvious `TEST-ONLY` placeholder), and the hosted-model S11
 slice, which remains NOT TESTED pending separate approval.
 
+The full gate-by-gate status, including what remains NOT TESTED, is in
+[`docs/V4_CANDIDATE_ACCEPTANCE.md`](docs/V4_CANDIDATE_ACCEPTANCE.md).
+
 ### The gates, and where the code is authoritative
 
 Where this page describes a gate, the code is authoritative and the reference

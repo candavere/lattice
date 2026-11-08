@@ -55,6 +55,20 @@ An endpoint error never retries. A timeout after the permitted retry is a
 failure like any other: one stderr line, non-zero exit.
 
 Stderr is diagnostic only; stdout is the protocol.
+
+Acceptance mode (opt-in, OFF by default): with --acceptance-ledger PATH
+(and optional --acceptance-max-attempts N, default 400, max 400), every
+HTTP attempt — retries included — is reserved in a durable JSON ledger
+shared by both seat processes at the same PATH, before it is sent. A
+reserved slot is never reclaimed after a crash. HTTP 401/403/429 marks
+the run stopped so no later process sends. Mutual exclusion is taken on a
+stable PATH.lock sidecar (the ledger itself is replaced atomically, which
+would swap the inode an flock is held on). The ledger records the
+requested model id and the server-reported response.model (or null when
+missing/malformed) per attempt, plus HTTP status and error class; it
+never records credentials, headers, env values or raw responses, and it
+lives wherever the caller points it (keep it outside public source).
+Without --acceptance-ledger, default behavior and timing are unchanged.
 """
 
 import argparse
@@ -175,10 +189,239 @@ def parse_args(argv):
         help="write the comparability tuple (endpoint host, model, temperature, "
         "prompt version, parser version) here at startup",
     )
+    parser.add_argument(
+        "--reasoning-effort",
+        choices=("none", "low", "medium", "high"),
+        default=None,
+        help="OPT-IN: include reasoning_effort in the request body (for "
+        "reasoning models that reject temperature at nonzero effort). "
+        "Omitted from the request when unset.",
+    )
+    parser.add_argument(
+        "--max-completion-tokens",
+        type=int,
+        default=None,
+        help="OPT-IN: include max_completion_tokens in the request body to "
+        "cap billed output tokens (reasoning tokens included). Omitted when unset.",
+    )
+    parser.add_argument(
+        "--max-request-bytes",
+        type=int,
+        default=None,
+        help="OPT-IN: refuse to send and fail closed when the serialized "
+        "request body would exceed this many bytes. Off by default.",
+    )
+    parser.add_argument(
+        "--acceptance-ledger",
+        default=None,
+        help="OPT-IN acceptance mode: durable attempt ledger at this path. "
+        "Both seat processes of an acceptance pair must be given the SAME "
+        "path. Off by default; default behavior is unchanged when absent.",
+    )
+    parser.add_argument(
+        "--acceptance-max-attempts",
+        type=int,
+        default=400,
+        help="global HTTP attempt cap in acceptance mode (default 400). "
+        "Counts every request, retries included, across processes.",
+    )
     args = parser.parse_args(argv)
     if args.request_timeout_ms < 1:
         parser.error("--request-timeout-ms must be a positive integer")
+    if args.acceptance_max_attempts < 1:
+        parser.error("--acceptance-max-attempts must be a positive integer")
+    if args.acceptance_max_attempts > 400:
+        parser.error("--acceptance-max-attempts must not exceed 400")
+    if args.acceptance_ledger is None and "--acceptance-max-attempts" in argv:
+        parser.error("--acceptance-max-attempts requires --acceptance-ledger")
+    if args.max_completion_tokens is not None and args.max_completion_tokens < 1:
+        parser.error("--max-completion-tokens must be a positive integer")
+    if args.max_request_bytes is not None and args.max_request_bytes < 1:
+        parser.error("--max-request-bytes must be a positive integer")
     return args
+
+
+FATAL_HTTP_STATUSES = (401, 403, 429)
+ACCEPTANCE_LOCK_WAIT_S = 30.0
+
+
+class AcceptanceStopped(Exception):
+    pass
+
+
+class AcceptanceRefused(Exception):
+    pass
+
+
+class _LedgerLock:
+    """Bounded exclusive cross-process lock via fcntl.flock on a sidecar file.
+
+    The lock is taken on "<ledger path>.lock", never on the ledger itself:
+    the ledger is rewritten by atomic replace, which swaps its inode, and an
+    flock held on the old inode does not exclude a process that opens the path
+    after the replace. The sidecar is created once and never replaced or
+    unlinked, so its inode is stable and the exclusion is real.
+
+    Crash behaviour: the lock is advisory on the open file descriptor and is
+    released by the OS when the holding process exits, so an abandoned lock
+    cannot deadlock a later process. Wait is bounded (no infinite spin).
+    fcntl is POSIX-only; acceptance mode is therefore POSIX-only and fails
+    closed where flock is unavailable, while default mode never imports it.
+    """
+
+    def __init__(self, path):
+        self._path = path + ".lock"
+        self._fd = None
+
+    def __enter__(self):
+        try:
+            import fcntl
+        except ImportError:
+            raise AcceptanceRefused(
+                "acceptance mode requires POSIX file locking (fcntl); refusing"
+            )
+        deadline = time.monotonic() + ACCEPTANCE_LOCK_WAIT_S
+        while True:
+            self._fd = os.open(self._path, os.O_RDWR | os.O_CREAT, 0o600)
+            try:
+                fcntl.flock(self._fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                self._fcntl = fcntl
+                return self
+            except OSError:
+                os.close(self._fd)
+                self._fd = None
+                if time.monotonic() >= deadline:
+                    raise AcceptanceRefused(
+                        "acceptance ledger lock wait exceeded 30s; refusing to proceed"
+                    )
+                time.sleep(0.05)
+
+    def __exit__(self, *exc):
+        if self._fd is not None:
+            try:
+                getattr(self, "_fcntl", None)  # locked below if present
+                import fcntl as _fcntl
+
+                _fcntl.flock(self._fd, _fcntl.LOCK_UN)
+            finally:
+                os.close(self._fd)
+                self._fd = None
+        return False
+
+
+class AcceptanceLedger:
+    """Durable cross-process attempt ledger for opt-in acceptance mode.
+
+    Reserve-before-send: each HTTP attempt is recorded (status "reserved")
+    and fsynced before the request is made, so a crash after reservation
+    leaves the slot consumed (never reclaimed). Outcomes are recorded in the
+    same locked transaction as reservation where applicable; a fatal HTTP
+    status (401/403/429) also sets `stopped` before any further attempt is
+    allowed. Corrupt/ambiguous state fails closed.
+    """
+
+    def __init__(self, path, cap, requested_model):
+        self.path = path
+        self.cap = cap
+        self.requested_model = requested_model
+
+    def _read(self):
+        try:
+            with open(self.path, "r", encoding="utf-8") as handle:
+                raw = handle.read()
+                handle.flush()
+        except FileNotFoundError:
+            return {
+                "version": 1,
+                "cap": self.cap,
+                "stopped": None,
+                "attempts": [],
+            }
+        if raw == "":
+            # Only reachable when the lock's O_CREAT created the file before
+            # any reservation under the lock; no send can have happened yet.
+            return {
+                "version": 1,
+                "cap": self.cap,
+                "stopped": None,
+                "attempts": [],
+            }
+        try:
+            data = json.loads(raw)
+        except ValueError:
+            raise AcceptanceRefused("acceptance ledger is corrupt; refusing to proceed")
+        if (
+            not isinstance(data, dict)
+            or data.get("version") != 1
+            or not isinstance(data.get("attempts"), list)
+            or data.get("cap") != self.cap
+        ):
+            raise AcceptanceRefused(
+                "acceptance ledger state is ambiguous (version, cap or shape "
+                "mismatch); refusing to proceed"
+            )
+        return data
+
+    def _write(self, data):
+        tmp = self.path + ".tmp.%d" % os.getpid()
+        with open(tmp, "w", encoding="utf-8") as handle:
+            json.dump(data, handle, separators=(",", ":"))
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp, self.path)
+        try:
+            dfd = os.open(os.path.dirname(os.path.abspath(self.path)), os.O_RDONLY)
+            try:
+                os.fsync(dfd)
+            finally:
+                os.close(dfd)
+        except OSError:
+            pass
+
+    def reserve(self):
+        with _LedgerLock(self.path):
+            data = self._read()
+            if data.get("stopped") is not None:
+                raise AcceptanceStopped(
+                    "acceptance run stopped by fatal HTTP response; refusing to send"
+                )
+            if len(data["attempts"]) >= self.cap:
+                raise AcceptanceRefused(
+                    "acceptance attempt cap %d exhausted; refusing to send" % self.cap
+                )
+            n = len(data["attempts"]) + 1
+            data["attempts"].append(
+                {
+                    "n": n,
+                    "status": "reserved",
+                    "http_status": None,
+                    "error_class": None,
+                    "requested_model": self.requested_model,
+                    "server_model": None,
+                }
+            )
+            self._write(data)
+            return n
+
+    def record(self, n, http_status, error_class, server_model):
+        with _LedgerLock(self.path):
+            data = self._read()
+            if not (1 <= n <= len(data["attempts"])):
+                raise AcceptanceRefused(
+                    "acceptance ledger has no attempt %d; refusing" % n
+                )
+            entry = data["attempts"][n - 1]
+            entry["status"] = "recorded"
+            entry["http_status"] = http_status
+            entry["error_class"] = error_class
+            entry["server_model"] = server_model
+            if http_status in FATAL_HTTP_STATUSES:
+                data["stopped"] = {
+                    "reason": "fatal-http",
+                    "status": http_status,
+                    "attempt": n,
+                }
+            self._write(data)
 
 
 def endpoint_host(endpoint):
@@ -217,18 +460,32 @@ def build_prompt(observation):
 
 
 def call_model(args, api_key, observation):
-    """One chat-completions call. Returns the reply text, or raises.
+    status = _call_model(args, api_key, observation)
+    return status[0]
 
-    Timeouts are distinguishable from other endpoint errors so the caller can
-    apply the one-retry rule; everything else is an endpoint error.
+
+def _call_model(args, api_key, observation):
+    """One chat-completions call. Returns (reply text, server_model).
+
+    server_model is the envelope's "model" value exactly as reported
+    (None when missing/malformed); acceptance mode records it truthfully.
+    Timeouts are distinguishable from other endpoint errors so the caller
+    can apply the one-retry rule; everything else is an endpoint error.
     """
     messages = [
         {"role": "user", "content": build_prompt(observation)},
     ]
-    body = json.dumps(
-        {"model": args.model, "messages": messages, "temperature": args.temperature},
-        separators=(",", ":"),
-    ).encode("utf-8")
+    payload = {"model": args.model, "messages": messages, "temperature": args.temperature}
+    if getattr(args, "reasoning_effort", None) is not None:
+        payload["reasoning_effort"] = args.reasoning_effort
+    if getattr(args, "max_completion_tokens", None) is not None:
+        payload["max_completion_tokens"] = args.max_completion_tokens
+    body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    if getattr(args, "max_request_bytes", None) is not None and len(body) > args.max_request_bytes:
+        raise RequestTooLarge(
+            "request body %d bytes exceeds --max-request-bytes %d; not sent"
+            % (len(body), args.max_request_bytes)
+        )
     request = urllib.request.Request(args.endpoint, data=body, method="POST")
     request.add_header("Content-Type", "application/json")
     request.add_header("Accept", "application/json")
@@ -242,6 +499,13 @@ def call_model(args, api_key, observation):
             payload = response.read(CONTENT_MAX_BYTES + 1)
     except (socket.timeout, TimeoutError) as error:
         raise ModelTimeout(str(error)) from error
+    except urllib.error.HTTPError as error:
+        exc = EndpointError("endpoint error: %s" % error)
+        try:
+            exc.http_status = int(error.code)
+        except Exception:
+            pass
+        raise exc from error
     except urllib.error.URLError as error:
         reason = getattr(error, "reason", None)
         if isinstance(reason, (socket.timeout, TimeoutError)):
@@ -265,19 +529,59 @@ def call_model(args, api_key, observation):
         ) from error
     if not isinstance(content, str):
         raise ParseFailure("endpoint reply message content is not a string")
-    return content
+    server_model = envelope.get("model") if isinstance(envelope, dict) else None
+    if not isinstance(server_model, str):
+        server_model = None
+    return content, server_model
 
 
 class ModelTimeout(Exception):
-    pass
+    http_status = None
 
 
 class EndpointError(Exception):
-    pass
+    http_status = None
 
 
 class ParseFailure(Exception):
-    pass
+    http_status = None
+
+
+class RequestTooLarge(EndpointError):
+    """The serialized request body exceeded --max-request-bytes; not sent."""
+
+    http_status = None
+
+
+def _acceptance_call(ledger, args, api_key, observation):
+    """One HTTP attempt under an acceptance ledger (reserve before send).
+
+    Returns (content, server_model) on success. Raises the original
+    ModelTimeout/EndpointError/ParseFailure after durably recording the
+    outcome; AcceptanceStopped/AcceptanceRefused propagate for die().
+    """
+    n = ledger.reserve()
+    try:
+        content, server_model = _call_model(args, api_key, observation)
+    except RequestTooLarge as error:
+        try:
+            ledger.record(n, None, "request-too-large", None)
+        except (AcceptanceRefused, AcceptanceStopped) as ledger_error:
+            raise AcceptanceRefused(str(ledger_error)) from error
+        raise AcceptanceRefused(str(error)) from error
+    except (ModelTimeout, EndpointError, ParseFailure) as error:
+        error_class = (
+            "timeout"
+            if isinstance(error, ModelTimeout)
+            else ("parse" if isinstance(error, ParseFailure) else "endpoint")
+        )
+        try:
+            ledger.record(n, getattr(error, "http_status", None), error_class, None)
+        except (AcceptanceRefused, AcceptanceStopped) as ledger_error:
+            raise AcceptanceRefused(str(ledger_error)) from error
+        raise
+    ledger.record(n, 200, None, server_model)
+    return content, server_model
 
 
 def validate_model_reply(observation, content):
@@ -430,6 +734,19 @@ def main(argv=None):
 
     send({"type": "hello_ack", "protocol": PROTOCOL})
 
+    ledger = None
+    if args.acceptance_ledger is not None:
+        ledger = AcceptanceLedger(
+            args.acceptance_ledger, args.acceptance_max_attempts, args.model
+        )
+        try:
+            with _LedgerLock(ledger.path):
+                ledger._read()
+        except (AcceptanceRefused, AcceptanceStopped) as error:
+            return die(str(error))
+        except OSError as error:
+            return die("cannot open --acceptance-ledger: %s" % error)
+
     while True:
         message = read_json_line()
         if message is None:
@@ -454,8 +771,15 @@ def main(argv=None):
             send({"type": "action", "step": message["step"], "kind": "Wait"})
             continue
 
+        def do_call():
+            if ledger is None:
+                return call_model(args, api_key, message)
+            return _acceptance_call(ledger, args, api_key, message)[0]
+
         try:
-            content = call_model(args, api_key, message)
+            content = do_call()
+        except (AcceptanceStopped, AcceptanceRefused) as error:
+            return die(str(error))
         except ModelTimeout:
             if not _retry_permitted(args, step_timeout_ms, started):
                 return die(
@@ -466,7 +790,9 @@ def main(argv=None):
                 % args.request_timeout_ms
             )
             try:
-                content = call_model(args, api_key, message)
+                content = do_call()
+            except (AcceptanceStopped, AcceptanceRefused) as error:
+                return die(str(error))
             except ModelTimeout:
                 return die(
                     "model request timed out again after %d ms"

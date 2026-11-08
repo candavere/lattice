@@ -73,8 +73,18 @@ jobs:
           dotnet build Cli/Lattice.Cli.csproj -c Release
           CLI_VERSION="$(dotnet run -c Release --project Cli --no-build -- --version | tr -d '\r' | tail -n1)"
           echo "cli --version: $CLI_VERSION"
-          if [ "$CLI_VERSION" != "$TAG_VERSION" ]; then
+          # --version prints the build-identity contract Version+SourceCommit
+          # (Cli/CliApp.cs InformationalVersion); compare the plain version to
+          # the tag and require the stamped commit to be the exact checked-out
+          # commit, rather than dropping the identity suffix.
+          CLI_PLAIN_VERSION="${CLI_VERSION%%+*}"
+          CLI_STAMPED_COMMIT="${CLI_VERSION#*+}"
+          if [ "$CLI_PLAIN_VERSION" != "$TAG_VERSION" ]; then
             echo "::error::CLI --version '$CLI_VERSION' does not match tag '$TAG_VERSION'"
+            exit 1
+          fi
+          if [ "$CLI_STAMPED_COMMIT" != "${GITHUB_SHA}" ]; then
+            echo "::error::CLI --version '$CLI_VERSION' is not stamped with the checked-out commit '${GITHUB_SHA}'"
             exit 1
           fi
 
@@ -148,8 +158,16 @@ jobs:
           echo "== $BIN --version =="
           VERSION_OUTPUT="$("$BIN" --version | tr -d '\r' | tail -n1)"
           echo "reported version: $VERSION_OUTPUT"
-          if [ "$VERSION_OUTPUT" != "$EXPECTED_VERSION" ]; then
+          # Same build-identity contract as the parity gate: the plain version
+          # must match the tag and the +SourceCommit stamp must be exact.
+          PLAIN_VERSION="${VERSION_OUTPUT%%+*}"
+          STAMPED_COMMIT="${VERSION_OUTPUT#*+}"
+          if [ "$PLAIN_VERSION" != "$EXPECTED_VERSION" ]; then
             echo "::error::$BIN reported '$VERSION_OUTPUT', expected '$EXPECTED_VERSION'"
+            exit 1
+          fi
+          if [ "$STAMPED_COMMIT" != "${GITHUB_SHA}" ]; then
+            echo "::error::$BIN reported '$VERSION_OUTPUT', not stamped with '${GITHUB_SHA}'"
             exit 1
           fi
 
@@ -265,6 +283,12 @@ jobs:
           - \`ScenarioSha256\` is **provenance, not an assertion replay can check**: the recording stays self-contained and never reopens the descriptor, so a schema-5 recording missing its digest still verifies and reports \`no scenario digest: the recording does not name the descriptor that produced it\`. That is deliberately unlike the state hash, whose absence from a schema-3-or-later recording is a discrepancy, because the state hash is something replay recomputes and compares. The two are computed over different things and are never compared to each other.
           - Determinism is scoped to serialized \`StepResult\` equivalence **plus** the per-tick state hash that schema 3 introduced: \`replay --verify\` re-serializes each \`StepResult\` and recomputes the SHA-256 digest of each tick's end-of-tick simulation state, naming the first mismatched tick. This is per-step serialized equivalence plus per-tick digest equality, **not** raw byte identity. See [docs/SUPPORT_AND_REPRODUCIBILITY.md](https://github.com/candavere/lattice/blob/$COMMIT/docs/SUPPORT_AND_REPRODUCIBILITY.md).
           - Schema constants are read from [Trajectories/TrajectoryModel.cs](https://github.com/candavere/lattice/blob/$COMMIT/Trajectories/TrajectoryModel.cs); the read/verify rules are in [Trajectories/TrajectoryReplay.cs](https://github.com/candavere/lattice/blob/$COMMIT/Trajectories/TrajectoryReplay.cs).
+
+          ## v4 model integration
+          - \`evaluate --agent-cmd\` can run the bring-your-own-model adapter (\`examples/python/lattice_model_agent.py\`, protocol 1) against any OpenAI-compatible chat-completions endpoint the caller has access to, with explicit parse/timeout failures and no guessed actions.
+          - \`--record-episodes <dir>\` records each completed match as a trajectory JSONL; \`replay <file> --verify\` re-verifies it.
+          - Credentials are passed only via \`--api-key-env <VAR_NAME>\` (Authorization header only), never in \`--agent-cmd\` or recorded artifacts.
+          - This integration does not imply native support for every provider or local runner, says nothing about model playing quality, and makes no cross-provider benchmark-validity claim. Hosted-model acceptance runs only under a person's explicit approval; see the acceptance slices in \`docs/CLI.md\`.
 
           ## Supported matrix
           | Asset | OS | Architecture | Runtime |

@@ -57,7 +57,7 @@ public static class CliApp
     /// The CLI's reported version. Kept in lockstep with the project
     /// <c>&lt;Version&gt;</c> elements by the release workflow's tag-parity gate.
     /// </summary>
-    public const string Version = "3.1.0";
+    public const string Version = "4.0.0";
 
     /// <summary>
     /// The full source commit this build was produced from, stamped at build

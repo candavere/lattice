@@ -15,9 +15,13 @@ is the full flag-by-flag reference; the landing page keeps a
 [compact table](../README.md#reference).
 
 Every command in this reference can also be invoked as `lattice <command>` if
-you have installed the CLI as a .NET global tool (`dotnet pack Cli -c Release`
-then `dotnet tool install -g --add-source ./Cli/bin/Release --version 3.1.0 lattice`; see
-[the README](../README.md#or-install-the-cli-once-as-a-net-global-tool)). That
+you have installed the CLI into a throwaway local tool path. Version 4.0.0
+is a release candidate, not a released version and not a registry package:
+package it from this source tree only (`dotnet pack Cli -c Release`, then
+install from that local source into a throwaway `--tool-path` with
+`--version 4.0.0` — never a global `-g` install); published users use the
+`v3.1.0` native binaries from its GitHub Release. See
+[the README](../README.md#published-release-vs-candidate-source-two-different-installs). That
 is the same compiled binary under a launcher name, so the flags, output and exit
 codes below are identical either way; every example on this page uses the
 zero-install `dotnet run --project Cli --` form and stays valid as written.
@@ -461,6 +465,42 @@ study records under `Decision` in its artifact — the same analyzer's words, no
 second phrasing of them. If voids leave fewer than 30 valid seeds the run is "Not
 graded", and the summary says that the exclusion is why.
 
+## Model adapter (`lattice_model_agent.py`)
+
+`examples/python/lattice_model_agent.py` is the v4 bring-your-own-model
+adapter. It speaks protocol 1 on stdin/stdout (one JSON value per line,
+nothing else on stdout) and, for each observation, POSTs
+`{"model", "messages", "temperature"}` to an OpenAI-compatible
+chat-completions endpoint and reads the reply text from the first choice's
+message content. It accepts exactly `{"action":"wait"}`,
+`{"action":"move","zone_id":N}` and `{"action":"collect","resource_id":N}`
+(exact key sets; ids are integers in the observation's ranges) and otherwise
+fails explicitly: any endpoint error, request timeout, or reply that fails
+parse or validation is one stderr line and a non-zero exit — never a guessed
+action. One retry is allowed on a request *timeout* only, and only when it
+fits the step budget Lattice offered in `hello.limits`; an endpoint error
+never retries.
+
+Exact options (from the adapter's own argument parser):
+
+| Option | Meaning |
+| :--- | :--- |
+| `--endpoint <url>` | Required. Full chat-completions URL (loopback for the acceptance slice; the adapter itself takes any URL its caller supplies) |
+| `--model <id>` | Required. Model id sent in the request body |
+| `--api-key-env <VAR>` | Optional. Names an environment variable holding the key; the key is sent only as an `Authorization: Bearer` header, never in the URL, argv, logs or sidecar. If the variable is unset or empty the adapter exits non-zero before the handshake |
+| `--temperature <float>` | Sampling temperature sent to the endpoint; default `0.0` |
+| `--request-timeout-ms <n>` | Per-request HTTP timeout; default `1500` |
+| `--prompt-version <id>` | Required. Prompt-template version id recorded in the sidecar |
+| `--sidecar <file>` | Optional. Writes one JSON object at startup (before the handshake): endpoint host, model, temperature, prompt version, parser version — never the key |
+| `--acceptance-ledger <file>` | Optional, **opt-in acceptance mode, off by default**. Durable attempt ledger at this path; both seat processes of an acceptance pair must be given the **same** path. Every HTTP attempt (retries included) is reserved before it is sent; a `reserved` slot is never reclaimed after a crash. HTTP 401/403/429 marks the run stopped so no later process sends. Records requested model and server-reported `response.model` (or null) per attempt, HTTP status and error class; never credentials, headers or raw responses. Requires POSIX locking (`fcntl.flock`); fails closed elsewhere. Keep the ledger outside public source |
+| `--acceptance-max-attempts <n>` | Optional, acceptance mode only (requires `--acceptance-ledger`); global HTTP attempt cap across processes; default `400`, must not exceed `400`. Counts retries and uncertain (post-crash) reservations too |
+
+Public examples never put a key in `--agent-cmd` or in recorded artifacts;
+the only credential channel is `--api-key-env`. The adapter works with any
+OpenAI-compatible endpoint the caller has access to. It does not imply native
+support for every provider or local runner, says nothing about model playing
+quality, and supports no cross-provider benchmark-validity claim.
+
 ## Acceptance report for the external-agent path
 
 `scripts/acceptance_v4.sh [OUT_DIR]` runs the checks that back the bring-your-own-model adapter (`examples/python/lattice_model_agent.py`) and writes `ACCEPTANCE.md` into a new evidence directory (default `.evidence/acceptance-v4-<UTC>`; an existing directory is refused, nothing is overwritten). Each slice is recorded as `works`, `broken` or `not-tested` with its command, exit code and evidence file. The script stops at the first `broken` slice and records the rest as `not-tested: not reached`. It does not restore packages (`--no-restore`), so it makes no network use.
@@ -472,9 +512,9 @@ graded", and the summary says that the exclusion is why.
 | S4 | Adapter unit tests (stub endpoint, no network beyond loopback) |
 | S5, S6 | Reference-agent match with `--record-episodes`; `replay --verify` on each recording |
 | S7, S8, S9 | Expected-negative checks: overwrite refusal (exit 1), `--record-episodes` without `--agent-cmd` (exit 2), unset `--api-key-env` variable fails closed (exit 1, empty stdout, one documented stderr line) |
-| S10 | Local model match on a loopback endpoint you started (2 completed matches, no void runs or agent failures, recordings replay-verified) (`LATTICE_ACCEPT_LOCAL_ENDPOINT`, `LATTICE_ACCEPT_LOCAL_MODEL`, optional `LATTICE_ACCEPT_STEP_MS`); `not-tested` otherwise. A non-loopback endpoint is refused |
-| S11 | Hosted model match: always `not-tested` here; it needs a provider and cost terms chosen by a person |
+| S10 | Local model match on a loopback endpoint you started (2 completed matches, no void runs or agent failures, recordings replay-verified) (`LATTICE_ACCEPT_LOCAL_ENDPOINT`, `LATTICE_ACCEPT_LOCAL_MODEL`, optional `LATTICE_ACCEPT_STEP_MS`); `not-tested` otherwise. A non-loopback endpoint is refused. **Completed (inherited evidence):** source SHA `497bca08b90767f1285524e6f39c8913a49258bd`, evidence `.evidence/acceptance-local/` (maintainer-local working tree only; not present in a public checkout) — 2 completed 200-step matches, 400 model calls, VoidRuns 0, no AgentFailures, both recordings `replay --verify`-passed, acceptance exit 0. This proves integration/plumbing, not model quality or a statistical benchmark |
+| S11 | Hosted model match: **NOT TESTED** — execution approval is pending and no hosted call has been made. It needs a provider and cost terms chosen and approved by a person; the script itself always records it `not-tested` |
 | S12 | Token-shaped secret scan of tracked files and the net `eb13fad..HEAD` diff (per-commit history is not covered); paths and pattern names only |
-| S13 | Fixture-literal classification: always `not-tested`; it is a human decision |
+| S13 | Fixture-literal classification: **CLOSED** — the maintainer classified the old credential-shaped literal in commit `c3467b7` as a dummy test fixture; the current fixture is the obvious `TEST-ONLY` placeholder. The script still records this slice `not-tested` because classification is a human decision it cannot make; it is not reopened by this candidate |
 
-A passing report shows that the checked plumbing works. It does not show that a real model plays well, and the report never states that v4 is usable.
+A passing report shows that the checked plumbing works. It does not show that a real model plays well, and no report here states that v4 is usable: 4.0.0 remains a release candidate until the hosted-model S11 slice passes under its own separate approval. The committed, public-safe aggregate for this candidate (commands, source SHA, counts, provenance, inherited vs newly executed status, host scope and limitations) is [`docs/V4_CANDIDATE_ACCEPTANCE.md`](V4_CANDIDATE_ACCEPTANCE.md); raw local evidence is not published.

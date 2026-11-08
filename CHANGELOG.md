@@ -4,6 +4,50 @@ All notable changes to Lattice are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 4.0.0 - UNRELEASED (release candidate)
+
+**4.0.0 is a candidate, not a released version.** There is no `v4.0.0` tag,
+no GitHub Release, no release date and no DOI for it; the latest published
+release remains `v3.1.0`. Nothing in this section asserts that publication
+has happened. The version bump (all nine project `<Version>` elements,
+`CliApp.Version`, `CITATION.cff`) is release preparation only.
+
+### Added
+
+- The v4 model integration: `examples/python/lattice_model_agent.py`, a
+  bring-your-own-model adapter that speaks protocol 1 over stdin/stdout and
+  posts each observation to an OpenAI-compatible chat-completions endpoint.
+  It accepts exactly `wait` / `move` / `collect` replies with exact key sets
+  and fails explicitly (one stderr line, non-zero exit, no guessed action) on
+  endpoint errors, timeouts and parse/validation failures (one bounded retry
+  on timeout only, only when it fits the offered step budget). Credentials
+  travel only via `--api-key-env <VAR_NAME>` as an `Authorization` header —
+  never in `--agent-cmd`, argv, logs, sidecars or recorded artifacts.
+  `evaluate --agent-cmd … --record-episodes <dir>` records each completed
+  match as a trajectory JSONL and `replay <file> --verify` re-verifies it.
+  The adapter supports any OpenAI-compatible endpoint the caller has access
+  to; it does not imply native support for every provider or local runner,
+  says nothing about model quality, and makes no cross-provider
+  benchmark-validity claim.
+- `scripts/acceptance_v4.sh`, the S1–S13 acceptance report for the
+  external-agent path (see `docs/CLI.md`).
+
+### Acceptance status (candidate evidence, inherited where noted)
+
+- **S10 works (inherited, not rerun for this candidate):** at source SHA
+  `497bca08b90767f1285524e6f39c8913a49258bd`, evidence
+  `.evidence/acceptance-local/` (maintainer-local only; not in a public
+  checkout) — two completed 200-step local-model matches,
+  400 model calls, VoidRuns 0, no AgentFailures, both recordings
+  replay-verified, acceptance exit 0. This proves integration and plumbing,
+  not model quality.
+- **S13 closed:** the maintainer classified the old credential-shaped test
+  literal (added in `c3467b7`) as a dummy fixture; the current fixture is the
+  obvious `TEST-ONLY` placeholder. No history rewrite.
+- **S11 NOT TESTED:** hosted-model acceptance has not been approved or
+  executed. The full v4 cannot be called verified until S11 passes under its
+  own separate approval.
+
 ## [Unreleased]
 
 ### Changed

@@ -49,7 +49,8 @@ Read job steps and logs there; badges or other commits are not evidence.
 ## Future release pass/fail
 
 A release is a pass only when: the tag, every project `<Version>`, and
-`--version` agree (now ten projects including `Protocol` and `Tui`); the full
+`--version` agree (now nine projects including `Protocol`; the interactive
+TUI is parked and is not a shipped project); the full
 suite, golden replays, and workflow gates are green on the exact tag SHA;
 the native assets for `linux-x64`, `win-x64`, `osx-arm64` smoke-test cleanly;
 and the checklist above is re-run from a clean checkout at that SHA. Anything

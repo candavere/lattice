@@ -81,21 +81,27 @@ public static void Playback(TextReader trajectorySource, TextWriter sink)
 
     private static void WriteFrame(TextWriter sink, MapGraph map, AgentState[] agents, int[] claims)
     {
-        sink.Write(AsciiRenderer.RenderFrame(map, agents, claims) + "\n\n");
+        // Two writes, not one concatenation: identical bytes on the wire
+        // without copying the frame.
+        sink.Write(AsciiRenderer.RenderFrame(map, agents, claims));
+        sink.Write("\n\n");
     }
 
     private static void WriteFrame(TextWriter sink, MapGraph map, AgentState[] agents, int[] claims, string? scenario, string[]? agentRoles)
     {
-        sink.Write(AsciiRenderer.RenderFrame(map, agents, claims, scenario, agentRoles) + "\n\n");
+        sink.Write(AsciiRenderer.RenderFrame(map, agents, claims, scenario, agentRoles));
+        sink.Write("\n\n");
     }
 
     private static void WriteFrame(TextWriter sink, MapGraph map, Observation observation)
     {
-        sink.Write(AsciiRenderer.RenderFrame(map, observation) + "\n\n");
+        sink.Write(AsciiRenderer.RenderFrame(map, observation));
+        sink.Write("\n\n");
     }
 
     private static void WriteFrame(TextWriter sink, MapGraph map, Observation observation, string? scenario, string[]? agentRoles)
     {
-        sink.Write(AsciiRenderer.RenderFrame(map, observation, scenario, agentRoles) + "\n\n");
+        sink.Write(AsciiRenderer.RenderFrame(map, observation, scenario, agentRoles));
+        sink.Write("\n\n");
     }
 }

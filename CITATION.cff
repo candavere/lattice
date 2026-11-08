@@ -11,14 +11,10 @@ authors:
     given-names: Deep
 license: MIT
 repository-code: "https://github.com/candavere/lattice"
-version: 3.1.0
+version: 4.0.0
 # Under CFF 1.2.0 date-released is optional and means the date the software was
-# released. It is recorded here as a publication candidate: 2026-10-01 is the
-# actual release day this metadata was written for (Asia/Kolkata), and the
-# authoritative record of whether publication completed is the v3.1.0 GitHub
-# Release itself. This field becomes a statement of fact at the moment the
-# v3.1.0 tag and GitHub Release exist; until then it is the intended date of
-# that step, not evidence that it happened. It is never moved to repair a
-# mismatch: a published tag is permanent. The 2026-09-27 date belongs to
-# v3.0.0 and is not a claim about 3.1.0.
-date-released: 2026-10-01
+# released. Version 4.0.0 is a release candidate only: it is not released, has
+# no tag or GitHub Release, and no release date is claimed here. The field is
+# therefore omitted until the actual release day, and no DOI is claimed. The
+# authoritative record of whether publication ever completes is the v4.0.0
+# GitHub Release itself, not this metadata.

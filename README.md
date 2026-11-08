@@ -306,32 +306,38 @@ evaluation artifacts is documented in
 (section 5), and the turnkey external-reviewer path, pinned to the published
 `v3.0.0` release, is [`docs/reproduction_packet.md`](docs/reproduction_packet.md).
 
-### Or install the CLI once as a .NET global tool
+### Published release vs candidate source: two different installs
 
 The commands above are the **zero-install path**: nothing to install, just the
-SDK and a checkout. Cloning alone does not put `lattice` on `PATH`. If you
-would rather type `lattice <command>` than repeat the
-`dotnet run --project Cli --` prefix, pack the CLI and install it:
+SDK and a checkout. Cloning alone does not put `lattice` on `PATH`.
+
+**Published users — use the published release, not this candidate.** The
+latest published release is `v3.1.0`, distributed as native binaries from its
+GitHub Release (`lattice-linux-x64`, `lattice-osx-arm64`, `lattice-win-x64.exe`
+plus `SHA256SUMS.txt`): https://github.com/candavere/lattice/releases/tag/v3.1.0
+— download the binary for your platform, verify it against `SHA256SUMS.txt`,
+and run it. There is **no registry package** for Lattice: no nuget.org (or
+other registry) publication exists or is claimed. Publication of `v3.1.0`
+itself is recorded only by that GitHub Release; it was not re-verified from
+this offline session, so this page does not assert its current availability
+beyond the published record.
+
+**Candidate source (4.0.0, unreleased) — local pack only.** Version 4.0.0
+exists only as this source tree. The commands below are valid only after you
+build and pack *this* candidate, and they install exclusively from your local
+package source into a throwaway tool path — they never fetch a published
+4.0.0 (there is none) and never touch your global installation:
 
 ```sh
-dotnet pack Cli -c Release                                  # produces Cli/bin/Release/lattice.3.1.0.nupkg
-dotnet tool install -g --add-source ./Cli/bin/Release --version 3.1.0 lattice
-lattice replay Tests/fixtures/golden_trajectory.jsonl --verify
-```
-
-A throwaway install that leaves the user profile alone (verified in
-`docs/RELEASE_READINESS.md` from a clean checkout at the current commit):
-
-```sh
-dotnet pack Cli -c Release --no-build --output ./pkg-source
-dotnet tool install --tool-path ./tool-path --version 3.1.0 --add-source ./pkg-source lattice
-./tool-path/lattice --version                               # 3.1.0
+dotnet pack Cli -c Release --no-build --output ./pkg-source   # local source only
+dotnet tool install --tool-path ./tool-path --version 4.0.0 --add-source ./pkg-source lattice
+./tool-path/lattice --version                               # 4.0.0+<source-commit>
 ./tool-path/lattice replay Tests/fixtures/golden_trajectory.jsonl --verify
 ```
 
-```sh
-dotnet tool uninstall -g lattice                             # back to the zero-install path
-```
+That throwaway tool-path install is the only candidate install offered here:
+do not substitute a global (`-g`) install, and do not present the unpublished
+4.0.0 as a public install command.
 
 Try one replay and one evidence view, then quit each screen with `q`:
 
@@ -362,21 +368,45 @@ compiled binary with a launcher named `lattice`; every command, flag, output and
 exit code is the one documented above, because it is the same code. It adds **no
 dependency**: the nine production projects still declare zero
 `PackageReference` items, and the packed `.nuspec` declares no dependencies at
-all — the package carries Lattice's own assemblies (including `Tui` and
+all — the package carries Lattice's own assemblies (including
 `Protocol`) and asks for the .NET
-runtime, which you already have for the commands above. A package version still
-saying 3.1.0 does not mean untagged main-branch changes were released. CI proves the two entry
+runtime, which you already have for the commands above. A package version
+saying 4.0.0 does not mean the v4 release has shipped: **4.0.0 is a release
+candidate, not a released version**. The latest published release remains
+`v3.1.0` (https://github.com/candavere/lattice/releases/tag/v3.1.0). CI proves the two entry
 points agree: the `build-test` matrix packs, installs the tool into a
 throwaway tool path on Ubuntu, Windows and macOS, and fails if the installed
-`lattice` and `dotnet run` differ by a single byte on the golden replay. The
-The latest published release is `v3.1.0` (https://github.com/candavere/lattice/releases/tag/v3.1.0).
+`lattice` and `dotnet run` differ by a single byte on the golden replay.
 
 `--add-source` points NuGet at the package you just built. NuGet may still
-consult your other configured sources, so pass `--version 3.1.0` as well if you
+consult your other configured sources, so pass `--version 4.0.0` as well if you
 want the install pinned to exactly what you packed. Publishing to nuget.org is a
 **separate, optional maintainer action** and is not required to use any of this;
 the `lattice` package ID there may already be taken, and the command name is
 `lattice` either way.
+
+### v4 release candidate: connecting a model
+
+Version 4.0.0 (candidate, unreleased) adds the bring-your-own-model path:
+`examples/python/lattice_model_agent.py` speaks protocol 1 and posts each
+observation to an OpenAI-compatible chat-completions endpoint, validating the
+model's reply (`wait` / `move` / `collect`, exact key sets) and failing
+explicitly — one stderr line, non-zero exit, no guessed action — on endpoint
+errors, timeouts, or replies that fail parse/validation. `evaluate
+--agent-cmd … --record-episodes <dir>` then records each completed match as a
+trajectory JSONL, and `replay <file> --verify` re-verifies it. Credentials are
+never put in `--agent-cmd` or recorded artifacts: the adapter reads a key only
+via `--api-key-env <VAR_NAME>`, sends it only as an `Authorization` header,
+and writes only the endpoint host, model and versions to its sidecar. The
+adapter supports any OpenAI-compatible chat-completions endpoint; it does not
+imply native support for every provider or local runner, says nothing about
+model playing quality, and cross-provider benchmark comparison is not claimed.
+See [`docs/CLI.md`](docs/CLI.md) §"Acceptance report for the external-agent
+path" for the exact adapter options and the acceptance slices, including the
+completed local-model S10 result, the closed S13 fixture classification
+(the old credential-shaped test literal is a classified dummy; the current
+fixture is the obvious `TEST-ONLY` placeholder), and the hosted-model S11
+slice, which remains NOT TESTED pending separate approval.
 
 ### The gates, and where the code is authoritative
 

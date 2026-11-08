@@ -57,8 +57,22 @@ public static class AsciiRenderer
         }
 
         var cells = DrawMap(map, claims);
-        var canvas = BuildCanvas(cells, map);
-        return string.Join("\n", new[] { canvas }.Concat(Footer(map, agents, claims, scenario, agentRoles)));
+        // Single assembly pass: the canvas is drawn straight into the frame
+        // builder, then one '\n' per footer line - identical bytes to joining
+        // the canvas with the footer lines, without intermediate copies.
+        var width0 = (long)map.Zones.Select(z => z.Position).Concat(map.Resources.Select(r => r.Position)).Max(p => p.X)
+            - map.Zones.Select(z => z.Position).Concat(map.Resources.Select(r => r.Position)).Min(p => p.X) + 1;
+        var height0 = (long)map.Zones.Select(z => z.Position).Concat(map.Resources.Select(r => r.Position)).Max(p => p.Y)
+            - map.Zones.Select(z => z.Position).Concat(map.Resources.Select(r => r.Position)).Min(p => p.Y) + 1;
+        var capacity = width0 * (height0 + 1) + 256;
+        var frame = new StringBuilder(capacity <= int.MaxValue ? (int)capacity : 256);
+        BuildCanvas(cells, map, frame);
+        foreach (var line in Footer(map, agents, claims, scenario, agentRoles))
+        {
+            frame.Append('\n').Append(line);
+        }
+
+        return frame.ToString();
     }
 
     /// <summary>
@@ -135,7 +149,7 @@ public static class AsciiRenderer
         return dy > dx ? '|' : '+';
     }
 
-    private static string BuildCanvas(Dictionary<(int X, int Y), char> cells, MapGraph map)
+    private static void BuildCanvas(Dictionary<(int X, int Y), char> cells, MapGraph map, StringBuilder builder)
     {
         var points = map.Zones.Select(z => z.Position)
             .Concat(map.Resources.Select(r => r.Position))
@@ -145,19 +159,35 @@ public static class AsciiRenderer
         var minY = points.Min(p => p.Y);
         var maxY = points.Max(p => p.Y);
 
-        var builder = new StringBuilder();
-        for (var y = minY; y <= maxY; y++)
+        // Flat grid fill instead of a per-cell dictionary lookup: for wide
+        // coordinate spans the canvas dwarfs the drawn cells, so the lookup
+        // loop dominates both time and allocation churn. Output is unchanged.
+        // Long arithmetic keeps degenerate spans honest: a canvas that cannot
+        // fit memory fails with the same OutOfMemoryException the original
+        // per-cell loop threw, instead of a wrapped-length index error.
+        var widthLong = (long)maxX - minX + 1;
+        var heightLong = (long)maxY - minY + 1;
+        if (widthLong > int.MaxValue || heightLong > int.MaxValue || widthLong * heightLong > int.MaxValue)
         {
-            for (var x = minX; x <= maxX; x++)
-            {
-                builder.Append(cells.TryGetValue((x, y), out var glyph) ? glyph : EmptyCell);
-            }
+            throw new OutOfMemoryException();
+        }
 
+        var width = (int)widthLong;
+        var height = (int)heightLong;
+        var grid = new char[width * height];
+        Array.Fill(grid, EmptyCell);
+        foreach (var (point, glyph) in cells)
+        {
+            grid[(point.Y - minY) * width + (point.X - minX)] = glyph;
+        }
+
+        for (var y = 0; y < height; y++)
+        {
+            builder.Append(grid, y * width, width);
             builder.Append('\n');
         }
 
         builder.Length--; // no trailing newline: footer lines carry the terminator
-        return builder.ToString();
     }
 
     private static IEnumerable<string> Footer(

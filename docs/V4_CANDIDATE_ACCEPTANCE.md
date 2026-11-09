@@ -11,8 +11,13 @@ can. Each number below was read from those local artifacts during candidate
 preparation; where a number rests only on the maintainer's session report
 rather than on an artifact that was re-read, it is labelled as such.
 
-Candidate source SHA (the tree the inherited results were produced on):
-`497bca08b90767f1285524e6f39c8913a49258bd` (branch `main`).
+Candidate source SHA (the tree the closeout-session verification below ran on):
+`42a85be70bb418074780d35914860279efd959d6` (branch `main`, on this Mac).
+This is the last commit this session verified, before the docs commit that
+contains this file; a committed file cannot name the commit that contains it,
+so the final docs-commit SHA is reported in the session closeout, not here.
+The inherited results table below was produced at the earlier candidate SHA
+`497bca08b90767f1285524e6f39c8913a49258bd` and is retained verbatim as history.
 Candidate version declarations: 4.0.0 (nine project `<Version>` elements,
 `CliApp.Version`, `CITATION.cff`); `--version` prints `4.0.0+<source-commit>`
 by the build-identity contract.
@@ -107,6 +112,30 @@ clear it.
 Suite and diagnostic logs were retained outside tracked source during
 preparation and are not part of this public aggregate.
 
+## Closeout session 2026-11-09 (this Mac, rerun now)
+
+Session worked toward this file's evidence-base commit, with per-phase
+temporary instrumentation restored byte-identical afterwards (manifest-verified).
+Nothing below claims remote CI for local commits (no push was made); CI status
+cited is the earlier push of `65e6babcb1600511fdbc0399d1054fd081eac8f2`.
+
+| Gate | Before (inherited) | This session | Evidence provenance |
+|---|---|---|---|
+| Full suite (baseline) | 913/913 on the repaired tree (later session) | **913/913 locally** (macOS, `Release`, 1 m 31 s), exit 0 | Rerun now; log in session scratch `$WORK/baseline-test.log` |
+| Fuzz budget tail | mechanism measured and reduced; residual risk not excluded - not cleared | **No case ≥ 5 s in 6 instrumented runs** (unloaded full ×1 + loaded full ×3 + targeted under load ×2). Max `CliApp.Run` wall 2,590.7 ms (generate+min-fairness, loaded; solo ~1.2 s adversarial incl. startup). Gen max 264 ms. Slowest class in every run was `generate`, not `render` (render max ~717 ms). **Gate NOT cleared; original >10 s never reproduced on demand.** | Rerun now with temporary per-case instrumentation (generation vs run split, written=214/232, skipped=0, process-wide CPU/alloc/GC labeled non-attributable); file restored byte-identical (SHA-256 `f5728441…1136ca7`); analysis + adversarial sweep in session scratch `fuzz-tail.md` |
+| macOS descendant-cleanup intermittent | One CI failure (42528584218); 15/15 green locally; instrumentation on main | Loaded loop 20/20 green, `clean=True` 20/20, liveness empty 20/20. Sibling `StepTimeout…` produced one load-red of a different shape (first-exchange `timeout_step`) in a full-suite loaded run. `unreaped` non-empty in 10/20 green iterations with the worker already dead. Spawn-delay adversarial (300 ms, restored) still green and analysis shows a late spawn makes the parent die first (no worker), so it cannot make `clean=False`. **Gate stays OPEN.** | Rerun now, bounded loaded loop + stub-side injection (restored byte-identical, SHA-256 `d53a2f62…e5d4e`); DIAG analysis in session scratch `mac-status.md` |
+| S11 hosted-model acceptance | NOT TESTED | **BLOCKED - owner-owned:** no `GROQ_API_KEY` variable on this machine (checked without printing); no inference run, nothing spent. Costs/terms/budget unverified - gate stops at key check. | Checked now; record in session scratch `s11-status.md` |
+| CI (65e6bab, prior push) | Green per task brief at session start | **Full CI green after one failed-job rerun** (ubuntu-24.04 UI regression failed once on Microsoft-package-repo 403 `install-deps`; rerun of the single failed job green; macOS setup.sh leg green both times). | Prior push shown via `gh` (external run; logs not in tree) |
+| Version parity | 4.0.0 everywhere (nine projects + `CliApp.Version` + `CITATION.cff`) | **Verified current:** 9/9 project `<Version>` = 4.0.0, `CliApp.cs:60` = `4.0.0`, `CITATION.cff` = 4.0.0; CHANGELOG `4.0.0 - UNRELEASED (release candidate)`; README/LICENSE/SECURITY/CODE_OF_CONDUCT/CONTRIBUTING present | Rerun now; no change needed |
+| Release workflow pre-tag readiness | Tag-only triggers | **Added `workflow_dispatch` + `release_version` input** (required, no default) so validate/publish can be exercised pre-tag; input used only when ref is not a tag; publish matrix and `if: startsWith(github.ref, 'refs/tags/v')` publish guard byte-identical. | Edited + committed this session; YAML parse + full diff review (actionlint absent, nothing installed) |
+
+Per-phase content-hash manifests enforced that no other tracked or untracked file
+changed; see the session's scratch manifest snapshots for the cumulative allowed set.
+Raw per-phase logs were kept in the session's scratch `$WORK` directory, not in this tree.
+The closeout's fresh-clone verification (`$WORK/fresh-clone.md`) was run at the final
+HEAD after this doc commit; the final SHA is not named here by construction.
+Green runs here are measurements only: they do not clear the intermittent defect.
+
 ## Post-candidate render repair and re-verification (later session)
 
 Scope: output-preserving repairs approved by the maintainer ("If it doesnt
@@ -158,15 +187,25 @@ call, no tag, no push; all results below are offline on the repaired tree.
 
 ## Limitations
 
-- The candidate is **red**: the full-suite fuzz budget failure above is
-  unresolved, so no checkpoint commit has been made on this candidate.
-- No cross-platform results are claimed from this macOS-only session; CI and
-  native release-asset results remain pending publication.
+- The candidate is **red**: the fuzz budget original >10 s event was never
+  reproduced on demand and is not cleared by this session's green measurements
+  (see the closeout table above); the macOS descendant-cleanup intermittent
+  gate also stays open, and S11 remains blocked owner-owned. Local checkpoint
+  commits exist (work was committed per-phase as allowed), but no tag, push,
+  or release has been made for them in this session.
+- No cross-platform results are claimed from this macOS-only session. Remote
+  CI on push `65e6babcb1600511fdbc0399d1054fd081eac8f2` (an earlier push)
+  showed full green after a single-failed-job rerun; this session's local
+  commits have no remote CI status and claim none. Native release assets
+  remain unpublished (no tag).
 - S10's raw artifacts are maintainer-local evidence, not public reproducible
   artifacts; this summary transfers their recorded counts faithfully and
   claims no more than integration/plumbing.
-- Hosted-model acceptance (S11) is NOT TESTED and needs its own explicit
-  approval, entitlement check and bounded run plan before any call.
+- Hosted-model acceptance (S11) is NOT TESTED and, per the 2026-11-09
+  closeout session, BLOCKED owner-owned: no `GROQ_API_KEY` variable exists
+  on this machine, so the key check stopped the gate before any cost-terms
+  verification, inference, or spend. It needs its own explicit approval,
+  entitlement check and bounded run plan before any call.
 
 ## Laya real-model verification (external run, reported separately)
 

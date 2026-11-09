@@ -732,7 +732,17 @@ public class EvaluateAgentCmdTests
                 // already down
             }
 
-            _listener.Close();
+            // .NET on Unix can report "Address already in use" removing the
+            // prefix at Close after Stop (macOS CI, second suite run); the
+            // listener is already stopped, so this is not a failure.
+            try
+            {
+                _listener.Close();
+            }
+            catch (Exception)
+            {
+                // already down
+            }
             _thread.Join(TimeSpan.FromSeconds(5));
         }
     }

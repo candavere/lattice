@@ -1,0 +1,9 @@
+wrote .evidence/acceptance-local/local-episodes/evaluate-seed1001-seat0.jsonl
+wrote .evidence/acceptance-local/local-episodes/evaluate-seed1001-seat1.jsonl
+evaluation suite=dev seeds=1 matches=2 policy=external:python3 baseline=Scout rollouts=32 max_steps=200
+  paired delta   mean=-4  median=-4  sd=0  iqr=0
+  95% CI         [-4, -4]  -> FAIL
+  outcomes       win=50.0%  draw=0.0%  loss=50.0%  timeout=0.0%  contention=0.0%
+  external        valid_seeds=1  void_runs=0  agent_failures=none
+  decision        Not graded: 1 seeds is below the 30-seed floor of the decision rule (the canonical suites run 50).
+wrote .evidence/acceptance-local/local.json

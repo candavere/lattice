@@ -1,0 +1,60 @@
+{
+  "CommitSha": "497bca08b90767f1285524e6f39c8913a49258bd",
+  "CreatedAtUtc": "2026-11-06T12:33:43.478184Z",
+  "Runtime": ".NET 10.0.12",
+  "Os": "macOS 27.0.0",
+  "Cores": 8,
+  "Architecture": "Arm64",
+  "Studies": [
+    {
+      "Suite": "dev",
+      "TargetPolicy": "external:python3",
+      "BaselinePolicy": "Scout",
+      "RolloutsPerAction": 32,
+      "MaxStepsPerMatch": 200,
+      "PerSeed": [
+        {
+          "Seed": 1001,
+          "PolicyScoreAtSeat0": 2,
+          "PolicyScoreAtSeat1": 6,
+          "BaselineScoreAtSeat0": 6,
+          "BaselineScoreAtSeat1": 2,
+          "MeanDelta": 0,
+          "Match0Outcome": 1,
+          "Match1Outcome": 0
+        }
+      ],
+      "Statistics": {
+        "Seeds": 1,
+        "Matches": 2,
+        "MeanDelta": 0,
+        "MedianDelta": 0,
+        "StdDevDelta": 0,
+        "IqrDelta": 0,
+        "CiLower95": 0,
+        "CiUpper95": 0,
+        "Wins": 0,
+        "Draws": 0,
+        "Losses": 2,
+        "Timeouts": 0,
+        "WinRate": 0,
+        "DrawRate": 0,
+        "LossRate": 1,
+        "TimeoutRate": 0,
+        "MeanContentionSaturation": 0
+      },
+      "Passed": false,
+      "Decision": "Not graded: 1 seeds is below the 30-seed floor of the decision rule (the canonical suites run 50)."
+    }
+  ],
+  "AgentFailures": {},
+  "VoidRuns": 0,
+  "AgentCommand": [
+    "python3",
+    "examples/python/lattice_agent.py"
+  ],
+  "AgentLimits": {
+    "StepTimeoutMs": 5000,
+    "MatchTimeoutMs": 1030000
+  }
+}

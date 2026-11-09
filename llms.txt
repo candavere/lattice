@@ -1,0 +1,10 @@
+# Lattice
+
+Lattice is deterministic multi-agent benchmarking with auditable replay: a headless .NET 10 environment for seeded Dec-POMDP-style experiments where every run is a replayable recording.
+
+- README: README.md
+- CLI reference: docs/CLI.md
+- External-agent protocol: docs/EXTERNAL_AGENT_PROTOCOL.md
+- Benchmarking: docs/BENCHMARKING.md
+- Ecosystem: docs/ECOSYSTEM.md
+- v4 candidate acceptance summary: docs/V4_CANDIDATE_ACCEPTANCE.md

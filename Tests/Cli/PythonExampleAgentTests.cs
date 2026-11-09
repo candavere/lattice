@@ -40,7 +40,10 @@ public class PythonExampleAgentTests
 
     public PythonExampleAgentTests(ITestOutputHelper output) => _output = output;
 
-    [Fact(Timeout = TestTimeoutMs)]
+    // Whole-study tests exceed 60 s under full parallel load (many dotnet
+    // children at once); 120 s keeps the host ceiling honest without making a
+    // hang silent. See #12.
+    [Fact(Timeout = 120_000)]
     public async Task The_Python_Example_Plays_A_Whole_Study_Without_A_Protocol_Failure()
     {
         var python = ResolvePython();

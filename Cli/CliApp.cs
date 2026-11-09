@@ -2006,8 +2006,14 @@ public static class CliApp
 
     internal static double ParseFairnessThreshold(string text)
     {
+        // NaN needs its own guard: it parses successfully and every range
+        // comparison against it is false, so without this check a NaN threshold
+        // slips through and the acceptance gate rejects all 50 candidates
+        // (bias <= NaN is never true), surfacing as a misleading generator
+        // exhaustion instead of the usage error it is. Infinities are already
+        // excluded by the range comparisons.
         if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value)
-            || value < 0.0 || value > 1.0)
+            || double.IsNaN(value) || value < 0.0 || value > 1.0)
         {
             throw new UsageError(
                 $"flag '--min-fairness' expects a SpawnBiasIndex threshold in [0, 1], got '{text}'.");

@@ -168,11 +168,16 @@ public class ExternalAgentDescendantCleanupTests
         try
         {
             System.Environment.SetEnvironmentVariable(WorkerPidFileVar, pidFile);
+            var diag = System.Diagnostics.Stopwatch.StartNew();
+            void Diag(string tag) =>
+                _output.WriteLine($"DIAG {tag}: t={diag.ElapsedMilliseconds}ms utc={DateTimeOffset.UtcNow:HH:mm:ss.fff}");
+            Diag("ctor-start");
             var limits = new ExternalTimeLimits(stepTimeoutMs: 500, matchTimeoutMs: 500, maxTicks: 1);
             using var agent = new ExternalAgent(
                 ExternalAgentTestHost.Launch("spawn-stall-match", "5000"),
                 agentId: 0, runSeed: Seed + 3, scenario: ExternalAgent.StandardScenario,
                 maxTicks: 1, agentCount: 2, limits);
+            Diag("ctor-returned");
             Assert.Null(agent.PendingFault);
             var childPid = agent.ProcessId;
             try
@@ -180,12 +185,55 @@ public class ExternalAgentDescendantCleanupTests
                 var fault = await Assert.ThrowsAsync<ExternalAgentFaultException>(
                     () => Task.Run(() => agent.Decide(Obs())).WaitAsync(TimeSpan.FromSeconds(12)));
                 Assert.Equal(ProtocolReason.TimeoutMatch, fault.Fault.Reason);
+                Diag($"fault reason={fault.Fault.Reason}");
+                Diag("dispose-entry");
                 agent.Dispose();
+                Diag($"dispose-returned unreaped=[{string.Join(",", agent.UnreapedDescendants)}]");
+
                 var workers = ReadPids(pidFile);
                 var clean = workers.All(p => !IsAlive(p));
                 _output.WriteLine($"PRODUCT-ASSERT match-timeout: clean={clean} workers=[{string.Join(",", workers)}]");
-                ExternalAgentTestHost.AssertNoProcessLeft(childPid);
-                Assert.True(clean, "worker remains after match timeout.");
+                try
+                {
+                    ExternalAgentTestHost.AssertNoProcessLeft(childPid);
+                    Assert.True(clean, "worker remains after match timeout.");
+                }
+                finally
+                {
+                    // DIAG (post-assertion, best-effort): the stub records worker PIDs in
+                    // this file right after Process.Start returns, so the mtime is the
+                    // stub-recorded spawn completion - not the exact process birth, and
+                    // the filesystem clock is coarse. Observed only after the original
+                    // assertions so the read cannot interfere with the kill path or the
+                    // assertion timing; a failure here is reported and never replaces
+                    // the original failure or cleanup.
+                    try
+                    {
+                        var pidContent = File.Exists(pidFile) ? File.ReadAllText(pidFile).Trim() : "<absent>";
+                        var pidMtimeUtc = File.Exists(pidFile) ? File.GetLastWriteTimeUtc(pidFile).ToString("HH:mm:ss.fff") : "<absent>";
+                        _output.WriteLine($"DIAG pid-file-post-dispose: pids=[{pidContent}] mtime-utc={pidMtimeUtc} now-utc={DateTimeOffset.UtcNow:HH:mm:ss.fff}");
+                    }
+                    catch (Exception diagError)
+                    {
+                        _output.WriteLine($"DIAG pid-file-read-error: {diagError.GetType().Name}: {diagError.Message}");
+                    }
+
+                    // DIAG (post-assertion, best-effort, observational only): liveness at
+                    // two fixed offsets after the original assertions. Runs on pass and
+                    // fail; a failure here is reported and never masks the original
+                    // result. Two samples, then done: no watcher, no polling loop.
+                    try
+                    {
+                        Thread.Sleep(250);
+                        _output.WriteLine($"DIAG liveness +250ms-after-asserts: alive=[{string.Join(",", workers.Where(IsAlive))}]");
+                        Thread.Sleep(750);
+                        _output.WriteLine($"DIAG liveness +1000ms-after-asserts: alive=[{string.Join(",", workers.Where(IsAlive))}]");
+                    }
+                    catch (Exception diagError)
+                    {
+                        _output.WriteLine($"DIAG liveness-error: {diagError.GetType().Name}: {diagError.Message}");
+                    }
+                }
             }
             finally
             {

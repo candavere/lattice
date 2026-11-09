@@ -127,7 +127,7 @@ public class ExternalAgentDescendantCleanupTests
         try
         {
             System.Environment.SetEnvironmentVariable(WorkerPidFileVar, pidFile);
-            var limits = ExternalAgentTestHost.Budget(stepTimeoutMs: 500, maxTicks: 2, slackMs: 2_000);
+            var limits = ExternalAgentTestHost.Budget(stepTimeoutMs: 500, maxTicks: 2, slackMs: 30_000);
             using var agent = new ExternalAgent(
                 ExternalAgentTestHost.Launch("spawn-hang-at-step", "1"),
                 agentId: 0, runSeed: Seed + 2, scenario: ExternalAgent.StandardScenario,

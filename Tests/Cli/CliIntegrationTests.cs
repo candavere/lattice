@@ -141,6 +141,18 @@ public class CliIntegrationTests
     }
 
     [Fact]
+    public void Generate_MinFairnessNaN_UsageError()
+    {
+        // NaN parses as a double but is not in [0, 1]: every range comparison
+        // against it is false. Without an explicit guard it slips through and
+        // the acceptance gate rejects all 50 candidates (bias <= NaN is never
+        // true), misreporting the input error as generator exhaustion.
+        var (exit, _, stderr) = Run("generate", "--seed", "9", "--min-fairness", "NaN");
+        Assert.Equal(2, exit);
+        Assert.Contains("expects a SpawnBiasIndex threshold in [0, 1]", stderr);
+    }
+
+    [Fact]
     public void Simulate_RecordsTrajectoryJsonlToStdout()
     {
         var (exit, stdout, stderr) = Run("simulate", "--seed", "42");

@@ -76,6 +76,37 @@ public static class ProcessTree
     }
 
     /// <summary>
+    /// True only when the process is positively gone: it does not exist, or it
+    /// has exited. Every uncertainty (lookup failure, unsupported platform query)
+    /// answers false, so callers that report an unreaped descendant fail closed:
+    /// a process that may be alive is reported, a process that is certainly dead
+    /// is not. A PID whose start time could not be captured because the process
+    /// had already exited is reaped by definition; reporting it as unreaped
+    /// conflates "could not verify, may be alive" with "dead before we could
+    /// verify" (observed 2026-11-09: non-empty UnreapedDescendants with the
+    /// worker already dead).
+    /// </summary>
+    internal static bool IsGone(int pid)
+    {
+        if (pid <= 0) return true;
+        try
+        {
+            using var p = Process.GetProcessById(pid);
+            return p.HasExited;
+        }
+        catch (ArgumentException) { return true; } // no process with that id: positively gone
+        // InvalidOperationException is not a positive "gone" signal: fail closed
+        // (report unverifiable) instead of claiming the process exited.
+        catch (Exception exception) when (exception is NotSupportedException
+            or PlatformNotSupportedException
+            or InvalidOperationException
+            or System.ComponentModel.Win32Exception)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Returns the start time of a live process, or null if it cannot be
     /// determined. Used to record identity alongside a captured PID.
     /// </summary>

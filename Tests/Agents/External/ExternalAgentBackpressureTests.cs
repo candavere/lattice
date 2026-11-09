@@ -212,7 +212,12 @@ public class ExternalAgentBackpressureTests
     [Fact(Timeout = ExternalAgentTestHost.TestTimeoutMs)]
     public async Task ConcurrentDisposeDuringBlockedWriteReadsAsCancellation()
     {
-        var limits = ExternalAgentTestHost.Budget(stepTimeoutMs: 5_000, maxTicks: 2, slackMs: 2_000);
+        // Step budget must comfortably exceed the 500 ms dispose delay: under
+        // full parallel load the writer's budget clock can otherwise expire
+        // before the beside-thread dispose is observed, reading a step timeout
+        // for an agent the test itself cancelled. 30 s is far above the delay
+        // so cancellation ordering is deterministic; the budget never binds.
+        var limits = ExternalAgentTestHost.Budget(stepTimeoutMs: 30_000, maxTicks: 2, slackMs: 2_000);
         var agent = new ExternalAgent(
             ExternalAgentTestHost.Launch("ack-then-stop-reading"),
             agentId: 0, runSeed: Seed, scenario: ExternalAgent.StandardScenario,

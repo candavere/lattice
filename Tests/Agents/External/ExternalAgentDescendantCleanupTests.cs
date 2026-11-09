@@ -127,7 +127,10 @@ public class ExternalAgentDescendantCleanupTests
         try
         {
             System.Environment.SetEnvironmentVariable(WorkerPidFileVar, pidFile);
-            var limits = ExternalAgentTestHost.Budget(stepTimeoutMs: 500, maxTicks: 2, slackMs: 30_000);
+            // Step budget must cover stub startup under parallel load: the
+            // handshake uses the same budget, and 500 ms times out at the ctor
+            // when the host spawns many dotnet children at once.
+            var limits = ExternalAgentTestHost.Budget(stepTimeoutMs: 2_000, maxTicks: 2, slackMs: 30_000);
             using var agent = new ExternalAgent(
                 ExternalAgentTestHost.Launch("spawn-hang-at-step", "1"),
                 agentId: 0, runSeed: Seed + 2, scenario: ExternalAgent.StandardScenario,
@@ -172,7 +175,9 @@ public class ExternalAgentDescendantCleanupTests
             void Diag(string tag) =>
                 _output.WriteLine($"DIAG {tag}: t={diag.ElapsedMilliseconds}ms utc={DateTimeOffset.UtcNow:HH:mm:ss.fff}");
             Diag("ctor-start");
-            var limits = new ExternalTimeLimits(stepTimeoutMs: 500, matchTimeoutMs: 500, maxTicks: 1);
+            // Same startup coverage as above: stub cold start under parallel
+            // load must not consume the 500 ms handshake budget.
+            var limits = new ExternalTimeLimits(stepTimeoutMs: 2_000, matchTimeoutMs: 2_000, maxTicks: 1);
             using var agent = new ExternalAgent(
                 ExternalAgentTestHost.Launch("spawn-stall-match", "5000"),
                 agentId: 0, runSeed: Seed + 3, scenario: ExternalAgent.StandardScenario,
@@ -287,6 +292,171 @@ public class ExternalAgentDescendantCleanupTests
         }
     }
 
+    [Fact(Timeout = 30_000)]
+    public async Task WorkerSpawnedAfterTheLastExchangeIsReapedAtDispose()
+    {
+        // Regression: the dispose-time descendant capture used to be dead code
+        // (NoteDescendants refuses to run once the teardown claim is staked, and
+        // Dispose staked the claim first), so the last effective snapshot was
+        // the previous exchange's. A worker born after that exchange was
+        // invisible: the graceful stdin close let the conforming child exit on
+        // EOF, the worker orphaned to PID 1, and the tree kill requested on the
+        // exited handle no-op'd. The capture is now forced exactly once, after
+        // the claim and before the kill passes.
+        //
+        // The fixture barrier is the PROTOCOL, not a sleep: the stub spawns its
+        // worker only after answering step 0, and the host captures descendants
+        // before it writes an observation - so the worker is deterministically
+        // born after the last capture, however long the constructor's
+        // post-handshake scan took. (A fixed post-handshake sleep could
+        // false-green when that scan stalled past the sleep under load.)
+        var pidFile = NewPidFile();
+        try
+        {
+            System.Environment.SetEnvironmentVariable(WorkerPidFileVar, pidFile);
+            var limits = ExternalAgentTestHost.Budget(stepTimeoutMs: 4_000, maxTicks: 4, slackMs: 2_000);
+            using var agent = new ExternalAgent(
+                ExternalAgentTestHost.Launch("spawn-hold-after-step", "0"),
+                agentId: 0, runSeed: Seed + 4, scenario: ExternalAgent.StandardScenario,
+                maxTicks: 4, agentCount: 2, limits);
+            Assert.Null(agent.PendingFault);
+            var childPid = agent.ProcessId;
+
+            // One ordinary exchange: the stub answers step 0 correctly and only
+            // then spawns its worker. No further exchange runs, so no later
+            // capture can see the worker before the dispose.
+            _ = await Task.Run(() => agent.Decide(Obs())).WaitAsync(TimeSpan.FromSeconds(10));
+
+            // Owned synchronization, bounded: the worker certainly exists
+            // before the disposal - no fixed sleep.
+            var workers = await WaitForOwnedWorkers(pidFile, wantAlive: 1);
+            await Task.Run(() => agent.Dispose());
+
+            var clean = workers.All(p => !IsAlive(p));
+            _output.WriteLine($"PRODUCT-ASSERT dispose-capture: clean={clean} workers=[{string.Join(",", workers)}]");
+            ExternalAgentTestHost.AssertNoProcessLeft(childPid);
+            Assert.True(clean, "worker remains after dispose despite the dispose-time capture.");
+        }
+        finally
+        {
+            var reaped = ReapOwned(pidFile);
+            _output.WriteLine($"HARNESS-CLEANUP dispose-capture: reaped-any={reaped}");
+            System.Environment.SetEnvironmentVariable(WorkerPidFileVar, null);
+        }
+    }
+
+    [Fact(Timeout = 30_000)]
+    public async Task WorkerOrphanedBeforeAnyCaptureOutlivesDispose_HarnessReaps()
+    {
+        // Characterization, not a passing grade: the relay spawns the worker
+        // and exits BEFORE the hello_ack is written, so the worker has
+        // reparented past the child before the host's first descendant
+        // snapshot. No capture ever sees it, the tree kill cannot reach it,
+        // and it is not even listed in UnreapedDescendants - the pre-existing
+        // orphan blind spot, pinned here so a future fix flips this test.
+        // The harness owns the worker via the pid file and reaps it after the
+        // product assertions.
+        var pidFile = NewPidFile();
+        try
+        {
+            System.Environment.SetEnvironmentVariable(WorkerPidFileVar, pidFile);
+            var limits = ExternalAgentTestHost.Budget(stepTimeoutMs: 4_000, maxTicks: 4, slackMs: 2_000);
+            using var agent = new ExternalAgent(
+                ExternalAgentTestHost.Launch("spawn-relayed-worker"),
+                agentId: 0, runSeed: Seed + 6, scenario: ExternalAgent.StandardScenario,
+                maxTicks: 4, agentCount: 2, limits);
+            Assert.Null(agent.PendingFault);
+            var childPid = agent.ProcessId;
+
+            var workers = await WaitForOwnedWorkers(pidFile, wantAlive: 1);
+            await Task.Run(() => agent.Dispose());
+
+            var surviving = workers.Where(IsAlive).ToList();
+            _output.WriteLine($"CHARACTERIZATION orphan-before-capture: surviving=[{string.Join(",", surviving)}] unreaped=[{string.Join(",", agent.UnreapedDescendants)}]");
+            ExternalAgentTestHost.AssertNoProcessLeft(childPid);
+            Assert.Single(surviving);
+            Assert.DoesNotContain(surviving[0], agent.UnreapedDescendants);
+        }
+        finally
+        {
+            var reaped = ReapOwned(pidFile);
+            _output.WriteLine($"HARNESS-CLEANUP orphan-before-capture: reaped-any={reaped}");
+            System.Environment.SetEnvironmentVariable(WorkerPidFileVar, null);
+        }
+    }
+
+    [Fact(Timeout = 30_000)]
+    public async Task WorkerBornInTheGraceWindowOutlivesDispose_HarnessReaps()
+    {
+        // Characterization of the residual race the dispose-time capture does
+        // not close: the stub plays correctly until the host closes stdin at
+        // dispose, then spawns its worker in the dying breath - AFTER the
+        // dispose-time snapshot - and exits cleanly within the grace,
+        // orphaning the worker. Closing this window means killing before the
+        // graceful close, a protocol-contract change (every conforming agent
+        // would be SIGKILLed at dispose instead of exiting on EOF), so it is
+        // pinned here rather than silently widened. The harness owns the
+        // worker via the pid file and reaps it after the product assertions.
+        //
+        // The spawn needs the child to observe EOF and exit cleanly inside the
+        // grace. Windows CI never recorded the worker (fixture broken): the
+        // blocked pipe reader's EOF wake and dotnet spawn under parallel load do
+        // not fit the grace there, while the sibling orphan-before-capture
+        // characterization passes on Windows. This single characterization is
+        // therefore POSIX-scoped; the kill/clean assertions run on every OS.
+        // Move it to Windows only if a deterministic spawn in the grace window
+        // is built (it needs host cooperation, not a wider budget).
+        if (OperatingSystem.IsWindows())
+        {
+            _output.WriteLine(
+                "SKIP grace-window spawn on Windows (see comment above); POSIX characterization only.");
+            return;
+        }
+        var pidFile = NewPidFile();
+        try
+        {
+            System.Environment.SetEnvironmentVariable(WorkerPidFileVar, pidFile);
+            var limits = ExternalAgentTestHost.Budget(stepTimeoutMs: 4_000, maxTicks: 4, slackMs: 2_000);
+            using var agent = new ExternalAgent(
+                ExternalAgentTestHost.Launch("spawn-on-eof"),
+                agentId: 0, runSeed: Seed + 7, scenario: ExternalAgent.StandardScenario,
+                maxTicks: 4, agentCount: 2, limits);
+            Assert.Null(agent.PendingFault);
+            var childPid = agent.ProcessId;
+
+            _ = await Task.Run(() => agent.Decide(Obs())).WaitAsync(TimeSpan.FromSeconds(10));
+            await Task.Run(() => agent.Dispose());
+
+            // The spawn happens before the child exits, and Dispose waited for
+            // that exit, so the pid file is written; the bounded poll only
+            // covers file-flush latency.
+            var workers = await WaitForOwnedWorkers(pidFile, wantAlive: 1);
+            var surviving = workers.Where(IsAlive).ToList();
+            _output.WriteLine($"CHARACTERIZATION grace-window-birth: surviving=[{string.Join(",", surviving)}] unreaped=[{string.Join(",", agent.UnreapedDescendants)}]");
+            ExternalAgentTestHost.AssertNoProcessLeft(childPid);
+            Assert.Single(surviving);
+            Assert.DoesNotContain(surviving[0], agent.UnreapedDescendants);
+        }
+        finally
+        {
+            var reaped = ReapOwned(pidFile);
+            _output.WriteLine($"HARNESS-CLEANUP grace-window-birth: reaped-any={reaped}");
+            System.Environment.SetEnvironmentVariable(WorkerPidFileVar, null);
+        }
+    }
+
+    private async Task<List<int>> WaitForOwnedWorkers(string pidFile, int wantAlive)
+    {
+        for (var waited = 0; waited < 10_000; waited += 50)
+        {
+            var pids = ReadPids(pidFile);
+            if (pids.Count(IsAlive) >= wantAlive) { return pids; }
+            await Task.Delay(50);
+        }
+
+        throw new InvalidOperationException("fixture never recorded a live worker pid; the test setup itself is broken.");
+    }
+
     private static string NewPidFile() =>
         Path.Combine(Path.GetTempPath(), $"lattice-b3-pids-{Guid.NewGuid():N}.txt");
 
@@ -361,6 +531,56 @@ public class ExternalAgentDescendantCleanupTests
     public void ProcessTree_KillById_AbsentPidIsComplete()
     {
         Assert.True(ProcessTree.KillById(int.MaxValue));
+    }
+
+    [Fact(Timeout = 30_000)]
+    public async Task UnverifiedWorkerAlreadyDeadIsExcludedFromUnreaped_LiveUnverifiedIsListedNotKilled()
+    {
+        // Integration evidence for the null-start branch of
+        // KillKnownDescendants. A null start time means identity was never
+        // captured, so the PID is never killed by bare id - that invariant is
+        // unchanged. What changed: a null-start PID whose process is already
+        // gone is no longer reported unreaped ("dead before we could verify"
+        // is not "could not verify, may be alive"); a null-start PID whose
+        // process is still live is still listed and left running.
+        //
+        // The null-start state cannot be produced deterministically from the
+        // public surface (it needs TryGetStartTime to fail on a live capture),
+        // so the precondition is injected into the private bookkeeping with
+        // reflection; everything asserted is real: real processes, a real
+        // child, a real Dispose, the public UnreapedDescendants report.
+        var limits = ExternalAgentTestHost.Budget(stepTimeoutMs: 4_000, maxTicks: 4, slackMs: 2_000);
+        using var agent = new ExternalAgent(
+            ExternalAgentTestHost.Launch("conform"),
+            agentId: 0, runSeed: Seed + 8, scenario: ExternalAgent.StandardScenario,
+            maxTicks: 4, agentCount: 2, limits);
+        Assert.Null(agent.PendingFault);
+
+        using var live = Process.Start(new ProcessStartInfo
+        {
+            FileName = "sleep", ArgumentList = { "30" }, UseShellExecute = false, CreateNoWindow = true,
+        })!;
+        using var dead = Process.Start(new ProcessStartInfo
+        {
+            FileName = "sleep", ArgumentList = { "0" }, UseShellExecute = false, CreateNoWindow = true,
+        })!;
+        dead.WaitForExit(10_000);
+
+        var field = typeof(ExternalAgent).GetField("_knownDescendants",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+            ?? throw new InvalidOperationException("bookkeeping field renamed; update this test");
+        var known = (System.Collections.Generic.IDictionary<int, DateTime?>)field.GetValue(agent)!;
+        known[dead.Id] = null;
+        known[live.Id] = null;
+
+        await Task.Run(() => agent.Dispose());
+
+        _output.WriteLine($"PRODUCT-ASSERT null-start: unreaped=[{string.Join(",", agent.UnreapedDescendants)}] dead={dead.Id} live={live.Id}");
+        Assert.DoesNotContain(dead.Id, agent.UnreapedDescendants);
+        Assert.Contains(live.Id, agent.UnreapedDescendants);
+        Assert.True(IsAlive(live.Id), "a null-start PID must never be killed by bare id.");
+        try { live.Kill(entireProcessTree: true); } catch { }
+        try { live.WaitForExit(5_000); } catch { }
     }
 
     private bool ReapOwned(string pidFile)

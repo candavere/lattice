@@ -77,6 +77,35 @@ public static class Program
             return 0;
         }
 
+        // hold-until-eof is a barrier fixture: it must never speak the protocol,
+        // and its whole job is to stay alive until the parent releases it.
+        // Release is stdin EOF - no signals - so the fixture itself cannot hit
+        // the stopped-process kill races the descendant tests live next to.
+        // Unlike worker-hold it MAY read: it gets its own redirected stdin from
+        // the test, not a worker's shared pipe.
+        if (mode == "hold-until-eof")
+        {
+            Console.Error.WriteLine("stub: holding until stdin EOF");
+            Console.Error.Flush();
+            while (stdin.ReadByte() != -1)
+            {
+            }
+            return 0;
+        }
+
+        // relay-worker is an INTERMEDIATE: it spawns the pipe-holding worker and
+        // exits immediately, so the worker reparents to PID 1 while the real
+        // parent (the host's child) stays alive. Like worker-hold it must never
+        // touch the shared stdin/stdout: no reads, no protocol bytes - it only
+        // holds the handles open long enough to hand them to the worker.
+        if (mode == "relay-worker")
+        {
+            SpawnHoldingWorker("worker-hold");
+            Console.Error.WriteLine("stub: relay spawned worker; exiting to orphan it");
+            Console.Error.Flush();
+            return 0;
+        }
+
         // Every mode begins with the handshake, so the failure under test is the
         // only thing that differs. silent-handshake is the one exception: it reads
         // hello and then says nothing, which is what a timeout_handshake is.
@@ -106,6 +135,17 @@ public static class Program
         // the entire match budget cannot be waited out at any child startup speed,
         // which is what makes timeout_match reachable without a race.
         var stallMs = (mode == "stall-match" || mode == "spawn-stall-match") && parsed > 0 ? parsed : 0;
+
+        // spawn-relayed-worker orphans its worker BEFORE the hello_ack: the relay
+        // is spawned and the ack is written only after the relay has exited, so
+        // the worker has reparented past this process before the host's
+        // post-handshake descendant snapshot can ever run - the
+        // reparent-before-capture case, made deterministic by the wait instead
+        // of by a fixed sleep.
+        if (mode == "spawn-relayed-worker")
+        {
+            SpawnHoldingWorker("relay-worker")?.WaitForExit(10_000);
+        }
 
         // The handshake is answered immediately. The delay is spent inside the
         // step loop instead, where the host is actually counting: with
@@ -152,6 +192,8 @@ public static class Program
         // hang-at-step 1 answers step 0 and stalls on step 1, rather than
         // stalling before it has answered anything.
         var step = 0;
+        try
+        {
         while (true)
         {
             var observationLine = ReadLineOrThrow(stdin);
@@ -253,7 +295,35 @@ public static class Program
                     break;
             }
 
+            // spawn-hold-after-step answers the step FIRST and spawns its worker
+            // only after the host has the action. The host captures descendants
+            // before it WRITES an observation, and the worker is born after this
+            // exchange's answer: strictly after the last capture, whatever the
+            // constructor's post-handshake scan did or how long it took. A fixed
+            // sleep after the handshake could false-green when that scan stalled
+            // past the sleep under load; the protocol order here cannot.
+            if (mode == "spawn-hold-after-step" && step == at)
+            {
+                SpawnHoldingWorker();
+                Console.Error.WriteLine($"stub: spawned worker after answering step {step}");
+                Console.Error.Flush();
+            }
+
             step++;
+        }
+        }
+        catch (ProtocolViolation) when (mode == "spawn-on-eof")
+    {
+        // The host closed stdin (dispose): the blocked read above threw on EOF.
+        // The worker is spawned in the dying breath, AFTER the dispose-time
+        // descendant snapshot has already run, and the clean exit that follows
+        // orphans it - the one birth window a capture-before-exit strategy
+        // cannot see. Fixture for the documented residual race; other modes
+        // keep the unfiltered violation.
+        SpawnHoldingWorker();
+        Console.Error.WriteLine("stub: stdin closed; spawned worker in the dying breath");
+        Console.Error.Flush();
+        return 0;
         }
     }
 
@@ -266,15 +336,15 @@ public static class Program
     /// PID is recorded there so the test that started this fixture can reap the
     /// worker by an owned PID where the platform's tree kill cannot.
     /// </summary>
-    private static void SpawnHoldingWorker()
+    private static Process? SpawnHoldingWorker(string workerMode = "worker-hold")
     {
         try
         {
             var stub = Path.Combine(AppContext.BaseDirectory, "Lattice.ExternalAgentStub.dll");
-            using var worker = Process.Start(new ProcessStartInfo
+            var worker = Process.Start(new ProcessStartInfo
             {
                 FileName = "dotnet",
-                Arguments = $"{QuoteIfNeeded(stub)} worker-hold",
+                Arguments = $"{QuoteIfNeeded(stub)} {workerMode}",
                 UseShellExecute = false,
 
                 // No redirect: the worker inherits this process's stdout and
@@ -291,11 +361,14 @@ public static class Program
                 // test owns, never anywhere a real run would look.
                 File.AppendAllText(pidFile, $"{worker.Id}\n");
             }
+
+            return worker;
         }
         catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException)
         {
             Console.Error.WriteLine($"stub: could not spawn worker: {exception.Message}");
             Console.Error.Flush();
+            return null;
         }
     }
 

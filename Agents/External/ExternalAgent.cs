@@ -243,8 +243,13 @@ public sealed class ExternalAgent : IAgent, IDisposable
     public int ProcessId { get; }
 
     /// <summary>
-    /// PIDs whose cleanup could not be verified (identity unverifiable or
-    /// lookup failure). Never killed by bare PID. Exposed for diagnostics/tests.
+    /// CAPTURED descendant PIDs whose cleanup could not be verified (identity
+    /// unverifiable or lookup failure). Never killed by bare PID. Exposed for
+    /// diagnostics/tests. This is bookkeeping over the captured set only, not
+    /// complete containment: a worker the child orphaned before any snapshot
+    /// (e.g. via an intermediate that exited early) or one born after the last
+    /// capture was never recorded, so it neither appears here nor is killed —
+    /// the residual the characterization tests pin.
     /// </summary>
     public IReadOnlyCollection<int> UnreapedDescendants
     {
@@ -398,7 +403,16 @@ public sealed class ExternalAgent : IAgent, IDisposable
         // its budget is released by the cancellation rather than served it.
         _cancelled.Cancel();
 
-        NoteDescendants();
+        // One final descendant snapshot, forced past the teardown guard that
+        // makes every OTHER teardown-phase call a no-op: without it the last
+        // effective capture is the previous exchange's, and a worker born after
+        // that exchange is invisible to the kill passes - the graceful stdin
+        // close lets a conforming child exit on EOF, orphaning its workers to
+        // PID 1 before KillEntireTree can see them (a tree kill requested on an
+        // exited handle is a no-op). Forcing only HERE, after the claim is
+        // staked, keeps a single capturer: a concurrent losing Dispose adds
+        // nothing, and no capture can interleave with the kill passes below.
+        NoteDescendants(force: true);
 
         if (Volatile.Read(ref _writesInFlight) > 0)
         {
@@ -514,9 +528,9 @@ public sealed class ExternalAgent : IAgent, IDisposable
     /// the handshake and before every exchange, so a worker spawned at any
     /// point is captured before a later exit reparents it.
     /// </summary>
-    private void NoteDescendants()
+    private void NoteDescendants(bool force = false)
     {
-        if (Volatile.Read(ref _disposeState) != 0) return;
+        if (!force && Volatile.Read(ref _disposeState) != 0) return;
         int pid = ProcessId;
         if (pid <= 0) return;
         try
@@ -548,7 +562,15 @@ public sealed class ExternalAgent : IAgent, IDisposable
             if (pid == ProcessId) continue;
             if (!start.HasValue)
             {
-                // Identity was never captured: do not kill by bare PID.
+                // Identity was never captured: never kill by bare PID. But a PID
+                // whose identity read failed because the process had already
+                // exited (a transient intermediate, or one that finished between
+                // the descendant snapshot and the identity read) is reaped by
+                // definition; listing it as unreaped would conflate "could not
+                // verify, may be alive" with "dead before we could verify".
+                // IsGone answers true only for a positively-gone process, so an
+                // unverifiable-but-possibly-alive PID is still listed (fail closed).
+                if (ProcessTree.IsGone(pid)) { continue; }
                 lock (_descendantsLock) { _unreapedDescendants.Add(pid); }
                 continue;
             }

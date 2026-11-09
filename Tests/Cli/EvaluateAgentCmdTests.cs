@@ -44,7 +44,10 @@ public class EvaluateAgentCmdTests
 
     public EvaluateAgentCmdTests(ITestOutputHelper output) => _output = output;
 
-    [Fact(Timeout = TestTimeoutMs)]
+    // Whole-study tests exceed 60 s under full parallel load (many dotnet
+    // children at once); 120 s keeps the host ceiling honest without making a
+    // hang silent. See #12.
+    [Fact(Timeout = 120_000)]
     public async Task A_Conforming_External_Agent_Produces_A_Study_And_An_Artifact()
     {
         var path = TempPath();
@@ -732,7 +735,17 @@ public class EvaluateAgentCmdTests
                 // already down
             }
 
-            _listener.Close();
+            // .NET on Unix can report "Address already in use" removing the
+            // prefix at Close after Stop (macOS CI, second suite run); the
+            // listener is already stopped, so this is not a failure.
+            try
+            {
+                _listener.Close();
+            }
+            catch (Exception)
+            {
+                // already down
+            }
             _thread.Join(TimeSpan.FromSeconds(5));
         }
     }

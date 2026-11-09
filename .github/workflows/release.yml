@@ -161,12 +161,22 @@ jobs:
 
       - name: Smoke test the exact native asset
         shell: bash
+        env:
+          RELEASE_VERSION_INPUT: ${{ inputs.release_version }}
         run: |
           set -euo pipefail
           BIN="publish/${{ matrix.target.name }}"
           chmod +x "$BIN" || true
 
-          EXPECTED_VERSION="${GITHUB_REF#refs/tags/v}"
+          # Same tag-vs-dispatch version selection as the parity gate above:
+          # on a tag the version comes from GITHUB_REF; on dispatch it comes
+          # from the required release_version input. Using GITHUB_REF alone
+          # would make a dispatch run compare against "refs/heads/main".
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            EXPECTED_VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            EXPECTED_VERSION="$RELEASE_VERSION_INPUT"
+          fi
 
           echo "== $BIN --help =="
           "$BIN" --help

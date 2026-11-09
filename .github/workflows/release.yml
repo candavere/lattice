@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Release version to validate (only used when run by dispatch, not from a tag)'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -26,11 +32,21 @@ jobs:
 
       - name: Assert tag version == every project <Version> == CLI --version
         shell: bash
+        env:
+          RELEASE_VERSION_INPUT: ${{ inputs.release_version }}
         run: |
           set -euo pipefail
 
-          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            TAG_VERSION="$RELEASE_VERSION_INPUT"
+          fi
           echo "tag version: $TAG_VERSION"
+          if [ -z "$TAG_VERSION" ]; then
+            echo "::error::no release version: the tag is empty and no release_version input was given"
+            exit 1
+          fi
           echo "checked-out commit SHA: ${GITHUB_SHA}"
           if [ -z "${GITHUB_SHA:-}" ]; then
             echo "::error::GITHUB_SHA is empty; release cannot target a commit"

@@ -8,13 +8,8 @@
 
 <p align="center">
   <a href="https://github.com/candavere/lattice/actions/workflows/ci.yml"><img src="https://github.com/candavere/lattice/actions/workflows/ci.yml/badge.svg" alt="CI: latest build status" title="CI: latest build status" /></a>
-  <a href="https://github.com/candavere/lattice/actions/workflows/pages.yml"><img src="https://github.com/candavere/lattice/actions/workflows/pages.yml/badge.svg" alt="Pages: latest deploy status" title="Pages: latest deploy status" /></a>
-  <a href="https://github.com/candavere/lattice/actions/workflows/benchmarks.yml"><img src="https://github.com/candavere/lattice/actions/workflows/benchmarks.yml/badge.svg" alt="Benchmarks: latest run status" title="Benchmarks: latest run status" /></a>
   <img src="https://img.shields.io/badge/status-research%20preview-orange" alt="Status: research preview" title="Status: research preview" />
-  <a href="https://github.com/candavere/lattice/releases/latest"><img src="https://img.shields.io/github/v/release/candavere/lattice" alt="Latest release" title="Latest release" /></a>
-  <a href="https://github.com/candavere/lattice/blob/main/docs/ECOSYSTEM.md"><img src="https://img.shields.io/badge/target%20framework-net10.0-512BD4?logo=dotnet&logoColor=white" alt="Target framework: net10.0" title="Target framework: net10.0" /></a>
   <a href="https://github.com/candavere/lattice/blob/main/LICENSE"><img src="https://img.shields.io/github/license/candavere/lattice" alt="License: MIT" title="License: MIT" /></a>
-  <a href="https://github.com/candavere/lattice/blob/main/docs/ECOSYSTEM.md"><img src="https://img.shields.io/badge/production%20runtime%20deps-0-success" alt="Production runtime dependencies: 0" title="Production runtime dependencies: 0" /></a>
 </p>
 
 <p align="center"><sub>Every production assembly is pure .NET 10 BCL with zero external
@@ -45,6 +40,21 @@ negative result is first-class evidence, not something to hide: the committed
 32-rollout MCTS study **loses** to a deterministic heuristic, that loss is the
 baseline any future policy must beat, and it is published with its confidence
 interval. See [Results](#results).
+
+**The thesis in one minute:** every run is seeded, every run is a recording,
+and every recording can be replayed and checked. Run it, replay it, read the
+verdict:
+
+```sh
+dotnet run -c Release --project Cli -- simulate --seed 42 --steps 100 --out run.jsonl
+dotnet run -c Release --project Cli -- replay run.jsonl --verify
+dotnet run -c Release --project Cli -- evaluate --seed-set dev --scenario standard --seeds 30 --rollouts 32
+```
+
+The third command shows the honest case: on the standard study the built-in
+MCTS baseline loses to a deterministic heuristic — that committed loss is the
+baseline, not a failure to hide. If you want your own agent in the loop, see
+[Bring your own agent](#bring-your-own-agent) and [Verify everything yourself](#verify-everything-yourself).
 
 The data flow, drawn from the committed tools:
 
@@ -203,7 +213,7 @@ Each row is one committed benchmark claim, with the artifact behind it.
 | 32-rollout MCTS loses to the deterministic Scout heuristic on standard generated maps: mean paired delta -1.12, 95% CI [-1.37, -0.87] on the dev suite. This loss is the committed negative baseline. | [`benchmarks/mcts_evaluation_results.json`](benchmarks/mcts_evaluation_results.json) |
 | The same 32-rollout MCTS policy wins when both agents are funneled through capacity-1 chokepoints into one shared vault: +2.03, CI [+1.66, +2.41] on the dev suite. Topology changed the conclusion. | [`benchmarks/bottleneck_evaluation_results.json`](benchmarks/bottleneck_evaluation_results.json) |
 | 99.61% scoped mutation score on `Simulation.cs` + `PerceptionFilter.cs` only (252 killed / 1 timed out / 1 survived / 0 no-coverage). A historical local calibration at `053f3eb`, not a rerun at the current head, not whole-repository coverage, and not a CI gate. | [`benchmarks/mutation_stryker_summary.json`](benchmarks/mutation_stryker_summary.json) |
-| Five-workload throughput record on one host: median 14,916 to 899,075 steps/s depending on workload (the MCTS case reports decisions/s). Speed is measured, not advertised. | [`benchmarks/throughput_benchmark.json`](benchmarks/throughput_benchmark.json), [`benchmarks/throughput_summary.md`](benchmarks/throughput_summary.md) |
+| Five-workload throughput record on one host (tree `41530ef`, recorded in the artifact): median 14,916 to 899,075 steps/s depending on workload (the MCTS case reports decisions/s). Speed is measured, not advertised. | [`benchmarks/throughput_benchmark.json`](benchmarks/throughput_benchmark.json), [`benchmarks/throughput_summary.md`](benchmarks/throughput_summary.md) |
 
 ### The standard study: a committed loss
 
@@ -352,15 +362,14 @@ on Windows) packs a real build and installs `lattice` into an owned per-user dir
 one profile, or (on Windows) appends the directory to the user `Path` only. Without that
 flag it prints the exact line instead and changes no profile or registry. Every effect is
 recorded in `install.json` and undone by `--uninstall-launcher` / `-UninstallLauncher`;
-dry-run changes nothing. Open a new terminal after PATH changes. On a Homebrew .NET
-install set `DOTNET_ROOT=/opt/homebrew/opt/dotnet/libexec` if the launcher complains; see
-below.
+dry-run changes nothing. Open a new terminal after PATH changes. If the
+launcher complains about a missing .NET runtime, see below.
 
-On a Homebrew .NET install the `lattice` launcher can fail with `You must
-install .NET to run this application.` even though `dotnet` itself works,
-because the launcher resolves the runtime from `DOTNET_ROOT` or a registered
-location and Homebrew installs to neither. Set `DOTNET_ROOT` to the real runtime
-root — for Homebrew that is `/opt/homebrew/opt/dotnet/libexec`. `dotnet run`
+On some package-manager .NET installations the `lattice` launcher can fail
+with `You must install .NET to run this application.` even though `dotnet`
+itself works, because the launcher resolves the runtime from `DOTNET_ROOT` or
+a registered location and such installations may provide neither. Set
+`DOTNET_ROOT` to the real runtime root for your installation. `dotnet run`
 above is unaffected, so if the launcher fails, use the zero-install path instead.
 
 This is **packaging, not a second implementation**. The tool is the same
@@ -698,9 +707,10 @@ Only claims the repository can back up are listed here.
   replay divergence. A descriptor that names a policy this build cannot
   construct, or a seat count the study cannot run, is the second kind, not the
   first: the command line was fine and the file it named was not usable.
-- Timing bounds are calibrated on an Apple M1 and are far from binding: the
-  default step budget is 5000 ms and the whole-match budget is
-  `5000 × max_ticks + 30000` ms. They were not measured on slower runners.
+- Timing bounds are calibrated on the reference host recorded in the benchmarks
+  artifacts and are far from binding: the default step budget is 5000 ms and
+  the whole-match budget is `5000 × max_ticks + 30000` ms. They were not
+  measured on slower runners.
 - The `TempFile` test helper swallows an `IOException` on delete and leaves the
   file, so a refused delete is not a test failure. Real handle leaks are caught
   directly, by asserting the exclusive-open property, in
@@ -888,9 +898,11 @@ paper over. So this page does not claim a green suite for the current head; it
 points at the CI artifact, which reports what actually happened on the run you
 are looking at.
 
-Current-session facts (2026-11-09, macOS arm64, local commits only): full
-.NET suite 924/924, Python adapter suite 39/39, golden replay 12/12 on the
-committed candidate tree. The macOS descendant-cleanup probe (issue #12):
+Current-session facts (2026-11-09, local-only, not yet published evidence):
+full .NET suite 924/924, Python adapter suite 39/39, golden replay 12/12 on
+the committed candidate tree at the time. These counts are local session
+measurements without a yet-published inspectable artifact; read the CI
+per-OS artifacts for the published per-commit counts. The macOS descendant-cleanup probe (issue #12):
 not reproduced in 40 loaded runs on this host — a bounded evidence gap, not
 clearance. Green runs here confirm this build passed; they do not clear any
 intermittent failure.

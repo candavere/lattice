@@ -888,6 +888,13 @@ paper over. So this page does not claim a green suite for the current head; it
 points at the CI artifact, which reports what actually happened on the run you
 are looking at.
 
+Current-session facts (2026-11-09, macOS arm64, local commits only): full
+.NET suite 924/924, Python adapter suite 39/39, golden replay 12/12 on the
+committed candidate tree. The macOS descendant-cleanup probe (issue #12):
+not reproduced in 40 loaded runs on this host — a bounded evidence gap, not
+clearance. Green runs here confirm this build passed; they do not clear any
+intermittent failure.
+
 ## How evidence works
 
 Each committed artifact below is the exact file behind a claim on this page:

@@ -101,8 +101,12 @@ public sealed class ExternalAgent : IAgent, IDisposable
     /// killed. A conforming agent sees the EOF immediately, so this only has to
     /// cover process teardown; it is deliberately short because it is paid by
     /// every match, including the ones whose child is hung and never will exit.
+    /// The grace must still cover .NET teardown on a slow, loaded Windows
+    /// runner — the barrier fixture's exit-on-EOF spawn needs the child to
+    /// survive here, or the kill wins before the spawn and no worker ever
+    /// exists (Windows CI, descendant PR) — so it is sized for that host class.
     /// </summary>
-    private static readonly TimeSpan GracefulExitTimeout = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan GracefulExitTimeout = TimeSpan.FromMilliseconds(1_500);
 
     /// <summary>How long to wait for the kill to be observed before giving up on a clean join.</summary>
     private static readonly TimeSpan KillConfirmTimeout = TimeSpan.FromSeconds(2);

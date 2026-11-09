@@ -1,0 +1,70 @@
+{
+  "CommitSha": "497bca08b90767f1285524e6f39c8913a49258bd",
+  "CreatedAtUtc": "2026-11-06T12:35:04.277672Z",
+  "Runtime": ".NET 10.0.12",
+  "Os": "macOS 27.0.0",
+  "Cores": 8,
+  "Architecture": "Arm64",
+  "Studies": [
+    {
+      "Suite": "dev",
+      "TargetPolicy": "external:python3",
+      "BaselinePolicy": "Scout",
+      "RolloutsPerAction": 32,
+      "MaxStepsPerMatch": 200,
+      "PerSeed": [
+        {
+          "Seed": 1001,
+          "PolicyScoreAtSeat0": 0,
+          "PolicyScoreAtSeat1": 0,
+          "BaselineScoreAtSeat0": 6,
+          "BaselineScoreAtSeat1": 2,
+          "MeanDelta": -4,
+          "Match0Outcome": 1,
+          "Match1Outcome": 1
+        }
+      ],
+      "Statistics": {
+        "Seeds": 1,
+        "Matches": 2,
+        "MeanDelta": -4,
+        "MedianDelta": -4,
+        "StdDevDelta": 0,
+        "IqrDelta": 0,
+        "CiLower95": -4,
+        "CiUpper95": -4,
+        "Wins": 1,
+        "Draws": 0,
+        "Losses": 1,
+        "Timeouts": 0,
+        "WinRate": 0.5,
+        "DrawRate": 0,
+        "LossRate": 0.5,
+        "TimeoutRate": 0,
+        "MeanContentionSaturation": 0
+      },
+      "Passed": false,
+      "Decision": "Not graded: 1 seeds is below the 30-seed floor of the decision rule (the canonical suites run 50)."
+    }
+  ],
+  "AgentFailures": {},
+  "VoidRuns": 0,
+  "AgentCommand": [
+    "python3",
+    "examples/python/lattice_model_agent.py",
+    "--endpoint",
+    "http://127.0.0.1:8081/v1/chat/completions",
+    "--model",
+    "qwen05",
+    "--prompt-version",
+    "acceptance",
+    "--request-timeout-ms",
+    "20000",
+    "--sidecar",
+    ".evidence/acceptance-local/local-sidecar.json"
+  ],
+  "AgentLimits": {
+    "StepTimeoutMs": 30000,
+    "MatchTimeoutMs": 6030000
+  }
+}

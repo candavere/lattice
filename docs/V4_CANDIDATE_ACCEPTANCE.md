@@ -198,9 +198,13 @@ call, no tag, no push; all results below are offline on the repaired tree.
   showed full green after a single-failed-job rerun; this session's local
   commits have no remote CI status and claim none. Native release assets
   remain unpublished (no tag).
-- S10's raw artifacts are maintainer-local evidence, not public reproducible
-  artifacts; this summary transfers their recorded counts faithfully and
-  claims no more than integration/plumbing.
+- S10's raw artifacts are published as a **committed subset** under
+  [`evidence/acceptance-s10/`](../evidence/acceptance-s10/README.md) (evaluation
+  JSONs, sidecar, replay-verified episodes, slice table, and a SHA-256 manifest
+  covering every published file). The remainder of the local `.evidence/`
+  directory stays untracked/local-only, and the Laya bundle is still reported
+  separately (not in this checkout). The counts above are checkable against the
+  manifest; no claim beyond integration/plumbing is made.
 - Hosted-model acceptance (S11) is NOT TESTED and, per the 2026-11-09
   closeout session, BLOCKED owner-owned: no `GROQ_API_KEY` variable exists
   on this machine, so the key check stopped the gate before any cost-terms

@@ -1,0 +1,22 @@
+# Lattice v4 acceptance report
+
+| slice | status | command | exit | evidence | note |
+|---|---|---|---|---|---|
+| S1 | works | git rev-parse/branch/status/log (read-only) | 0 | S1.log | tree state: clean; author and committer are candavere noreply only |
+| S2 | works | dotnet build Lattice.sln -c Release --no-restore | 0 | S2.log | 0 errors |
+| S3 | works | dotnet test Lattice.sln -c Release --no-build | 0 | S3.log | Passed! - Failed: 0, Passed: 913, Skipped: 0, Total: 913, Duration: 1 m 52 s - Lattice.Tests.dll (net10.0) |
+| S4 | works | (cd examples/python && python3 -m unittest -v test_lattice_model_agent) | 0 | S4.log | Ran 25 tests in 16.122s |
+| S5 | works | dotnet run --no-build -c Release --project Cli -- evaluate --scenario standard --seed-set dev --seeds 1 --agent-cmd python3 examples/python/lattice_agent.py --record-episodes .evidence/acceptance-local/ref-episodes --out .evidence/acceptance-local/ref.json | 0 | S5.log ref.json ref-episodes/ | 2 episode files; VoidRuns 0; AgentFailures empty; Decision: Not graded: 1 seeds is below the 30-seed floor of the decision rule (t |
+| S6 | works | replay <file> --verify (each episode) | 0 | S6.log | both recordings verify |
+| S7 | works | dotnet run --no-build -c Release --project Cli -- evaluate --scenario standard --seed-set dev --seeds 1 --agent-cmd python3 examples/python/lattice_agent.py --record-episodes .evidence/acceptance-local/ref-episodes --out .evidence/acceptance-local/ref-second.json | 1 | S7.log | expected-negative: refused, named existing files, no artifact |
+| S8 | works | dotnet run --no-build -c Release --project Cli -- evaluate --scenario standard --seed-set dev --seeds 1 --record-episodes .evidence/acceptance-local/none-expected | 2 | S8.log | expected-negative: usage error, nothing written |
+| S9 | works | python3 examples/python/lattice_model_agent.py --endpoint http://127.0.0.1:9/v1/chat/completions --model x --prompt-version acceptance --api-key-env LATTICE_ACCEPT_DEFINITELY_UNSET_VAR </dev/null | 1 | S9.log S9.stdout | expected-negative: exit 1, empty stdout, the single documented stderr line |
+| S10 | works | dotnet run --no-build -c Release --project Cli -- evaluate --scenario standard --seed-set dev --seeds 1 --agent-step-timeout-ms 30000 --agent-cmd python3 examples/python/lattice_model_agent.py --endpoint http://127.0.0.1:8081/v1/chat/completions --model qwen05 --prompt-version acceptance --request-timeout-ms 20000 --sidecar .evidence/acceptance-local/local-sidecar.json --record-episodes .evidence/acceptance-local/local-episodes --out .evidence/acceptance-local/local.json | 0 | S10.log local.json local-episodes/ S10.replay.log | 2 completed matches, VoidRuns 0, no AgentFailures, 2 recordings replay-verified; plumbing only, says nothing about model quality |
+| S11 | not-tested | - | - | - | needs a provider choice, verified cost terms and an existing key variable; no provider call made |
+| S12 | works | python scan of git ls-files and git diff (names only) | 0 | S12.log | tracked files read and net diff eb13fad..HEAD scanned, zero token-shaped hits; per-commit history is NOT covered and a value that is not token-shaped is not detected |
+| S13 | not-tested | - | - | - | test fixture literal in examples/python/test_lattice_model_agent.py is unclassified (dummy or real); publication stays blocked until a person decides |
+
+No slice stopped the run.
+
+Usable v4 not claimed. Hosted-model slice is not-tested here; the local-model slice is not-tested unless it shows works above.
+Push: not covered by this script.

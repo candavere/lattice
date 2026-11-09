@@ -185,6 +185,9 @@ has happened. The version bump (all nine project `<Version>` elements,
 
 ### Fixed
 
+- `--min-fairness NaN` rejected at parse (exit 2) instead of exhausting the generator.
+- External-agent descendant capture/bookkeeping corrections: force-capture at dispose, null-start recheck, corrected `UnreapedDescendants` reporting, `ProcessTree` fail-closed gone-checks.
+- Exited-process identity test no longer races child exit: barrier-held fixture (`hold-until-eof`, EOF release, no signals).
 - Child-process CLI tests now launch the CLI copy MSBuild deploys beside the test assembly instead of the CLI project's own bin tree, so in-suite builds can no longer rewrite the binary under a running child; exit-code mismatches dump both sides' exit codes, stdout and stderr. This hazard is consistent with the macOS CI exit 147, whose exact cause remains unproven.
 
 ## [3.1.0] - 2026-10-01

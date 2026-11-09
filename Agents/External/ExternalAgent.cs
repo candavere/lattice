@@ -834,9 +834,16 @@ public sealed class ExternalAgent : IAgent, IDisposable
         }
         catch (AggregateException)
         {
-            // The write itself faulted — the pipe is already broken. The first
-            // fault is the one to record, not a wrapper around it: GetResult
-            // rethrows the original IOException.
+            // The write itself faulted — the pipe is already broken. During
+            // teardown the pipe end is caused by Dispose's kill, so report it as
+            // cancellation rather than leaking a raw pipe IOException out of
+            // Decide. Otherwise the first fault is the one to record, not a
+            // wrapper around it: GetResult rethrows the original IOException.
+            if (_cancelled.IsCancellationRequested)
+            {
+                throw new OperationCanceledException(
+                    "the external agent was disposed during the exchange.");
+            }
             write.GetAwaiter().GetResult();
         }
 
@@ -854,8 +861,17 @@ public sealed class ExternalAgent : IAgent, IDisposable
         }
 
         // Completed within budget: surface an in-flight pipe failure as the
-        // fault it is, exactly as a synchronous write would have.
-        write.GetAwaiter().GetResult();
+        // fault it is, exactly as a synchronous write would have. A teardown
+        // kill that faulted the write is cancellation, not a raw pipe error.
+        try
+        {
+            write.GetAwaiter().GetResult();
+        }
+        catch (IOException) when (_cancelled.IsCancellationRequested)
+        {
+            throw new OperationCanceledException(
+                "the external agent was disposed during the exchange.");
+        }
     }
 
     /// <summary>

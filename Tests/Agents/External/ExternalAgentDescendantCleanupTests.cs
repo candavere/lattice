@@ -127,7 +127,10 @@ public class ExternalAgentDescendantCleanupTests
         try
         {
             System.Environment.SetEnvironmentVariable(WorkerPidFileVar, pidFile);
-            var limits = ExternalAgentTestHost.Budget(stepTimeoutMs: 500, maxTicks: 2, slackMs: 30_000);
+            // Step budget must cover stub startup under parallel load: the
+            // handshake uses the same budget, and 500 ms times out at the ctor
+            // when the host spawns many dotnet children at once.
+            var limits = ExternalAgentTestHost.Budget(stepTimeoutMs: 2_000, maxTicks: 2, slackMs: 30_000);
             using var agent = new ExternalAgent(
                 ExternalAgentTestHost.Launch("spawn-hang-at-step", "1"),
                 agentId: 0, runSeed: Seed + 2, scenario: ExternalAgent.StandardScenario,
@@ -172,7 +175,9 @@ public class ExternalAgentDescendantCleanupTests
             void Diag(string tag) =>
                 _output.WriteLine($"DIAG {tag}: t={diag.ElapsedMilliseconds}ms utc={DateTimeOffset.UtcNow:HH:mm:ss.fff}");
             Diag("ctor-start");
-            var limits = new ExternalTimeLimits(stepTimeoutMs: 500, matchTimeoutMs: 500, maxTicks: 1);
+            // Same startup coverage as above: stub cold start under parallel
+            // load must not consume the 500 ms handshake budget.
+            var limits = new ExternalTimeLimits(stepTimeoutMs: 2_000, matchTimeoutMs: 2_000, maxTicks: 1);
             using var agent = new ExternalAgent(
                 ExternalAgentTestHost.Launch("spawn-stall-match", "5000"),
                 agentId: 0, runSeed: Seed + 3, scenario: ExternalAgent.StandardScenario,

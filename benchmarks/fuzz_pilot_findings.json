@@ -1,0 +1,10 @@
+{
+  "seed": 20261110,
+  "surfaces": {
+    "recording-parser": {"accepted": 1, "declared": 49, "crashes": 0, "timeouts": 0},
+    "protocol-framing": {"accepted": 1, "declared": 49, "crashes": 0, "timeouts": 0},
+    "scenario-loader": {"accepted": 1, "declared": 49, "crashes": 0, "timeouts": 0}
+  },
+  "selfcheck_statehash": "caught",
+  "note": "random mutation, NOT coverage-guided; rerun scripts/fuzz-pilot.py --cases 50 to reproduce"
+}

@@ -51,9 +51,11 @@ internal static class FuzzHarness
         {
             var caseSeed = CaseSeed(baseSeed, index);
             var watch = Stopwatch.StartNew();
+            var completed = false;
             try
             {
                 caseBody(caseSeed);
+                completed = true;
             }
             catch (FuzzCheckException)
             {
@@ -70,7 +72,11 @@ internal static class FuzzHarness
             finally
             {
                 watch.Stop();
-                if (watch.Elapsed > PerCaseBudget)
+
+                // A budget exception thrown from here would replace the case's
+                // own exception, turning a crash into a timing report. Only
+                // report the budget when the body actually ran to completion.
+                if (completed && watch.Elapsed > PerCaseBudget)
                 {
                     throw new FuzzCheckException(
                         $"{target} exceeded the per-case budget " +

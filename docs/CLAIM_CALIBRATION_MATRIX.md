@@ -49,7 +49,7 @@ Evidence rows cite repository-relative paths. All commits referenced are on the
 
 | Status | Count |
 | --- | --- |
-| `CONFIRMED_BOUNDED` | 6 |
+| `CONFIRMED_BOUNDED` | 7 |
 | `RESEARCH_PREVIEW_SCOPED` | 1 |
 | `DEFERRED_TO_P2` | 3 |
 

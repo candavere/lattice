@@ -105,8 +105,8 @@ if run S3 0 dotnet test Lattice.sln -c Release --no-build; then
 else row S3 broken "$CMDSTR" "$RC" S3.log "suite red; not rerun; read S3.log"; finish; fi
 
 # S4 adapter unit tests
-cp_run() { (cd examples/python && PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_lattice_model_agent) > "$OUT/S4.log" 2>&1; RC=$?; }
-cp_run; CMDSTR="(cd examples/python && python3 -m unittest -v test_lattice_model_agent)"
+cp_run() { (cd examples/python && PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_lattice_model_agent test_lattice_model_agent_acceptance) > "$OUT/S4.log" 2>&1; RC=$?; }
+cp_run; CMDSTR="(cd examples/python && python3 -m unittest -v test_lattice_model_agent test_lattice_model_agent_acceptance)"
 if [ "$RC" -eq 0 ]; then row S4 works "$CMDSTR" 0 S4.log "$(grep -E '^Ran ' "$OUT/S4.log")"
 else row S4 broken "$CMDSTR" "$RC" S4.log "adapter tests red"; finish; fi
 

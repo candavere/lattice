@@ -68,10 +68,17 @@ agent](#bring-your-own-agent).
 
 ## Headline result
 
-| Study | Result | Artifact |
-| :--- | :--- | :--- |
-| Standard generated maps | 32-rollout MCTS **loses** to the deterministic Scout heuristic: mean paired delta **-1.12**, 95% CI **[-1.37, -0.87]** on 50 dev seeds; held-out **-1.25**, **[-1.54, -0.96]** on 50 seeds. This is the committed negative baseline. | [`benchmarks/mcts_evaluation_results.json`](benchmarks/mcts_evaluation_results.json) |
-| Capacity-1 bottleneck | The **same policy wins** when both agents are funneled through chokepoints into one shared vault: **+2.03**, CI **[+1.66, +2.41]** on 30 dev seeds; held-out **+2.60**, **[+2.20, +3.00]** on 30 seeds. Topology changed the conclusion. | [`benchmarks/bottleneck_evaluation_results.json`](benchmarks/bottleneck_evaluation_results.json) |
+### Standard generated maps
+
+32-rollout MCTS **loses** to the deterministic Scout heuristic: mean paired delta **-1.12**, 95% CI **[-1.37, -0.87]** on 50 dev seeds; held-out **-1.25**, **[-1.54, -0.96]** on 50 seeds. This is the committed negative baseline.
+
+Artifact: [`benchmarks/mcts_evaluation_results.json`](benchmarks/mcts_evaluation_results.json)
+
+### Capacity-1 bottleneck
+
+The **same policy wins** when both agents are funneled through chokepoints into one shared vault: **+2.03**, CI **[+1.66, +2.41]** on 30 dev seeds; held-out **+2.60**, **[+2.20, +3.00]** on 30 seeds. Topology changed the conclusion.
+
+Artifact: [`benchmarks/bottleneck_evaluation_results.json`](benchmarks/bottleneck_evaluation_results.json)
 
 The full tables, the pre-fix comparison, the five-workload throughput record,
 and the negative-results list are in [`docs/RESULTS.md`](docs/RESULTS.md). Every
@@ -183,7 +190,7 @@ use. Independent replication starts with
   ([`FINDING-014`](docs/FINDINGS_LEDGER.md#finding-014--the-mcts-decision-throughput-case-cannot-be-gated-on-this-host-class-and-four-of-five-workloads-can));
   a green Benchmarks workflow is a narrow claim on that runner class.
 - **A seed with one completed match and one void refuses the study.** Dropping
-  the one-sided seed and reporting the drop is planned for v3.2; the constraint
+  the one-sided seed and reporting the drop is not implemented; the constraint
   is in [`docs/SUPPORT_AND_REPRODUCIBILITY.md` §3](docs/SUPPORT_AND_REPRODUCIBILITY.md#3-known-limitations).
 - **A small number of tests flake under the full parallel run.** A green run is
   evidence, not a guarantee; the current per-OS counts are the CI artifacts, and

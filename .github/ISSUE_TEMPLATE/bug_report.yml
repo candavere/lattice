@@ -10,7 +10,7 @@ body:
         reproducible from a committed command, so the most useful report is one that
         names the command, the revision, and the exact difference you saw.
 
-        Not a security issue? Please use the private route in
+        Is this a security issue? Please use the private route in
         [SECURITY.md](https://github.com/candavere/lattice/blob/main/SECURITY.md) instead.
 
   - type: input
@@ -18,7 +18,7 @@ body:
     attributes:
       label: Lattice version
       description: The `lattice --version` output, or the release tag you are on.
-      placeholder: "3.0.0"
+      placeholder: "4.0.0"
     validations:
       required: true
 

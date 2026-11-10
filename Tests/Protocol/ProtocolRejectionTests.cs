@@ -73,9 +73,18 @@ public class ProtocolRejectionTests
     public void MalformedJson_Embedded_Carriage_Return()
     {
         var payload = Encoding.UTF8.GetBytes("{\"type\":\"hello_ack\",\"protocol\":1}");
+
+        // The control: without the CR this exact line is a valid hello_ack, so
+        // the rejection below can only be attributable to the inserted byte.
+        Assert.IsType<HelloAckMessage>(ProtocolParser.Parse(payload));
+
+        // Insert the CR before the closing brace, where it is JSON whitespace:
+        // the message stays otherwise well-formed and one line long, so a parser
+        // that merely trimmed CRs would accept it.
         var withCr = new byte[payload.Length + 1];
-        payload.CopyTo(withCr, 0);
+        payload.AsSpan(0, payload.Length - 1).CopyTo(withCr);
         withCr[^2] = 0x0D;
+        withCr[^1] = (byte)'}';
 
         var violation = Assert.IsType<ProtocolViolation>(
             Record.Exception(() => ProtocolParser.Parse(withCr)));

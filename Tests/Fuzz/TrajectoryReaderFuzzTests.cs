@@ -27,6 +27,39 @@ public sealed class TrajectoryReaderFuzzTests
         "TotalResources", "Seed", "Reason", "MaxOccupancy", "TransitSpeed",
     };
 
+    [Fact]
+    public void PerturbNumbers_RematchesOffsets_AfterALengthChangingMutation()
+    {
+        // Seed 8 makes the first operation rewrite "100" as "98", shortening the
+        // text by one. An offset captured before that rewrite puts the second
+        // numeric hit one past the end of the builder, so the old code threw
+        // ArgumentOutOfRangeException from Remove before any second mutation
+        // could happen. Re-matching the current builder yields 101,-7 instead.
+        var output = TextMutator.PerturbNumbers("100,7", new Rng(8));
+
+        Assert.Equal("101,-7", output);
+    }
+
+    [Fact]
+    public void Run_ReportsACaseCrash_EvenWhenTheCaseIsOverBudget()
+    {
+        // The budget is checked in a finally block. If that check fires after a
+        // throwing body, its exception replaces the crash and the seed loses the
+        // only evidence of what actually went wrong. A real over-budget case is
+        // used rather than a shortened one, so this exercises the same path the
+        // 10 s budget takes in production.
+        var exception = Assert.Throws<FuzzCheckException>(() =>
+            FuzzHarness.Run("crash-over-budget", 1, 1, _ =>
+            {
+                Thread.Sleep(FuzzHarness.PerCaseBudget + TimeSpan.FromMilliseconds(50));
+                throw new InvalidOperationException("body crash");
+            }));
+
+        Assert.Contains("crashed unhandled", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("InvalidOperationException: body crash", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("exceeded the per-case budget", exception.Message, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(1337)]
     [InlineData(42424242)]

@@ -82,7 +82,15 @@ status=0
 # The pinned recording must still replay and still verify with no notices: that is
 # the property it exists to hold, and it is invisible to a byte comparison.
 echo "verifying the pinned demo.jsonl replays with no perception notice"
-if "${LATTICE[@]}" replay site/demo.jsonl --verify 2>&1 | grep -q "no recorded perception"; then
+set +e
+replay_out=$("${LATTICE[@]}" replay site/demo.jsonl --verify 2>&1)
+replay_rc=$?
+set -e
+if [ "$replay_rc" -ne 0 ]; then
+  echo "FAIL     site/demo.jsonl replay --verify failed with exit code $replay_rc" >&2
+  printf '%s\n' "$replay_out" >&2
+  status=1
+elif echo "$replay_out" | grep -q "no recorded perception"; then
   echo "NOTICE   site/demo.jsonl replayed but reported a missing-perception notice" >&2
   status=1
 else

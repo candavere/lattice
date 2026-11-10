@@ -253,16 +253,19 @@ internal static class TextMutator
     /// <summary>Applies small arithmetic corruption to 1..3 number literals.</summary>
     public static string PerturbNumbers(string input, Rng rng)
     {
-        var matches = NumberPattern.Matches(input);
-        if (matches.Count == 0)
-        {
-            return input;
-        }
-
         var operations = 1 + rng.Next(0, 3);
         var builder = new StringBuilder(input);
         for (var i = 0; i < operations; i++)
         {
+            // Re-match the current contents: a previous replacement can change
+            // the length of the text, so offsets captured before the first
+            // mutation are stale and can point past the end of the builder.
+            var matches = NumberPattern.Matches(builder.ToString());
+            if (matches.Count == 0)
+            {
+                return builder.ToString();
+            }
+
             var hit = matches[rng.Next(0, matches.Count)];
             if (!long.TryParse(hit.Value, out var parsed))
             {

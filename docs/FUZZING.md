@@ -23,7 +23,7 @@ random mutation**, not coverage-guided fuzzing.
 ## Black-box pilot harness (`scripts/fuzz-pilot.py`)
 
 `scripts/fuzz-pilot.py` exercises the **shipped CLI entry points** as oracles
-(`replay --verify` for recording + protocol framing, `validate-scenario` for the
+(`replay --verify` for recording and trajectory header parsing, `validate-scenario` for the
 scenario loader). It is also random mutation (fixed seed `20261110`), **not**
 coverage-guided feedback; nothing here uses libFuzzer/AFL-style coverage.
 
@@ -47,10 +47,13 @@ python3 scripts/fuzz-pilot.py --lattice-bin Cli/bin/Release/net10.0/lattice --ou
 ## Pilot result (2026-11-09 session, local)
 
 50 cases per surface = 150 mutants. Self-check: `caught`. Each surface:
-1 accepted, 49 declared errors, 0 crashes, 0 timeouts. Accepted mutants are
-benign byte edits the parsers still validly accept (e.g., whitespace/comments
-outside validated fields); they are recorded, not treated as defects. Full
-output is in the PR's local evidence; rerun the script to reproduce.
+1 accepted, 49 declared errors, 0 crashes, 0 timeouts. The earlier rationale
+stating that accepted mutants were "benign byte edits (e.g., whitespace/comments
+outside validated fields)" is not auditable or verifiable from the committed
+evidence (JSON/JSONL carry no comments, and the original mutant offsets were
+never committed to the repository); their benignness assessment cannot be
+verified from the committed evidence. Full output is in the PR's local evidence;
+rerun the script to reproduce.
 
 The old 240-mutant scratch pilot is **not** coverage-guided and is not claimed
 as such. A true coverage-guided campaign (libFuzzer/AFL route) and independent

@@ -30,10 +30,25 @@ vision, mirror-seated per seed. The protocol facts are reproduced by
 `Cli/CliApp.cs` (evaluation config) and `Agents/MctsAgent.cs` (default search
 depth).
 
-| Suite | Seeds | Mean delta | 95% CI | Win | Draw | Loss | Timeout | Verdict |
-| :--- | ---: | ---: | :--- | ---: | ---: | ---: | ---: | :--- |
-| dev (1001-1050) | 50 | -1.12 | [-1.37, -0.87] | 15% | 27% | 58% | 0% | **FAIL** |
-| held-out (2001-2050) | 50 | -1.25 | [-1.54, -0.96] | 18% | 14% | 68% | 0% | **FAIL** |
+**dev (1001-1050)**
+- Seeds: 50
+- Mean delta: -1.12
+- 95% CI: [-1.37, -0.87]
+- Win: 15%
+- Draw: 27%
+- Loss: 58%
+- Timeout: 0%
+- Verdict: **FAIL**
+
+**held-out (2001-2050)**
+- Seeds: 50
+- Mean delta: -1.25
+- 95% CI: [-1.54, -0.96]
+- Win: 18%
+- Draw: 14%
+- Loss: 68%
+- Timeout: 0%
+- Verdict: **FAIL**
 
 The entire 95% CI sits below 0 on both suites, so the decision rule fails by a
 wide margin. Every suite run terminates at `resources-exhausted` on at most 200
@@ -54,10 +69,27 @@ The reference result for the bottleneck study is
 source revision `28c89d3`, identical policy budget and baseline, procedural
 contention topology family, first 30 dev + 30 held-out seeds.
 
-| Suite | Seeds | Mean delta | 95% CI | Win | Draw | Loss | Timeout | Contention | Verdict |
-| :--- | ---: | ---: | :--- | ---: | ---: | ---: | ---: | ---: | :--- |
-| dev (1001-1030) | 30 | +2.03 | [+1.66, +2.41] | 50% | 3% | 47% | 0% | 16% | **PASS** |
-| held-out (2001-2030) | 30 | +2.60 | [+2.20, +3.00] | 50% | 18% | 32% | 0% | 16% | **PASS** |
+**dev (1001-1030)**
+- Seeds: 30
+- Mean delta: +2.03
+- 95% CI: [+1.66, +2.41]
+- Win: 50%
+- Draw: 3%
+- Loss: 47%
+- Timeout: 0%
+- Contention: 16%
+- Verdict: **PASS**
+
+**held-out (2001-2030)**
+- Seeds: 30
+- Mean delta: +2.60
+- 95% CI: [+2.20, +3.00]
+- Win: 50%
+- Draw: 18%
+- Loss: 32%
+- Timeout: 0%
+- Contention: 16%
+- Verdict: **PASS**
 
 Each seed draws a distinct topology, while both spawn arms stay geometric mirror
 images, so both agents reach the shared single-lane gate on the same tick and

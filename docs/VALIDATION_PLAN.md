@@ -19,10 +19,9 @@ re-check without trusting the first.
 > string, and checksum in this plan belongs to the published **v2.3.2** assets
 > and is left unchanged. **v3.0.0 shipped on 2026-09-27** — a historical fact
 > about that release, not a claim about which release is latest. The current
-> source tree is at **3.1.0**, where `--version` prints `3.1.0`. **This source
-> snapshot targets v3.1.0: publication is pending until the `v3.1.0` tag and
-> GitHub Release are verified, and after that checkpoint v3.1.0 is the
-> published release for this snapshot.** The `v3.0.0` turnkey challenge guide
+> source tree is at **4.0.0**, where `--version` prints `4.0.0`. The latest
+> published release is **v3.1.0**, published 2026-10-01; the 4.0.0 source is
+> unreleased. The `v3.0.0` turnkey challenge guide
 > is the second packet in [`reproduction_packet.md`](reproduction_packet.md).
 > That packet is a challenge guide, not a judged plan: **nothing in this
 > document judges 3.0.0, and nothing in it judges 3.1.0.** Independent

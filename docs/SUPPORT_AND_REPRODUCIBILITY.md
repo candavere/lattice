@@ -10,20 +10,16 @@ companion to the governing thesis in
 
 > **Release status: Research Preview — evaluation by maintainers and
 > collaborators.** The support contract in this document targets the published
-> **v2.3.2** release and its assets. **The current source version is 3.1.0**
-> (`--version` prints `3.1.0`, and every project `<Version>` matches). **This
-> source snapshot targets v3.1.0: publication is pending until the `v3.1.0` tag
-> and GitHub Release are verified, and after that checkpoint v3.1.0 is the
-> published release for this snapshot.** Until then the latest published
-> release is `v3.0.0`, whose assets are pinned to the `v3.0.0` tag and are
-> unchanged. Every reference below should be read against the version it names:
-> a `v2.3.2` or `v3.0.0` reference describes that release and its assets, not
-> the current source, while the trajectory schema, scenario file, perception and
-> replay-verification sections describe what the source tree does today at
-> 3.1.0. Where a release statement and a current-source statement differ, both
-> are true of their own subject and the difference is the version gap, not a
-> contradiction. The live `v3.1.0` GitHub Release record, not this paragraph,
-> is the authority on whether publication completed.
+> **v2.3.2** release and its assets. **The current source version is 4.0.0**
+> (`--version` prints `4.0.0`, and every project `<Version>` matches). The
+> latest published release is **v3.1.0**, published 2026-10-01; the 4.0.0
+> source is **unreleased**. Every reference below should be read against the
+> version it names: a `v2.3.2`, `v3.0.0`, or `v3.1.0` reference describes that
+> release and its assets, not the current source, while the trajectory schema,
+> scenario file, perception and replay-verification sections describe what the
+> source tree does today at 4.0.0. Where a release statement and a
+> current-source statement differ, both are true of their own subject and the
+> difference is the version gap, not a contradiction.
 >
 > Publishing v3.0.0 does not by itself qualify Lattice for production
 > use; it remains a research instrument until independent security review,
@@ -195,7 +191,7 @@ are stated rather than buried.
   when a seed is missing one side of the mirrored pair, and a void run produces
   no match row at all. Dropping the one-sided seed and counting it, so the
   grading floor is read on completed pairs only and the drops are reported
-  beside them, is planned for v3.2. It is not a one-line change: the drop count
+  beside them, is not implemented. It is not a one-line change: the drop count
   has to reach the report, and [`EXTERNAL_AGENT_PROTOCOL.md`](EXTERNAL_AGENT_PROTOCOL.md)
   §9.3 requires an in-process study's `evaluate` artifact to be byte-for-byte
   unchanged, so the report surface and that promise have to be settled together.

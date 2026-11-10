@@ -119,7 +119,7 @@ stop being the family it names.
 | `Zones` | array | `static` only. `{ "Id", "X", "Y", "MaxOccupancy"?, "Role"? }` |
 | `Resources` | array | `static` only. `{ "Id", "ZoneId", "X", "Y", "Role"? }` |
 | `ChokePoints` | array | `static` only. `{ "Id", "FromZoneId", "ToZoneId", "MaxOccupancy"?, "Role"? }` |
-| `Generator` | object | `generated` only. `{ "Family": "standard" \| "bottleneck" }` |
+| `Generator` | object | `generated` only. `{ "Family": "standard" \| "bottleneck" \| "dungeon" }` |
 | `Overrides` | object | `generated` only. `{ "ZoneMaxOccupancy": [ { "ZoneId", "MaxOccupancy" } ] }` |
 | `AddZones` | array | `generated` only. Same shape as `Zones` |
 | `AddResources` | array | `generated` only. Same shape as `Resources` |

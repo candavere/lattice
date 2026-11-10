@@ -427,19 +427,30 @@ class ModelAgentTest(unittest.TestCase):
 
     def test_missing_limits_means_no_retry(self):
         # A hello that does not make the budget known cannot authorise a retry.
+        # A timeout is used rather than an HTTP 500 because a timeout is
+        # retryable when the budget is known (see the test above), so this
+        # isolates "no limits" from the always-on no-retry-on-endpoint-error
+        # rule that a 500 would satisfy on its own.
         hello = dict(PROTOCOL_HELLO)
         del hello["limits"]
 
-        def boom(body, headers):
-            return 500, b"{}"
-
-        stub = self._stub(boom)
+        stub = self._stub(sleep_then_wait(2))
         proc = run_adapter(
-            ["--endpoint", stub.url, "--model", "stub", "--prompt-version", "v1"],
+            [
+                "--endpoint",
+                stub.url,
+                "--model",
+                "stub",
+                "--prompt-version",
+                "v1",
+                "--request-timeout-ms",
+                "300",
+            ],
             json.dumps(hello, separators=(",", ":"))
             + "\n"
             + observation_line(OBSERVATION)
             + "\n",
+            timeout=15,
         )
         self.assertNotEqual(0, proc.returncode)
         self.assertEqual(1, len(stub.requests))

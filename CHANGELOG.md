@@ -190,6 +190,18 @@ has happened. The version bump (all nine project `<Version>` elements,
 - Exited-process identity test no longer races child exit: barrier-held fixture (`hold-until-eof`, EOF release, no signals).
 - Child-process CLI tests now launch the CLI copy MSBuild deploys beside the test assembly instead of the CLI project's own bin tree, so in-suite builds can no longer rewrite the binary under a running child; exit-code mismatches dump both sides' exit codes, stdout and stderr. This hazard is consistent with the macOS CI exit 147, whose exact cause remains unproven.
 
+### Removed
+
+- 2026-11-10: The TUI/Launchpad surface is not part of this source tree and never
+  shipped in it. The `Added`/`Changed` entries above for the shared TUI palette,
+  `lattice tui ledger`, and the bare-`lattice` Launchpad describe work developed
+  outside this line; they are retained as history, not as a present promise. The
+  bare `lattice` invocation now prints its usage to stderr and exits 2.
+- 2026-11-10: The `v3.2` target recorded in the 3.1.0 notes for the one-sided
+  paired-evaluation seed drop is withdrawn. Dropping and counting a one-sided
+  seed remains unimplemented; no release target is promised for it. The 3.1.0
+  entry is left unchanged as history.
+
 ## [3.1.0] - 2026-10-01
 
 Source version 3.1.0, the release line that follows `v3.0.0`. This section

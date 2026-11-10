@@ -342,6 +342,39 @@ public class ExternalAgentCodeTests
             tail.Length <= StderrRing.CapacityBytes,
             $"the attached stderr tail was {tail.Length} chars, over the 64 KiB ring.");
     }
+
+    /// <summary>
+    /// Once the ring wraps, the snapshot must still be the retained bytes in
+    /// oldest-first order. The append below starts with the cursor not at zero
+    /// and overflows, so the retained region straddles the physical wrap; a
+    /// snapshot that resets its start to zero would return the same bytes
+    /// rotated, which a length-only assertion cannot see.
+    /// </summary>
+    [Fact]
+    public void StderrRing_AfterWrap_SnapshotIsOldestFirst()
+    {
+        var ring = new StderrRing();
+        var written = new List<byte>();
+
+        void Put(int count)
+        {
+            var chunk = new byte[count];
+            for (var i = 0; i < count; i++)
+            {
+                chunk[i] = (byte)((written.Count + i) * 37 + 11);
+            }
+
+            written.AddRange(chunk);
+            ring.Append(chunk);
+        }
+
+        Put(100);
+        Put(StderrRing.CapacityBytes - 50);
+
+        var expected = written.ToArray()[^StderrRing.CapacityBytes..];
+        Assert.Equal(expected, ring.Snapshot());
+        Assert.Equal((long)written.Count, ring.TotalBytes);
+    }
 }
 
 /// <summary>

@@ -256,6 +256,13 @@ jobs:
           python3 -m unittest discover -s .github/workflows \
             -p 'test_summarize_test_results.py' -v
 
+      - name: Python model agent adapter unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s examples/python \
+            -p 'test_*.py' -v
+
   # Non-gating forward-compatibility probe. GitHub is moving `ubuntu-latest`
   # from 24.04 to 26.04 between 2026-10-19 and 2026-11-19; the gated matrix
   # above stays pinned to 24.04 so a runner-image change cannot move a gate

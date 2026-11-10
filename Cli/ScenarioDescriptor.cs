@@ -448,8 +448,10 @@ public static class ScenarioLoader
         var name = ReadString(root, "Name", errors);
         var description = ReadString(root, "Description", errors);
 
-        var map = ReadMap(root, errors);
+        // AgentCount is read before the map because the topology check needs
+        // the declared roster size to know how many spawn zones exist.
         var (agentCount, stepLimit, transitSpeed) = ReadSimulation(root, errors);
+        var map = ReadMap(root, agentCount, errors);
         var slots = ReadSlots(root, agentCount, errors);
         var victory = ReadEnum(root, "Victory", "Condition", ScenarioMechanics.VictoryConditions, errors);
         var scoring = ReadEnum(root, "Scoring", "Scheme", ScenarioMechanics.ScoringSchemes, errors);
@@ -470,7 +472,7 @@ public static class ScenarioLoader
 
     // ---------------------------------------------------------------- map
 
-    private static ScenarioMapSpec? ReadMap(JsonElement root, List<ScenarioError> errors)
+    private static ScenarioMapSpec? ReadMap(JsonElement root, int agentCount, List<ScenarioError> errors)
     {
         if (!root.TryGetProperty("Map", out var map) || map.ValueKind != JsonValueKind.Object)
         {
@@ -516,11 +518,11 @@ public static class ScenarioLoader
         }
 
         return source == "generated" || isGenerated
-            ? ReadGeneratedMap(map, errors)
-            : ReadStaticMap(map, errors);
+            ? ReadGeneratedMap(map, agentCount, errors)
+            : ReadStaticMap(map, agentCount, errors);
     }
 
-    private static ScenarioMapSpec ReadStaticMap(JsonElement map, List<ScenarioError> errors)
+    private static ScenarioMapSpec ReadStaticMap(JsonElement map, int agentCount, List<ScenarioError> errors)
     {
         // A static map carries no generator, no overrides, and no additions:
         // everything it has is in the file. A generated-only field appearing
@@ -544,13 +546,13 @@ public static class ScenarioLoader
 
         if (zones is not null && resources is not null && chokes is not null)
         {
-            ValidateTopology(zones, resources, chokes, errors);
+            ValidateTopology(zones, resources, chokes, errors, agentCount);
         }
 
         return new ScenarioMapSpec.Static(new MapGraph(zones ?? [], resources ?? [], chokes ?? []));
     }
 
-    private static ScenarioMapSpec ReadGeneratedMap(JsonElement map, List<ScenarioError> errors)
+    private static ScenarioMapSpec ReadGeneratedMap(JsonElement map, int agentCount, List<ScenarioError> errors)
     {
         RejectUnknown(
             map,
@@ -586,7 +588,7 @@ public static class ScenarioLoader
         // a choke or a resource already refers to).
         if (addedZones is not null && addedChokes is not null)
         {
-            ValidateTopology(addedZones, addedResources ?? [], addedChokes, errors, prefix: "Map.Add");
+            ValidateTopology(addedZones, addedResources ?? [], addedChokes, errors, agentCount, prefix: "Map.Add");
         }
 
         return new ScenarioMapSpec.Generated(
@@ -1008,6 +1010,7 @@ public static class ScenarioLoader
         ResourceNode[] resources,
         ChokePoint[] chokes,
         List<ScenarioError> errors,
+        int agentCount,
         string prefix = "Map")
     {
         // Everything from here to the end assumes unique ids and resolvable
@@ -1091,7 +1094,7 @@ public static class ScenarioLoader
                 $"zone {zone.Id} is declared impassable (0); an agent can never occupy it, so declaring it as a room is unreachable by construction."));
         }
 
-        RejectUnreachableResources(zones, resources, chokes, errors, prefix);
+        RejectUnreachableResources(zones, resources, chokes, agentCount, errors, prefix);
     }
 
     private static void RejectDuplicateIds(IEnumerable<int> ids, string path, List<ScenarioError> errors)
@@ -1154,6 +1157,7 @@ public static class ScenarioLoader
         Zone[] zones,
         ResourceNode[] resources,
         ChokePoint[] chokes,
+        int agentCount,
         List<ScenarioError> errors,
         string prefix)
     {
@@ -1182,9 +1186,9 @@ public static class ScenarioLoader
             }
         }
 
-        // Slot 0 always spawns in zone 0; a descriptor with more agents than
-        // zones round-robins, so the spawn set is zones 0..min(agents, zones)-1
-        // and every one of them must reach every resource.
+        // Slot 0 always spawns in zone 0; the engine places slot i in zone
+        // i % zoneCount, so the spawn set is exactly zones 0..min(AgentCount,
+        // zones)-1. The declared roster is what matters here, not a fixed four.
         foreach (var resource in resources)
         {
             if (!passable.ContainsKey(resource.ZoneId))
@@ -1200,7 +1204,7 @@ public static class ScenarioLoader
             // reach, which would sit unclaimable for the whole episode and make
             // "resources-exhausted" unreachable.
             var reachableFromAnySpawn = false;
-            for (var slot = 0; slot < Math.Min(4, zones.Length) && !reachableFromAnySpawn; slot++)
+            for (var slot = 0; slot < Math.Min(agentCount, zones.Length) && !reachableFromAnySpawn; slot++)
             {
                 if (Reachable(passable, zones[slot].Id, resource.ZoneId))
                 {

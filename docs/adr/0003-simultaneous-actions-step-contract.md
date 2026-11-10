@@ -241,3 +241,16 @@ The guarantee remains runtime-scoped rather than cross-runtime: determinism is
 claimed under one named BCL contract, and the recording's own metadata records
 the runtime that produced it, so a verification run on a different runtime is a
 different claim and must be reported as one.
+
+## Addendum — choke admission and departure occupancy superseded (2026-11-10)
+
+The "Multi-tick transit and spatial capacity" addendum above stated that choke
+capacity is consulted only for crossings that actually take more than one tick,
+and that an in-transit agent acts as an occupant of its departure node for
+capacity purposes. Both statements are **superseded**. The `28c89d3`
+choke-admission fix (recorded as `FINDING-008`) made every crossing kind —
+instant, one-tick, and multi-tick — pass the same admission rule, and the
+departure-occupancy wording no longer describes an admitted crossing. The
+original addendum text is left unchanged as history.
+[`INVARIANT_SPECIFICATION.md`](../INVARIANT_SPECIFICATION.md) is the current
+authority for the choke-admission and occupancy contract.

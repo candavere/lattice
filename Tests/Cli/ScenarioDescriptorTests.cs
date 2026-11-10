@@ -294,6 +294,34 @@ public class ScenarioDescriptorTests
         Assert.Contains(errors, error => error.Message.Contains("does not exist", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void AResourceNoDeclaredAgentCanReach_IsRejected()
+    {
+        // Three zones and a declared roster of two: slot 0 starts in zone 0 and
+        // slot 1 in zone 1, so zone 2 is never a spawn. Both chokes into zone 2
+        // are impassable, leaving the one resource there unclaimable for the
+        // whole episode. The old check scanned four slots regardless of the
+        // declared AgentCount and so treated zone 2 as a spawn it could reach.
+        var errors = RejectText("""
+            { "SchemaVersion": 1, "Id": "unreachable-third-zone",
+              "Map": {
+                "Source": "static",
+                "Zones": [ { "Id": 0, "X": 0, "Y": 0 }, { "Id": 1, "X": 3, "Y": 0 }, { "Id": 2, "X": 6, "Y": 0 } ],
+                "ChokePoints": [
+                  { "Id": 0, "FromZoneId": 0, "ToZoneId": 2, "MaxOccupancy": 0 },
+                  { "Id": 1, "FromZoneId": 1, "ToZoneId": 2, "MaxOccupancy": 0 } ],
+                "Resources": [ { "Id": 0, "ZoneId": 2, "X": 6, "Y": 0 } ] },
+              "Simulation": { "AgentCount": 2, "StepLimit": 10, "TransitSpeed": 0 },
+              "Slots": [ { "Slot": 0, "Policy": "greedy" }, { "Slot": 1, "Policy": "greedy" } ],
+              "Victory": { "Condition": "first-of-either" }, "Scoring": { "Scheme": "resources-claimed" } }
+            """);
+
+        Assert.Contains(
+            errors,
+            error => error.FieldPath == "Map.Resources[].ZoneId"
+                && error.Message.Contains("unreachable", StringComparison.Ordinal));
+    }
+
     // ------------------------------------------------------------- digest
 
     [Fact]

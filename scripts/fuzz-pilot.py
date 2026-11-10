@@ -3,8 +3,7 @@
 
 Surfaces:
   - recording parser: Tests/fixtures/golden_trajectory.jsonl via `replay --verify`
-  - protocol framing: Protocol/ProtocolFraming + CliArgumentVectors sources
-    (payload-level mutation of the recording header/step lines)
+  - trajectory header parser: Tests/fixtures/golden_trajectory.jsonl header line via `replay --verify`
   - scenario loader: scenarios/dungeon-infiltration.json via `validate-scenario`
 
 Oracle: a mutant is ACCEPTED only when the CLI itself accepts it (exit 0).
@@ -118,8 +117,8 @@ def main():
             counts2["crashes"] += 1
     findings["surfaces"]["scenario-loader"] = counts2
 
-    # Surface 2: protocol framing (mutate first line = handshake envelope).
-    corpus3 = out / "corpus-protocol"
+    # Surface 2: trajectory header parser (mutate first line = trajectory header).
+    corpus3 = out / "corpus-header"
     corpus3.mkdir(exist_ok=True)
     counts3 = {"accepted": 0, "declared": 0, "crashes": 0, "timeouts": 0}
     for i in range(args.cases):
@@ -140,7 +139,7 @@ def main():
             counts3["timeouts"] += 1
         else:
             counts3["crashes"] += 1
-    findings["surfaces"]["protocol-framing"] = counts3
+    findings["surfaces"]["trajectory-header"] = counts3
 
     (out / "findings.json").write_text(
         json.dumps(findings, indent=2) + "\n", encoding="utf-8"

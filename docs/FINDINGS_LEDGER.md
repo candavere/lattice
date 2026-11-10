@@ -130,20 +130,6 @@ schema is defined in [`reproduction_packet.md`](reproduction_packet.md)
 | **Resolution & Evidence Link** | Tooling pinned in `.config/dotnet-tools.json` and mutation scope configured in `stryker-config.json` (`8eb86fc`); twelve targeted tests added in `ce2620b` across `Tests/Environment/CapacityTests.cs`, `DynamicTopologyTests.cs`, `EnvironmentLoopTests.cs`, `PerceptionFilterTests.cs`, `SimulationForkTests.cs`, and `TransitTests.cs`. The scoped mutation score recorded at the calibration run was 98.43% (calibrated strategy; `high` 80 / `low` 60 / `break` 0 thresholds are the committed gate). Boundary: the per-run HTML/JSON Stryker report is generated locally and is not checked in; the committed gate is the config, not the report artifact. |
 | **Resolution & Release Status** | `MAIN_ONLY` → `RELEASED_IN_v2.3.2` (the closure commits `8eb86fc` and `ce2620b` postdate the `c0e8342` tag commit and are packaged into the `v2.3.2` patch release). |
 
-## FINDING-007 — EdgeChoke not-found path uncovered; fuzz-harness kill attribution is batch-state dependent
-
-| Field | Value |
-| --- | --- |
-| **ID** | `FINDING-007` |
-| **Date** | 2026-09-22 |
-| **Source / Provenance** | `AI_ASSISTED_REVIEW` |
-| **Target Surface** | `Environment/Simulation.cs` — `EdgeChoke` not-found sentinel and the collect-loop resolution bound; `Tests/Fuzz/CliArgumentFuzzTests.cs` |
-| **Observation** | (a) The `EdgeChoke` not-found sentinel (`return -1` in `Simulation.cs`) was never exercised: a crossing over a choke-less pair silently skipped the not-found branch, so a corrupt map indexing an absent choke would silently charge `edgeLoad[+1]` instead of surfacing an indexed-out failure. Stryker previously recorded the `-1 → +1` mutant as `NoCoverage`. (b) The resolution-collect loop bound `rank < agentCount` is semantically identical under the `rank <= agentCount` mutant — the extra rank re-resolves the rank-0 agent, which is already processed and claim-gated — yet the CLI-argument fuzz harness reported a kill for that mutant in one batch run. The fuzz harness writes its generated scenario/rule/replay fixtures under a fixed `/tmp/lattice-fuzz-cli-<seed>` workspace and only writes a file when it does not already exist; under Stryker's parallel per-mutant batches a race on that shared workspace changes generated vectors between mutants, so a mutant that deterministically survives a sequential run can appear killed in a batch. The same pattern affected the `zoneCapacity > 0 → >= 0` mutant. |
-| **Severity & Confidence** | 439: High / Confirmed. Kill attribution flakiness: Medium / Confirmed (reproduced both as survivor and as batch-killed across runs). |
-| **Disposition** | (a) `FIXED` — the uncovered not-found path is now exercised and its loud-failure contract asserted. (b) `ACCEPTED_LIMITATION` — the two survivors are equivalent mutants; deterministic full-suite runs pass against each applied mutant, and the fuzz-attributed kills are documented as batch-state artifacts rather than real detections. |
-| **Resolution & Evidence Link** | `TransitAcrossMissingChoke_FailsLoudly_InsteadOfSilentlyChargingSiblingEdge` in `Tests/Environment/TransitTests.cs` and `ResolutionRotation_WrapRank_DoesNotDoubleAwardOrDoubleClaim` in `Tests/Environment/SimulationStepTests.cs` (added in the Stage-3 commit). Baseline record: `benchmarks/mutation_stryker_summary.json` (99.61% raw clean Stryker; reproducible killed/survived disposition and survivor rationales corrected for the line-222 `_agentLastSeenTicks` claim). Determinism checks: full 419-test suite passes with each of the 258 and 309 mutants applied to a clean tree; `CliArgumentFuzzTests` passes three consecutive isolated runs against each. |
-| **Resolution & Release Status** | `MAIN_ONLY` (postdates `v2.3.2` tag commit `4f7816f`; not packaged into any published release). |
-
 ## FINDING-006 — Context-dependent policy divergence (preserved negative result)
 
 | Field | Value |
@@ -157,6 +143,20 @@ schema is defined in [`reproduction_packet.md`](reproduction_packet.md)
 | **Disposition** | `ACCEPTED_LIMITATION` — the negative result is preserved, publicly disclosed, and explicitly scoped to research preview; no production-confidence claim is made from either direction. |
 | **Resolution & Evidence Link** | Both raw artifacts are committed and cited: `benchmarks/mcts_evaluation_results.json` (source revision `5783ca1`) and `benchmarks/bottleneck_evaluation_results.json` (source revision `1c6fa80`). The procedural bottleneck generator and paired contention harness were added in `c568897` and `cb91bc3`/`f4af28d`; the empirical artifact was committed in `e6ba4bf`. Research-preview scoping and calibration of the surrounding claims are in `6e361af`, `67ad127`, and `abb78fa`. |
 | **Resolution & Release Status** | `RELEASED_IN_v2.3.1` (all closure commits predate the `c0e8342` tag commit). |
+
+## FINDING-007 — EdgeChoke not-found path uncovered; fuzz-harness kill attribution is batch-state dependent
+
+| Field | Value |
+| --- | --- |
+| **ID** | `FINDING-007` |
+| **Date** | 2026-09-22 |
+| **Source / Provenance** | `AI_ASSISTED_REVIEW` |
+| **Target Surface** | `Environment/Simulation.cs` — `EdgeChoke` not-found sentinel and the collect-loop resolution bound; `Tests/Fuzz/CliArgumentFuzzTests.cs` |
+| **Observation** | (a) The `EdgeChoke` not-found sentinel (`return -1` in `Simulation.cs`) was never exercised: a crossing over a choke-less pair silently skipped the not-found branch, so a corrupt map indexing an absent choke would silently charge `edgeLoad[+1]` instead of surfacing an indexed-out failure. Stryker previously recorded the `-1 → +1` mutant as `NoCoverage`. (b) The resolution-collect loop bound `rank < agentCount` is semantically identical under the `rank <= agentCount` mutant — the extra rank re-resolves the rank-0 agent, which is already processed and claim-gated — yet the CLI-argument fuzz harness reported a kill for that mutant in one batch run. The fuzz harness writes its generated scenario/rule/replay fixtures under a fixed `/tmp/lattice-fuzz-cli-<seed>` workspace and only writes a file when it does not already exist; under Stryker's parallel per-mutant batches a race on that shared workspace changes generated vectors between mutants, so a mutant that deterministically survives a sequential run can appear killed in a batch. The same pattern affected the `zoneCapacity > 0 → >= 0` mutant. |
+| **Severity & Confidence** | 439: High / Confirmed. Kill attribution flakiness: Medium / Confirmed (reproduced both as survivor and as batch-killed across runs). |
+| **Disposition** | (a) `FIXED` — the uncovered not-found path is now exercised and its loud-failure contract asserted. (b) `ACCEPTED_LIMITATION` — the two survivors are equivalent mutants; deterministic full-suite runs pass against each applied mutant, and the fuzz-attributed kills are documented as batch-state artifacts rather than real detections. |
+| **Resolution & Evidence Link** | `TransitAcrossMissingChoke_FailsLoudly_InsteadOfSilentlyChargingSiblingEdge` in `Tests/Environment/TransitTests.cs` and `ResolutionRotation_WrapRank_DoesNotDoubleAwardOrDoubleClaim` in `Tests/Environment/SimulationStepTests.cs` (added in the Stage-3 commit). Baseline record: `benchmarks/mutation_stryker_summary.json` (99.61% raw clean Stryker; reproducible killed/survived disposition and survivor rationales corrected for the line-222 `_agentLastSeenTicks` claim). Determinism checks: full 419-test suite passes with each of the 258 and 309 mutants applied to a clean tree; `CliArgumentFuzzTests` passes three consecutive isolated runs against each. |
+| **Resolution & Release Status** | `MAIN_ONLY` (postdates `v2.3.2` tag commit `4f7816f`; not packaged into any published release). |
 
 ## FINDING-008 — Bottleneck empirical evidence re-anchored after choke admission fix
 
@@ -289,6 +289,8 @@ schema is defined in [`reproduction_packet.md`](reproduction_packet.md)
 | **Resolution & Evidence Link** | No code change. Evidence is this entry plus `benchmarks/runner_class_throughput_benchmark.json` (`Provenance.Spread.ByWorkload.stress_topology_4agent.MinRatio` = 0.8669, `MaxOverMin` = 1.661, `AllowedRatio` = 0.8236) and the two attempt logs linked above. Read together with `FINDING-013` (why a threshold from an unlike host class is not honest) and `FINDING-014` (why `policy_lookahead_mcts_32` is not armed at all on this host class); this entry does not supersede either and is filed alongside them |
 | **Resolution Release Status** | `MAIN_ONLY` (postdates `v3.0.0`; unversioned evidence-and-gate stage, no tag applies) |
 
+> **Correction (2026-11-10):** The quoted pathspec `-- Engine Agents Analytics Tests Protocol Generator Trajectories Visualization` is vacuous with respect to the engine: there is no `Engine/` directory in this repository (the engine core is `Environment/`), so that restricted diff could not have detected an engine change and its emptiness is not evidence about engine code. The unscoped diff for the same range covers the engine core, and it shows no path under `Environment/` changing. The entry text above is left unchanged.
+
 ---
 
 ## FINDING-016 — FINDING-015 understated the later non-documentation diff: it also covered a workflow and the site page, not only tool packaging metadata
@@ -305,6 +307,8 @@ schema is defined in [`reproduction_packet.md`](reproduction_packet.md)
 | **Resolution & Evidence Link** | No code change. `git diff --name-status ca438d062a542ad939c3aa7590c54ce1f06d828d 2c02b7d12c6fd79333570758f88e07817c6d31cf` (7 paths, 3 non-documentation); `git diff --stat` on each of the three; `git diff --name-only ca438d0 2c02b7d -- 'Cli/*.cs'` (empty); `git diff --stat ca438d0 2c02b7d -- Engine Agents Analytics Tests Protocol Generator Trajectories Visualization` (empty); `gh run view 36692501509 --json headSha` for attempts 1 and 2. Read together with `FINDING-013` (why an unlike host class cannot be gated) and `FINDING-014` (why `policy_lookahead_mcts_32` is not armed), neither of which this entry supersedes |
 | **Resolution Release Status** | `MAIN_ONLY` (postdates `v3.0.0`; unversioned evidence-and-documentation stage, no tag applies) |
 
+> **Correction (2026-11-10):** The narrower measured-code claim above quotes the pathspec `-- Engine Agents Analytics Tests Protocol Generator Trajectories Visualization`. That pathspec is vacuous for the engine: there is no `Engine/` directory in this repository (the engine core is `Environment/`), so its emptiness says nothing about engine code. The unscoped diff for `ca438d0..2c02b7d` covers the engine core, and it shows no path under `Environment/` changing. The entry text above is left unchanged; this note corrects the quoted evidence, not the recorded measurements.
+
 ---
 
 ## FINDING-017 — ExternalAgent handshake timeout, one historical occurrence
@@ -319,6 +323,38 @@ schema is defined in [`reproduction_packet.md`](reproduction_packet.md)
 | **Severity & Confidence** | Medium / Bounded |
 | **Disposition** | `OPEN` |
 | **Resolution & Evidence Link** | No code change. Harness and raw timings are under `.evidence/startup-timing/` (untracked, not committed). The contention load was approximated by two concurrent test classes rather than the full suite, and the harness runs outside the test process so it cannot observe host-side in-process scheduling. Cause unestablished; the startup-contention hypothesis is neither confirmed nor excluded. |
+| **Resolution Release Status** | `MAIN_ONLY` |
+
+---
+
+## FINDING-018 — Pump-completion await before exit classification
+
+| Field | Value |
+| --- | --- |
+| **ID** | `FINDING-018` |
+| **Date** | 2026-11-02 |
+| **Source / Provenance** | `INTERNAL_AUDIT` |
+| **Target Surface** | `Agents/External/ExternalAgent.cs` — pump-completion await before exit classification; `Tests/Agents/External/ExternalAgentCodeTests.cs` |
+| **Observation** | Single full-suite failure of `Line_Too_Long_When_The_Agent_Sends_An_Over_Length_Line` expected `LineTooLong` actual `AgentExited` (`ExternalAgentCodeTests.cs:195`). Mechanism consistent with the `ReadWithin` exit branch classifying before `PumpStdout` enqueued the terminal violation. Historical cause not established (never reproduced). |
+| **Severity & Confidence** | Low / Bounded (one observed occurrence; cause unestablished) |
+| **Disposition** | `FIXED` — await pump completion bounded by the remaining budget before classifying. Regression: none added at the time (no minimal seam); the precedence property was unchanged. The regression point is superseded by `FINDING-019`, which records the seam and the deterministic raced-state test. |
+| **Resolution & Evidence Link** | `Agents/External/ExternalAgent.cs` (pump-completion await before exit classification, `efe6470`). No test was added in this entry; `FINDING-019` records the deterministic raced-state regression and the inert seams that make it possible. |
+| **Resolution Release Status** | `MAIN_ONLY` |
+
+---
+
+## FINDING-019 — Exit-classification precedence (spec section 8.4) pinned by a deterministic raced-state test; corrects FINDING-018's "no minimal seam" claim by reference
+
+| Field | Value |
+| --- | --- |
+| **ID** | `FINDING-019` |
+| **Date** | 2026-11-03 |
+| **Source / Provenance** | `INTERNAL_AUDIT` - follow-up to `efe6470`, which shipped without the deterministic regression the closure review required. Seam design, patch and test were validated on an isolated copy of the tree at `efe6470` (.NET 10.0.403, Linux x64) before being applied here |
+| **Target Surface** | `Agents/External/ExternalAgent.cs` (three inert internal seams), `Agents/AssemblyAccess.cs` (new), `Tests/Agents/External/ExternalAgentExitClassificationRaceTests.cs` (new), `docs/FINDINGS_LEDGER.md` (this entry and its index row). `FINDING-018` is corrected by reference only and is not edited |
+| **Observation** | `FINDING-018` records "Regression: none added (no minimal seam)". A minimal seam exists: three instance-scoped `internal Action?` hooks on `ExternalAgent` (`BeforeTerminalEnqueue`, `TerminalEnqueued`, `ExitBranchProbe`), null in production, no reflection, no public API surface, exposed to the test assembly via `InternalsVisibleTo` in `Agents/AssemblyAccess.cs`. With them, `Violation_Enqueued_While_Consumer_Is_In_The_Exit_Branch_Wins` establishes the raced state (child exited AND terminal outcome not yet enqueued AND consumer inside the exit branch) by two-way event synchronization - no sleeps, no timing margins - and asserts the queued violation outranks the exit per spec section 8.4. Teeth: with the exit-branch settle take removed (control), the test fails with `Expected: LineTooLong Actual: AgentExited`. Bound: the reconstructed pre-fix shape (one 20 ms settle `TryTake`, then `OfClosed`) passes the same test; that shape was reconstructed from pasted reports of 2026-11-01 because the reviewed source archive carried no git history, and it was not verified against the actual `ae45cdf` source. The tested seam and property therefore cannot evidence that `efe6470`'s settle-window widening improves on the reconstructed pre-fix shape; this is bounded to the tested seam and property and is not a claim that no deterministic separation is possible by any means |
+| **Severity & Confidence** | Low / **Confirmed** for the seam's existence and the test's teeth (observed directly in isolated runs: green on `efe6470` in 692 ms, green on the reconstructed pre-fix shape in 639 ms, red on the no-settle control in 670 ms with the assertion quoted above). **Bounded** for the pre-fix reconstruction (provenance as stated) |
+| **Disposition** | `FIXED` for the missing regression guard (the section 8.4 precedence property is now pinned against settle removal). `OPEN` for `efe6470`'s incremental effect over the reconstructed pre-fix shape, which this test cannot establish. The historical failure's cause remains unestablished, unchanged from `FINDING-018` |
+| **Resolution & Evidence Link** | `Tests/Agents/External/ExternalAgentExitClassificationRaceTests.cs`; seams in `Agents/External/ExternalAgent.cs` (null in production; no product behavior change). Validation environment .NET 10.0.403 Linux x64: race test green (692 ms); chunked suite 899 passed with two pre-existing environmental gaps (`PackageReadinessTests` requires `.github/`, absent from the review archive; `LauncherSetupTests` exceeded a 100 s sandbox cap, 300 s budgets, no `ExternalAgent` references). The full-suite gate on the development checkout is recorded in this commit's execution report |
 | **Resolution Release Status** | `MAIN_ONLY` |
 
 ---
@@ -344,26 +380,10 @@ schema is defined in [`reproduction_packet.md`](reproduction_packet.md)
 | `FINDING-015` | 2026-09-30 | Same commit `ca438d0`, same runner image, same fingerprint: `stress_topology_4agent` read 0.802 → 0.785 → 1.006 across two attempts of one run; a re-dispatch turned red into green with the cause unestablished | Medium | `OPEN` (cause) / `ACCEPTED_LIMITATION` (re-dispatch is not a diagnosis) | No code change; entry plus run [`36692501509`](https://github.com/candavere/lattice/actions/runs/36692501509) attempts 1 and 2 |
 | `FINDING-016` | 2026-10-01 | `FINDING-015` understated its later non-documentation diff: `ca438d0..2c02b7d` changed **three** non-doc paths (`.github/workflows/ci.yml` +66, `Cli/Lattice.Cli.csproj` +2 packaging metadata, `site/index.html` favicon), not one. Corrected by reference; the narrower measured-code claim and all same-SHA evidence stand | Low | `FIXED` (scope statement, by reference) | Docs-only ledger addition; no source, workflow, benchmark record or baseline changed |
 | `FINDING-017` | 2026-11-01 | ExternalAgent handshake timeout, one historical occurrence | Medium | `OPEN` | No code change; `.evidence/startup-timing/` measurement (20 samples, worst 113.6 ms, no reproduction) |
+| `FINDING-018` | 2026-11-02 | Pump-completion await before exit classification | Low | `FIXED` | `efe6470` (pump-completion await; regression pinned in `FINDING-019`) |
 | `FINDING-019` | 2026-11-03 | `FINDING-018` said no minimal seam existed; one does, and the section 8.4 exit-classification precedence property is now pinned by a deterministic raced-state test. Corrected by reference; `efe6470`'s incremental effect over the reconstructed pre-fix shape and the historical cause remain unestablished | Low | `FIXED` (regression guard) / `OPEN` (incremental effect; historical cause) | Test + inert seams + ledger addition; no product behavior change |
 
 The ledger is maintained under the governing evidentiary standards of
 [`adr/0001-governing-product-thesis.md`](adr/0001-governing-product-thesis.md);
 the corresponding public-claim mappings are calibrated in
 [`CLAIM_CALIBRATION_MATRIX.md`](CLAIM_CALIBRATION_MATRIX.md).
-## FINDING-018: Pump-completion await before exit classification
-
-Observed: single full-suite failure of `Line_Too_Long_When_The_Agent_Sends_An_Over_Length_Line` expected `LineTooLong` actual `AgentExited` (ExternalAgentCodeTests.cs:195). Mechanism consistent with ReadWithin exit branch classifying before PumpStdout enqueued terminal violation. Historical cause not established (never reproduced). Fix: await pump completion bounded by remaining budget before classifying. Regression: none added (no minimal seam); precedence property unchanged.
-
-## FINDING-019 - Exit-classification precedence (spec section 8.4) pinned by a deterministic raced-state test; corrects FINDING-018's "no minimal seam" claim by reference
-
-| Field | Value |
-| --- | --- |
-| **ID** | `FINDING-019` |
-| **Date** | 2026-11-03 |
-| **Source / Provenance** | `INTERNAL_AUDIT` - follow-up to `efe6470`, which shipped without the deterministic regression the closure review required. Seam design, patch and test were validated on an isolated copy of the tree at `efe6470` (.NET 10.0.403, Linux x64) before being applied here |
-| **Target Surface** | `Agents/External/ExternalAgent.cs` (three inert internal seams), `Agents/AssemblyAccess.cs` (new), `Tests/Agents/External/ExternalAgentExitClassificationRaceTests.cs` (new), `docs/FINDINGS_LEDGER.md` (this entry and its index row). `FINDING-018` is corrected by reference only and is not edited |
-| **Observation** | `FINDING-018` records "Regression: none added (no minimal seam)". A minimal seam exists: three instance-scoped `internal Action?` hooks on `ExternalAgent` (`BeforeTerminalEnqueue`, `TerminalEnqueued`, `ExitBranchProbe`), null in production, no reflection, no public API surface, exposed to the test assembly via `InternalsVisibleTo` in `Agents/AssemblyAccess.cs`. With them, `Violation_Enqueued_While_Consumer_Is_In_The_Exit_Branch_Wins` establishes the raced state (child exited AND terminal outcome not yet enqueued AND consumer inside the exit branch) by two-way event synchronization - no sleeps, no timing margins - and asserts the queued violation outranks the exit per spec section 8.4. Teeth: with the exit-branch settle take removed (control), the test fails with `Expected: LineTooLong Actual: AgentExited`. Bound: the reconstructed pre-fix shape (one 20 ms settle `TryTake`, then `OfClosed`) passes the same test; that shape was reconstructed from pasted reports of 2026-11-01 because the reviewed source archive carried no git history, and it was not verified against the actual `ae45cdf` source. The tested seam and property therefore cannot evidence that `efe6470`'s settle-window widening improves on the reconstructed pre-fix shape; this is bounded to the tested seam and property and is not a claim that no deterministic separation is possible by any means |
-| **Severity & Confidence** | Low / **Confirmed** for the seam's existence and the test's teeth (observed directly in isolated runs: green on `efe6470` in 692 ms, green on the reconstructed pre-fix shape in 639 ms, red on the no-settle control in 670 ms with the assertion quoted above). **Bounded** for the pre-fix reconstruction (provenance as stated) |
-| **Disposition** | `FIXED` for the missing regression guard (the section 8.4 precedence property is now pinned against settle removal). `OPEN` for `efe6470`'s incremental effect over the reconstructed pre-fix shape, which this test cannot establish. The historical failure's cause remains unestablished, unchanged from `FINDING-018` |
-| **Resolution & Evidence Link** | `Tests/Agents/External/ExternalAgentExitClassificationRaceTests.cs`; seams in `Agents/External/ExternalAgent.cs` (null in production; no product behavior change). Validation environment .NET 10.0.403 Linux x64: race test green (692 ms); chunked suite 899 passed with two pre-existing environmental gaps (`PackageReadinessTests` requires `.github/`, absent from the review archive; `LauncherSetupTests` exceeded a 100 s sandbox cap, 300 s budgets, no `ExternalAgent` references). The full-suite gate on the development checkout is recorded in this commit's execution report |
-| **Resolution Release Status** | `MAIN_ONLY` |

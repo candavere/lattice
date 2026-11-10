@@ -2030,10 +2030,7 @@ public static class CliApp
         sink.WriteLine();
         sink.WriteLine("usage: lattice <command> [options]");
         sink.WriteLine();
-        sink.WriteLine("  With no command, and standard input and standard output both a terminal,");
-        sink.WriteLine("  lattice opens the Launchpad: a screen where each command below can be");
-        sink.WriteLine("  configured from its own flags and started. On a redirected stream, or with");
-        sink.WriteLine("  any argument at all, the behaviour is exactly as described here.");
+        sink.WriteLine("  With no command, lattice prints this usage to stderr and exits 2.");
         sink.WriteLine();
         sink.WriteLine("  generate  --seed <ulong> [--min-fairness <0..1>] [--out <file>]");
         sink.WriteLine("            Generate a valid map (JSON) to stdout or file; with --min-fairness,");

@@ -88,7 +88,9 @@ UNCLAIMED_COLOR = "#E0AF68"
 BENCH_PIN = "6463e486"
 
 # Read-only probes. Each is a plain expression so `page.evaluate` can run it.
-CANVAS_LABEL = "(document.querySelector('#viewer-canvas')?.getAttribute('aria-label') ?? '')"
+CANVAS_LABEL = (
+    "(document.querySelector('#viewer-canvas')?.getAttribute('aria-label') ?? '')"
+)
 MAP_CAPTION = "(document.querySelector('#map-caption')?.textContent ?? '')"
 CLAIMED_STAT = "(document.querySelector('#stat-claimed')?.textContent ?? '')"
 CLAIM_LABEL = "(document.querySelector('#stat-claim-label')?.textContent ?? '')"
@@ -150,7 +152,9 @@ ZONE_ROWS_JS = """() => Array.from(document.querySelectorAll('#zones-body tr')).
   room: tr.querySelector('.k')?.textContent ?? '',
   value: tr.querySelector('.v')?.textContent ?? '' }))"""
 PRESENCE_LABEL = "(document.querySelector('#zone-presence-label')?.textContent ?? '')"
-ZONES_TABLE_ARIA = "(document.querySelector('#zones-table')?.getAttribute('aria-label') ?? '')"
+ZONES_TABLE_ARIA = (
+    "(document.querySelector('#zones-table')?.getAttribute('aria-label') ?? '')"
+)
 
 # Who is standing where, read off the probe's own ink rather than off any helper
 # the page uses to compute it. A live token is one the canvas drew this frame:
@@ -225,6 +229,7 @@ def score_of(name_text):
 
 # --- what the recording itself implies -------------------------------------
 
+
 def frames_with_claims(recording):
     """Mirror of the page's frame list, each with its agent states and claims.
 
@@ -235,12 +240,20 @@ def frames_with_claims(recording):
     header = recording[0]
     zone_count = len(header["Map"]["Zones"])
     agents = header["SimulationConfig"]["AgentCount"]
-    frames = [{"agents": [{"AgentId": i, "ZoneId": i % zone_count, "Score": 0, "Transit": None}
-                          for i in range(agents)], "claims": []}]
+    frames = [
+        {
+            "agents": [
+                {"AgentId": i, "ZoneId": i % zone_count, "Score": 0, "Transit": None}
+                for i in range(agents)
+            ],
+            "claims": [],
+        }
+    ]
     for line in recorded_steps(recording):
         observed = line["Result"]["Observations"][0]
-        frames.append({"agents": observed["AgentStates"],
-                       "claims": sorted(observed["Claims"])})
+        frames.append(
+            {"agents": observed["AgentStates"], "claims": sorted(observed["Claims"])}
+        )
     return frames
 
 
@@ -286,17 +299,22 @@ def visible_chests(perception):
     per-diamond state would otherwise pass a check that only ever asks "is any
     painted chest claimed?", by painting nothing.
     """
-    return {str(r["ResourceId"]) for r in (perception.get("Resources") or [])
-            if r["Status"] != 2}
+    return {
+        str(r["ResourceId"])
+        for r in (perception.get("Resources") or [])
+        if r["Status"] != 2
+    }
 
 
 def assert_paints_exactly(self, painted, perception, where):
     """The painted diamonds are exactly the ones this perception shows."""
     self.assertEqual(
-        set(painted), visible_chests(perception),
+        set(painted),
+        visible_chests(perception),
         f"{where}: the page painted a different set of chests from the one this "
         f"perception shows (painted {sorted(painted)}, perception "
-        f"{sorted(visible_chests(perception))})")
+        f"{sorted(visible_chests(perception))})",
+    )
 
 
 def view_name(recording, ego_id):
@@ -309,6 +327,7 @@ def agent_ids(recording):
 
 
 # --- what the zone table has to say ---------------------------------------
+
 
 def presence_of(cell):
     """The occupant count a zone-table cell reports, or None when it declines.
@@ -347,8 +366,11 @@ def room_labels(recording):
     expectation in the file."""
     out = {}
     for zone in recording[0]["Map"]["Zones"]:
-        out[zone["Id"]] = re.sub(r"([a-z])([A-Z])", r"\1 \2", zone["Role"]) if zone.get("Role") \
+        out[zone["Id"]] = (
+            re.sub(r"([a-z])([A-Z])", r"\1 \2", zone["Role"])
+            if zone.get("Role")
             else "Room %s" % zone["Id"]
+        )
     return out
 
 
@@ -381,7 +403,7 @@ def recorded_presence(steps, frame, ego_id, frame_agents, zone_ids):
     ego = frame_agents.get(ego_id)
     if ego and not ego.get("Transit") and status.get(ego["ZoneId"]) == 0:
         counts[ego["ZoneId"]] += 1
-    for entry in (perception.get("Agents") or []):
+    for entry in perception.get("Agents") or []:
         if entry["AgentId"] == ego_id or entry["Status"] != 0:
             continue
         last = entry.get("LastKnownState")
@@ -419,34 +441,44 @@ class TestAgentViewHonesty(unittest.TestCase):
         httpd, port = start_server()
         base = f"http://127.0.0.1:{port}/"
         try:
+
             async def run():
                 async with async_playwright() as p:
                     browser = await p.chromium.launch()
                     try:
                         context = await browser.new_context(
                             viewport={"width": 1440, "height": 900},
-                            reduced_motion="reduce")
+                            reduced_motion="reduce",
+                        )
                         page = await context.new_page()
                         errors = []
-                        page.on("console",
-                                lambda m: errors.append(m.text) if m.type == "error" else None)
+                        page.on(
+                            "console",
+                            lambda m: (
+                                errors.append(m.text) if m.type == "error" else None
+                            ),
+                        )
                         page.on("pageerror", lambda e: errors.append(str(e)))
                         # Reduced motion, so the agent view's radar pulse cannot
                         # redraw the canvas between a repaint and a read.
-                        await page.goto(base + "?measure=1&" + name,
-                                        wait_until="networkidle")
+                        await page.goto(
+                            base + "?measure=1&" + name, wait_until="networkidle"
+                        )
                         await page.wait_for_function(
-                            "window.__latticeGeo && window.__latticeGeo.frame")
+                            "window.__latticeGeo && window.__latticeGeo.frame"
+                        )
                         # The page always opens the default preset, so a different
                         # committed recording has to be selected through the chip
                         # a visitor would use, not smuggled in on the query string.
                         if name != "infiltration.jsonl":
                             key = name.split(".")[0]
                             await page.locator(
-                                f'#scenario-chips .chip[data-id="{key}"]').click()
+                                f'#scenario-chips .chip[data-id="{key}"]'
+                            ).click()
                             await page.wait_for_function(
                                 "() => document.querySelector('#source-label')"
-                                ".textContent === %s" % json.dumps(name))
+                                ".textContent === %s" % json.dumps(name)
+                            )
                         recording = fetch_recording(base, name)
                         return await body(page, recording, errors)
                     finally:
@@ -480,7 +512,8 @@ class TestAgentViewHonesty(unittest.TestCase):
             await page.set_input_files("#file-input", path)
             await page.wait_for_function(
                 "() => document.querySelector('#source-label').textContent === %s"
-                % json.dumps(name))
+                % json.dumps(name)
+            )
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
@@ -494,15 +527,17 @@ class TestAgentViewHonesty(unittest.TestCase):
 
         async def body(page, recording, errors):
             steps = recorded_steps(recording)
-            self.assertEqual(len(steps[0]["Perceptions"]), 2,
-                             "expected a two-agent recording")
+            self.assertEqual(
+                len(steps[0]["Perceptions"]), 2, "expected a two-agent recording"
+            )
             for ego in agent_ids(recording):
                 with self.subTest(view=view_name(recording, ego)):
                     self.assertTrue(
                         leak_frames(recording, ego),
                         f"{view_name(recording, ego)}'s recorded claims never "
                         "differ from the world's, so there is nothing here to "
-                        "be honest about")
+                        "be honest about",
+                    )
             self.assertIn(9, leak_frames(recording, agent_ids(recording)[1]))
             self.assertIn(19, leak_frames(recording, agent_ids(recording)[1]))
             return errors
@@ -533,21 +568,30 @@ class TestAgentViewHonesty(unittest.TestCase):
                     await show(page, frame, str(ego))
                     painted = await page.evaluate(_CLAIMS_JS)
                     expected = recorded_claims(perception)
-                    assert_paints_exactly(self, painted["claimed"], perception,
-                                          f"{where} at frame {frame}")
+                    assert_paints_exactly(
+                        self,
+                        painted["claimed"],
+                        perception,
+                        f"{where} at frame {frame}",
+                    )
                     for rid, is_claimed in painted["claimed"].items():
                         with self.subTest(view=where, frame=frame, chest=rid):
                             self.assertEqual(
-                                is_claimed, rid in expected,
+                                is_claimed,
+                                rid in expected,
                                 f"{where} at frame {frame}: chest {rid} painted "
                                 f"{'claimed' if is_claimed else 'unclaimed'}, but the "
-                                f"recording's VisibleClaims is {sorted(expected)}")
-                        with self.subTest(view=where, frame=frame, chest=rid, colour=True):
+                                f"recording's VisibleClaims is {sorted(expected)}",
+                            )
+                        with self.subTest(
+                            view=where, frame=frame, chest=rid, colour=True
+                        ):
                             self.assertEqual(
                                 painted["colors"][rid],
                                 CLAIMED_COLOR if rid in expected else UNCLAIMED_COLOR,
                                 f"{where} at frame {frame}: chest {rid} painted in "
-                                "the wrong colour for the claim state recorded")
+                                "the wrong colour for the claim state recorded",
+                            )
             return errors
 
         self._no_console_errors(self._drive(body))
@@ -572,35 +616,60 @@ class TestAgentViewHonesty(unittest.TestCase):
                     await show(page, frame, str(ego))
                     painted = (await page.evaluate(_CLAIMS_JS))["claimed"]
                     perception = perception_at(recorded_steps(recording), frame, ego)
-                    assert_paints_exactly(self, painted, perception,
-                                          f"frame {frame} {view_name(recording, ego)}")
+                    assert_paints_exactly(
+                        self,
+                        painted,
+                        perception,
+                        f"frame {frame} {view_name(recording, ego)}",
+                    )
                     recorded = recorded_claims(perception)
                     with self.subTest(frame=frame, view=view_name(recording, ego)):
                         self.assertEqual(
-                            {rid for rid, on in painted.items() if on}, recorded,
+                            {rid for rid, on in painted.items() if on},
+                            recorded,
                             f"frame {frame} {view_name(recording, ego)}: painted "
-                            f"claims disagree with the recording's VisibleClaims")
+                            f"claims disagree with the recording's VisibleClaims",
+                        )
                     painted_by_view[ego] = painted
 
                 # The two views must not be the same picture, and at least one
                 # of them must have a green chest, or this proves nothing.
                 self.assertTrue(
-                    any(on for painted in painted_by_view.values() for on in painted.values()),
-                    f"frame {frame}: no view painted a claimed chest at all")
+                    any(
+                        on
+                        for painted in painted_by_view.values()
+                        for on in painted.values()
+                    ),
+                    f"frame {frame}: no view painted a claimed chest at all",
+                )
+                ego_order = list(painted_by_view)
+                self.assertEqual(
+                    2, len(ego_order), f"frame {frame}: expected exactly two ego views"
+                )
+                first_claims = {
+                    rid for rid, on in painted_by_view[ego_order[0]].items() if on
+                }
+                second_claims = {
+                    rid for rid, on in painted_by_view[ego_order[1]].items() if on
+                }
                 self.assertNotEqual(
-                    [dict(p) for p in painted_by_view.values()],
-                    [dict(p) for p in painted_by_view.values()][1:],
-                    f"frame {frame}: both ego views painted identical claim states, "
-                    "so the recording's two per-agent views are not being told apart")
+                    first_claims,
+                    second_claims,
+                    f"frame {frame}: both ego views painted the same claimed set "
+                    f"{sorted(first_claims)}, so the recording's two per-agent views "
+                    "are not being told apart",
+                )
 
                 await show(page, frame, "ground")
                 truth = (await page.evaluate(_CLAIMS_JS))["claimed"]
                 with self.subTest(frame=frame, view="ground"):
                     self.assertEqual({rid for rid, on in truth.items() if on}, world)
                 self.assertEqual(
-                    set(truth), {str(r["Id"]) for r in recording[0]["Map"]["Resources"]},
+                    set(truth),
+                    {str(r["Id"]) for r in recording[0]["Map"]["Resources"]},
                     f"frame {frame} ground truth: every chest in the map is drawn, "
-                    "because ground truth masks nothing")
+                    "because ground truth masks nothing",
+                )
             return errors
 
         self._no_console_errors(self._drive(body))
@@ -634,22 +703,27 @@ class TestAgentViewHonesty(unittest.TestCase):
                     await show(page, frame, str(ego))
                     with self.subTest(view=where, frame=frame):
                         self.assertEqual(
-                            await page.evaluate(CLAIM_LABEL), LABEL_SEEN,
+                            await page.evaluate(CLAIM_LABEL),
+                            LABEL_SEEN,
                             f"{where} at frame {frame}: the claim metric is not "
-                            "labelled as what the observer saw")
+                            "labelled as what the observer saw",
+                        )
                         self.assertEqual(
                             await page.evaluate(CLAIMED_STAT),
                             f"{len(recorded_claims(perception))} / {total}",
                             f"{where} at frame {frame}: the claim metric is not "
                             f"the count of VisibleClaims "
-                            f"{sorted(recorded_claims(perception))}")
+                            f"{sorted(recorded_claims(perception))}",
+                        )
 
             for frame in range(len(steps) + 1):
                 await show(page, frame, "ground")
                 with self.subTest(view="ground", frame=frame):
                     self.assertEqual(await page.evaluate(CLAIM_LABEL), LABEL_GROUND)
-                    self.assertEqual(await page.evaluate(CLAIMED_STAT),
-                                     f"{len(frames[frame]['claims'])} / {total}")
+                    self.assertEqual(
+                        await page.evaluate(CLAIMED_STAT),
+                        f"{len(frames[frame]['claims'])} / {total}",
+                    )
             return errors
 
         self._no_console_errors(self._drive(body))
@@ -682,18 +756,25 @@ class TestAgentViewHonesty(unittest.TestCase):
             for ego in ids:
                 expected[str(ego)] = (
                     LABEL_SEEN,
-                    f"{len(recorded_claims(perception_at(steps, frame, ego)))} / {total}")
+                    f"{len(recorded_claims(perception_at(steps, frame, ego)))} / {total}",
+                )
 
-            for view in ["ground"] + [str(e) for e in ids] + ["ground"] + [str(e) for e in ids]:
+            for view in (
+                ["ground"] + [str(e) for e in ids] + ["ground"] + [str(e) for e in ids]
+            ):
                 await show(page, frame, view)
                 with self.subTest(view=view, where="label"):
-                    self.assertEqual(await page.evaluate(CLAIM_LABEL),
-                                     expected[view][0],
-                                     f"{view} at frame {frame}: a stale claim label")
+                    self.assertEqual(
+                        await page.evaluate(CLAIM_LABEL),
+                        expected[view][0],
+                        f"{view} at frame {frame}: a stale claim label",
+                    )
                 with self.subTest(view=view, where="count"):
-                    self.assertEqual(await page.evaluate(CLAIMED_STAT),
-                                     expected[view][1],
-                                     f"{view} at frame {frame}: a stale claim count")
+                    self.assertEqual(
+                        await page.evaluate(CLAIMED_STAT),
+                        expected[view][1],
+                        f"{view} at frame {frame}: a stale claim count",
+                    )
 
             # And the same while scrubbing across the recording, since the
             # scrubber is the other way a frame changes under a live metric.
@@ -704,8 +785,10 @@ class TestAgentViewHonesty(unittest.TestCase):
                 want = perception_at(steps, tick, ids[0])
                 want = len(recorded_claims(want)) if want else None
                 with self.subTest(view=str(ids[0]), tick=tick, where="count"):
-                    self.assertEqual(await page.evaluate(CLAIMED_STAT),
-                                     f"{want} / {total}" if want is not None else "—")
+                    self.assertEqual(
+                        await page.evaluate(CLAIMED_STAT),
+                        f"{want} / {total}" if want is not None else "—",
+                    )
             return errors
 
         self._no_console_errors(self._drive(body))
@@ -730,9 +813,11 @@ class TestAgentViewHonesty(unittest.TestCase):
         """
 
         async def body(page, recording, errors):
-            self.assertFalse(has_recorded_perception(recording),
-                             "demo.jsonl now records perceptions, so it is no "
-                             "longer the reconstruction this asserts")
+            self.assertFalse(
+                has_recorded_perception(recording),
+                "demo.jsonl now records perceptions, so it is no "
+                "longer the reconstruction this asserts",
+            )
             steps = recorded_steps(recording)
             frames = frames_with_claims(recording)
             total = len(recording[0]["Map"]["Resources"])
@@ -749,7 +834,11 @@ class TestAgentViewHonesty(unittest.TestCase):
                 page makes, so the count is derived from the file rather than
                 from whatever the page happens to print."""
                 agent = next(a for a in frames[frame]["agents"] if a["AgentId"] == ego)
-                start = agent["Transit"]["ToZoneId"] if agent["Transit"] else agent["ZoneId"]
+                start = (
+                    agent["Transit"]["ToZoneId"]
+                    if agent["Transit"]
+                    else agent["ZoneId"]
+                )
                 depth = {start: 0}
                 frontier = [start]
                 while frontier:
@@ -771,25 +860,34 @@ class TestAgentViewHonesty(unittest.TestCase):
                 if not world:
                     continue
                 for ego in ids:
-                    in_sight = {r["Id"] for r in resources
-                                if r["ZoneId"] in within_vision(frame, ego)}
+                    in_sight = {
+                        r["Id"]
+                        for r in resources
+                        if r["ZoneId"] in within_vision(frame, ego)
+                    }
                     await show(page, frame, str(ego))
                     with self.subTest(view=str(ego), frame=frame):
-                        self.assertEqual(await page.evaluate(CLAIM_LABEL), LABEL_DERIVED,
-                                         f"ego {ego} at frame {frame}: a derived "
-                                         "sightline must not be labelled as seen")
+                        self.assertEqual(
+                            await page.evaluate(CLAIM_LABEL),
+                            LABEL_DERIVED,
+                            f"ego {ego} at frame {frame}: a derived "
+                            "sightline must not be labelled as seen",
+                        )
                         self.assertEqual(
                             await page.evaluate(CLAIMED_STAT),
                             f"{len(world & in_sight)} / {total}",
                             f"ego {ego} at frame {frame}: the derived count must "
-                            "cover the world's claims inside the derived sightline")
+                            "cover the world's claims inside the derived sightline",
+                        )
                     checked += 1
             self.assertTrue(checked, "no frame in demo.jsonl has a claim to report")
 
             await show(page, len(steps), "ground")
             self.assertEqual(await page.evaluate(CLAIM_LABEL), LABEL_GROUND)
-            self.assertEqual(await page.evaluate(CLAIMED_STAT),
-                             f"{len(frames[len(steps)]['claims'])} / {total}")
+            self.assertEqual(
+                await page.evaluate(CLAIMED_STAT),
+                f"{len(frames[len(steps)]['claims'])} / {total}",
+            )
             return errors
 
         self._no_console_errors(self._drive(body, "demo.jsonl"))
@@ -809,32 +907,43 @@ class TestAgentViewHonesty(unittest.TestCase):
             steps = recorded_steps(recording)
             frames = frames_with_claims(recording)
             last = len(steps)
-            pre = frames[last - 1]    # the world the last decision was made from
-            post = frames[last]        # the world that last step produced
+            pre = frames[last - 1]  # the world the last decision was made from
+            post = frames[last]  # the world that last step produced
             # If these agreed, nothing below could detect the mix at all.
-            self.assertNotEqual([a["ZoneId"] for a in pre["agents"]],
-                                [a["ZoneId"] for a in post["agents"]],
-                                "the pre-step and post-step terminal worlds are "
-                                "identical, so this cannot detect the mix")
-            self.assertNotEqual([a["Score"] for a in pre["agents"]],
-                                [a["Score"] for a in post["agents"]])
+            self.assertNotEqual(
+                [a["ZoneId"] for a in pre["agents"]],
+                [a["ZoneId"] for a in post["agents"]],
+                "the pre-step and post-step terminal worlds are "
+                "identical, so this cannot detect the mix",
+            )
+            self.assertNotEqual(
+                [a["Score"] for a in pre["agents"]],
+                [a["Score"] for a in post["agents"]],
+            )
             self.assertNotEqual(pre["claims"], post["claims"])
             total = len(recording[0]["Map"]["Resources"])
 
             for ego in agent_ids(recording):
                 where = view_name(recording, ego)
                 perception = perception_at(steps, last, ego)
-                self.assertIsNotNone(perception, f"{where} has no last decision-time view")
+                self.assertIsNotNone(
+                    perception, f"{where} has no last decision-time view"
+                )
                 await show(page, last, str(ego))
                 painted = await page.evaluate(_AGENTS_JS)
 
                 ego_pre = next(a for a in pre["agents"] if a["AgentId"] == ego)
                 with self.subTest(view=where, subject="ego"):
-                    self.assertEqual(painted[str(ego)]["zone"], ego_pre["ZoneId"],
-                                     f"{where} drawn outside the decision-time world")
-                    self.assertEqual(score_of(painted[str(ego)]["text"]), ego_pre["Score"],
-                                     f"{where}'s painted score is not the "
-                                     "decision-time score")
+                    self.assertEqual(
+                        painted[str(ego)]["zone"],
+                        ego_pre["ZoneId"],
+                        f"{where} drawn outside the decision-time world",
+                    )
+                    self.assertEqual(
+                        score_of(painted[str(ego)]["text"]),
+                        ego_pre["Score"],
+                        f"{where}'s painted score is not the decision-time score",
+                    )
 
                 # Rivals: where the recording last knew each one, and nothing
                 # else. An observed rival is drawn live at its LastKnownState; a
@@ -846,51 +955,73 @@ class TestAgentViewHonesty(unittest.TestCase):
                     known = rival.get("LastKnownState")
                     with self.subTest(view=where, subject="rival " + rid):
                         if known is None:
-                            self.assertNotIn(rid, painted,
-                                             f"{where} drew a rival it never saw")
+                            self.assertNotIn(
+                                rid, painted, f"{where} drew a rival it never saw"
+                            )
                             continue
-                        self.assertIn(rid, painted,
-                                      f"{where} dropped a rival it had seen")
-                        self.assertEqual(painted[rid]["zone"], known["ZoneId"],
-                                         f"{where} placed rival {rid} at "
-                                         f"{painted[rid]['zone']}, not the "
-                                         f"recorded last-known {known['ZoneId']}")
+                        self.assertIn(
+                            rid, painted, f"{where} dropped a rival it had seen"
+                        )
+                        self.assertEqual(
+                            painted[rid]["zone"],
+                            known["ZoneId"],
+                            f"{where} placed rival {rid} at "
+                            f"{painted[rid]['zone']}, not the "
+                            f"recorded last-known {known['ZoneId']}",
+                        )
                         self.assertEqual(painted[rid]["ghost"], rival["Status"] != 0)
                         if not painted[rid]["ghost"]:
-                            self.assertEqual(score_of(painted[rid]["text"]), known["Score"])
+                            self.assertEqual(
+                                score_of(painted[rid]["text"]), known["Score"]
+                            )
 
                 # Claim colours and the metric come from the same perception,
                 # and the metric says so: the terminal ego frame is no more
                 # entitled to the world's claim list than any other ego frame.
                 claims = (await page.evaluate(_CLAIMS_JS))["claimed"]
-                assert_paints_exactly(self, claims, perception,
-                                      f"terminal frame, {where}")
+                assert_paints_exactly(
+                    self, claims, perception, f"terminal frame, {where}"
+                )
                 recorded_here = recorded_claims(perception)
                 for rid, is_claimed in claims.items():
                     with self.subTest(view=where, subject="claim " + str(rid)):
                         self.assertEqual(is_claimed, rid in recorded_here)
                 with self.subTest(view=where, subject="metric"):
-                    self.assertEqual(await page.evaluate(CLAIMED_STAT),
-                                     f"{len(recorded_here)} / {total}")
+                    self.assertEqual(
+                        await page.evaluate(CLAIMED_STAT),
+                        f"{len(recorded_here)} / {total}",
+                    )
                     self.assertEqual(await page.evaluate(CLAIM_LABEL), LABEL_SEEN)
 
                 # And the frame is still labelled as what it is.
                 with self.subTest(view=where, subject="caption"):
-                    self.assertIn("Last decision-time view", await page.evaluate(MAP_CAPTION))
+                    self.assertIn(
+                        "Last decision-time view", await page.evaluate(MAP_CAPTION)
+                    )
                 with self.subTest(view=where, subject="label"):
-                    self.assertIn("last decision-time view", await page.evaluate(CANVAS_LABEL))
+                    self.assertIn(
+                        "last decision-time view", await page.evaluate(CANVAS_LABEL)
+                    )
 
             # Ground truth at the same frame stays post-step: it is labelled
             # ground truth, and that is the honest reading of it.
             await show(page, last, "ground")
             truth = await page.evaluate(_AGENTS_JS)
             for agent in post["agents"]:
-                with self.subTest(view="ground", subject="agent " + str(agent["AgentId"])):
-                    self.assertEqual(truth[str(agent["AgentId"])]["zone"], agent["ZoneId"])
-                    self.assertEqual(score_of(truth[str(agent["AgentId"])]["text"]),
-                                     agent["Score"])
+                with self.subTest(
+                    view="ground", subject="agent " + str(agent["AgentId"])
+                ):
+                    self.assertEqual(
+                        truth[str(agent["AgentId"])]["zone"], agent["ZoneId"]
+                    )
+                    self.assertEqual(
+                        score_of(truth[str(agent["AgentId"])]["text"]), agent["Score"]
+                    )
             with self.subTest(view="ground", subject="metric"):
-                self.assertEqual(await page.evaluate(CLAIMED_STAT), f"{len(post['claims'])} / {total}")
+                self.assertEqual(
+                    await page.evaluate(CLAIMED_STAT),
+                    f"{len(post['claims'])} / {total}",
+                )
                 self.assertEqual(await page.evaluate(CLAIM_LABEL), LABEL_GROUND)
             with self.subTest(view="ground", subject="caption"):
                 self.assertIn("Ground truth", await page.evaluate(MAP_CAPTION))
@@ -908,32 +1039,39 @@ class TestAgentViewHonesty(unittest.TestCase):
         async def body(page, recording, errors):
             prov = await page.evaluate(PROV_HREFS)
             blob = [href for href in prov if "/blob/" in href]
-            self.assertEqual(len(blob), 1,
-                             f"expected exactly one repository blob link, got {prov}")
+            self.assertEqual(
+                len(blob), 1, f"expected exactly one repository blob link, got {prov}"
+            )
             self.assertTrue(
                 blob[0].endswith("/blob/main/site/infiltration.jsonl"),
                 f"the playing recording's repository link is {blob[0]}, which does "
-                "not resolve to the file being played")
-            self.assertNotIn(BENCH_PIN, blob[0],
-                             "a playing recording is not pinned to a commit; Pages "
-                             "deploys it from main")
+                "not resolve to the file being played",
+            )
+            self.assertNotIn(
+                BENCH_PIN,
+                blob[0],
+                "a playing recording is not pinned to a commit; Pages "
+                "deploys it from main",
+            )
 
             for href in await page.evaluate(BENCH_HREFS):
                 with self.subTest(href=href):
                     self.assertIn(
-                        BENCH_PIN, href,
+                        BENCH_PIN,
+                        href,
                         "a benchmark result JSON link lost its pin; that artifact "
                         "is immutable at 6463e486 and the number a reader gets back "
-                        "has to be the published one")
+                        "has to be the published one",
+                    )
             return errors
 
         self._no_console_errors(self._drive(body))
 
     # -- zone-table presence must agree with the painted map ----------------
 
-    async def assert_presence_matches_paint(self, page, recording, where,
-                                            frame, view, expect_label=None,
-                                            expect_counts=None):
+    async def assert_presence_matches_paint(
+        self, page, recording, where, frame, view, expect_label=None, expect_counts=None
+    ):
         """One frame in one view, checked three ways at once.
 
         The zone table, the occupancy badge painted inside each room card, and
@@ -948,15 +1086,19 @@ class TestAgentViewHonesty(unittest.TestCase):
         rows = await page.evaluate(ZONE_ROWS_JS)
         painted = await page.evaluate(PAINTED_PRESENCE_JS)
         labels = room_labels(recording)
-        self.assertEqual(len(rows), len(labels),
-                         f"{where}: the table has {len(rows)} rows for "
-                         f"{len(labels)} rooms")
+        self.assertEqual(
+            len(rows),
+            len(labels),
+            f"{where}: the table has {len(rows)} rows for {len(labels)} rooms",
+        )
         table = {}
         for row in rows:
             zid = next((z for z, name in labels.items() if name == row["room"]), None)
             self.assertIsNotNone(
-                zid, f"{where}: no room in the recording is named {row['room']!r}, "
-                     "so the table row cannot be keyed to a zone")
+                zid,
+                f"{where}: no room in the recording is named {row['room']!r}, "
+                "so the table row cannot be keyed to a zone",
+            )
             table[zid] = row["value"]
 
         if expect_label is not None:
@@ -979,49 +1121,64 @@ class TestAgentViewHonesty(unittest.TestCase):
                         shown,
                         f"{where}: room {zid} ({labels[zid]}) is painted "
                         f"{status!r} but the table reads {cell!r}, which claims "
-                        "something about a room the view cannot see")
+                        "something about a room the view cannot see",
+                    )
                     self.assertTrue(
                         cell.startswith(
-                            WORD_STALE if status == "stale" else WORD_UNKNOWN),
+                            WORD_STALE if status == "stale" else WORD_UNKNOWN
+                        ),
                         f"{where}: room {zid} reads {cell!r}, not the canvas's own "
-                        f"word for a {status!r} room")
+                        f"word for a {status!r} room",
+                    )
                 self.assertIsNone(
                     badge,
                     f"{where}: room {zid} is painted {status!r} yet carries an "
-                    f"occupancy badge reading {painted['pills'].get(str(zid))!r}")
+                    f"occupancy badge reading {painted['pills'].get(str(zid))!r}",
+                )
                 continue
 
             with self.subTest(where=where, zone=zid, subject="table vs tokens"):
                 self.assertEqual(
-                    shown, painted["counts"].get(str(zid), 0),
+                    shown,
+                    painted["counts"].get(str(zid), 0),
                     f"{where}: room {zid} ({labels[zid]}) reads {cell!r} but the "
                     f"canvas painted {painted['counts'].get(str(zid), 0)} live "
                     f"token(s) inside it (members {painted['members'].get(str(zid))}, "
                     f"corridor travellers {painted['strays']}, ghosts "
-                    f"{painted['ghosts']})")
+                    f"{painted['ghosts']})",
+                )
             if expect_counts is not None:
                 with self.subTest(where=where, zone=zid, subject="table vs recording"):
                     self.assertEqual(
-                        shown, expect_counts.get(zid, 0),
+                        shown,
+                        expect_counts.get(zid, 0),
                         f"{where}: room {zid} ({labels[zid]}) reads {cell!r}, not the "
                         f"{expect_counts.get(zid, 0)} occupant(s) the recording puts "
-                        "in that room for this view")
+                        "in that room for this view",
+                    )
             if badge is not None:
                 with self.subTest(where=where, zone=zid, subject="badge vs tokens"):
                     self.assertEqual(
-                        badge, painted["counts"].get(str(zid), 0),
+                        badge,
+                        painted["counts"].get(str(zid), 0),
                         f"{where}: the occupancy badge on room {zid} shows "
                         f"{painted['pills'].get(str(zid))!r} while the room holds "
-                        f"{painted['counts'].get(str(zid), 0)} painted token(s)")
+                        f"{painted['counts'].get(str(zid), 0)} painted token(s)",
+                    )
                 if shown is not None:
                     with self.subTest(where=where, zone=zid, subject="badge vs table"):
-                        self.assertEqual(badge, shown,
-                                         f"{where}: room {zid} has a badge saying "
-                                         f"{badge} and a table row saying {shown!r}")
+                        self.assertEqual(
+                            badge,
+                            shown,
+                            f"{where}: room {zid} has a badge saying "
+                            f"{badge} and a table row saying {shown!r}",
+                        )
         if expect_label is not None:
-            self.assertEqual(await page.evaluate(PRESENCE_LABEL), expect_label,
-                             f"{where}: the zone table does not say which view it "
-                             "is counting")
+            self.assertEqual(
+                await page.evaluate(PRESENCE_LABEL),
+                expect_label,
+                f"{where}: the zone table does not say which view it is counting",
+            )
         return painted
 
     def test_zone_table_presence_agrees_with_the_painted_tokens(self):
@@ -1039,22 +1196,30 @@ class TestAgentViewHonesty(unittest.TestCase):
         async def body(page, recording, errors):
             steps = recorded_steps(recording)
             frames = frames_with_claims(recording)
-            ego_ids = agent_ids(recording) if has_recorded_perception(recording) \
+            ego_ids = (
+                agent_ids(recording)
+                if has_recorded_perception(recording)
                 else [a["AgentId"] for a in frames[0]["agents"]]
+            )
             leaked = 0
             for frame in range(len(steps) + 1):
                 for view in ["ground"] + [str(e) for e in ego_ids]:
                     await show(page, frame, view)
                     painted = await self.assert_presence_matches_paint(
-                        page, recording, f"{recording[0]['Scenario']} {view} f{frame}",
-                        frame, view)
+                        page,
+                        recording,
+                        f"{recording[0]['Scenario']} {view} f{frame}",
+                        frame,
+                        view,
+                    )
                     # A token that is not in any room is a corridor traveller, and
                     # a ghost is a memory: neither may be counted as an occupant.
                     self.assertTrue(
                         set(painted["strays"]).issubset(set(painted["transit"])),
                         f"a token was painted outside every room that is not in "
                         f"transit: strays {painted['strays']}, transit "
-                        f"{painted['transit']}")
+                        f"{painted['transit']}",
+                    )
             self.assertTrue(True, "presence agreement exercised")
             return errors
 
@@ -1081,8 +1246,14 @@ class TestAgentViewHonesty(unittest.TestCase):
                     world[agent["ZoneId"]] = world.get(agent["ZoneId"], 0) + 1
                 await show(page, frame, "ground")
                 await self.assert_presence_matches_paint(
-                    page, recording, f"ground f{frame}", frame, "ground",
-                    expect_label=PRESENCE_GROUND, expect_counts=world)
+                    page,
+                    recording,
+                    f"ground f{frame}",
+                    frame,
+                    "ground",
+                    expect_label=PRESENCE_GROUND,
+                    expect_counts=world,
+                )
                 checked += 1
             self.assertTrue(checked, "no ground-truth frame was checked")
             return errors
@@ -1100,8 +1271,10 @@ class TestAgentViewHonesty(unittest.TestCase):
         """
 
         async def body(page, recording, errors):
-            self.assertTrue(has_recorded_perception(recording),
-                            "infiltration.jsonl no longer records perceptions")
+            self.assertTrue(
+                has_recorded_perception(recording),
+                "infiltration.jsonl no longer records perceptions",
+            )
             steps = recorded_steps(recording)
             frames = frames_with_claims(recording)
             zone_ids = [z["Id"] for z in recording[0]["Map"]["Zones"]]
@@ -1112,13 +1285,20 @@ class TestAgentViewHonesty(unittest.TestCase):
                 for ego in agent_ids(recording):
                     want = recorded_presence(steps, frame, ego, agents, zone_ids)
                     self.assertIsNotNone(
-                        want, f"{view_name(recording, ego)} at frame {frame}: the "
-                              "file records no perception to count from")
+                        want,
+                        f"{view_name(recording, ego)} at frame {frame}: the "
+                        "file records no perception to count from",
+                    )
                     await show(page, frame, str(ego))
                     await self.assert_presence_matches_paint(
-                        page, recording,
-                        f"{view_name(recording, ego)} f{frame}", frame, str(ego),
-                        expect_label=PRESENCE_SEEN, expect_counts=want)
+                        page,
+                        recording,
+                        f"{view_name(recording, ego)} f{frame}",
+                        frame,
+                        str(ego),
+                        expect_label=PRESENCE_SEEN,
+                        expect_counts=want,
+                    )
                     # Where the world and the recorded view genuinely differ, the
                     # two ego views must not end up with the same figure.
                     world = {z: 0 for z in zone_ids}
@@ -1137,7 +1317,8 @@ class TestAgentViewHonesty(unittest.TestCase):
                 crossing,
                 "no frame in this recording has an agent crossing a corridor, so "
                 "the rule that a corridor traveller occupies no room was never "
-                "exercised")
+                "exercised",
+            )
             return errors
 
         self._no_console_errors(self._drive(body))
@@ -1163,8 +1344,10 @@ class TestAgentViewHonesty(unittest.TestCase):
         async def body(page, recording, errors):
             steps = recorded_steps(recording)
             frames = frames_with_claims(recording)
-            self.assertTrue(has_recorded_perception(recording),
-                            "infiltration.jsonl no longer records perceptions")
+            self.assertTrue(
+                has_recorded_perception(recording),
+                "infiltration.jsonl no longer records perceptions",
+            )
             stale_at, unknown_at = 5, 15
             ids = agent_ids(recording)
             self.assertGreater(len(ids), 1, "this fixture needs a rival to hide")
@@ -1180,59 +1363,91 @@ class TestAgentViewHonesty(unittest.TestCase):
                             if entry["AgentId"] == perception["AgentId"]:
                                 continue
                             if i == stale_at:
-                                entry["Status"] = 1      # last known, not live
+                                entry["Status"] = 1  # last known, not live
                                 entry["LastSeenTick"] = 1
                             else:
-                                entry["Status"] = 2      # never seen it at all
+                                entry["Status"] = 2  # never seen it at all
                                 entry["LastKnownState"] = None
                                 entry["LastSeenTick"] = 0
                 lines.append(step)
             lines.append(recording[-1])
             await self._load_variant(page, lines, "hidden_rivals.jsonl")
 
-            for frame, kind in ((stale_at, "stale ghost"),
-                                (unknown_at, "unknown rival")):
+            for frame, kind in (
+                (stale_at, "stale ghost"),
+                (unknown_at, "unknown rival"),
+            ):
                 for ego in ids:
                     # The world really does have that rival standing in a room,
                     # or a table that counted it would not be detectably wrong.
-                    with self.subTest(subject=kind, view=str(ego), frame=frame,
-                                      where="fixture is meaningful"):
-                        rivals = [a for a in frames[frame]["agents"]
-                                  if a["AgentId"] != ego]
+                    with self.subTest(
+                        subject=kind,
+                        view=str(ego),
+                        frame=frame,
+                        where="fixture is meaningful",
+                    ):
+                        rivals = [
+                            a for a in frames[frame]["agents"] if a["AgentId"] != ego
+                        ]
                         self.assertTrue(
                             any(not a.get("Transit") for a in rivals),
                             f"at frame {frame} the world has no stationary rival, "
-                            "so a leaked count could not be detected here")
+                            "so a leaked count could not be detected here",
+                        )
                     await show(page, frame, str(ego))
                     painted = await self.assert_presence_matches_paint(
-                        page, recording, f"{kind} ego {ego} f{frame}", frame,
-                        str(ego), expect_label=PRESENCE_SEEN)
-                    seated = {str(a) for ids_ in painted["members"].values()
-                              for a in ids_}
-                    with self.subTest(subject=kind, view=str(ego), frame=frame,
-                                      where="rival is not a live token"):
+                        page,
+                        recording,
+                        f"{kind} ego {ego} f{frame}",
+                        frame,
+                        str(ego),
+                        expect_label=PRESENCE_SEEN,
+                    )
+                    seated = {
+                        str(a) for ids_ in painted["members"].values() for a in ids_
+                    }
+                    with self.subTest(
+                        subject=kind,
+                        view=str(ego),
+                        frame=frame,
+                        where="rival is not a live token",
+                    ):
                         for other in ids:
                             if other == ego:
                                 continue
                             self.assertNotIn(
-                                str(other), seated,
+                                str(other),
+                                seated,
                                 f"{kind}: rival {other} was painted as a live "
-                                f"token; live tokens {sorted(seated)}")
+                                f"token; live tokens {sorted(seated)}",
+                            )
                     if kind == "stale ghost":
-                        with self.subTest(subject=kind, view=str(ego), frame=frame,
-                                          where="a ghost is drawn"):
+                        with self.subTest(
+                            subject=kind,
+                            view=str(ego),
+                            frame=frame,
+                            where="a ghost is drawn",
+                        ):
                             self.assertEqual(
-                                len(painted["ghosts"]), len(ids) - 1,
+                                len(painted["ghosts"]),
+                                len(ids) - 1,
                                 "a rival reported stale with a last-known position "
                                 "must be drawn as a ghost; ghosts seen: "
-                                f"{painted['ghosts']}")
+                                f"{painted['ghosts']}",
+                            )
                     else:
-                        with self.subTest(subject=kind, view=str(ego), frame=frame,
-                                          where="nothing is drawn"):
+                        with self.subTest(
+                            subject=kind,
+                            view=str(ego),
+                            frame=frame,
+                            where="nothing is drawn",
+                        ):
                             self.assertEqual(
-                                painted["ghosts"], [],
+                                painted["ghosts"],
+                                [],
                                 "a rival with no last-known position must not be "
-                                f"drawn at all; ghosts seen: {painted['ghosts']}")
+                                f"drawn at all; ghosts seen: {painted['ghosts']}",
+                            )
             return errors
 
         self._no_console_errors(self._drive(body))
@@ -1251,8 +1466,11 @@ class TestAgentViewHonesty(unittest.TestCase):
             frames = frames_with_claims(recording)
             recorded = has_recorded_perception(recording)
             label = PRESENCE_SEEN if recorded else PRESENCE_DERIVED
-            ids = (agent_ids(recording) if recorded
-                   else [a["AgentId"] for a in frames[0]["agents"]])
+            ids = (
+                agent_ids(recording)
+                if recorded
+                else [a["AgentId"] for a in frames[0]["agents"]]
+            )
             zone_ids = [z["Id"] for z in recording[0]["Map"]["Zones"]]
             dim = 0
             for frame in range(len(steps) + 1):
@@ -1260,22 +1478,32 @@ class TestAgentViewHonesty(unittest.TestCase):
                 agents = frame_agent_map(frames, index)
                 for ego in ids:
                     await show(page, frame, str(ego))
-                    want = (recorded_presence(steps, frame, ego, agents, zone_ids)
-                            if recorded else None)
+                    want = (
+                        recorded_presence(steps, frame, ego, agents, zone_ids)
+                        if recorded
+                        else None
+                    )
                     painted = await self.assert_presence_matches_paint(
-                        page, recording,
-                        f"{recording[0]['Scenario']} {ego} f{frame}", frame, str(ego),
-                        expect_label=label, expect_counts=want)
+                        page,
+                        recording,
+                        f"{recording[0]['Scenario']} {ego} f{frame}",
+                        frame,
+                        str(ego),
+                        expect_label=label,
+                        expect_counts=want,
+                    )
                     for zone, status in painted["status"].items():
                         if status == "observed":
                             continue
                         dim += 1
                         with self.subTest(view=str(ego), frame=frame, zone=zone):
                             self.assertNotIn(
-                                str(zone), painted["pills"],
+                                str(zone),
+                                painted["pills"],
                                 f"room {zone} is painted {status!r} but carries an "
                                 "occupancy badge "
-                                f"{painted['pills'].get(str(zone))!r}")
+                                f"{painted['pills'].get(str(zone))!r}",
+                            )
             return errors, dim
 
         seen = 0
@@ -1284,8 +1512,10 @@ class TestAgentViewHonesty(unittest.TestCase):
             self._no_console_errors(errors)
             seen += dim
         self.assertTrue(
-            seen, "no stale or unexplored room was ever painted, so the "
-            "decline-to-count rule was never exercised")
+            seen,
+            "no stale or unexplored room was ever painted, so the "
+            "decline-to-count rule was never exercised",
+        )
 
     def test_terminal_frame_presence_comes_from_the_last_decision_world(self):
         """The last frame, in an ego view, is the last decision-time view: the
@@ -1300,11 +1530,18 @@ class TestAgentViewHonesty(unittest.TestCase):
             last = len(steps)
             for ego in agent_ids(recording):
                 want = recorded_presence(
-                    steps, last, ego, frame_agent_map(frames, last - 1), zone_ids)
+                    steps, last, ego, frame_agent_map(frames, last - 1), zone_ids
+                )
                 await show(page, last, str(ego))
                 await self.assert_presence_matches_paint(
-                    page, recording, f"{view_name(recording, ego)} terminal",
-                    last, str(ego), expect_label=PRESENCE_SEEN, expect_counts=want)
+                    page,
+                    recording,
+                    f"{view_name(recording, ego)} terminal",
+                    last,
+                    str(ego),
+                    expect_label=PRESENCE_SEEN,
+                    expect_counts=want,
+                )
             return errors
 
         self._no_console_errors(self._drive(body))
@@ -1327,8 +1564,10 @@ class TestAgentViewHonesty(unittest.TestCase):
             steps = recorded_steps(recording)
             zone_ids = [z["Id"] for z in recording[0]["Map"]["Zones"]]
             frames = frames_with_claims(recording)
-            self.assertTrue(has_recorded_perception(recording),
-                            "infiltration.jsonl no longer records perceptions")
+            self.assertTrue(
+                has_recorded_perception(recording),
+                "infiltration.jsonl no longer records perceptions",
+            )
 
             blind = 1
             lines = [recording[0]]
@@ -1350,11 +1589,13 @@ class TestAgentViewHonesty(unittest.TestCase):
             frame = blind
             self.assertIsNone(
                 perception_at(doctored, frame, 0),
-                "the variant still records a perception at the blind frame")
+                "the variant still records a perception at the blind frame",
+            )
             self.assertIsNotNone(
                 perception_at(steps, frame, 0),
                 "the committed file already lacked a perception here, so this "
-                "test is no longer exercising the missing-perception path")
+                "test is no longer exercising the missing-perception path",
+            )
             await show(page, frame, "0")
             rows = await page.evaluate(ZONE_ROWS_JS)
             self.assertEqual(await page.evaluate(PRESENCE_LABEL), PRESENCE_UNAVAILABLE)
@@ -1363,15 +1604,18 @@ class TestAgentViewHonesty(unittest.TestCase):
                     self.assertIsNone(
                         presence_of(row["value"]),
                         f"{row['room']}: with no recorded perception this view has "
-                        f"no count to give, but the table says {row['value']!r}")
+                        f"no count to give, but the table says {row['value']!r}",
+                    )
             # And the world, which is right there in the file, was not borrowed.
             world = {z: 0 for z in zone_ids}
             for agent in frames[frame]["agents"]:
                 if not agent.get("Transit"):
                     world[agent["ZoneId"]] = world.get(agent["ZoneId"], 0) + 1
-            self.assertTrue(any(world.values()),
-                            "the blind frame has no agents at all, so this test "
-                            "cannot detect a leaked world count")
+            self.assertTrue(
+                any(world.values()),
+                "the blind frame has no agents at all, so this test "
+                "cannot detect a leaked world count",
+            )
             return errors
 
         self._no_console_errors(self._drive(body))

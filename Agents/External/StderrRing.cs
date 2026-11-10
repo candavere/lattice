@@ -91,7 +91,10 @@ public sealed class StderrRing
             _count = Math.Min(_count + bytes.Length, CapacityBytes);
             if (_count == CapacityBytes)
             {
-                _start = 0;
+                // Once the ring is full, the oldest retained byte is the one
+                // just past the last byte written, not position 0. An append
+                // that straddles the wrap leaves the tail starting mid-buffer.
+                _start = (writeAt + bytes.Length) % CapacityBytes;
             }
         }
     }

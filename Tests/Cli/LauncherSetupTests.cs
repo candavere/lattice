@@ -526,12 +526,10 @@ public sealed class LauncherSetupTests
         var tempHome2 = Path.Combine(scope.Root, "home2");
         Directory.CreateDirectory(tempHome2);
         var env2 = new Dictionary<string, string>(env) { ["HOME"] = tempHome2 };
-#pragma warning disable xUnit1031
         var t1 = Task.Run(() => Run("bash", new[] { setup, "--install-launcher" }, scope.Work, env, "unix-step9-concurrent-install-a", Guid.NewGuid().ToString("N"), deadline).ExitCode);
         var t2 = Task.Run(() => Run("bash", new[] { setup, "--install-launcher" }, scope.Work, env2, "unix-step9-concurrent-install-b", Guid.NewGuid().ToString("N"), deadline).ExitCode);
-#pragma warning restore xUnit1031
-        await Task.WhenAll(t1, t2);
-        Assert.False(t1.Result == 0 && t2.Result == 0, "concurrent installs both succeeded");
+        var concurrent = await Task.WhenAll(t1, t2);
+        Assert.False(concurrent[0] == 0 && concurrent[1] == 0, "concurrent installs both succeeded");
 
         // 10. clean up temp home2 if needed
         try { Directory.Delete(tempHome2, recursive: true); } catch { }

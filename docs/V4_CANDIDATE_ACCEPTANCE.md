@@ -38,6 +38,8 @@ evidence directory was read locally during preparation and is not published.
 | S11 | **NOT TESTED** | Hosted-model acceptance has not been approved or executed; no hosted call made |
 | S13 | **CLOSED** | Maintainer classification: the old credential-shaped test literal (added in `c3467b7`) is a dummy fixture; the current fixture is the obvious `TEST-ONLY` placeholder. The script still records `not-tested` by design (classification is a human decision) |
 
+> Correction 2026-11-10: `evidence/acceptance-s10/README.md` says "(11 files OK)"; the bundle's `SHA256SUMS.txt` lists 12 files and verifies 12/12. The evidence bundle is preserved byte-identical; this note is the correction record.
+
 Local-host scope for S10: macOS arm64, loopback-only server on
 `127.0.0.1:8081`. The model-file size (491400032 bytes) and SHA-256
 `74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db`

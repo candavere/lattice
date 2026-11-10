@@ -1,10 +1,19 @@
 # Lattice
 
-Lattice is deterministic multi-agent benchmarking with auditable replay: a headless .NET 10 environment for seeded Dec-POMDP-style experiments where every run is a replayable recording.
+Lattice is deterministic multi-agent benchmarking with auditable replay: a headless .NET 10 environment for seeded Dec-POMDP-style experiments where every run is a replayable recording. The committed 32-rollout MCTS study loses to a deterministic heuristic on standard maps and wins under capacity-1 bottleneck contention; both results ship with their confidence intervals and artifacts.
 
 - README: README.md
+- Install and packaging: docs/INSTALL.md
 - CLI reference: docs/CLI.md
+- Verification, claims, gates, and test evidence: docs/VERIFICATION.md
+- Results and negative results: docs/RESULTS.md
 - External-agent protocol: docs/EXTERNAL_AGENT_PROTOCOL.md
+- Scenario files: docs/SCENARIOS.md
 - Benchmarking: docs/BENCHMARKING.md
-- Ecosystem: docs/ECOSYSTEM.md
+- Support, boundaries, and trajectory schema: docs/SUPPORT_AND_REPRODUCIBILITY.md
+- Ecosystem and architecture: docs/ECOSYSTEM.md
+- Engine mechanics: docs/MECHANICS.md
 - v4 candidate acceptance summary: docs/V4_CANDIDATE_ACCEPTANCE.md
+- Claim calibration matrix: docs/CLAIM_CALIBRATION_MATRIX.md
+- Findings ledger: docs/FINDINGS_LEDGER.md
+- Fuzzing: docs/FUZZING.md

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/lattice-logo.svg" alt="Lattice" width="288" height="288" />
+  <img src="assets/lattice-logo.svg" alt="Lattice logo: a connected graph of zones with seeded agent paths" width="288" height="288" />
 </p>
 
 # Lattice
@@ -39,11 +39,20 @@ game-AI product, and MCTS is one evaluation subject here, not the product. A
 negative result is first-class evidence, not something to hide: the committed
 32-rollout MCTS study **loses** to a deterministic heuristic, that loss is the
 baseline any future policy must beat, and it is published with its confidence
-interval. See [Results](#results).
+interval. See [Results](docs/RESULTS.md) and the artifact behind the headline
+below.
 
-**The thesis in one minute:** every run is seeded, every run is a recording,
-and every recording can be replayed and checked. Run it, replay it, read the
-verdict:
+The viewer shows only what a recording supports: ground truth, recorded
+perception, and derived sightline are labelled separately. [Replay the
+infiltration recording in your browser](https://candavere.github.io/lattice/);
+the claim and presence semantics, and the pixel and geometry tests that pin
+them, are in
+[`docs/SUPPORT_AND_REPRODUCIBILITY.md`](docs/SUPPORT_AND_REPRODUCIBILITY.md#viewer-claim-semantics).
+
+## The thesis in one minute
+
+From a clean checkout (see [Get started](#get-started)), every run is seeded,
+every run is a recording, and every recording can be replayed and checked:
 
 ```sh
 dotnet run -c Release --project Cli -- simulate --seed 42 --steps 100 --out run.jsonl
@@ -51,913 +60,141 @@ dotnet run -c Release --project Cli -- replay run.jsonl --verify
 dotnet run -c Release --project Cli -- evaluate --seed-set dev --scenario standard --seeds 30 --rollouts 32
 ```
 
-The third command shows the honest case: on the standard study the built-in
-MCTS baseline loses to a deterministic heuristic — that committed loss is the
-baseline, not a failure to hide. If you want your own agent in the loop, see
-[Bring your own agent](#bring-your-own-agent) and [Verify everything yourself](#verify-everything-yourself).
+The third command runs a local 30-seed paired study (no network) and prints the
+honest case: on the standard study the built-in MCTS baseline loses to a
+deterministic heuristic. That committed loss is the baseline, not a failure to
+hide. To put your own agent in the loop, see [Bring your own
+agent](#bring-your-own-agent).
 
-The data flow, drawn from the committed tools:
+## Headline result
 
+| Study | Result | Artifact |
+| :--- | :--- | :--- |
+| Standard generated maps | 32-rollout MCTS **loses** to the deterministic Scout heuristic: mean paired delta **-1.12**, 95% CI **[-1.37, -0.87]** on 50 dev seeds; held-out **-1.25**, **[-1.54, -0.96]** on 50 seeds. This is the committed negative baseline. | [`benchmarks/mcts_evaluation_results.json`](benchmarks/mcts_evaluation_results.json) |
+| Capacity-1 bottleneck | The **same policy wins** when both agents are funneled through chokepoints into one shared vault: **+2.03**, CI **[+1.66, +2.41]** on 30 dev seeds; held-out **+2.60**, **[+2.20, +3.00]** on 30 seeds. Topology changed the conclusion. | [`benchmarks/bottleneck_evaluation_results.json`](benchmarks/bottleneck_evaluation_results.json) |
+
+The full tables, the pre-fix comparison, the five-workload throughput record,
+and the negative-results list are in [`docs/RESULTS.md`](docs/RESULTS.md). Every
+number keeps its dated or scoped label and its committed-artifact link there.
+
+## Get started
+
+Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download). From a clean
+checkout:
+
+```sh
+git clone https://github.com/candavere/lattice.git
+cd lattice
+./setup.sh              # macOS/Linux; Windows: .\setup.ps1
 ```
-simulate -> recording (.jsonl) -> replay --verify / render / analyze / site
-benchmark -> throughput JSON -> throughput gate
-evaluate  -> evaluation JSON   evaluate --agent-cmd -> your agent
+
+`setup.sh` verifies the SDK, restores, builds, runs the full test suite, and
+reproduces the golden replay. It is idempotent, uses no `sudo`, and installs no
+system software. `make setup` is equivalent on macOS/Linux. To run the
+quickstart by hand after restore:
+
+```sh
+dotnet build Lattice.sln -c Release
+dotnet test Lattice.sln -c Release --no-build
+dotnet run -c Release --project Cli -- replay Tests/fixtures/golden_trajectory.jsonl --verify
 ```
 
-The full diagram is [`docs/architecture.svg`](docs/architecture.svg), and a
-fixed-size raster of the same rendering is
-[`docs/architecture.png`](docs/architecture.png):
-
-<p align="center">
-  <img src="docs/architecture.svg" alt="Lattice architecture, drawn from the committed tools. A seeded lattice simulate run writes one schema 5 JSONL recording, and four readers consume it: lattice replay --verify, lattice render, lattice analyze, and the site replay viewer. The golden fixture is itself a recording, so the test suite pins the reader, and CI runs that suite on Ubuntu, Windows and macOS. Independently of any recording, lattice benchmark writes a host-scoped throughput JSON that is gated only on a full host match, and lattice evaluate writes an evaluation JSON from a mirrored-seat paired study of MCTS against the Scout baseline. Seated instead of the in-process MCTS candidate, lattice evaluate --agent-cmd runs an external agent process of any language, in a separate OS process, that speaks protocol 1 over stdin and stdout." />
-</p>
-
-Where each box in that diagram is implemented, at this commit:
-
-| Box | Implementation |
-| --- | --- |
-| `lattice simulate` | `Cli/CliApp.cs:219`; the header is stamped with the current schema at `Trajectories/TrajectoryWriter.cs:117` |
-| `recording .jsonl` (schema 5) | `Trajectories/TrajectoryModel.cs`; one header line, one line per tick, one final line. Schema 5 adds the header's `ScenarioSha256`, the digest of the scenario descriptor's exact bytes; schema 4's decision-time `Perceptions` and `AgentVision` and schema 3's per-tick state hash are unchanged |
-| `lattice replay --verify` | `Cli/CliApp.cs:222`; per-tick result, state-digest and decision-time perception comparison at `Trajectories/TrajectoryReplay.cs` |
-| `lattice render` | `Cli/CliApp.cs:220`, over `Visualization/` |
-| `lattice analyze` | `Cli/CliApp.cs:221`, over `Analytics/` |
-| `site/ replay viewer` | `site/app.js`, deployed by `.github/workflows/pages.yml` |
-| `lattice benchmark` | `Cli/CliApp.cs:223`; five workloads on fresh simulations, never on a recording |
-| `throughput JSON` | the host is sampled for the artifact at `Analytics/Benchmarking/BenchmarkMetadata.cs:53`, so the record names its own commit, runtime, OS, CPU, cores and RAM |
-| `throughput gate` | the strict gate arms only on a full host match, at `.github/workflows/compare_benchmarks.py:518-543`; which hosted-runner workloads are armed, and which is a permanent non-verdict, is stated once in [`FINDING-014`](docs/FINDINGS_LEDGER.md#finding-014--the-mcts-decision-throughput-case-cannot-be-gated-on-this-host-class-and-four-of-five-workloads-can) |
-| `lattice evaluate` | `Cli/CliApp.cs:224`; the pass/fail verdict is composed at `Agents/PairedEvaluation.cs:145-150` |
-| `evaluation JSON` | the per-seed rows and statistics are written at `Cli/CliApp.cs:1450`; an external agent's failures are tallied per reason code at `Cli/CliApp.cs:1416` |
-| `lattice evaluate --agent-cmd` | the candidate seat, with the command line split without a shell at `Cli/AgentCommandLine.cs:49`; the child process is launched from `Agents/External/ExternalAgentLaunch.cs:84` |
-| `your agent, any language` | a separate OS process reached only over protocol 1; a CR anywhere in a line is refused as `malformed_json` at `Protocol/ProtocolFraming.cs:65` |
-| `tests + golden fixture` → `CI on 3 operating systems` | the golden-trajectory replay gate runs on every matrix OS at `.github/workflows/ci.yml:42-43`; every committed `site/*.jsonl` is re-verified by the gate at `.github/workflows/ci.yml:221-236` |
-
-[Replay the infiltration recording in your browser](https://candavere.github.io/lattice/).
-The page replays committed recordings only: ground truth shows everything a
-recording carried, and an agent view dims what that agent could not have
-reached. Nothing is recomputed from a new simulation in your browser.
-
-The viewer reports what a recording actually supports, and distinguishes the
-three counts that are easy to conflate: `claimed in world`, the observer's own
-`claims seen` (schema 4), and `claims in derived view` where nothing was
-recorded. A frame with no recorded perception reports no count rather than
-inventing one, and zone-table presence follows the painted ego view. The
-detailed table of claim and presence semantics, and the pixel and geometry
-tests that pin them, are in
-[`docs/SUPPORT_AND_REPRODUCIBILITY.md`](docs/SUPPORT_AND_REPRODUCIBILITY.md#viewer-claim-semantics).
+Published users: use the **v3.1.0** native binaries from the [GitHub
+Release](https://github.com/candavere/lattice/releases/tag/v3.1.0)
+(`lattice-linux-x64`, `lattice-osx-arm64`, `lattice-win-x64.exe`, plus
+`SHA256SUMS.txt`); there is no registry package. Candidate source is **4.0.0,
+unreleased**: pack it locally and install into a throwaway tool path only, never
+a global `-g` install. Full install, packaging, launcher, and `DOTNET_ROOT`
+details: [`docs/INSTALL.md`](docs/INSTALL.md).
 
 ## Bring your own agent
 
 Lattice speaks a normative, language-neutral wire protocol over stdin/stdout, so
-**any language that speaks the protocol** can play it: Python, Rust, Go, C++,
-Java. The contract is
-[`docs/EXTERNAL_AGENT_PROTOCOL.md`](docs/EXTERNAL_AGENT_PROTOCOL.md); the
-complete worked example is
-[`examples/python/lattice_agent.py`](examples/python/lattice_agent.py), about 150
-lines of standard-library Python with no dependencies.
-
-Here is the entire policy that example agent plays, quoted verbatim from
-[`examples/python/lattice_agent.py:79-104`](examples/python/lattice_agent.py):
-
-```python
-def decide(observation):
-    """The single action for this observation: pure, so the same observation
-    always produces the same action and a run is reproducible from its seed."""
-    mine = next(s for s in observation["agent_states"] if s["agent_id"] == observation["agent_id"])
-    step = observation["step"]
-
-    # Mid-crossing the agent is on an edge, not at a node: zone_id is still the
-    # departure node and transit describes the crossing. The honest action is to
-    # wait (spec 5.4).
-    if "transit" in mine:
-        return {"type": "action", "step": step, "kind": "Wait"}
-
-    here = mine["zone_id"]
-    claimed = set(observation["claims"])
-    wanted = [r for r in observation["map"]["resources"] if r["id"] not in claimed]
-
-    # Standing on one, so take it. Collect carries no zone_id: the wire must not
-    # include a field the action would ignore (spec section 6.1).
-    for resource in sorted(wanted, key=lambda r: r["id"]):
-        if resource["zone_id"] == here:
-            return {"type": "action", "step": step, "kind": "Collect", "resource_id": resource["id"]}
-
-    hop = first_hop(adjacency(observation["map"]), here, {r["zone_id"] for r in wanted})
-    if hop is None:
-        return {"type": "action", "step": step, "kind": "Wait"}  # nothing reachable left
-    return {"type": "action", "step": step, "kind": "Move", "zone_id": hop}
-```
-
-Score it with the ordinary `evaluate` command, naming your program instead of the
-in-process candidate:
+any language that speaks protocol 1 can play. The contract is
+[`docs/EXTERNAL_AGENT_PROTOCOL.md`](docs/EXTERNAL_AGENT_PROTOCOL.md); the worked
+example is [`examples/python/lattice_agent.py`](examples/python/lattice_agent.py),
+about 150 lines of standard-library Python.
 
 ```sh
 dotnet run --project Cli -- evaluate --scenario standard --seed-set dev --seeds 30 \
   --agent-cmd "python3 examples/python/lattice_agent.py"
 ```
 
-That is the whole command. The measured result, recorded in
-[`examples/python/README.md`](examples/python/README.md) at commit `c8417f0` on
-2026-09-27, is the same agent **failing** the standard suite and **passing** the
-bottleneck suite:
+That runs the 30-seed paired study as 60 short-lived Python processes; it needs
+Python 3.8+ (standard library only) and a built CLI, and it contacts no network.
+The measured result is in
+[`examples/python/README.md`](examples/python/README.md): the same agent
+**fails** the standard suite (mean -0.383, 95% CI [-0.672, -0.095]) and
+**passes** the bottleneck suite (+1.733, [+1.424, +2.042]) on the same 30 dev
+seeds. Neither number is a quality claim; the harness is the thing to check.
 
-| | `--scenario standard` | `--scenario bottleneck` |
-| :--- | :--- | :--- |
-| valid seeds | 30 | 30 |
-| void runs | 0 | 0 |
-| agent failures | none | none |
-| mean paired delta | −0.383 | +1.733 |
-| 95% CI | [−0.672, −0.095] | [+1.424, +2.042] |
-| win / draw / loss | 38.3% / 23.3% / 38.3% | 63.3% / 0.0% / 36.7% |
-| contention | 0.0% | 30.1% |
-| verdict | **Fail** | **Pass** |
-
-The same policy, the same 30 seeds, one map family apart. Neither number is a
-claim about the agent's quality; they are what the harness reports, and the
-harness is the thing you should be checking. That inversion is the same one the
-in-process MCTS study shows in [Results](#results).
-
-## Claims and proofs
-
-Every claim on this page has a command you can run and a committed artifact it
-rests on. Unless a row names a revision, the output fragments below are
-verbatim from runs at the commit that introduced this page, on a macOS arm64
-host. Host metadata — CPU, cores, OS, and the exact .NET runtime build — is
-recorded in the committed artifacts rather than restated here as a standing
-fact; the `benchmarks/*.json` files are the authority for it. A local run is
-evidence that the command worked on one machine, not that CI is green; the
-current per-OS CI counts are the CI
-artifacts linked under [Test totals, as CI publishes them](#test-totals-as-ci-publishes-them).
-
-| Claim | Verify with | Rests on |
-| :--- | :--- | :--- |
-| Same seed, same arguments, same bytes. | `dotnet run -c Release --project Cli -- simulate --seed 42 --scenario infiltration --steps 100 --out a.jsonl`, then the same again with `--out b.jsonl`, then `shasum -a 256 a.jsonl b.jsonl` | Both runs hash to `d557e80f02fb4783…6a7`, which is the committed [`site/infiltration.jsonl`](site/infiltration.jsonl) (115,067 bytes, schema 5). Verified by running the command twice outside the repository on a macOS arm64 host at the current tree; both outputs matched the committed file byte for byte. Scoped to a macOS arm64 host on the .NET 10 runtime the artifacts record. |
-| Replay is hash-verified, not just re-run. | `dotnet run -c Release --project Cli -- replay Tests/fixtures/golden_trajectory.jsonl --verify` | `replay verified: 12 step(s) serialized-equivalent, 12 state hash(es) matched (seed 2024, schema v3).` Exit 0. Digest computed by [`Trajectories/SimulationStateHash.cs`](Trajectories/SimulationStateHash.cs), compared in [`Trajectories/TrajectoryReplay.cs`](Trajectories/TrajectoryReplay.cs). |
-| The same check runs on all three operating systems. | Read the `Build & test` matrix in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | The golden replay-verify step is a matrix step over `ubuntu-24.04`, `windows-latest`, `macos-latest`. Run [36622539217](https://github.com/candavere/lattice/actions/runs/36622539217) on commit `4035de6` shows all three legs green on the pinned labels, 738/738 tests passed on each: `Build & test (ubuntu-24.04)` 738 passed, `Build & test (macos-latest)` 738 passed, `Build & test (windows-latest)` 738 passed. The label is pinned to 24.04 on purpose so GitHub's rollout of `ubuntu-latest` to 26.04 cannot move this gate. A separate `ubuntu-26.04` job builds, golden-replays, and tests as a **non-gating** compatibility probe: on that run it reported `Total tests: 738` and concluded success, but it publishes no artifact, no other job depends on it, and it is not part of the three-OS equivalence contract — read its steps and logs, never infer 26.04 support from a green run. |
-| Every committed recording replays, not just the golden one. | `dotnet run -c Release --project Cli -- replay site/demo.jsonl --verify` and the same for `site/infiltration.jsonl` | `27 step(s) … 27 state hash(es) matched` and `20 step(s) … 20 state hash(es) matched`. A separate CI job replays every recording under `site/`. |
-| The suite had 711 tests at the v3.0.0 release commit. | `dotnet test Lattice.sln -c Release` | Historical: `Passed! - Failed: 0, Passed: 711, Skipped: 0, Total: 711`, recorded at `a8b2fc6` (the v3.0.0 release commit). It is **not** the current head count — schema-4 decision-time perception and other post-release work added tests after that revision. For today's totals, use the per-OS head-matched TRX summary artifacts, not this number: see [Test totals, as CI publishes them](#test-totals-as-ci-publishes-them). |
-| A paired study needs 30 seeds, and the rule is mean > 0 **and** CI lower > 0. | `dotnet run -c Release --project Cli -- evaluate --scenario standard --seed-set dev --seeds 29 --agent-cmd "python3 examples/python/lattice_agent.py"`, then the same with `--seeds 30` | `--seeds 29` → `Not graded: 29 seeds is below the 30-seed floor of the decision rule (the canonical suites run 50).` `--seeds 30` → `Fail: mean paired delta -0.383 and/or the 95% CI lower bound -0.672 did not clear 0 on 30 seeds.` The rule is [`Agents/PairedEvaluation.cs:144-145`](Agents/PairedEvaluation.cs): `graded = deltas.Length >= 30` and `passed = graded && mean > 0.0 && ciLower > 0.0`, with `ConfidenceLevel = 0.95` at line 74. |
-| Every protocol failure is a loss, never a retry. | `dotnet run -c Release --project Cli -- evaluate --scenario standard --seed-set dev --seeds 2 --agent-step-timeout-ms 300 --agent-cmd "python3 crash.py"`, where `crash.py` is `import sys; sys.exit(3)` | `"AgentFailures": {"agent_crashed": 4}`, `VoidRuns: 0`, wins/draws/losses `0/0/4` of 4. The reason set is the closed fourteen-code table at [`docs/EXTERNAL_AGENT_PROTOCOL.md` §8](docs/EXTERNAL_AGENT_PROTOCOL.md) and [`Protocol/ProtocolReasons.cs:17-30`](Protocol/ProtocolReasons.cs); thirteen are agent-attributable and one, `host_limit`, is host-attributable. |
-| A failed match forfeits: external side 0, opponent keeps its score, partials are diagnostic only. | An agent that plays normally, then `sys.exit(3)` at step 10, over 3 seeds | `AgentForfeits` rows read `"PartialScoreAtSlot0": 2, "PartialScoreAtSlot1": 3, "ScoredExternalScore": 0, "ScoredOpponentScore": 3` — the external side's 2 and 3 are recorded but not scored, and the opponent keeps 3 and 2. `AgentFailures: {"agent_crashed": 6}`, all 6 matches losses, mean delta −2.333. |
-| A bad `--agent-cmd` is a usage error, not a lost result. | `dotnet run -c Release --project Cli -- evaluate --scenario standard --seed-set dev --seeds 2 --agent-cmd "definitely-not-a-real-binary-xyz"` | Exit **2**, `error: --agent-cmd could not be run: 'definitely-not-a-real-binary-xyz' was not found on PATH.` [`Cli/UsageError.cs:29`](Cli/UsageError.cs) sets `ExitCode = 2`, mapped at [`Cli/CliApp.cs:1749`](Cli/CliApp.cs). |
-| The published negative result is negative. | `python3 -c "import json;print(json.load(open('benchmarks/mcts_evaluation_results.json'))['Studies'][0]['Statistics'])"` | dev: mean −1.12, CI [−1.37, −0.87], 50 seeds, `Passed: false`. held-out: mean −1.25, CI [−1.54, −0.96], `Passed: false`. Committed at source revision `5783ca1`, .NET 10.0.10. |
-
-The four gates the code actually enforces are spelled out with file and line in
-[Verify everything yourself](#verify-everything-yourself).
-
-## Results
-
-Each row is one committed benchmark claim, with the artifact behind it.
-
-| Finding | Artifact |
-| :--- | :--- |
-| 32-rollout MCTS loses to the deterministic Scout heuristic on standard generated maps: mean paired delta -1.12, 95% CI [-1.37, -0.87] on the dev suite. This loss is the committed negative baseline. | [`benchmarks/mcts_evaluation_results.json`](benchmarks/mcts_evaluation_results.json) |
-| The same 32-rollout MCTS policy wins when both agents are funneled through capacity-1 chokepoints into one shared vault: +2.03, CI [+1.66, +2.41] on the dev suite. Topology changed the conclusion. | [`benchmarks/bottleneck_evaluation_results.json`](benchmarks/bottleneck_evaluation_results.json) |
-| 99.61% scoped mutation score on `Simulation.cs` + `PerceptionFilter.cs` only (252 killed / 1 timed out / 1 survived / 0 no-coverage). A historical local calibration at `053f3eb`, not a rerun at the current head, not whole-repository coverage, and not a CI gate. | [`benchmarks/mutation_stryker_summary.json`](benchmarks/mutation_stryker_summary.json) |
-| Five-workload throughput record on one host (tree `41530ef`, recorded in the artifact): median 14,916 to 899,075 steps/s depending on workload (the MCTS case reports decisions/s). Speed is measured, not advertised. | [`benchmarks/throughput_benchmark.json`](benchmarks/throughput_benchmark.json), [`benchmarks/throughput_summary.md`](benchmarks/throughput_summary.md) |
-
-### The standard study: a committed loss
-
-The reference result for the standard study is
-[`benchmarks/mcts_evaluation_results.json`](benchmarks/mcts_evaluation_results.json):
-source revision `5783ca1`, .NET 10.0.10, MCTS 32 rollouts
-x depth 12, 2 agents / 200 ticks / transit speed 4, baseline
-`ScoutCollectorAgent` with unbounded vision, mirror-seated per seed. The
-protocol facts are reproduced by `Cli/CliApp.cs` (evaluation config) and
-`Agents/MctsAgent.cs` (default search depth).
-
-| Suite | Seeds | Mean delta | 95% CI | Win | Draw | Loss | Timeout | Verdict |
-| :--- | ---: | ---: | :--- | ---: | ---: | ---: | ---: | :--- |
-| dev (1001-1050) | 50 | -1.12 | [-1.37, -0.87] | 15% | 27% | 58% | 0% | **FAIL** |
-| held-out (2001-2050) | 50 | -1.25 | [-1.54, -0.96] | 18% | 14% | 68% | 0% | **FAIL** |
-
-The entire 95% CI sits below 0 on both suites, so the decision rule fails by a
-wide margin. Every suite run terminates at `resources-exhausted` on at most
-200 ticks; contention stays at 0, because generated maps never put both agents
-on the same claim path. This measures policy speed on open layouts: the
-scout's back-pressure-aware collection beats this budget's shallow lookahead.
-
-**This failure is the committed baseline.** Any future search or learning
-policy must clear the rule (mean paired delta > 0 and CI lower bound > 0) on
-the same suites, seeds, and budget to supersede it. To challenge the result:
-raise the budget (`--rollouts 64`), change the map distribution, or swap the
-baseline, and every run records its own delta, CI, and verdict.
-
-### The bottleneck study: the same policy, the other verdict
-
-The reference result for the bottleneck study is
-[`benchmarks/bottleneck_evaluation_results.json`](benchmarks/bottleneck_evaluation_results.json):
-source revision `28c89d3`, identical policy budget and baseline, procedural
-contention topology family, first 30 dev + 30 held-out seeds.
-
-| Suite | Seeds | Mean delta | 95% CI | Win | Draw | Loss | Timeout | Contention | Verdict |
-| :--- | ---: | ---: | :--- | ---: | ---: | ---: | ---: | ---: | :--- |
-| dev (1001-1030) | 30 | +2.03 | [+1.66, +2.41] | 50% | 3% | 47% | 0% | 16% | **PASS** |
-| held-out (2001-2030) | 30 | +2.60 | [+2.20, +3.00] | 50% | 18% | 32% | 0% | 16% | **PASS** |
-
-Each seed draws a distinct topology, while both spawn arms stay geometric
-mirror images, so both agents reach the shared single-lane gate on the same
-tick and actively contend. Under that pressure the same MCTS budget wins.
-Relative to the pre-fix record (measured at `1c6fa80`), the re-anchored
-run's mean delta rose while its match win rate fell: dev 0.55 → 0.50 (losses
-22 → 28) and held-out 0.533 → 0.50 (losses 14 → 19), of 60 matches each, read
-from the artifacts. This
-does **not** supersede the standard-suite negative baseline; the two are
-complementary evidence on different map distributions.
-
-### Performance, qualified
-
-The committed
-[`benchmarks/throughput_benchmark.json`](benchmarks/throughput_benchmark.json)
-records five workloads, raw stepping, mixed static facility, dynamic
-contention, stress topology, and MCTS decisions, on a single reference host
-(.NET 10.0.12 Release, Workstation GC, tree
-`41530ef`, baseline re-anchored to a conservative full-protocol session on
-the current runtime). Numbers come from a single reference host; its full
-metadata (CPU, cores, OS, runtime) is recorded in the artifact. Median
-throughput spans from 14,916 steps/s on the
-30-zone stress case to 899,075 steps/s on the micro case; the MCTS case
-reports decisions/s.
-The per-workload latency and allocation breakdowns, the protocol, and the
-honest-reading notes are in
-[`benchmarks/throughput_summary.md`](benchmarks/throughput_summary.md) and
-[`docs/BENCHMARKING.md`](docs/BENCHMARKING.md). Numbers vary with hardware and
-build profile.
-
-## Verify everything yourself
-
-The commands in this section run from a clean checkout at the repository root
-with the .NET 10 SDK installed, and require no network access once dependencies
-are restored. (That guarantee covers this block only; it does not cover
-`dotnet tool install` below, which contacts a NuGet source.)
-You need the [.NET 10 SDK](https://dotnet.microsoft.com/download); Lattice also
-runs on later .NET majors via `RollForward=LatestMajor`.
-
-```sh
-./setup.sh              # macOS/Linux: verify SDK, restore, build, test,
-                        # reproduce one committed claim. Windows: .\setup.ps1
-dotnet test Lattice.sln -c Release
-dotnet run -c Release --project Cli -- replay Tests/fixtures/golden_trajectory.jsonl --verify
-dotnet run -c Release --project Cli -- replay site/demo.jsonl --verify
-dotnet run -c Release --project Cli -- replay site/infiltration.jsonl --verify
-dotnet run -c Release --project Cli -- evaluate --seed-set dev,heldout --scenario standard --seeds 50 --rollouts 32
-dotnet run -c Release --project Cli -- evaluate --seed-set dev,heldout --scenario bottleneck --seeds 30 --rollouts 32
-dotnet run -c Release --project Cli -- benchmark
-```
-
-`setup.sh` and `setup.ps1` also run a one-command reproduce: they run one
-existing benchmark or replay command and compare its output to the committed
-artifact, printing `Reproduced: <claim> matches <artifact>` or a clear
-mismatch. They are idempotent, use no `sudo`, and never install system
-software. `make setup` is equivalent on macOS/Linux.
-
-A pass prints `replay verified` and exits 0. Reproducing the committed
-evaluation artifacts is documented in
-[`docs/SUPPORT_AND_REPRODUCIBILITY.md`](docs/SUPPORT_AND_REPRODUCIBILITY.md)
-(section 5), and the turnkey external-reviewer path, pinned to the published
-`v3.0.0` release, is [`docs/reproduction_packet.md`](docs/reproduction_packet.md).
-
-### Published release vs candidate source: two different installs
-
-The commands above are the **zero-install path**: nothing to install, just the
-SDK and a checkout. Cloning alone does not put `lattice` on `PATH`.
-
-**Published users — use the published release, not this candidate.** The
-latest published release is `v3.1.0`, distributed as native binaries from its
-GitHub Release (`lattice-linux-x64`, `lattice-osx-arm64`, `lattice-win-x64.exe`
-plus `SHA256SUMS.txt`): https://github.com/candavere/lattice/releases/tag/v3.1.0
-— download the binary for your platform, verify it against `SHA256SUMS.txt`,
-and run it. There is **no registry package** for Lattice: no nuget.org (or
-other registry) publication exists or is claimed. Publication of `v3.1.0`
-itself is recorded only by that GitHub Release; it was not re-verified from
-this offline session, so this page does not assert its current availability
-beyond the published record.
-
-**Candidate source (4.0.0, unreleased) — local pack only.** Version 4.0.0
-exists only as this source tree. The commands below are valid only after you
-build and pack *this* candidate, and they install exclusively from your local
-package source into a throwaway tool path — they never fetch a published
-4.0.0 (there is none) and never touch your global installation:
-
-```sh
-dotnet pack Cli -c Release --no-build --output ./pkg-source   # local source only
-dotnet tool install --tool-path ./tool-path --version 4.0.0 --add-source ./pkg-source lattice
-./tool-path/lattice --version                               # 4.0.0+<source-commit>
-./tool-path/lattice replay Tests/fixtures/golden_trajectory.jsonl --verify
-```
-
-That throwaway tool-path install is the only candidate install offered here:
-do not substitute a global (`-g`) install, and do not present the unpublished
-4.0.0 as a public install command.
-
-Try one replay and one evidence view, then quit each screen with `q`:
-
-```sh
-lattice replay site/demo.jsonl --verify                     # headless, exit 0
-```
-
-Opt-in launcher setup: `./setup.sh --install-launcher` (or `.\setup.ps1 -InstallLauncher`
-on Windows) packs a real build and installs `lattice` into an owned per-user directory
-(`$HOME/.lattice/bin` on macOS/Linux, `%LOCALAPPDATA%\\Lattice\\bin` on Windows). With
-`--add-to-path` / `-AddToPath` it records and (on Unix) appends one marked block to
-one profile, or (on Windows) appends the directory to the user `Path` only. Without that
-flag it prints the exact line instead and changes no profile or registry. Every effect is
-recorded in `install.json` and undone by `--uninstall-launcher` / `-UninstallLauncher`;
-dry-run changes nothing. Open a new terminal after PATH changes. If the
-launcher complains about a missing .NET runtime, see below.
-
-On some package-manager .NET installations the `lattice` launcher can fail
-with `You must install .NET to run this application.` even though `dotnet`
-itself works, because the launcher resolves the runtime from `DOTNET_ROOT` or
-a registered location and such installations may provide neither. Set
-`DOTNET_ROOT` to the real runtime root for your installation. `dotnet run`
-above is unaffected, so if the launcher fails, use the zero-install path instead.
-
-This is **packaging, not a second implementation**. The tool is the same
-compiled binary with a launcher named `lattice`; every command, flag, output and
-exit code is the one documented above, because it is the same code. It adds **no
-dependency**: the nine production projects still declare zero
-`PackageReference` items, and the packed `.nuspec` declares no dependencies at
-all — the package carries Lattice's own assemblies (including
-`Protocol`) and asks for the .NET
-runtime, which you already have for the commands above. A package version
-saying 4.0.0 does not mean the v4 release has shipped: **4.0.0 is a release
-candidate, not a released version**. The latest published release remains
-`v3.1.0` (https://github.com/candavere/lattice/releases/tag/v3.1.0). CI proves the two entry
-points agree: the `build-test` matrix packs, installs the tool into a
-throwaway tool path on Ubuntu, Windows and macOS, and fails if the installed
-`lattice` and `dotnet run` differ by a single byte on the golden replay.
-
-`--add-source` points NuGet at the package you just built. NuGet may still
-consult your other configured sources, so pass `--version 4.0.0` as well if you
-want the install pinned to exactly what you packed. Publishing to nuget.org is a
-**separate, optional maintainer action** and is not required to use any of this;
-the `lattice` package ID there may already be taken, and the command name is
-`lattice` either way.
-
-### v4 release candidate: connecting a model
-
-Version 4.0.0 (candidate, unreleased) adds the bring-your-own-model path:
-`examples/python/lattice_model_agent.py` speaks protocol 1 and posts each
-observation to an OpenAI-compatible chat-completions endpoint, validating the
-model's reply (`wait` / `move` / `collect`, exact key sets) and failing
-explicitly — one stderr line, non-zero exit, no guessed action — on endpoint
-errors, timeouts, or replies that fail parse/validation. `evaluate
---agent-cmd … --record-episodes <dir>` then records each completed match as a
-trajectory JSONL, and `replay <file> --verify` re-verifies it. Credentials are
-never put in `--agent-cmd` or recorded artifacts: the adapter reads a key only
-via `--api-key-env <VAR_NAME>`, sends it only as an `Authorization` header,
-and writes only the endpoint host, model and versions to its sidecar. The
-adapter supports any OpenAI-compatible chat-completions endpoint; it does not
-imply native support for every provider or local runner, says nothing about
-model playing quality, and cross-provider benchmark comparison is not claimed.
-See [`docs/CLI.md`](docs/CLI.md) §"Acceptance report for the external-agent
-path" for the exact adapter options and the acceptance slices, including the
-completed local-model S10 result, the closed S13 fixture classification
-(the old credential-shaped test literal is a classified dummy; the current
-fixture is the obvious `TEST-ONLY` placeholder), and the hosted-model S11
-slice, which remains NOT TESTED pending separate approval.
-
-The full gate-by-gate status, including what remains NOT TESTED, is in
+The v4 candidate adds a model-backed adapter for OpenAI-compatible
+chat-completions endpoints. It is a candidate, not a released feature; the
+options and the acceptance status are in
+[`docs/CLI.md`](docs/CLI.md#model-adapter-lattice_model_agentpy) and
 [`docs/V4_CANDIDATE_ACCEPTANCE.md`](docs/V4_CANDIDATE_ACCEPTANCE.md).
 
-### The gates, and where the code is authoritative
+## Where to go next
 
-Where this page describes a gate, the code is authoritative and the reference
-below is exact (file and line). Where a committed doc used to disagree with the
-code, the doc was corrected rather than the code, and the gate below now
-matches what CI enforces.
+| If you want to... | Go here |
+| :--- | :--- |
+| Run any command, with every flag | [`docs/CLI.md`](docs/CLI.md) |
+| Install, pack, or use the launcher | [`docs/INSTALL.md`](docs/INSTALL.md) |
+| Check the claims, gates, and test evidence | [`docs/VERIFICATION.md`](docs/VERIFICATION.md) |
+| Read the full results and negative results | [`docs/RESULTS.md`](docs/RESULTS.md) |
+| Design an experiment as a scenario file | [`docs/SCENARIOS.md`](docs/SCENARIOS.md) |
+| Benchmark, reproduce, or re-gate throughput | [`docs/BENCHMARKING.md`](docs/BENCHMARKING.md) |
+| Embed Lattice in a host, or see the architecture | [`docs/ECOSYSTEM.md`](docs/ECOSYSTEM.md) |
+| Read the engine mechanics | [`docs/MECHANICS.md`](docs/MECHANICS.md) |
+| Understand support, boundaries, and the trajectory schema | [`docs/SUPPORT_AND_REPRODUCIBILITY.md`](docs/SUPPORT_AND_REPRODUCIBILITY.md) |
+| Play as an external agent | [`docs/EXTERNAL_AGENT_PROTOCOL.md`](docs/EXTERNAL_AGENT_PROTOCOL.md) · [`examples/python/`](examples/python/README.md) |
+| Verify a published release asset-for-asset | [`docs/reproduction_packet.md`](docs/reproduction_packet.md) |
+| Read the v4 candidate acceptance evidence | [`docs/V4_CANDIDATE_ACCEPTANCE.md`](docs/V4_CANDIDATE_ACCEPTANCE.md) |
+| Audit a claim or a criticism | [`docs/CLAIM_CALIBRATION_MATRIX.md`](docs/CLAIM_CALIBRATION_MATRIX.md) · [`docs/FINDINGS_LEDGER.md`](docs/FINDINGS_LEDGER.md) |
+| Read the design decisions (ADRs) | [`docs/adr/`](docs/adr/) |
+| Contribute, report a vulnerability, or read the code of conduct | [`CONTRIBUTING.md`](CONTRIBUTING.md) · [`SECURITY.md`](SECURITY.md) · [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) |
+| See the fuzzing harness and its honest scope | [`docs/FUZZING.md`](docs/FUZZING.md) |
+| Watch a committed recording replay | <https://candavere.github.io/lattice/> |
 
-- **Evaluation verdict gate.** A paired study passes only when both conditions
-  hold: the mean paired delta is strictly positive **and** the lower bound of
-  the 95% two-sided t-confidence interval is strictly positive, on at least 30
-  seeds. `Agents/PairedEvaluation.cs:144-145` enforces
-  `graded = deltas.Length >= 30` and `passed = graded && mean > 0.0 &&
-  ciLower > 0.0`; the interval uses `ConfidenceLevel = 0.95`
-  (`Agents/PairedEvaluation.cs:74`, computed at line 127). The committed
-  artifacts carry the resulting `Passed` and `Decision` fields. The protocol
-  doc describes exactly this rule
-  ([`docs/SUPPORT_AND_REPRODUCIBILITY.md`](docs/SUPPORT_AND_REPRODUCIBILITY.md),
-  section 5), so doc and code agree here.
-- **Replay equivalence gate.** `.github/workflows/ci.yml:42-43` runs
-  `dotnet run -c Release --project Cli -- replay Tests/fixtures/golden_trajectory.jsonl --verify`
-  on Ubuntu, macOS, and Windows. `Trajectories/TrajectoryReplay.cs`
-  (`VerifyDetailed`) rebuilds a fresh simulation from the trajectory header,
-  re-feeds each recorded turn, compares re-serialized `StepResult`s against the
-  recorded ones, **and** recomputes the SHA-256 digest of the complete
-  simulation state at every tick (`Trajectories/SimulationStateHash.cs`) and
-  compares it to the digest the step line records, naming the first mismatched
-  tick. This is per-step serialized equivalence plus per-tick state-digest
-  equality, not raw byte identity, and the digest covers the state rather than
-  the header's configuration. A recording made before schema 3 carries no
-  per-tick digest, verifies on step results alone, and prints
-  `no state hash: step-level verification only`; a recording that *claims*
-  schema 3 but has no digest is reported as a discrepancy, so stripping the
-  hashes is not a way to downgrade the check.
-- **Benchmark regression gate.** `.github/workflows/benchmarks.yml:77-108`
-  re-benchmarks the five-case matrix and compares it against the committed
-  baseline with `compare_benchmarks.py`, failing when a current workload
-  median falls below its threshold times the baseline median. The explicit
-  thresholds in the workflow are 0.75 global, 0.6 for `micro_raw_2agent`, and
-  0.85 for `policy_lookahead_mcts_32` (`benchmarks.yml:88-90`); otherwise the
-  threshold is derived statistically from the baseline's own dispersion
-  (`.github/workflows/compare_benchmarks.py:104-120`), with the CLI default
-  floor at 0.8 (`compare_benchmarks.py:406`). The gate adjudicates only when
-  the host fingerprint (OS family + architecture + .NET runtime major +
-  logical cores + CPU model, trimmed and case-folded; a missing or empty
-  host field is also a mismatch) matches
-  (`compare_benchmarks.py:167-186,252`), and it re-measures once to rule
-  out shared-runner jitter (`benchmarks.yml:94-108`). GitHub-hosted runners
-  are a different host class than the
-  baseline record, so they get an informational cross-host
-  comparison plus the structural checks — the strict throughput verdict is
-  reserved for a matching host class. The measured artifact is uploaded with
-  `if: always()` (`benchmarks.yml:111-119`) so runner numbers survive a
-  failed gate without log access.
-  **Current state of the hosted arm64 job: it adjudicates 4 of its 5
-  workloads.** A separate `runner-class-gate` job runs on the pinned `macos-26`
-  arm64 label against its own hosted record
-  ([`benchmarks/runner_class_throughput_benchmark.json`](benchmarks/runner_class_throughput_benchmark.json)),
-  calibrated from 20 full-protocol sessions on pinned commit `1b9426f5` and
-  armed by the pre-registered rule (allowed ratios 0.7804–0.8416:
-  `micro_raw_2agent`, `facility_static_4agent`, `dynamic_contention_4agent`,
-  `stress_topology_4agent`). `policy_lookahead_mcts_32` is **deliberately
-  excluded** — 20 sessions span 2.050× max/min on that search-bound workload,
-  so a dip there is not separable from runner jitter. It is measured, printed,
-  and compared but carries no verdict, and that is a recorded negative result
-  ([`FINDING-014`](docs/FINDINGS_LEDGER.md)), not a gap to be closed later by
-  widening a tolerance. A green Benchmarks workflow is therefore a **narrow,
-  noisy-host claim** — it bounds throughput on this runner class only, and
-  says nothing about the bare-metal host or about engine performance. The
-  record supersedes an earlier 5-session version that was published demoted
-  (`ArmedWorkloads: []`) after its first live run
-  ([36471478970](https://github.com/candavere/lattice/actions/runs/36471478970),
-  commit `4d05585`) fell below the five-sample minimum on all five workloads
-  with no measured code changed; five idle-dispatched samples did not bound
-  the host class. That run's slowdown cause remains **unestablished**, the
-  demotion is not withdrawn, and no threshold was widened against any record
-  or observed run. The bare-metal research reference above is a separate
-  record and is unaffected. Details:
-  [`docs/BENCHMARKING.md`](docs/BENCHMARKING.md) and
-  [`benchmarks/runner_class_summary.md`](benchmarks/runner_class_summary.md).
-- **Mutation gate.** `stryker-config.json:22-26` sets Stryker thresholds
-  `high: 80`, `low: 60`, `break: 0`. The only threshold the tool enforces is
-  `break`, so the committed gate fails only at a 0% score; `high`/`low` are
-  informational. There is no mutation step in CI (`.github/workflows/ci.yml`
-  runs restore, build, replay-verify, test, a global-tool pack/install/smoke
-  check, the UI regression, a parser unit-test
-  job, and a second job that replays every `site/` recording). The 99.61% figure
-  is a historical local calibration recorded in
-  [`benchmarks/mutation_stryker_summary.json`](benchmarks/mutation_stryker_summary.json)
-  at `053f3eb`, scoped to `Simulation.cs` and `PerceptionFilter.cs`. It was not
-  rerun at the current head, it is not whole-repository coverage, and it is not
-  a CI gate: nothing in CI runs Stryker.
+## Trust and boundaries
 
-### Determinism and seeds
-
-Every command is seeded. Identical arguments produce identical per-step
-serialized output under the specified .NET 10 BCL runtime contract. The
-repository makes five distinct guarantees, documented in
-[`docs/SUPPORT_AND_REPRODUCIBILITY.md`](docs/SUPPORT_AND_REPRODUCIBILITY.md):
-engine transition determinism, per-step serialized `StepResult` replay
-equivalence, same-host normalized JSONL byte identity (narrow and explicit),
-the per-tick canonical state digest — the fourth covering the state each tick
-produced, not a whole-episode hash tree — and the recorded per-agent
-decision-time `Perceptions`, which equal what each agent's own
-`PerceptionFilter` produced inside its `Decide` call and are independently
-reprojected by `replay --verify`. Raw file-byte identity across heterogeneous
-hosts is not asserted. The first four are formalized as the formal,
-implementation-agnostic transition and perception laws, plus falsifiable
-challenge questions, in
-[`docs/INVARIANT_SPECIFICATION.md`](docs/INVARIANT_SPECIFICATION.md); the fifth
-is replay-verified rather than an oracle law, because a filter's stale memory
-is per-agent internal state no independent party could rebuild from the world
-alone, and that document says so in §2.5.
-
-`replay --verify` is the contract that makes those claims checkable rather than
-asserted. It rebuilds a fresh simulation from the trajectory header, feeds each
-recorded turn of actions back through the engine, compares every re-serialized
-`StepResult` against the recorded one, recomputes each step's state digest and
-compares that, reprojects each recorded per-agent decision-time perception
-through a `PerceptionFilter` built from the header's `AgentVision` and compares
-that too (a nonempty recording at schema 4 or later that declares neither
-recorded perceptions nor a declared `AgentVision` reports
-`no recorded perception: decision-time visibility not verified` rather than
-passing in silence; a file below schema 4 is not nagged), and re-computes the
-final summary line's aggregates field
-by field; exit code `0` means every tick, every recorded perception and the
-final aggregates reproduced. That
-is the same check the CI pipeline runs on the golden trajectory on Ubuntu,
-macOS, and Windows, and on every recording under `site/` in one further job.
-
-`infiltration.jsonl` is one JSONL line per tick: the header embeds the seeded
-map and simulation config, and each line is that tick's recorded actions and
-`StepResult`, plus the SHA-256 digest of the world state that tick produced. The
-SVG is a self-contained animated render:
-
-```sh
-dotnet run --project Cli -- simulate --seed 42 --scenario infiltration --steps 100 --out infiltration.jsonl
-dotnet run --project Cli -- render --trajectory infiltration.jsonl --format svg --out infiltration.svg
-```
-
-### Negative results, recorded rather than smoothed
-
-Only claims the repository can back up are listed here.
-
-- **The standard-suite loss is committed, not a bug.** The 32-rollout MCTS
-  policy loses to the deterministic Scout heuristic on standard generated maps
-  (`benchmarks/mcts_evaluation_results.json`). It is the baseline any future
-  policy must beat under the identical protocol.
-- **What the site calls "fog" is now recorded, for the infiltration run.**
-  `site/infiltration.jsonl` is trajectory schema v5: every step line carries a
-  `Perceptions` entry per agent, holding the masked view that agent's *own*
-  `PerceptionFilter` produced inside its `Decide` call at that tick, and the
-  header declares the cone each filter was built with (`AgentVision: [2, 2]`,
-  two graph hops apiece). The viewer draws that record, labels it "recorded
-  perception", and `replay --verify` reprojects all 20 of them and fails on any
-  edit. The core's `Vision` stays unbounded (`Vision = -1` in the header) by
-  design — the fog belongs to the agents, not the simulation.
-  The older recording still has no fog field, because it is pinned at schema v3:
-  `site/demo.jsonl` predates the perception field, so the viewer reconstructs its
-  sightline from recorded positions with a 2-hop rule and labels that "reconstructed
-  sightline" instead. The two chips are the honest answer to "where did this come
-  from?" on a page that shows both.
-- **The recorded fog's own tick disclosures.** Derived from
-  `site/infiltration.jsonl` (seed 42, 20 steps, `AgentVision [2, 2]`), reading
-  `Perceptions` and nothing else. On the Infiltrator's view the Treasure Vault
-  (zone 5) is not `Observed` at frame 0 (`Unknown`), 9 (`Stale`) and 19
-  (`Stale`), and the terminal frame 20 shows the last decision-time view —
-  step 20, where the vault is still `Stale`. On the Sentry's view the vault is
-  not observed only at frames 0 and 1; what the guard actually loses is its own
-  post and the entry hall, at frames 15 and 16, and at its final
-  decision-time view (tick 20) it records every room as observed. The page's
-  guided callout follows exactly these frames
-  ([`site/index.html`](site/index.html), [`site/infiltration.jsonl`](site/infiltration.jsonl)).
-- **The terminal frame is labelled, not dressed up as fresh.** Frame 20 is the
-  world *after* the last step; no agent ever decided from it, so no perception
-  was recorded for it. The viewer shows the last decision-time view the agents
-  did act on and says so in the caption, the badge-adjacent text, the frame
-  sentence and the canvas `aria-label` ("last decision-time view (tick 20)").
-- **The re-recording is bigger, and that is the whole point.**
-  `site/infiltration.jsonl` went from **66,465 bytes** (schema v3, SHA-256
-  `fe213bd5ed2180942cba5334e350a974d3a36e17b319281d9ad8efe99d57f3f5`) to
-  **114,983 bytes** (schema v4, SHA-256
-  `22f9b0fe391fa7dd2e3f6e1975f4fa7582c9b84d314723c0260d4c7feabf4cfc`) —
-  **+48,518 bytes, 1.73x**, for the same 20 ticks of the same episode. Strip the
-  two new fields and the file is the old one byte for byte, which
-  `Tests/Trajectories/DecisionTimePerceptionTests.cs` pins by digest: the extra
-  bytes are evidence, not a behavioural change to the run. Reproduce with
-  `dotnet run --project Cli -- simulate --seed 42 --scenario infiltration --steps 100 --out site/infiltration.jsonl`.
-- **Schema 5 added one header field, and the pre-schema-5 file is kept.**
-  The current committed `site/infiltration.jsonl` is **115,067 bytes** (schema
-  v5, SHA-256 `d557e80f02fb4783866d77300916945ab2326501f85948dd9829e971836766a7`),
-  re-recorded from the same command. The **+84 bytes** over the schema-4 file
-  are the `ScenarioSha256` field and the version stamp, and nothing else: strip
-  those two fields and it is the schema-4 file byte for byte, which
-  `Tests/Cli/ScenarioProvenanceTests.cs` pins field by field. The pre-schema-5
-  artifacts are **not** discarded — they are committed under
-  [`Tests/fixtures/legacy/`](Tests/fixtures/legacy) and are the standing proof
-  that a schema 3 and a schema 4 recording still read, replay, and verify
-  under the schema-5 reader.
-- **`site/demo.jsonl` is deliberately pinned at trajectory schema v3, and that
-  is load-bearing.** It is **84,090 bytes**, SHA-256
-  `f6da7cc39e56783b210bb2c936b051bf8eea80f99053cf2c4aecab1550573981`. It stays
-  at v3 because it is the committed proof that a **pre-perception** recording is
-  read, replayed and verified *without* the reader nagging it about fields that
-  did not exist yet: `TrajectoryReplay.NoPerceptionNotice` is gated on
-  `DecisionTimePerceptionVersion = 4`, so a recording with at least one step at
-  schema 4 or later that declares neither recorded perceptions nor a declared
-  `AgentVision` is *required* to be flagged, and re-recording this one would make
-  it exactly that. Re-recording it would replace a contract test with a nagged
-  file, which is a regression dressed as tidying.
-
-  It is also **not** true, as an earlier version of this file claimed, that no
-  current invocation regenerates it. Measured against the file, every one of its
-  27 step lines and its final metrics line are byte-identical to a fresh
-  `simulate --seed 42 --agent mcts --steps 30`; only the header differs, by the
-  `ScenarioSha256` and `SchemaVersion` that migration would add. The *episode*
-  was always reproducible. It is pinned for the reason above, not because it
-  drifted.
-
-  [`scripts/regenerate-site-demos.sh`](scripts/regenerate-site-demos.sh) encodes
-  exactly that split. `--check` re-derives the regenerable pair
-  (`site/infiltration.jsonl` and its SVG) into a scratch directory and
-  byte-compares them, renders `demo.svg` from the committed recording, and
-  asserts the pinned `demo.jsonl` still replays with **no** notice — **without
-  rewriting anything**. CI runs it, because `replay --verify` alone cannot catch
-  drift: a stale recording replays cleanly forever.
-- **Per-tick state hash.** `replay --verify` recomputes a SHA-256 digest of
-  the full simulation state at every tick — zone and resource positions,
-  occupancy, the per-tick choke capacities and derived edge load, scores,
-  claims, the episode seed and the tick — from a canonical, fixed-field-order,
-  invariant-culture serialization (`Trajectories/SimulationStateHash.cs`), and
-  compares it to the digest recorded on each step line. Positions are included
-  because they are state, not rendering: `Simulation.TransitTicks` reads
-  `Zone.Position` for a crossing's kinematic length, and the perception filter
-  reads both positions to build the observations a step line carries. Only the
-  demonstration-layer `Role` labels are excluded, since the step contract never
-  reads them. The digest does not cover the header's simulation config or
-  dynamic-rule set, so it attests to the state each tick produced rather than
-  to the whole episode configuration. The benchmark harness's FNV-1a step digest
-  remains an internal warm-up anchor, unrelated to this canonical hash.
-- **Stepping is not zero-allocation.** Managed step allocations range from
-  roughly 3.2 KB to 7.1 KB per tick on the raw, facility, and dynamic
-  workloads, and substantially more on the stress and MCTS workloads;
-  `benchmarks/throughput_summary.md` carries the measured values. No "0 bytes
-  allocated" claim is made.
-- **Policy quality is topology-conditional.** MCTS wins the bottleneck study
-  and loses the standard one; neither verdict describes the policy uniformly.
-  The Python example agent does the same, in [Bring your own
-  agent](#bring-your-own-agent).
-- **Site recordings are re-recorded, not historical.** `site/demo.jsonl` and
-  `site/infiltration.jsonl` were re-recorded on the current engine from the
-  seed and config their own headers and the page's reproduce commands name, so
-  `replay --verify` passes on both, state hashes included, and a CI job gates
-  every recording under `site/`. They are not the files the page first shipped:
-  engine changes since 2026-09-17 (the `Observation.StepNumber` field, the
-  tick-rotated choke arbitration, and the instant/one-tick crossing gate) moved
-  both episodes earlier — the demo now ends at tick 27 instead of hitting the
-  30-tick cap, and the infiltration run at tick 20 instead of 23. Re-running the
-  documented commands on any later engine revision can move them again, and the
-  CI job is what catches it.
+Lattice is developed through AI-assisted implementation under human direction,
+architectural specification, and review. Claims enter the repository only when
+they map to committed code, deterministic tests, CI workflows, or benchmark
+artifacts; AI assistance is an authoring method, never independent validation.
+It is a research preview, not qualified for production or critical-infrastructure
+use. Independent replication starts with
+[`docs/reproduction_packet.md`](docs/reproduction_packet.md) and
+[`docs/VALIDATION_PLAN.md`](docs/VALIDATION_PLAN.md); governance is in
+[`docs/FINDINGS_LEDGER.md`](docs/FINDINGS_LEDGER.md) and
+[`docs/CLAIM_CALIBRATION_MATRIX.md`](docs/CLAIM_CALIBRATION_MATRIX.md).
 
 ## Known limitations
 
-- At a 390px viewport the replay viewer's room titles render at roughly 8.3px.
-  The infiltration map is three columns of rooms, and a phone canvas is about
-  318px wide, so the cards are scaled to fit rather than overlapped: every
-  title and agent name is complete, inside its room, and legible, but small.
-  Wider viewports render the same map at the full 11px.
-- A seed with one completed match and one void refuses the study:
-  `Agents/PairedEvaluation.cs:100-105` throws when a seed is missing one side of
-  the mirrored pair, and a void run produces no match row at all. Dropping the
-  one-sided seed and counting it, so the grading floor is read on completed
-  pairs only and the drops are reported beside them, is planned for v3.2. It is
-  not a one-line change: the drop count has to reach the report, and
-  `docs/EXTERNAL_AGENT_PROTOCOL.md` §9.3 requires an in-process study's
-  `evaluate` artifact to be byte-for-byte unchanged, so the report surface and
-  that promise have to be settled together.
-- Replay verifies the recorded environment actions; it cannot reproduce a
-  nondeterministic external agent's decisions. Such an agent yields a different
+- **Research preview.** Not qualified for production or critical-infrastructure
+  use. The supported matrix and operational boundaries are in
+  [`docs/SUPPORT_AND_REPRODUCIBILITY.md`](docs/SUPPORT_AND_REPRODUCIBILITY.md).
+- **Replay verifies the recorded environment actions.** It cannot reproduce a
+  nondeterministic external agent's decisions; such an agent yields a different
   trajectory from the same seed on every run, and `replay --verify` still
   succeeds on each one.
-- Exit code 2 means the command line was not runnable — an unknown command, an
-  unknown/duplicated/valueless flag, a missing required flag, a malformed value,
-  an unexpected argument — and nothing ran. Exit code 1 means it was runnable
-  and the work failed: a missing or unreadable file, a rejected descriptor, a
-  replay divergence. A descriptor that names a policy this build cannot
-  construct, or a seat count the study cannot run, is the second kind, not the
-  first: the command line was fine and the file it named was not usable.
-- Timing bounds are calibrated on the reference host recorded in the benchmarks
-  artifacts and are far from binding: the default step budget is 5000 ms and
-  the whole-match budget is `5000 × max_ticks + 30000` ms. They were not
-  measured on slower runners.
-- The `TempFile` test helper swallows an `IOException` on delete and leaves the
-  file, so a refused delete is not a test failure. Real handle leaks are caught
-  directly, by asserting the exclusive-open property, in
-  `ExternalAgentFileHandleTests`.
-- **The hosted arm64 `runner-class-gate` enforces 4 of 5 workloads, on a noisy
-  host.** `policy_lookahead_mcts_32` carries no verdict by design
-  (`FINDING-014`): 20 sessions on one commit span 2.050× max/min there, too
-  wide to separate a real regression from runner jitter, so it is reported and
-  never adjudicated. The four armed ratios (0.7804–0.8416) are wide because
-  between-run spread across the cohort is 1.59×–2.05× per workload, so a green
-  Benchmarks workflow is a **narrow** claim on this runner class and is not
-  evidence of general hosted throughput stability. The first live
-  runner-class run's slowdown cause is unestablished. See
-  [the gate section](#the-gates-and-where-the-code-is-authoritative) and
-  [`docs/BENCHMARKING.md`](docs/BENCHMARKING.md).
-- A small number of tests fail intermittently under the full parallel run and
-  pass when run alone, so a green run is evidence, not a guarantee. See
-  [Flaky tests are known and listed](#flaky-tests-are-known-and-listed).
+- **The hosted arm64 `runner-class-gate` enforces 4 of 5 workloads.**
+  `policy_lookahead_mcts_32` is a permanent non-verdict by design
+  ([`FINDING-014`](docs/FINDINGS_LEDGER.md#finding-014--the-mcts-decision-throughput-case-cannot-be-gated-on-this-host-class-and-four-of-five-workloads-can));
+  a green Benchmarks workflow is a narrow claim on that runner class.
+- **A seed with one completed match and one void refuses the study.** Dropping
+  the one-sided seed and reporting the drop is planned for v3.2; the constraint
+  is in [`docs/SUPPORT_AND_REPRODUCIBILITY.md` §3](docs/SUPPORT_AND_REPRODUCIBILITY.md#3-known-limitations).
+- **A small number of tests flake under the full parallel run.** A green run is
+  evidence, not a guarantee; the current per-OS counts are the CI artifacts, and
+  the known flake history is in
+  [`docs/VERIFICATION.md`](docs/VERIFICATION.md#flaky-tests-are-known-and-listed).
+- **At a 390px viewport the viewer's room titles render at roughly 8.3px.**
+  Every title is complete and inside its room, but small; wider viewports render
+  at 11px.
 
-## Repository layout
-
-- `Cli/` - the `lattice` command surface: `generate`, `simulate`, `render`,
-  `analyze`, `replay`, `benchmark`, `evaluate`.
-- `Environment/` - the pure step contract: `Simulation`, `PerceptionFilter`,
-  dynamic topology rules.
-- `Generator/` - seeded procedural maps with a caller-supplied fairness gate.
-- `Agents/` - evaluation subjects (MCTS, Scout), the mirrored-seat paired
-  evaluation, and the external-agent match runner.
-- `Protocol/` - the external-agent wire types, a leaf that references nothing in
-  this repository.
-- `Trajectories/` - the JSONL recording model, writer, reader, and replay
-  verifier.
-- `Analytics/` - the benchmark harness and analysis.
-- `Visualization/` - the SVG/ASCII renderer.
-- `Tests/` - unit, determinism, property, and fuzz suites plus the golden
-  fixtures.
-- `benchmarks/` - the committed JSON artifacts every number above comes from.
-- `docs/` - ADRs, the invariant specification, protocols, the findings
-  ledger, and the claim calibration matrix.
-- `examples/` - worked external agents; `examples/python/` is a conformant
-  standard-library agent.
-- `site/` - the browser replay viewer deployed to GitHub Pages; it reads
-  committed `.jsonl` recordings.
-- `ui_tests/` - the tracked Playwright regression for the demo page.
-
-The assembly map and how the layers fit together are in
-[`docs/ECOSYSTEM.md`](docs/ECOSYSTEM.md). The engine mechanics and their
-enforcement tests are in [`docs/MECHANICS.md`](docs/MECHANICS.md).
-
-## Reference
-
-`Lattice.Cli` exposes eight commands (`Cli/CliApp.cs`). Run any of them with
-`dotnet run --project Cli -- <command> ...`; the binary name is `lattice`.
-Every command is seeded, and the exit status is one of three values: **0** on
-success, **2** when the command line is not runnable (an unknown command, an
-unknown/duplicated/valueless flag, a missing required flag, a malformed value,
-an unexpected argument — nothing is run), and **1** when the command was
-runnable and the work it named failed (a missing or unreadable file, a rejected
-descriptor, a replay divergence).
-
-| Command | Purpose | Key flags |
-| :--- | :--- | :--- |
-| `generate` | Write a valid seeded map | `--seed`, `--min-fairness`, `--out` |
-| `simulate` | Record an episode as JSONL | `--seed`, `--steps`, `--agent`, `--scenario`, `--rules`, `--out` |
-| `render` | Replay a recording as ASCII or SVG | `--trajectory`, `--format`, `--out` |
-| `analyze` | Report on a recording (contention, pathing, heatmaps) | `--trajectory`, `--out` |
-| `replay` | Replay and optionally verify per-step serialized equivalence and the final summary line | `<file>`, `--verify`, `--out` |
-| `benchmark` | Run the five-case workload matrix | `--runs`, `--warmup`, `--commit`, `--cpu`, `--out` |
-| `evaluate` | Mirror-seated paired MCTS study, or an external agent process | `--seed-set`, `--rollouts`, `--seeds`, `--scenario`, `--out`, `--agent-cmd`, `--agent-step-timeout-ms` |
-| `validate-scenario` | Check a declarative scenario descriptor and print its SHA-256; runs no episode and writes no artifact | `<file>` or `--out <file>` |
-
-`evaluate --agent-cmd "<command line>"` scores an external agent process in place
-of the in-process MCTS candidate, under the same seeds, budget, and statistics;
-a complete conformant agent is in
-[`examples/python/`](examples/python/README.md). The command line is split
-**without a shell**: unquoted whitespace separates, a double quote groups, a
-backslash escapes only `"` and `\` inside quotes and is an ordinary character
-everywhere else.
-
-The flag-by-flag reference, every flag, its semantics, and worked examples,
-lives in [`docs/CLI.md`](docs/CLI.md).
-
-## Declarative scenario files
-
-An experiment setup can be written down as a **scenario file**: a declarative,
-closed-schema JSON document describing the environment, the roster, the tick
-budget, and which existing win and scoring rules apply. Scenario files are data
-only — no scripts, no expressions, no reflection, no dynamic loading, no
-external commands, and no environment-variable-dependent behaviour.
-
-A map is declared one of two ways, and both are first class. A scenario can
-name one of the engine's **seeded generator families as a skeleton** and then
-narrow it with ordered overrides and additions — topology, obstacles,
-resources, roster, step limit, and victory/scoring are all under the file's
-control, while the family's own seed variation is preserved. Or it can be
-**hand-authored outright** with no generator at all.
-
-```sh
-dotnet run -c Release --project Cli -- validate-scenario scenarios/dungeon-infiltration.json
-```
-
-```
-scenario dungeon-infiltration is valid (schema v1)
-  sha256         b062ac6ed3987494e63051fe57928d90d26a812f8a48f7124d5b78442b65e6d9
-  map            hand-authored (static)
-  simulation     2 agent(s), step limit 100, transit speed 4
-  slot 0         sentry (Sentry)
-  slot 1         infiltrator (Infiltrator)
-  victory        first-of-either   scoring resources-claimed
-```
-
-Unknown fields and unrecognised enum strings are **rejected, not ignored**, and
-each fault is reported with the offending field's JSON path — all of them in one
-pass, so a hand-written file can be fixed in one run. Obstacles use the engine's
-own capacity semantics (a zone or choke with `MaxOccupancy: 0` is impassable)
-rather than a wall mechanic invented for the format.
-
-The digest is the SHA-256 of the descriptor's **exact source bytes, read once**,
-in lowercase hex. It identifies the *file*, not the meaning: two descriptors
-that differ only in whitespace hash differently, on purpose. It is distinct
-from a recording's per-tick `SimulationStateHash`, which names the simulation
-*state* at a tick; the two are computed over different things and are never
-compared.
-
-The format contract, both map forms, every validation rule, and worked examples
-are in [`docs/SCENARIOS.md`](docs/SCENARIOS.md); committed descriptors live in
-[`scenarios/`](scenarios).
-
-## Test totals, as CI publishes them
-
-`dotnet test` prints a summary line, but a log line is not something a reader can
-check. So CI writes VSTest TRX reports and reduces them to one small JSON
-document per operating system, uploaded as an Actions artifact:
-
-- **Artifact names.** `dotnet-test-summary-ubuntu`, `dotnet-test-summary-windows`,
-  `dotnet-test-summary-macos`, one per matrix leg, retained 30 days. Each
-  contains `test-summary.json` plus the raw `.trx` files it was derived from.
-- **What is in it.** `total`, `passed`, `failed`, `skipped` and `notRun` counts,
-  the head `commitSha` that was tested, the `runnerOs`, `osSlug`, `runnerImage`
-  and `dotnetVersion`, and the name of every TRX file the numbers came from.
-  Because the raw TRX ships alongside the JSON, the counts can be re-derived
-  and audited rather than taken on trust.
-- **Read the numbers per OS.** The three legs are three separate documents and
-  they are never added together. Summing them would triple-count one suite and
-  produce a figure that describes no real run. There is deliberately no
-  repository-wide "N tests" shield: a static count goes stale silently, and
-  a cross-OS total is not a fact about the suite.
-- **The parser refuses rather than guesses.** `.github/workflows/summarize_test_results.py`
-  exits non-zero and publishes no JSON when the reports are absent, malformed,
-  duplicated, internally contradictory, or when a run discovered zero tests. A
-  `total: 0` that reads as a pass is the failure this exists to prevent, so a
-  run that finds nothing is reported as an error, not as a green empty suite.
-  Exit 0 means parsed and nothing failed; exit 1 means parsed with failures,
-  and the JSON is still written so a red run's numbers survive.
-- **Run the same parser yourself.** `python3 -m unittest discover -s .github/workflows -p 'test_summarize_test_results.py'`
-  — 24 tests covering the valid, missing, malformed, duplicate, contradictory
-  and nonzero-failure cases, run in CI as the `Test summary parser unit tests`
-  job so the refusal logic is itself covered.
-
-Verify an artifact against its run: open the CI run for the commit, download
-`test-summary.json`, and check that `commitSha` is the commit you are reading
-and that the four counts match the job's log summary for that OS.
-
-### Flaky tests are known and listed
-
-The figures below are **historical**, recorded at `a8b2fc6` (the v3.0.0 release
-commit) on one macOS arm64 host. They are not a claim about the current head,
-which has since added tests including the schema-4 decision-time perception
-suite. Five consecutive full `dotnet test Lattice.sln -c Release` runs at that
-revision gave 711/711 twice, 709/711 once, 710/711 once, and 707/711 once.
-Every failure was in the
-external-agent and CLI-argument-fuzz areas, and all 20 of those tests pass when
-run on their own, so they race on shared temporary state under the parallel
-suite rather than being deterministically broken. The mutation summary at
-[`benchmarks/mutation_stryker_summary.json`](benchmarks/mutation_stryker_summary.json)
-records the same class of problem: two mutants attributed to
-`CliArgumentFuzzTests` are non-reproducible batch-mode artifacts of the fuzz
-harness's shared temp workspace.
-
-Stated rather than smoothed, because the alternative is worse: a README that
-says "the suite is green" while a run in three goes red is a claim that cannot
-survive a reader running the command. Fixing the shared-state races is real
-work in `Tests/**` and the fuzz harness, and not something a README row can
-paper over. So this page does not claim a green suite for the current head; it
-points at the CI artifact, which reports what actually happened on the run you
-are looking at.
-
-Current-session facts (2026-11-09, local-only, not yet published evidence):
-full .NET suite 924/924, Python adapter suite 39/39, golden replay 12/12 on
-the committed candidate tree at the time. These counts are local session
-measurements without a yet-published inspectable artifact; read the CI
-per-OS artifacts for the published per-commit counts. The macOS descendant-cleanup probe (issue #12):
-not reproduced in 40 loaded runs on this host — a bounded evidence gap, not
-clearance. Green runs here confirm this build passed; they do not clear any
-intermittent failure.
-
-## How evidence works
-
-Each committed artifact below is the exact file behind a claim on this page:
-
-| Artifact | What it is | Sub-claims it backs |
-| :--- | :--- | :--- |
-| [`docs/SUPPORT_AND_REPRODUCIBILITY.md`](docs/SUPPORT_AND_REPRODUCIBILITY.md) | The operational contract: what is supported, what is not, the five-equivalence vocabulary, and the viewer's [claim](docs/SUPPORT_AND_REPRODUCIBILITY.md#viewer-claim-semantics) and [presence](docs/SUPPORT_AND_REPRODUCIBILITY.md#viewer-presence-semantics) semantics | Replay equivalence, determinism boundary, support matrix, what the viewer is allowed to report |
-| [`docs/INVARIANT_SPECIFICATION.md`](docs/INVARIANT_SPECIFICATION.md) | Formal, implementation-agnostic transition and perception laws plus falsifiable challenge questions | Capacity gates, conflict resolution, perception boundary, replay contract |
-| [`benchmarks/mcts_evaluation_results.json`](benchmarks/mcts_evaluation_results.json) | Standard-map paired study, dev + held-out | Negative baseline, delta, CI, verdict |
-| [`benchmarks/bottleneck_evaluation_results.json`](benchmarks/bottleneck_evaluation_results.json) | Contention-bearing paired study, dev + held-out | Topology-dependent inversion |
-| [`benchmarks/throughput_benchmark.json`](benchmarks/throughput_benchmark.json) | Five-workload timing record on one host | Performance, qualified |
-| [`benchmarks/mutation_stryker_summary.json`](benchmarks/mutation_stryker_summary.json) | Stryker run summary with survivor classification, from a historical local calibration at `053f3eb` scoped to two files. Not a current rerun, not whole-repo coverage, not a CI gate | Mutation score, scope |
-| [`docs/reproduction_packet.md`](docs/reproduction_packet.md) | Turnkey guide to verifying the published `v2.3.2` and `v3.0.0` releases asset-for-asset | Release claims, checksums |
-| [`docs/FINDINGS_LEDGER.md`](docs/FINDINGS_LEDGER.md) | Append-only record of criticisms, edge cases, and resolved issues | Governance, traceability |
-| [`docs/CLAIM_CALIBRATION_MATRIX.md`](docs/CLAIM_CALIBRATION_MATRIX.md) | Every public claim mapped to its proving artifact, tested matrix, and boundary | Claim-to-artifact traceability |
-| [`docs/EXTERNAL_AGENT_PROTOCOL.md`](docs/EXTERNAL_AGENT_PROTOCOL.md) | The normative external-agent wire contract, including the closed reason set and the forfeit rule | Bring-your-own-agent, failure accounting |
-
-The reproduction packet covers the **v2.3.2** and **v3.0.0** releases. Each has
-its own section with its own tag, commit, sizes, and SHA-256 checksums, taken
-from the published assets of that release; the v2.3.2 section is deliberately
-unchanged, so the two are verified independently rather than one being edited to
-match the other.
-
-## Trust, boundaries, and further reading
-
-- **Development and verification method.** Lattice is developed through
-  AI-assisted implementation under human direction, architectural
-  specification, and review. Claims enter the repository only when they map to
-  committed code, deterministic tests, CI workflows, or benchmark artifacts;
-  AI assistance is an authoring method, never independent validation.
-- **Research preview.** Not qualified for production or critical-infrastructure
-  use. The supported matrix and operational boundaries live in
-  [`docs/SUPPORT_AND_REPRODUCIBILITY.md`](docs/SUPPORT_AND_REPRODUCIBILITY.md).
-- **Independent replication.** Verify the published `v3.0.0` (or `v2.3.2`)
-  release asset-for-asset via
-  [`docs/reproduction_packet.md`](docs/reproduction_packet.md), governed by
-  [`docs/VALIDATION_PLAN.md`](docs/VALIDATION_PLAN.md).
-- **Governance.** [`docs/FINDINGS_LEDGER.md`](docs/FINDINGS_LEDGER.md) records
-  criticisms, edge cases, and resolved issues;
-  [`docs/CLAIM_CALIBRATION_MATRIX.md`](docs/CLAIM_CALIBRATION_MATRIX.md) maps
-  every public claim to its proving artifact, tested matrix, and boundary.
-- **External agents.** [`docs/EXTERNAL_AGENT_PROTOCOL.md`](docs/EXTERNAL_AGENT_PROTOCOL.md)
-  is the normative contract for playing Lattice as an agent from an external
-  process over stdin/stdout, in any language.
-- **Design decisions.** Architecture decision records in
-  [`docs/adr/`](docs/adr/) explain why the contracts are shaped as they are:
-  product thesis and evidentiary standards, graph-over-grid maps, the
-  two-phase step resolution plus perception/transit/forking addenda, mirrored-
-  seat spawn fairness, and the external-agent wire contract.
-- **Related.** [Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [License](LICENSE) ·
-  [Security](SECURITY.md) · [Live demo](https://candavere.github.io/lattice/).
+The full list, including timing bounds and the `TempFile` test-helper caveat, is
+in [`docs/SUPPORT_AND_REPRODUCIBILITY.md` §3](docs/SUPPORT_AND_REPRODUCIBILITY.md#3-known-limitations).
 
 ## Citation
 

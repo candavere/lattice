@@ -158,6 +158,9 @@ produced, and those recorded values are the only provenance a result carries.
 
 ## 3. Known Limitations
 
+This is the full list. The README keeps the top few; the rest are here so they
+are stated rather than buried.
+
 - **Per-tick digests, not a single episode digest.** Replay validation operates
   on tick-by-tick serialized `StepResult` equality and, for schema-3
   recordings, on a per-tick state digest. An episode is still not reducible to
@@ -173,7 +176,8 @@ produced, and those recorded values are the only provenance a result carries.
   against +2.03 and +2.60 for the bottleneck scenario
   ([`../benchmarks/bottleneck_evaluation_results.json`](../benchmarks/bottleneck_evaluation_results.json)).
   Policy quality is therefore topology-conditional and must not be described as
-  uniformly better or worse.
+  uniformly better or worse. The detailed studies are in
+  [`RESULTS.md`](RESULTS.md).
 - **Stepping is not zero-allocation.** Managed step allocations for the raw,
   facility, and dynamic-contention stepping workloads range from roughly
   3.2 KB to 7.1 KB per tick; the stress and MCTS workloads allocate
@@ -181,6 +185,54 @@ produced, and those recorded values are the only provenance a result carries.
   respectively). The reference values and their per-run dispersion are in
   [`../benchmarks/throughput_summary.md`](../benchmarks/throughput_summary.md)
   and [`../benchmarks/throughput_benchmark.json`](../benchmarks/throughput_benchmark.json).
+- **At a 390px viewport the replay viewer's room titles render at roughly
+  8.3px.** The infiltration map is three columns of rooms, and a phone canvas is
+  about 318px wide, so the cards are scaled to fit rather than overlapped: every
+  title and agent name is complete, inside its room, and legible, but small.
+  Wider viewports render the same map at the full 11px.
+- **A seed with one completed match and one void refuses the study.**
+  [`../Agents/PairedEvaluation.cs:100-105`](../Agents/PairedEvaluation.cs) throws
+  when a seed is missing one side of the mirrored pair, and a void run produces
+  no match row at all. Dropping the one-sided seed and counting it, so the
+  grading floor is read on completed pairs only and the drops are reported
+  beside them, is planned for v3.2. It is not a one-line change: the drop count
+  has to reach the report, and [`EXTERNAL_AGENT_PROTOCOL.md`](EXTERNAL_AGENT_PROTOCOL.md)
+  §9.3 requires an in-process study's `evaluate` artifact to be byte-for-byte
+  unchanged, so the report surface and that promise have to be settled together.
+- **Replay verifies the recorded environment actions; it cannot reproduce a
+  nondeterministic external agent's decisions.** Such an agent yields a
+  different trajectory from the same seed on every run, and `replay --verify`
+  still succeeds on each one.
+- **Exit code 2 means the command line was not runnable** — an unknown command,
+  an unknown/duplicated/valueless flag, a missing required flag, a malformed
+  value, an unexpected argument — and nothing ran. Exit code 1 means it was
+  runnable and the work failed: a missing or unreadable file, a rejected
+  descriptor, a replay divergence. A descriptor that names a policy this build
+  cannot construct, or a seat count the study cannot run, is the second kind,
+  not the first: the command line was fine and the file it named was not usable.
+- **Timing bounds are calibrated on the reference host recorded in the
+  benchmarks artifacts and are far from binding:** the default step budget is
+  5000 ms and the whole-match budget is `5000 × max_ticks + 30000` ms. They were
+  not measured on slower runners.
+- **The `TempFile` test helper swallows an `IOException` on delete and leaves
+  the file,** so a refused delete is not a test failure. Real handle leaks are
+  caught directly, by asserting the exclusive-open property, in
+  `ExternalAgentFileHandleTests`.
+- **The hosted arm64 `runner-class-gate` enforces 4 of 5 workloads, on a noisy
+  host.** `policy_lookahead_mcts_32` carries no verdict by design
+  ([`FINDING-014`](FINDINGS_LEDGER.md#finding-014--the-mcts-decision-throughput-case-cannot-be-gated-on-this-host-class-and-four-of-five-workloads-can)):
+  20 sessions on one commit span 2.050× max/min there, too wide to separate a
+  real regression from runner jitter, so it is reported and never adjudicated.
+  The four armed ratios (0.7804–0.8416) are wide because between-run spread
+  across the cohort is 1.59×–2.05× per workload, so a green Benchmarks workflow
+  is a **narrow** claim on this runner class and is not evidence of general
+  hosted throughput stability. The first live runner-class run's slowdown cause
+  is unestablished. See
+  [the gate section in `VERIFICATION.md`](VERIFICATION.md#the-gates-and-where-the-code-is-authoritative)
+  and [`BENCHMARKING.md`](BENCHMARKING.md).
+- **A small number of tests fail intermittently under the full parallel run and
+  pass when run alone,** so a green run is evidence, not a guarantee. See
+  [Flaky tests are known and listed](VERIFICATION.md#flaky-tests-are-known-and-listed).
 
 ## 4. Trajectory Schema and Release Immutability Policy
 

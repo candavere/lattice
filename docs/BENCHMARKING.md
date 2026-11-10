@@ -4,7 +4,9 @@ This page documents how the committed throughput record was produced and how
 to reproduce or re-gate it. Machine-readable data:
 [`benchmarks/throughput_benchmark.json`](../benchmarks/throughput_benchmark.json);
 reference record and honest-reading notes:
-[`benchmarks/throughput_summary.md`](../benchmarks/throughput_summary.md).
+[`benchmarks/throughput_summary.md`](../benchmarks/throughput_summary.md). The
+paired-study results (MCTS versus Scout) are in [`RESULTS.md`](RESULTS.md); this
+page covers throughput.
 
 A second, separate record covers GitHub-hosted runners:
 [`benchmarks/runner_class_throughput_benchmark.json`](../benchmarks/runner_class_throughput_benchmark.json)

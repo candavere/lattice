@@ -110,6 +110,82 @@ dependency graph is the BCL alone) and it will survive scrutiny — everything
 above is enforced by
 tests in `/Tests`.
 
+## Architecture and data flow
+
+The data flow, drawn from the committed tools:
+
+```
+simulate -> recording (.jsonl) -> replay --verify / render / analyze / site
+benchmark -> throughput JSON -> throughput gate
+evaluate  -> evaluation JSON   evaluate --agent-cmd -> your agent
+```
+
+The full diagram is [`architecture.svg`](architecture.svg), and a fixed-size
+raster of the same rendering is [`architecture.png`](architecture.png):
+
+<p align="center">
+  <img src="architecture.svg" alt="Lattice architecture, drawn from the committed tools. A seeded lattice simulate run writes one schema 5 JSONL recording, and four readers consume it: lattice replay --verify, lattice render, lattice analyze, and the site replay viewer. The golden fixture is itself a recording, so the test suite pins the reader, and CI runs that suite on Ubuntu, Windows and macOS. Independently of any recording, lattice benchmark writes a host-scoped throughput JSON that is gated only on a full host match, and lattice evaluate writes an evaluation JSON from a mirrored-seat paired study of MCTS against the Scout baseline. Seated instead of the in-process MCTS candidate, lattice evaluate --agent-cmd runs an external agent process of any language, in a separate OS process, that speaks protocol 1 over stdin and stdout." />
+</p>
+
+Where each box in that diagram is implemented, at the commit that introduced
+this table:
+
+| Box | Implementation |
+| --- | --- |
+| `lattice simulate` | `Cli/CliApp.cs:219`; the header is stamped with the current schema at `Trajectories/TrajectoryWriter.cs:117` |
+| `recording .jsonl` (schema 5) | `Trajectories/TrajectoryModel.cs`; one header line, one line per tick, one final line. Schema 5 adds the header's `ScenarioSha256`, the digest of the scenario descriptor's exact bytes; schema 4's decision-time `Perceptions` and `AgentVision` and schema 3's per-tick state hash are unchanged |
+| `lattice replay --verify` | `Cli/CliApp.cs:222`; per-tick result, state-digest and decision-time perception comparison at `Trajectories/TrajectoryReplay.cs` |
+| `lattice render` | `Cli/CliApp.cs:220`, over `Visualization/` |
+| `lattice analyze` | `Cli/CliApp.cs:221`, over `Analytics/` |
+| `site/ replay viewer` | `site/app.js`, deployed by `.github/workflows/pages.yml` |
+| `lattice benchmark` | `Cli/CliApp.cs:223`; five workloads on fresh simulations, never on a recording |
+| `throughput JSON` | the host is sampled for the artifact at `Analytics/Benchmarking/BenchmarkMetadata.cs:53`, so the record names its own commit, runtime, OS, CPU, cores and RAM |
+| `throughput gate` | the strict gate arms only on a full host match, at `.github/workflows/compare_benchmarks.py:518-543`; which hosted-runner workloads are armed, and which is a permanent non-verdict, is stated once in [`FINDING-014`](FINDINGS_LEDGER.md#finding-014--the-mcts-decision-throughput-case-cannot-be-gated-on-this-host-class-and-four-of-five-workloads-can) |
+| `lattice evaluate` | `Cli/CliApp.cs:224`; the pass/fail verdict is composed at `Agents/PairedEvaluation.cs:145-150` |
+| `evaluation JSON` | the per-seed rows and statistics are written at `Cli/CliApp.cs:1450`; an external agent's failures are tallied per reason code at `Cli/CliApp.cs:1416` |
+| `lattice evaluate --agent-cmd` | the candidate seat, with the command line split without a shell at `Cli/AgentCommandLine.cs:49`; the child process is launched from `Agents/External/ExternalAgentLaunch.cs:84` |
+| `your agent, any language` | a separate OS process reached only over protocol 1; a CR anywhere in a line is refused as `malformed_json` at `Protocol/ProtocolFraming.cs:65` |
+| `tests + golden fixture` → `CI on 3 operating systems` | the golden-trajectory replay gate runs on every matrix OS at `.github/workflows/ci.yml:42-43`; every committed `site/*.jsonl` is re-verified by the gate at `.github/workflows/ci.yml:221-236` |
+
+The viewer reports what a recording actually supports, and distinguishes the
+three counts that are easy to conflate: `claimed in world`, the observer's own
+`claims seen` (schema 4), and `claims in derived view` where nothing was
+recorded. A frame with no recorded perception reports no count rather than
+inventing one, and zone-table presence follows the painted ego view. The
+detailed table of claim and presence semantics, and the pixel and geometry
+tests that pin them, are in
+[`SUPPORT_AND_REPRODUCIBILITY.md`](SUPPORT_AND_REPRODUCIBILITY.md#viewer-claim-semantics).
+
+## Repository layout
+
+- `Cli/` - the `lattice` command surface: `generate`, `simulate`, `render`,
+  `analyze`, `replay`, `benchmark`, `evaluate`.
+- `Environment/` - the pure step contract: `Simulation`, `PerceptionFilter`,
+  dynamic topology rules.
+- `Generator/` - seeded procedural maps with a caller-supplied fairness gate.
+- `Agents/` - evaluation subjects (MCTS, Scout), the mirrored-seat paired
+  evaluation, and the external-agent match runner.
+- `Protocol/` - the external-agent wire types, a leaf that references nothing in
+  this repository.
+- `Trajectories/` - the JSONL recording model, writer, reader, and replay
+  verifier.
+- `Analytics/` - the benchmark harness and analysis.
+- `Visualization/` - the SVG/ASCII renderer.
+- `Tests/` - unit, determinism, property, and fuzz suites plus the golden
+  fixtures.
+- `benchmarks/` - the committed JSON artifacts every number above comes from.
+- `docs/` - ADRs, the invariant specification, protocols, the findings ledger,
+  and the claim calibration matrix.
+- `examples/` - worked external agents; `examples/python/` is a conformant
+  standard-library agent.
+- `site/` - the browser replay viewer deployed to GitHub Pages; it reads
+  committed `.jsonl` recordings.
+- `ui_tests/` - the tracked Playwright regression for the demo page.
+
+The engine mechanics and their enforcement tests are in
+[`MECHANICS.md`](MECHANICS.md). The command surface is in
+[`CLI.md`](CLI.md).
+
 ## What this subsystem deliberately does not do
 
 - It is not a networking or lockstep-transport layer. Determinism is a

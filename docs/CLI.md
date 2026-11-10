@@ -11,8 +11,29 @@ required flag, a malformed value, an unexpected argument) is `2` and nothing is
 run; everything discovered by touching the filesystem or running the engine (a
 file that is missing or unparseable, a descriptor that fails validation or
 declares something this build cannot run, a replay divergence) is `1`. This page
-is the full flag-by-flag reference; the landing page keeps a
-[compact table](../README.md#reference).
+is the full flag-by-flag reference; the landing page points here from
+[Where to go next](../README.md#where-to-go-next).
+
+## Command summary
+
+| Command | Purpose | Key flags |
+| :--- | :--- | :--- |
+| `generate` | Write a valid seeded map | `--seed`, `--min-fairness`, `--out` |
+| `simulate` | Record an episode as JSONL | `--seed`, `--steps`, `--agent`, `--scenario`, `--rules`, `--out` |
+| `render` | Replay a recording as ASCII or SVG | `--trajectory`, `--format`, `--out` |
+| `analyze` | Report on a recording (contention, pathing, heatmaps) | `--trajectory`, `--out` |
+| `replay` | Replay and optionally verify per-step serialized equivalence and the final summary line | `<file>`, `--verify`, `--out` |
+| `benchmark` | Run the five-case workload matrix | `--runs`, `--warmup`, `--commit`, `--cpu`, `--out` |
+| `evaluate` | Mirror-seated paired MCTS study, or an external agent process | `--seed-set`, `--rollouts`, `--seeds`, `--scenario`, `--out`, `--agent-cmd`, `--agent-step-timeout-ms` |
+| `validate-scenario` | Check a declarative scenario descriptor and print its SHA-256; runs no episode and writes no artifact | `<file>` or `--out <file>` |
+
+`evaluate --agent-cmd "<command line>"` scores an external agent process in place
+of the in-process MCTS candidate, under the same seeds, budget, and statistics;
+a complete conformant agent is in
+[`examples/python/`](../examples/python/README.md). The command line is split
+**without a shell**: unquoted whitespace separates, a double quote groups, a
+backslash escapes only `"` and `\` inside quotes and is an ordinary character
+everywhere else.
 
 Every command in this reference can also be invoked as `lattice <command>` if
 you have installed the CLI into a throwaway local tool path. Version 4.0.0
@@ -21,7 +42,8 @@ package it from this source tree only (`dotnet pack Cli -c Release`, then
 install from that local source into a throwaway `--tool-path` with
 `--version 4.0.0` — never a global `-g` install); published users use the
 `v3.1.0` native binaries from its GitHub Release. See
-[the README](../README.md#published-release-vs-candidate-source-two-different-installs). That
+[INSTALL.md](INSTALL.md) for the full install, packaging, launcher, and
+`DOTNET_ROOT` paths. That
 is the same compiled binary under a launcher name, so the flags, output and exit
 codes below are identical either way; every example on this page uses the
 zero-install `dotnet run --project Cli --` form and stays valid as written.

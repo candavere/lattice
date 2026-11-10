@@ -1,7 +1,7 @@
 # Simulation mechanics
 
 This page is the contract-level detail behind [Determinism and
-seeds](../README.md#determinism-and-seeds) on the landing page. Everything here
+seeds](VERIFICATION.md#determinism-and-seeds) on the verification page. Everything here
 is enforced by tests under
 [`Tests/`](../Tests) and consolidated in
 [`docs/INVARIANT_SPECIFICATION.md`](INVARIANT_SPECIFICATION.md).
